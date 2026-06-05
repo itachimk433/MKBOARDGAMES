@@ -58,13 +58,13 @@ class TicTacToeActivity : AppCompatActivity() {
         root.addView(scoreView, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (48 * dp).toInt()))
 
         try {
-            com.google.android.gms.ads.MobileAds.initialize(this) {}
-            val adView = com.google.android.gms.ads.AdView(this).apply {
-                setAdSize(com.google.android.gms.ads.AdSize.BANNER)
-                adUnitId = "ca-app-pub-3940256099942544/6300978111"
-                loadAd(com.google.android.gms.ads.AdRequest.Builder().build())
+            com.huawei.hms.ads.HwAds.init(this)
+            val bannerView = com.huawei.hms.ads.banner.BannerView(this).apply {
+                adId = "g2jnehr5cv"
+                bannerAdSize = com.huawei.hms.ads.BannerAdSize.BANNER_SIZE_320_50
+                loadAd(com.huawei.hms.ads.AdParam.Builder().build())
             }
-            root.addView(adView, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+            root.addView(bannerView, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         } catch (_: Exception) {}
 
         setContentView(root)
