@@ -14,8 +14,8 @@
         android:supportsRtl="true">
 
         <meta-data
-            android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-117932217"/>
+            android:name="com.huawei.hms.client.appid"
+            android:value="appid=117932217"/>
 
         <activity
             android:name=".MainActivity"

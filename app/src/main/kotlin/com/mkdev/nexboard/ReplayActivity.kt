@@ -23,12 +23,9 @@ import com.mkdev.nexboard.games.tictactoe.TicTacToePiece
 import com.mkdev.nexboard.games.tictactoe.TicTacToeRuleEngine
 import com.mkdev.nexboard.ui.BoardView
 import com.mkdev.nexboard.ui.MorabaraBoardView
-import com.google.android.gms.ads.AdError
-import com.google.android.gms.ads.AdRequest
-import com.google.android.gms.ads.FullScreenContentCallback
-import com.google.android.gms.ads.LoadAdError
-import com.google.android.gms.ads.interstitial.InterstitialAd
-import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
+import com.huawei.hms.ads.AdListener
+import com.huawei.hms.ads.AdParam
+import com.huawei.hms.ads.InterstitialAd
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -113,6 +110,7 @@ class ReplayActivity : AppCompatActivity() {
 
     // ─── Ads ─────────────────────────────────────────────────────────────────
     private var interstitialAd: InterstitialAd? = null
+    private var shouldFinishOnAdClose = false
     private var entryTimeMs = 0L
     private val minAdIntervalMs = 2 * 60 * 1000L   // show ad only if ≥ 2 min elapsed
 
@@ -289,28 +287,23 @@ class ReplayActivity : AppCompatActivity() {
     // ─── Ad helpers ───────────────────────────────────────────────────────────
 
     private fun loadInterstitial() {
-        val req = AdRequest.Builder().build()
-        InterstitialAd.load(
-            this,
-            "ca-app-pub-117932217/v1nyf9xhiq",
-            req,
-            object : InterstitialAdLoadCallback() {
-                override fun onAdLoaded(ad: InterstitialAd) { interstitialAd = ad }
-                override fun onAdFailedToLoad(e: LoadAdError) { interstitialAd = null }
-            }
-        )
+        val ad = InterstitialAd(this)
+        ad.adId = "v1nyf9xhiq"
+        ad.adListener = object : AdListener() {
+            override fun onAdLoaded() { interstitialAd = ad }
+            override fun onAdFailed(errorCode: Int) { interstitialAd = null }
+            override fun onAdClosed() { if (shouldFinishOnAdClose) finish() }
+        }
+        ad.loadAd(AdParam.Builder().build())
     }
 
     private fun showAdThenFinish() {
         stopAutoPlay()
         val ad = interstitialAd
         val elapsed = System.currentTimeMillis() - entryTimeMs
-        if (ad != null && elapsed >= minAdIntervalMs) {
-            ad.fullScreenContentCallback = object : FullScreenContentCallback() {
-                override fun onAdDismissedFullScreenContent() { finish() }
-                override fun onAdFailedToShowFullScreenContent(e: AdError) { finish() }
-            }
-            ad.show(this)
+        if (ad != null && ad.isLoaded && elapsed >= minAdIntervalMs) {
+            shouldFinishOnAdClose = true
+            try { ad.show(this) } catch (_: Exception) { finish() }
         } else {
             finish()
         }

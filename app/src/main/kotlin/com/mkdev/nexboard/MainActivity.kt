@@ -43,13 +43,13 @@ class MainActivity : AppCompatActivity() {
         root.addView(menu, android.widget.LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, 0).apply { weight = 1f })
         try {
-            com.google.android.gms.ads.MobileAds.initialize(this) {}
-            val adView = com.google.android.gms.ads.AdView(this).apply {
-                setAdSize(com.google.android.gms.ads.AdSize.BANNER)
-                adUnitId = "ca-app-pub-117932217/g2jnehr5cv"
-                loadAd(com.google.android.gms.ads.AdRequest.Builder().build())
+            com.huawei.hms.ads.HwAds.init(this)
+            val bannerView = com.huawei.hms.ads.banner.BannerView(this).apply {
+                adId = "g2jnehr5cv"
+                bannerAdSize = com.huawei.hms.ads.BannerAdSize.BANNER_SIZE_320_50
+                loadAd(com.huawei.hms.ads.AdParam.Builder().build())
             }
-            root.addView(adView, android.widget.LinearLayout.LayoutParams(
+            root.addView(bannerView, android.widget.LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         } catch (_: Exception) {}
         setContentView(root)
