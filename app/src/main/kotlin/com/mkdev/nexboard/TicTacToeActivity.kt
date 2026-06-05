@@ -57,17 +57,18 @@ class TicTacToeActivity : AppCompatActivity() {
         root.addView(boardView, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0).apply { weight = 1f })
         root.addView(scoreView, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (48 * dp).toInt()))
 
+        var bannerView: com.huawei.hms.ads.banner.BannerView? = null
         try {
             com.huawei.hms.ads.HwAds.init(this)
-            val bannerView = com.huawei.hms.ads.banner.BannerView(this).apply {
+            bannerView = com.huawei.hms.ads.banner.BannerView(this).apply {
                 adId = "g2jnehr5cv"
                 bannerAdSize = com.huawei.hms.ads.BannerAdSize.BANNER_SIZE_320_50
-                loadAd(com.huawei.hms.ads.AdParam.Builder().build())
             }
             root.addView(bannerView, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         } catch (_: Exception) {}
 
         setContentView(root)
+        bannerView?.loadAd(com.huawei.hms.ads.AdParam.Builder().build())
 
         @Suppress("DEPRECATION")
         window.decorView.setOnSystemUiVisibilityChangeListener { vis ->

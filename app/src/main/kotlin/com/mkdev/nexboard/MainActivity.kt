@@ -42,17 +42,18 @@ class MainActivity : AppCompatActivity() {
         }
         root.addView(menu, android.widget.LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, 0).apply { weight = 1f })
+        var bannerView: com.huawei.hms.ads.banner.BannerView? = null
         try {
             com.huawei.hms.ads.HwAds.init(this)
-            val bannerView = com.huawei.hms.ads.banner.BannerView(this).apply {
+            bannerView = com.huawei.hms.ads.banner.BannerView(this).apply {
                 adId = "g2jnehr5cv"
                 bannerAdSize = com.huawei.hms.ads.BannerAdSize.BANNER_SIZE_320_50
-                loadAd(com.huawei.hms.ads.AdParam.Builder().build())
             }
             root.addView(bannerView, android.widget.LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         } catch (_: Exception) {}
         setContentView(root)
+        bannerView?.loadAd(com.huawei.hms.ads.AdParam.Builder().build())
 
         if (!SettingsManager.hasConsentAccepted(this)) showConsentDialog()
 

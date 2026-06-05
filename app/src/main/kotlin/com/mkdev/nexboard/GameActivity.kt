@@ -86,18 +86,19 @@ class GameActivity : AppCompatActivity() {
         topCaptureView.visibility    = if (showCaptures) View.VISIBLE else View.GONE
         bottomCaptureView.visibility = if (showCaptures) View.VISIBLE else View.GONE
 
+        var bannerView: com.huawei.hms.ads.banner.BannerView? = null
         try {
             com.huawei.hms.ads.HwAds.init(this)
-            val bannerView = com.huawei.hms.ads.banner.BannerView(this).apply {
+            bannerView = com.huawei.hms.ads.banner.BannerView(this).apply {
                 adId = "g2jnehr5cv"
                 bannerAdSize = com.huawei.hms.ads.BannerAdSize.BANNER_SIZE_320_50
-                loadAd(com.huawei.hms.ads.AdParam.Builder().build())
             }
             container.addView(bannerView,
                 android.widget.LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         } catch (_: Exception) {}
 
         setContentView(container)
+        bannerView?.loadAd(com.huawei.hms.ads.AdParam.Builder().build())
 
         @Suppress("DEPRECATION")
         window.decorView.setOnSystemUiVisibilityChangeListener { vis ->
