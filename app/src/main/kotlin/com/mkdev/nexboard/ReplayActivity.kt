@@ -1,0 +1,681 @@
+package com.mkdev.nexboard
+
+import android.animation.ValueAnimator
+import android.content.Context
+import android.graphics.*
+import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.view.*
+import android.view.animation.OvershootInterpolator
+import android.widget.*
+import androidx.appcompat.app.AppCompatActivity
+import com.mkdev.nexboard.engine.*
+import com.mkdev.nexboard.games.checkers.CheckersPiece
+import com.mkdev.nexboard.games.checkers.CheckersRuleEngine
+import com.mkdev.nexboard.games.chess.ChessPiece
+import com.mkdev.nexboard.games.chess.ChessRuleEngine
+import com.mkdev.nexboard.games.morabaraba.MorabarabaRuleEngine
+import com.mkdev.nexboard.games.tictactoe.TicTacToePiece
+import com.mkdev.nexboard.games.tictactoe.TicTacToeRuleEngine
+import com.mkdev.nexboard.ui.BoardView
+import com.mkdev.nexboard.ui.MorabaraBoardView
+import com.google.android.gms.ads.AdError
+import com.google.android.gms.ads.AdRequest
+import com.google.android.gms.ads.FullScreenContentCallback
+import com.google.android.gms.ads.LoadAdError
+import com.google.android.gms.ads.interstitial.InterstitialAd
+import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
+import org.json.JSONArray
+import org.json.JSONObject
+
+class ReplayActivity : AppCompatActivity() {
+
+    companion object {
+        const val EXTRA_MOVES_JSON = "moves_json"
+        const val EXTRA_GAME_TYPE  = "game_type"
+        const val EXTRA_RESULT     = "game_result"
+        const val EXTRA_BOARD_SIZE = "board_size"   // for TicTacToe
+
+        fun buildMovesJson(moves: List<Move>): String {
+            val arr = JSONArray()
+            for (m in moves) {
+                val obj = JSONObject()
+                obj.put("fr", m.from.row); obj.put("fc", m.from.col)
+                obj.put("tr", m.to.row);   obj.put("tc", m.to.col)
+                if (m.captures.isNotEmpty()) {
+                    val caps = JSONArray()
+                    for (c in m.captures) {
+                        val cobj = JSONObject(); cobj.put("r", c.row); cobj.put("c", c.col)
+                        caps.put(cobj)
+                    }
+                    obj.put("caps", caps)
+                }
+                if (m.promotionType != null) obj.put("promo", m.promotionType)
+                arr.put(obj)
+            }
+            return arr.toString()
+        }
+
+        private fun parseMoves(json: String): List<Move> {
+            val arr  = JSONArray(json)
+            val list = mutableListOf<Move>()
+            for (i in 0 until arr.length()) {
+                val obj   = arr.getJSONObject(i)
+                val from  = Position(obj.getInt("fr"), obj.getInt("fc"))
+                val to    = Position(obj.getInt("tr"), obj.getInt("tc"))
+                val caps  = mutableListOf<Position>()
+                if (obj.has("caps")) {
+                    val ca = obj.getJSONArray("caps")
+                    for (j in 0 until ca.length()) {
+                        val c = ca.getJSONObject(j)
+                        caps += Position(c.getInt("r"), c.getInt("c"))
+                    }
+                }
+                val promo = if (obj.has("promo")) obj.getString("promo") else null
+                list += Move(from, to, caps, promo)
+            }
+            return list
+        }
+    }
+
+    // ─── Data ─────────────────────────────────────────────────────────────────
+
+    data class CaptureSnapshot(
+        val byWhite: List<Piece>,   // pieces WHITE captured  (are BLACK pieces)
+        val byBlack: List<Piece>    // pieces BLACK captured  (are WHITE pieces)
+    )
+
+    // ─── Views ────────────────────────────────────────────────────────────────
+
+    private var boardView:     BoardView?          = null
+    private var ticBoardView:  TicReplayBoard?     = null
+    private var moraBoardView: MorabaraBoardView?  = null
+    private lateinit var seekBar:      SeekBar
+    private lateinit var controlsView: ReplayControlsView
+    private lateinit var infoView:     ReplayInfoView
+    private lateinit var captureView:  ReplayCaptureView
+
+    // ─── State ────────────────────────────────────────────────────────────────
+
+    private var states:           List<GameState>       = emptyList()
+    private var moves:            List<Move>            = emptyList()
+    private var moveLabels:       List<String>          = emptyList()
+    private var captureSnapshots: List<CaptureSnapshot> = emptyList()
+    private var cursor     = 0
+    private var isPlaying  = false
+    private val handler    = Handler(Looper.getMainLooper())
+    private var resultText = ""
+    private var gameType   = "CHESS"
+
+    // ─── Ads ─────────────────────────────────────────────────────────────────
+    private var interstitialAd: InterstitialAd? = null
+    private var entryTimeMs = 0L
+    private val minAdIntervalMs = 2 * 60 * 1000L   // show ad only if ≥ 2 min elapsed
+
+    // ─── Speed ────────────────────────────────────────────────────────────────
+
+    private val speedMs    = intArrayOf(4000, 2000, 1000)
+    val         speedLabel = arrayOf("1×", "2×", "4×")
+    private var speedIdx   = 2
+    private val autoDelay  get() = speedMs[speedIdx]
+
+    fun cycleSpeed() {
+        speedIdx = (speedIdx + 1) % speedMs.size
+        infoView.invalidate()
+    }
+
+    // ─── Auto-play ────────────────────────────────────────────────────────────
+
+    private val autoPlayRunnable = object : Runnable {
+        override fun run() {
+            if (cursor < states.lastIndex) {
+                stepTo(cursor + 1, animate = true)
+                handler.postDelayed(this, autoDelay.toLong())
+            } else {
+                isPlaying = false
+                controlsView.invalidate()
+            }
+        }
+    }
+
+    // ─── Lifecycle ────────────────────────────────────────────────────────────
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        makeFullscreen()
+
+        gameType          = intent.getStringExtra(EXTRA_GAME_TYPE)  ?: "CHESS"
+        val movesJson     = intent.getStringExtra(EXTRA_MOVES_JSON) ?: "[]"
+        resultText        = intent.getStringExtra(EXTRA_RESULT)     ?: ""
+        val ticBoardSize  = intent.getIntExtra(EXTRA_BOARD_SIZE, 3)
+
+        val isTicTacToe  = gameType == "TICTACTOE"
+        val isMorabaraba = gameType == "MORABARABA"
+
+        val engine: RuleEngine = when (gameType) {
+            "TICTACTOE"  -> TicTacToeRuleEngine(ticBoardSize, ticBoardSize)
+            "CHECKERS"   -> CheckersRuleEngine()
+            "MORABARABA" -> MorabarabaRuleEngine()
+            else         -> ChessRuleEngine()
+        }
+
+        // Reconstruct every board state from the move list
+        moves = parseMoves(movesJson)
+        val allStates  = mutableListOf(engine.initialState())
+        val allLabels  = mutableListOf("Start")
+        for ((idx, move) in moves.withIndex()) {
+            val color = if (idx % 2 == 0) "White" else "Black"
+            allStates += engine.applyMove(allStates.last(), move)
+            allLabels += "${idx / 2 + 1}. $color"
+        }
+        states     = allStates
+        moveLabels = allLabels
+
+        // Build per-state capture snapshots (not meaningful for TicTacToe or Othello)
+        val hasCaptures = !isTicTacToe && gameType != "OTHELLO"
+        val snaps = mutableListOf(CaptureSnapshot(emptyList(), emptyList()))
+        if (hasCaptures) {
+            for ((idx, move) in moves.withIndex()) {
+                val prevState  = states[idx]
+                val prev       = snaps.last()
+                val moverColor = if (isMorabaraba) prevState.currentTurn
+                                 else prevState.get(move.from)?.color ?: prevState.currentTurn
+
+                val byWhite = prev.byWhite.toMutableList()
+                val byBlack = prev.byBlack.toMutableList()
+                for (pos in move.captures) {
+                    val captured = prevState.get(pos) ?: continue
+                    // White captures → black pieces go to byWhite (bottom strip)
+                    // Black captures → white pieces go to byBlack (top strip)
+                    if (moverColor == PieceColor.WHITE) byWhite += captured
+                    else                                byBlack += captured
+                }
+                snaps += CaptureSnapshot(
+                    byWhite.sortedByDescending { it.value() },
+                    byBlack.sortedByDescending { it.value() }
+                )
+            }
+        } else {
+            repeat(moves.size) { snaps += CaptureSnapshot(emptyList(), emptyList()) }
+        }
+        captureSnapshots = snaps
+
+        // ── Build UI ────────────────────────────────────────────────────────
+        val dp   = resources.displayMetrics.density
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.parseColor("#121212"))
+        }
+
+        infoView     = ReplayInfoView(this)
+        captureView  = ReplayCaptureView(this, gameType)
+        seekBar      = SeekBar(this).apply {
+            max      = (states.size - 1).coerceAtLeast(1)
+            progress = 0
+            progressTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#7FC8F8"))
+            thumbTintList    = android.content.res.ColorStateList.valueOf(Color.parseColor("#7FC8F8"))
+            val vp = (10 * dp).toInt(); val hp = (16 * dp).toInt()
+            setPadding(hp, vp, hp, vp)
+        }
+        controlsView = ReplayControlsView(this)
+
+        root.addView(infoView, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (60 * dp).toInt()))
+
+        when {
+            isTicTacToe -> {
+                val tbv = TicReplayBoard(this, ticBoardSize, engine as TicTacToeRuleEngine)
+                ticBoardView = tbv
+                root.addView(tbv, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0).apply { weight = 1f })
+            }
+            isMorabaraba -> {
+                val mbv = MorabaraBoardView(this).apply {
+                    ruleEngine  = engine as MorabarabaRuleEngine
+                    gameState   = states.first()
+                    isLocked    = true
+                    onMoveMade  = null
+                }
+                moraBoardView = mbv
+                root.addView(mbv, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0).apply { weight = 1f })
+            }
+            else -> {
+                val bv = BoardView(this).apply { isLocked = true; ruleEngine = engine }
+                boardView = bv
+                root.addView(bv, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0).apply { weight = 1f })
+            }
+        }
+
+        // Hide capture strip for TicTacToe (no captures) and Othello
+        val showCaptures = hasCaptures
+        captureView.visibility = if (showCaptures) View.VISIBLE else View.GONE
+        root.addView(captureView, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (48 * dp).toInt()))
+
+        root.addView(seekBar,      LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (52 * dp).toInt()))
+        root.addView(controlsView, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (72 * dp).toInt()))
+
+        setContentView(root)
+
+        seekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(sb: SeekBar, p: Int, fromUser: Boolean) {
+                if (fromUser) { stopAutoPlay(); stepTo(p) }
+            }
+            override fun onStartTrackingTouch(sb: SeekBar) = stopAutoPlay()
+            override fun onStopTrackingTouch(sb: SeekBar) {}
+        })
+
+        stepTo(0)
+        entryTimeMs = System.currentTimeMillis()
+        loadInterstitial()
+    }
+
+    // ─── Ad helpers ───────────────────────────────────────────────────────────
+
+    private fun loadInterstitial() {
+        val req = AdRequest.Builder().build()
+        InterstitialAd.load(
+            this,
+            "ca-app-pub-3940256099942544/1033173712",  // AdMob test interstitial unit
+            req,
+            object : InterstitialAdLoadCallback() {
+                override fun onAdLoaded(ad: InterstitialAd) { interstitialAd = ad }
+                override fun onAdFailedToLoad(e: LoadAdError) { interstitialAd = null }
+            }
+        )
+    }
+
+    private fun showAdThenFinish() {
+        stopAutoPlay()
+        val ad = interstitialAd
+        val elapsed = System.currentTimeMillis() - entryTimeMs
+        if (ad != null && elapsed >= minAdIntervalMs) {
+            ad.fullScreenContentCallback = object : FullScreenContentCallback() {
+                override fun onAdDismissedFullScreenContent() { finish() }
+                override fun onAdFailedToShowFullScreenContent(e: AdError) { finish() }
+            }
+            ad.show(this)
+        } else {
+            finish()
+        }
+    }
+
+    // ─── Navigation ───────────────────────────────────────────────────────────
+
+    private fun stepTo(idx: Int, animate: Boolean = false) {
+        val newCursor = idx.coerceIn(0, states.lastIndex)
+
+        if (animate && newCursor == cursor + 1 && cursor < moves.size) {
+            val move  = moves[cursor]
+            cursor    = newCursor
+
+            seekBar.progress = cursor
+            val label = moveLabels.getOrElse(cursor) { "Move $cursor" }
+            infoView.update(label, cursor, states.size - 1, resultText)
+            captureView.update(captureSnapshots.getOrNull(cursor) ?: CaptureSnapshot(emptyList(), emptyList()))
+            controlsView.invalidate()
+
+            boardView?.let { bv ->
+                bv.gameState = states[cursor - 1]
+                bv.onMoveMade = {
+                    bv.onMoveMade = null
+                    bv.gameState  = states[cursor]
+                    bv.isLocked   = true
+                }
+                bv.animateExternalMove(move)
+            }
+            ticBoardView?.showState(states[cursor])
+            moraBoardView?.let { mbv ->
+                mbv.gameState = states[cursor - 1]
+                mbv.isLocked  = true
+                mbv.onMoveMade = {
+                    mbv.onMoveMade = null
+                    mbv.gameState  = states[cursor]
+                    mbv.isLocked   = true
+                }
+                mbv.animateExternalMove(move)
+            }
+        } else {
+            cursor              = newCursor
+            boardView?.let { it.gameState = states[cursor]; it.isLocked = true }
+            ticBoardView?.showState(states[cursor])
+            moraBoardView?.let { it.gameState = states[cursor]; it.isLocked = true }
+            seekBar.progress    = cursor
+            val label = moveLabels.getOrElse(cursor) { "Move $cursor" }
+            infoView.update(label, cursor, states.size - 1, resultText)
+            captureView.update(captureSnapshots.getOrNull(cursor) ?: CaptureSnapshot(emptyList(), emptyList()))
+            controlsView.invalidate()
+        }
+    }
+
+    fun onFirst()  { stopAutoPlay(); stepTo(0) }
+    fun onPrev()   { stopAutoPlay(); stepTo(cursor - 1) }
+    fun onNext()   { stopAutoPlay(); stepTo(cursor + 1, animate = true) }
+    fun onLast()   { stopAutoPlay(); stepTo(states.lastIndex) }
+
+    fun onTogglePlay() {
+        if (isPlaying) stopAutoPlay()
+        else {
+            if (cursor >= states.lastIndex) stepTo(0)
+            isPlaying = true
+            controlsView.invalidate()
+            handler.postDelayed(autoPlayRunnable, 200)
+        }
+    }
+
+    private fun stopAutoPlay() {
+        isPlaying = false
+        handler.removeCallbacks(autoPlayRunnable)
+        controlsView.invalidate()
+    }
+
+    override fun onDestroy() { super.onDestroy(); stopAutoPlay() }
+
+    @Deprecated("Deprecated in Java")
+    override fun onBackPressed() { showAdThenFinish() }
+
+    override fun onResume()                          { super.onResume(); makeFullscreen() }
+    override fun onWindowFocusChanged(h: Boolean) { super.onWindowFocusChanged(h); if (h) makeFullscreen() }
+
+    private fun makeFullscreen() {
+        @Suppress("DEPRECATION")
+        window.decorView.systemUiVisibility = (
+            View.SYSTEM_UI_FLAG_LAYOUT_STABLE or View.SYSTEM_UI_FLAG_FULLSCREEN
+            or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+            or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+        )
+    }
+
+    // ─── TicTacToe replay board ───────────────────────────────────────────────
+
+    inner class TicReplayBoard(
+        ctx: Context,
+        private val bs: Int,
+        private val ticEngine: TicTacToeRuleEngine
+    ) : View(ctx) {
+
+        private var state     = ticEngine.initialState()
+        private var prevState = ticEngine.initialState()
+        private var winLine:  List<Int>? = null
+        private val cellScale = HashMap<Int, Float>()
+
+        private val dp = resources.displayMetrics.density
+        private var boardLeft = 0f; private var boardTop = 0f; private var cellSize = 0f
+
+        private val bgP   = Paint().apply { color = Color.parseColor("#121212") }
+        private val lineP = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#383838"); style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND
+        }
+        private val xP    = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#EF5350"); style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND
+        }
+        private val oP    = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#7FC8F8"); style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND
+        }
+        private val winP  = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND
+        }
+
+        override fun onSizeChanged(w: Int, h: Int, ow: Int, oh: Int) {
+            if (w <= 0 || h <= 0) return
+            val pad  = 24f * dp
+            val size = minOf(w - pad * 2, h - pad * 2)
+            cellSize  = size / bs.toFloat()
+            boardLeft = (w - size) / 2f
+            boardTop  = (h - size) / 2f
+            lineP.strokeWidth = maxOf(cellSize * 0.022f, 2f)
+            xP.strokeWidth    = cellSize * 0.085f
+            oP.strokeWidth    = cellSize * 0.085f
+            winP.strokeWidth  = cellSize * 0.05f
+        }
+
+        fun showState(newState: GameState) {
+            val old = prevState
+            prevState = newState
+            state     = newState
+            winLine   = ticEngine.winningLine(newState)
+
+            // Find any newly placed piece and animate it with an overshoot pop-in
+            for (idx in 0 until bs * bs) {
+                if (old.board[idx] == null && newState.board[idx] != null) {
+                    cellScale[idx] = 0f
+                    ValueAnimator.ofFloat(0f, 1f).apply {
+                        duration     = 220L
+                        interpolator = OvershootInterpolator(1.6f)
+                        addUpdateListener { cellScale[idx] = it.animatedValue as Float; invalidate() }
+                        start()
+                    }
+                    return   // only one piece placed per move
+                }
+            }
+            invalidate()
+        }
+
+        override fun onDraw(canvas: Canvas) {
+            canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgP)
+            if (cellSize <= 0f) return
+            drawGrid(canvas); drawPieces(canvas); drawWinLine(canvas)
+        }
+
+        private fun drawGrid(canvas: Canvas) {
+            val right  = boardLeft + bs * cellSize
+            val bottom = boardTop  + bs * cellSize
+            for (i in 1 until bs) {
+                canvas.drawLine(boardLeft + i * cellSize, boardTop, boardLeft + i * cellSize, bottom, lineP)
+                canvas.drawLine(boardLeft, boardTop + i * cellSize, right, boardTop + i * cellSize, lineP)
+            }
+        }
+
+        private fun drawPieces(canvas: Canvas) {
+            for (row in 0 until bs) for (col in 0 until bs) {
+                val piece = state.get(row, col) as? TicTacToePiece ?: continue
+                val idx   = row * bs + col
+                val scale = cellScale[idx] ?: 1f
+                val cx = boardLeft + col * cellSize + cellSize / 2f
+                val cy = boardTop  + row * cellSize + cellSize / 2f
+                val r  = cellSize * 0.29f * scale
+                if (piece.color == PieceColor.WHITE) {
+                    canvas.drawLine(cx - r, cy - r, cx + r, cy + r, xP)
+                    canvas.drawLine(cx + r, cy - r, cx - r, cy + r, xP)
+                } else {
+                    canvas.drawCircle(cx, cy, r, oP)
+                }
+            }
+        }
+
+        private fun drawWinLine(canvas: Canvas) {
+            val line = winLine ?: return
+            val color = (state.board[line.first()] as? TicTacToePiece)?.color
+            winP.color = if (color == PieceColor.WHITE) Color.parseColor("#EF5350")
+                         else Color.parseColor("#7FC8F8")
+            winP.alpha = 220
+            val ax = boardLeft + (line.first() % bs) * cellSize + cellSize / 2f
+            val ay = boardTop  + (line.first() / bs) * cellSize + cellSize / 2f
+            val bx = boardLeft + (line.last()  % bs) * cellSize + cellSize / 2f
+            val by = boardTop  + (line.last()  / bs) * cellSize + cellSize / 2f
+            canvas.drawLine(ax, ay, bx, by, winP)
+        }
+    }
+
+    // ─── Info header ─────────────────────────────────────────────────────────
+
+    inner class ReplayInfoView(ctx: Context) : View(ctx) {
+        private val dp = resources.displayMetrics.density
+        private val sp = resources.displayMetrics.scaledDensity
+        private val bgP  = Paint().apply { color = Color.parseColor("#1A1A1A") }
+        private val divP = Paint().apply { color = Color.parseColor("#2A2A2A") }
+        private val txtP = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE; textAlign = Paint.Align.CENTER
+            isFakeBoldText = true; textSize = 15f * sp.coerceAtMost(3f)
+        }
+        private val subP = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#7FC8F8"); textAlign = Paint.Align.CENTER
+            textSize = 13f * sp.coerceAtMost(3f)
+        }
+        private val btnP = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#7FC8F8"); textAlign = Paint.Align.CENTER
+            textSize = 14f * sp.coerceAtMost(3f)
+        }
+        private val btnBgP = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#252525") }
+
+        private val backRect  = RectF()
+        private val speedRect = RectF()
+
+        private var label = "Replay"; var moveNum = 0; var totalMoves = 0; var result = ""
+
+        fun update(l: String, m: Int, t: Int, r: String) {
+            label = l; moveNum = m; totalMoves = t; result = r; invalidate()
+        }
+
+        override fun onSizeChanged(w: Int, h: Int, ow: Int, oh: Int) {
+            val bw = 60f * dp; val bh = 32f * dp; val by = (h - bh) / 2f
+            backRect.set(8f * dp, by, 8f * dp + bw, by + bh)
+            speedRect.set(w - 8f * dp - bw, by, w - 8f * dp, by + bh)
+        }
+
+        override fun onTouchEvent(e: MotionEvent): Boolean {
+            if (e.action == MotionEvent.ACTION_UP) {
+                if (backRect.contains(e.x, e.y))  { showAdThenFinish(); return true }
+                if (speedRect.contains(e.x, e.y)) { cycleSpeed(); return true }
+            }
+            return true
+        }
+
+        override fun onDraw(canvas: Canvas) {
+            val w = width.toFloat(); val h = height.toFloat()
+            canvas.drawRect(0f, 0f, w, h, bgP)
+            canvas.drawRect(0f, h - dp, w, h, divP)
+            val rr = 6f * dp
+
+            canvas.drawRoundRect(backRect, rr, rr, btnBgP)
+            canvas.drawText("← Back", backRect.centerX(), backRect.centerY() + btnP.textSize * 0.36f, btnP)
+
+            canvas.drawRoundRect(speedRect, rr, rr, btnBgP)
+            canvas.drawText(speedLabel[speedIdx], speedRect.centerX(), speedRect.centerY() + btnP.textSize * 0.36f, btnP)
+
+            val cx = w / 2f
+            canvas.drawText(if (moveNum == 0) "Start" else label,
+                cx, h / 2f - txtP.textSize * 0.55f, txtP)
+            val sub = if (result.isNotEmpty() && moveNum == totalMoves) result
+                      else "Move $moveNum / $totalMoves"
+            canvas.drawText(sub, cx, h / 2f + subP.textSize * 0.80f, subP)
+        }
+    }
+
+    // ─── Captured Pieces Panel ────────────────────────────────────────────────
+
+    inner class ReplayCaptureView(ctx: Context, private val gameType: String) : View(ctx) {
+        private val dp = resources.displayMetrics.density
+        private val sp = resources.displayMetrics.scaledDensity
+
+        private val bgP   = Paint().apply { color = Color.parseColor("#1A1A1A") }
+        private val divP  = Paint().apply { color = Color.parseColor("#2A2A2A") }
+        private val lblP  = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#666666"); textAlign = Paint.Align.LEFT
+        }
+        private val pieceP = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
+
+        private var snapshot = CaptureSnapshot(emptyList(), emptyList())
+
+        fun update(s: CaptureSnapshot) { snapshot = s; invalidate() }
+
+        override fun onDraw(canvas: Canvas) {
+            val w = width.toFloat(); val h = height.toFloat()
+            canvas.drawRect(0f, 0f, w, h, bgP)
+            canvas.drawRect(0f, 0f, w, dp, divP)
+
+            val half  = w / 2f
+            canvas.drawRect(half - dp / 2f, 6f * dp, half + dp / 2f, h - 6f * dp, divP)
+
+            lblP.textSize  = 9f * sp.coerceAtMost(3f)
+            pieceP.textSize = h * 0.44f
+            val labelY  = lblP.textSize + 4f * dp
+            val pieceY  = h * 0.72f
+            val padStart = 8f * dp
+            val gap      = pieceP.textSize * 0.80f
+
+            // LEFT: White's captures — pieces White took (they are Black pieces)
+            canvas.drawText("White ⚔", padStart, labelY, lblP)
+            var x = padStart + gap / 2f
+            for (piece in snapshot.byWhite) {
+                pieceP.color = pieceColor(piece)
+                canvas.drawText(piece.symbol(), x, pieceY, pieceP)
+                x += gap
+                if (x > half - gap / 2f) break
+            }
+
+            // RIGHT: Black's captures — pieces Black took (they are White pieces)
+            lblP.textAlign = Paint.Align.RIGHT
+            canvas.drawText("Black ⚔", w - padStart, labelY, lblP)
+            lblP.textAlign = Paint.Align.LEFT
+            var rx = half + padStart + gap / 2f
+            for (piece in snapshot.byBlack) {
+                pieceP.color = pieceColor(piece)
+                canvas.drawText(piece.symbol(), rx, pieceY, pieceP)
+                rx += gap
+                if (rx > w - gap / 2f) break
+            }
+        }
+
+        /**
+         * Render each captured piece in its own color so White pieces show cream
+         * and Black pieces show grey — matching how they appear on the board.
+         */
+        private fun pieceColor(piece: Piece): Int = when (piece) {
+            is ChessPiece    -> if (piece.color == PieceColor.WHITE) Color.parseColor("#F5F5F5")
+                                else Color.parseColor("#9E9E9E")
+            is CheckersPiece -> if (piece.color == PieceColor.WHITE) Color.parseColor("#E0E0E0")
+                                else Color.parseColor("#757575")
+            else             -> Color.parseColor("#AAAAAA")
+        }
+    }
+
+    // ─── Controls ────────────────────────────────────────────────────────────
+
+    inner class ReplayControlsView(ctx: Context) : View(ctx) {
+        private val dp = resources.displayMetrics.density
+        private val sp = resources.displayMetrics.scaledDensity
+        private val bgP  = Paint().apply { color = Color.parseColor("#1A1A1A") }
+        private val divP = Paint().apply { color = Color.parseColor("#2A2A2A") }
+        private val btnP = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#252525") }
+        private val actP = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#7FC8F8"); textAlign = Paint.Align.CENTER
+            textSize = 18f * sp.coerceAtMost(3f)
+        }
+        private val dimP = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#444444"); textAlign = Paint.Align.CENTER
+            textSize = 18f * sp.coerceAtMost(3f)
+        }
+
+        private val rects   = Array(5) { RectF() }
+        private val labels  = arrayOf("⏮", "◀", "⏯", "▶", "⏭")
+        private val actions : Array<() -> Unit> = arrayOf(
+            { onFirst() }, { onPrev() }, { onTogglePlay() }, { onNext() }, { onLast() }
+        )
+
+        override fun onSizeChanged(w: Int, h: Int, ow: Int, oh: Int) {
+            val bw = (w - 60f * dp) / 5f
+            val bh = 44f * dp; val by = (h - bh) / 2f
+            for (i in 0..4) rects[i].set(10f * dp + i * bw, by, 10f * dp + (i + 1) * bw - 6f * dp, by + bh)
+        }
+
+        override fun onTouchEvent(e: MotionEvent): Boolean {
+            if (e.action == MotionEvent.ACTION_UP)
+                for ((i, r) in rects.withIndex()) if (r.contains(e.x, e.y)) { actions[i](); break }
+            return true
+        }
+
+        override fun onDraw(canvas: Canvas) {
+            val w = width.toFloat(); val h = height.toFloat()
+            canvas.drawRect(0f, 0f, w, h, bgP)
+            canvas.drawRect(0f, 0f, w, dp, divP)
+            val rr = 8f * dp
+            for ((i, r) in rects.withIndex()) {
+                canvas.drawRoundRect(r, rr, rr, btnP)
+                val lbl = if (i == 2 && isPlaying) "⏸" else labels[i]
+                val dimmed = (i == 0 || i == 1) && cursor == 0 ||
+                             (i == 3 || i == 4) && cursor == states.lastIndex
+                val p = if (dimmed) dimP else actP
+                canvas.drawText(lbl, r.centerX(), r.centerY() + p.textSize * 0.36f, p)
+            }
+        }
+    }
+}

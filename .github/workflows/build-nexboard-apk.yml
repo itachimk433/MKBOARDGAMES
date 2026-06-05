@@ -46,10 +46,19 @@ jobs:
       - name: Decode signing keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
         run: |
           if [ -n "$KEYSTORE_BASE64" ]; then
             echo "$KEYSTORE_BASE64" | base64 --decode > app/release.keystore
             echo "HAS_KEYSTORE=true" >> "$GITHUB_ENV"
+            echo "=== Release Certificate Fingerprints ==="
+            keytool -list -v \
+              -keystore app/release.keystore \
+              -alias "$KEY_ALIAS" \
+              -storepass "$STORE_PASSWORD" \
+              -storetype PKCS12 2>/dev/null \
+              | grep -E "SHA1|SHA256|MD5"
           else
             echo "HAS_KEYSTORE=false" >> "$GITHUB_ENV"
           fi
