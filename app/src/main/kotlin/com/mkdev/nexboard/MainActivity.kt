@@ -343,7 +343,7 @@ class MainActivity : AppCompatActivity() {
         content.addView(txt("NexBoard 不收集任何个人数据。游戏统计数据（胜负/平局）仅存储在您的本地设备上，不会上传至外部服务器。"))
         content.addView(txt("\n广告说明：我们通过 Google AdMob 和华为花瓣广告（HMS）展示广告。这些广告网络可能依据各自隐私政策收集设备标识符和使用数据。您可在设备设置 \u203a 隐私 \u203a 广告中关闭个性化广告。"))
         content.addView(txt("\n权限说明：网络访问权限（广告）；网络状态权限（广告）；振动权限（游戏触觉反馈）。"))
-        content.addView(txt("\n服务条款：请合法使用本应用。本应用按"现状"提供，不附任何保证。继续使用即表示您接受上述条款。"))
+        content.addView(txt("\n服务条款：请合法使用本应用。本应用按\"现状\"提供，不附任何保证。继续使用即表示您接受上述条款。"))
         content.addView(txt("\n联系方式：makhanyabanele12@gmail.com", colorHex = "#888888"))
 
         // ─ Full policy link ───────────────────────────────────────────────────
