@@ -292,7 +292,7 @@ class ReplayActivity : AppCompatActivity() {
         val req = AdRequest.Builder().build()
         InterstitialAd.load(
             this,
-            "ca-app-pub-3940256099942544/1033173712",  // AdMob test interstitial unit
+            "ca-app-pub-117932217/v1nyf9xhiq",
             req,
             object : InterstitialAdLoadCallback() {
                 override fun onAdLoaded(ad: InterstitialAd) { interstitialAd = ad }

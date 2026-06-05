@@ -64,6 +64,10 @@ class MenuView(context: Context) : View(context) {
         color = Color.parseColor("#555555"); textAlign = Paint.Align.CENTER
         textSize = 10f * sp.coerceAtMost(3f)
     }
+    private val versionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#555555"); textAlign = Paint.Align.LEFT
+        textSize = 10f * sp.coerceAtMost(3f)
+    }
     private val gearIconPaint  = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#7FC8F8"); textAlign = Paint.Align.CENTER
         textSize = 22f * sp.coerceAtMost(3f)
@@ -186,6 +190,8 @@ class MenuView(context: Context) : View(context) {
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
         drawTitle(canvas)    // fixed — not affected by scroll
         drawGear(canvas)     // fixed — top-right corner
+        // Version label — fixed top-left corner
+        canvas.drawText("v1.0", 12f * dp, 12f * dp + versionPaint.textSize, versionPaint)
 
         // Scrollable region: cards + footer
         canvas.save()

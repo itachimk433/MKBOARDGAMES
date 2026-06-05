@@ -46,7 +46,7 @@ class MainActivity : AppCompatActivity() {
             com.google.android.gms.ads.MobileAds.initialize(this) {}
             val adView = com.google.android.gms.ads.AdView(this).apply {
                 setAdSize(com.google.android.gms.ads.AdSize.BANNER)
-                adUnitId = "ca-app-pub-3940256099942544/6300978111"
+                adUnitId = "ca-app-pub-117932217/g2jnehr5cv"
                 loadAd(com.google.android.gms.ads.AdRequest.Builder().build())
             }
             root.addView(adView, android.widget.LinearLayout.LayoutParams(
