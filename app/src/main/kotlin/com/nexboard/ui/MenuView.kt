@@ -113,7 +113,7 @@ class MenuView(context: Context) : View(context) {
             val top = headerH + i * (cardH + spacing)
             cards[i].rect = RectF(cx, top, cx + cardW, top + cardH)
         }
-        val contentBottom = cards.last().rect.bottom + 26f * dp   // room for footer
+        val contentBottom = cards.last().rect.bottom + 56f * dp   // room for two-line footer
         maxScrollY = maxOf(0f, contentBottom - h)
 
         val gs = 34f * dp; val gx = w - gs - 14f * dp; val gy = 14f * dp
@@ -154,10 +154,14 @@ class MenuView(context: Context) : View(context) {
             MotionEvent.ACTION_UP -> {
                 if (logoPressed) {
                     animateLogoScale(1f)
-                    if (logoRect.contains(event.x, event.y)) onLogoTapped?.invoke()
+                    if (logoRect.contains(event.x, event.y)) {
+                        com.nexboard.SoundPlayer.play("ui_click")
+                        onLogoTapped?.invoke()
+                    }
                     logoPressed = false; invalidate(); return true
                 }
                 if (pressedGear && gearTouch.contains(event.x, event.y)) {
+                    com.nexboard.SoundPlayer.play("ui_click")
                     onSettingsClicked?.invoke(); pressedGear = false; invalidate(); return true
                 }
                 val hit = cards.firstOrNull { it.rect.contains(event.x, cy) }?.type
@@ -402,7 +406,9 @@ class MenuView(context: Context) : View(context) {
 
     private fun drawFooter(canvas: Canvas) {
         // positioned in content (unscrolled) coordinates — below the last card
-        val footerY = cards.last().rect.bottom + 20f * dp
-        canvas.drawText("©2026 MKDEV", width / 2f, footerY, copyrightPaint)
+        val lineH = copyrightPaint.textSize * 1.8f
+        val moreY = cards.last().rect.bottom + 20f * dp
+        canvas.drawText("More games coming soon", width / 2f, moreY, copyrightPaint)
+        canvas.drawText("©2026 MKDEV", width / 2f, moreY + lineH, copyrightPaint)
     }
 }

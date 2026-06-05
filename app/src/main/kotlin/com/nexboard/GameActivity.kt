@@ -108,7 +108,10 @@ class GameActivity : AppCompatActivity() {
         showModeDialog()
     }
 
-    override fun onResume() { super.onResume(); makeFullscreen() }
+    override fun onResume() {
+        super.onResume(); makeFullscreen()
+        SoundPlayer.movementSoundsEnabled = SettingsManager.isMovementSoundsEnabled(this)
+    }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus); if (hasFocus) makeFullscreen()
@@ -183,7 +186,7 @@ class GameActivity : AppCompatActivity() {
 OTHELLO — Rules
 
 Overview
-Othello (Reversi) is played on an 8×8 board. Each player has discs that are white on one side and black on the other. You play as Black.
+Othello (Reversi) is played on an 8×8 board. Each player has discs that are white on one side and black on the other. You choose your colour when starting a game vs AI.
 
 ─────────────────────────
 
@@ -210,7 +213,7 @@ When the board is full (or no legal moves remain), the player with more discs wi
 CHECKERS — Rules
 
 Overview
-Played on the dark squares of an 8×8 board. You play as Black; pieces start on rows 1–3 and 6–8.
+Played on the dark squares of an 8×8 board. You choose your colour when starting a game vs AI. Pieces start on the first 3 rows of each side.
 
 ─────────────────────────
 
@@ -237,7 +240,7 @@ Capture all of your opponent's pieces, or leave them with no legal moves.
 CHESS — Rules
 
 Overview
-Two players command 16 pieces each (White and Black) on an 8×8 board. You play as Black.
+Two players command 16 pieces each (White and Black) on an 8×8 board. You choose your colour when starting a game vs AI.
 
 ─────────────────────────
 
@@ -248,6 +251,11 @@ Pieces & How They Move
 ♗ Bishop — any number of squares diagonally.
 ♕ Queen — combines Rook + Bishop.
 ♔ King — one square in any direction.
+
+─────────────────────────
+
+Castling
+A special King-side or Queen-side move: the King slides 2 squares toward a Rook, and that Rook jumps to the other side of the King. Neither piece may have moved before, and the squares between them must be clear and not under attack.
 
 ─────────────────────────
 
@@ -389,17 +397,17 @@ Checkmate your opponent's King.
         }
         // Primary move sound
         when {
-            move.promotionType != null      -> SoundPlayer.play("promote")
-            move.metadata["castle"] != null -> SoundPlayer.play("castle")
-            move.captures.isNotEmpty()      -> SoundPlayer.play("capture")
+            move.promotionType != null      -> SoundPlayer.playMovement("promote")
+            move.metadata["castle"] != null -> SoundPlayer.playMovement("castle")
+            move.captures.isNotEmpty()      -> SoundPlayer.playMovement("capture")
             vsAI && gameState.currentTurn == playerColor ->
-                SoundPlayer.play("move_opponent")
-            else -> SoundPlayer.play("move_self")
+                SoundPlayer.playMovement("move_opponent")
+            else -> SoundPlayer.playMovement("move_self")
         }
         // Check sound plays on top (SoundPool supports simultaneous streams)
         val isCheck = (engine as? com.nexboard.games.chess.ChessRuleEngine)
             ?.isInCheck(gameState, gameState.currentTurn) == true
-        if (isCheck) SoundPlayer.play("move_check")
+        if (isCheck) SoundPlayer.playMovement("move_check")
     }
 
     // ─── Checkers sounds ──────────────────────────────────────────────────────
@@ -414,14 +422,13 @@ Checkmate your opponent's King.
             else -> {}
         }
         when {
-            move.captures.isNotEmpty() -> SoundPlayer.play("checkers_capture")
+            move.captures.isNotEmpty() -> SoundPlayer.playMovement("checkers_capture")
             else -> {
                 val prevState = moveHistory.lastOrNull()
                 val wasKing = prevState?.get(move.from)?.let { (it as? com.nexboard.games.checkers.CheckersPiece)?.isKing } ?: false
                 val isNowKing = (gameState.get(move.to) as? com.nexboard.games.checkers.CheckersPiece)?.isKing ?: false
-                if (!wasKing && isNowKing) SoundPlayer.play("checkers_king")
-                else if (vsAI && gameState.currentTurn == playerColor) SoundPlayer.play("checkers_move")
-                else SoundPlayer.play("checkers_move")
+                if (!wasKing && isNowKing) SoundPlayer.playMovement("checkers_king")
+                else SoundPlayer.playMovement("checkers_move")
             }
         }
     }
@@ -437,9 +444,9 @@ Checkmate your opponent's King.
             GameStatus.DRAW -> { SoundPlayer.play("game_draw"); return }
             else -> {}
         }
-        SoundPlayer.play("othello_place")
+        SoundPlayer.playMovement("othello_place")
         if (move.captures.isNotEmpty()) {
-            boardView.postDelayed({ SoundPlayer.play("othello_flip") }, 150)
+            boardView.postDelayed({ SoundPlayer.playMovement("othello_flip") }, 150)
         }
     }
 
@@ -642,9 +649,9 @@ Checkmate your opponent's King.
         override fun onTouchEvent(e: MotionEvent): Boolean {
             if (e.action == MotionEvent.ACTION_UP) {
                 when {
-                    backRect.contains(e.x, e.y) -> this@GameActivity.onBackPressed()
-                    undoRect.contains(e.x, e.y) -> onUndoClicked()
-                    menuRect.contains(e.x, e.y) -> onMenuClicked()
+                    backRect.contains(e.x, e.y) -> { SoundPlayer.play("ui_click"); this@GameActivity.onBackPressed() }
+                    undoRect.contains(e.x, e.y) -> { SoundPlayer.play("ui_click"); onUndoClicked() }
+                    menuRect.contains(e.x, e.y) -> { SoundPlayer.play("ui_click"); onMenuClicked() }
                 }
             }
             return true

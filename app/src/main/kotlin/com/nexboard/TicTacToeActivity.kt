@@ -80,6 +80,7 @@ class TicTacToeActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume(); makeFullscreen()
+        SoundPlayer.movementSoundsEnabled = SettingsManager.isMovementSoundsEnabled(this)
         if (::boardView.isInitialized) {
             SettingsManager.activateGameTheme(this, "ttt")
             boardView.applyTheme()
@@ -260,7 +261,7 @@ Strategy
             scope.launch { delay(1200); showResultDialog() }
             return
         }
-        if (moverWasX) SoundPlayer.play("ttt_x") else SoundPlayer.play("ttt_o")
+        if (moverWasX) SoundPlayer.playMovement("ttt_x") else SoundPlayer.playMovement("ttt_o")
         updateHud()
         if (vsAI && gameState.currentTurn != playerColor) {
             boardView.isLocked = true
@@ -616,9 +617,9 @@ Strategy
         override fun onTouchEvent(e: MotionEvent): Boolean {
             if (e.action == MotionEvent.ACTION_UP) {
                 when {
-                    backRect.contains(e.x, e.y) -> this@TicTacToeActivity.onBackPressed()
-                    undoRect.contains(e.x, e.y) -> onUndoClicked()
-                    menuRect.contains(e.x, e.y) -> onMenuClicked()
+                    backRect.contains(e.x, e.y) -> { SoundPlayer.play("ui_click"); this@TicTacToeActivity.onBackPressed() }
+                    undoRect.contains(e.x, e.y) -> { SoundPlayer.play("ui_click"); onUndoClicked() }
+                    menuRect.contains(e.x, e.y) -> { SoundPlayer.play("ui_click"); onMenuClicked() }
                 }
             }
             return true

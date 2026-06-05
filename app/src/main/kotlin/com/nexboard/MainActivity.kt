@@ -167,6 +167,18 @@ class MainActivity : AppCompatActivity() {
             return row to valV
         }
 
+        // ── General ──
+        root.addView(sectionHeader("⚙  GENERAL"))
+        var movementSounds = SettingsManager.isMovementSoundsEnabled(ctx)
+        val (movSoundRow, movSoundVal) = settingRow("🔊", "Movement Sounds", if (movementSounds) "On" else "Off")
+        movSoundRow.setOnClickListener {
+            movementSounds = !movementSounds
+            SettingsManager.setMovementSoundsEnabled(ctx, movementSounds)
+            SoundPlayer.movementSoundsEnabled = movementSounds
+            movSoundVal.text = if (movementSounds) "On" else "Off"
+        }
+        root.addView(movSoundRow)
+
         // ── Chess ──
         root.addView(sectionHeader("♟  CHESS"))
         var chessDiff  = SettingsManager.getChessDifficulty(ctx)

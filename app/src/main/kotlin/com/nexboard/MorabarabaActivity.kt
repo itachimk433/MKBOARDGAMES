@@ -82,6 +82,7 @@ class MorabarabaActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume(); makeFullscreen()
+        SoundPlayer.movementSoundsEnabled = SettingsManager.isMovementSoundsEnabled(this)
         if (::boardView.isInitialized) {
             SettingsManager.activateGameTheme(this, "morabaraba")
             boardView.applyTheme()
@@ -223,11 +224,11 @@ class MorabarabaActivity : AppCompatActivity() {
         val isPlacementPhase = wPlacedPrev < engine.pieceCount || bPlacedPrev < engine.pieceCount
         when {
             move.captures.isNotEmpty() -> {
-                SoundPlayer.play("mora_capture")
-                boardView.postDelayed({ SoundPlayer.play("mora_mill") }, 250)
+                SoundPlayer.playMovement("mora_capture")
+                boardView.postDelayed({ SoundPlayer.playMovement("mora_mill") }, 250)
             }
-            isPlacementPhase -> SoundPlayer.play("mora_place")
-            else             -> SoundPlayer.play("mora_move")
+            isPlacementPhase -> SoundPlayer.playMovement("mora_place")
+            else             -> SoundPlayer.playMovement("mora_move")
         }
     }
 
@@ -284,13 +285,18 @@ class MorabarabaActivity : AppCompatActivity() {
             (gameState.currentTurn == playerColor && playerColor == PieceColor.WHITE && wFlying) ||
             (gameState.currentTurn == playerColor && playerColor == PieceColor.BLACK && bFlying)
         )
+        val aiFlying = vsAI && (
+            (playerColor == PieceColor.WHITE && bFlying) ||
+            (playerColor == PieceColor.BLACK && wFlying)
+        )
 
         val (sub1, sub2) = if (inPlace) {
             val wLeft = pc - wPlaced; val bLeft = pc - bPlaced
             "Place  W:$wLeft left  B:$bLeft left" to "$wCount vs $bCount on board"
         } else {
             val flyTag = when {
-                flyingMe -> "  ✈ You can fly to any empty spot!"
+                flyingMe  -> "  ✈ You can fly to any empty spot!"
+                aiFlying  -> "  ✈ AI is in flying mode!"
                 wFlying && !vsAI -> "  ✈ White is flying"
                 bFlying && !vsAI -> "  ✈ Black is flying"
                 else -> ""
@@ -359,7 +365,7 @@ class MorabarabaActivity : AppCompatActivity() {
     private fun doUndo() {
         if (moveHistory.isEmpty()) return
         aiJob?.cancel(); aiJob = null
-        boardView.isLocked = false
+        boardView.cancelAnim()
         hudView.setThinking(false)
         if (vsAI && moveHistory.size >= 2) {
             moveHistory.removeLast()
@@ -527,9 +533,9 @@ You win by either:
         override fun onTouchEvent(e: MotionEvent): Boolean {
             if (e.action == MotionEvent.ACTION_UP) {
                 when {
-                    backRect.contains(e.x, e.y) -> onBack()
-                    undoRect.contains(e.x, e.y) -> onUndo()
-                    menuRect.contains(e.x, e.y) -> onMenu()
+                    backRect.contains(e.x, e.y) -> { SoundPlayer.play("ui_click"); onBack() }
+                    undoRect.contains(e.x, e.y) -> { SoundPlayer.play("ui_click"); onUndo() }
+                    menuRect.contains(e.x, e.y) -> { SoundPlayer.play("ui_click"); onMenu() }
                 }
             }
             return true

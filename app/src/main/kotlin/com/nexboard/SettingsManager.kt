@@ -48,7 +48,7 @@ object SettingsManager {
         prefs(ctx).getString(KEY_ACTIVE_GAME, "overall") ?: "overall"
 
     // ── Chess ────────────────────────────────────────────────────────────────
-    fun getChessDifficulty(ctx: Context) = prefs(ctx).getInt(KEY_CHESS_DIFFICULTY, 1)
+    fun getChessDifficulty(ctx: Context) = prefs(ctx).getInt(KEY_CHESS_DIFFICULTY, 0)
     fun setChessDifficulty(ctx: Context, v: Int) = prefs(ctx).edit().putInt(KEY_CHESS_DIFFICULTY, v).apply()
     fun chessAiDepth(ctx: Context) = when (getChessDifficulty(ctx)) {
         0    -> 2   // Easy
@@ -67,7 +67,7 @@ object SettingsManager {
     }
 
     // ── Checkers ─────────────────────────────────────────────────────────────
-    fun getCheckersDifficulty(ctx: Context) = prefs(ctx).getInt(KEY_CHECKERS_DIFFICULTY, 1)
+    fun getCheckersDifficulty(ctx: Context) = prefs(ctx).getInt(KEY_CHECKERS_DIFFICULTY, 0)
     fun setCheckersDifficulty(ctx: Context, v: Int) = prefs(ctx).edit().putInt(KEY_CHECKERS_DIFFICULTY, v).apply()
     fun checkersAiDepth(ctx: Context) = when (getCheckersDifficulty(ctx)) { 0 -> 2; 2 -> 8; else -> 5 }
 
@@ -75,7 +75,7 @@ object SettingsManager {
     fun othelloAiDepth(@Suppress("UNUSED_PARAMETER") ctx: Context) = 7
 
     // ── Morabaraba ───────────────────────────────────────────────────────────
-    fun getMorabarabaDifficulty(ctx: Context) = prefs(ctx).getInt(KEY_MORABARABA_DIFFICULTY, 1)
+    fun getMorabarabaDifficulty(ctx: Context) = prefs(ctx).getInt(KEY_MORABARABA_DIFFICULTY, 0)
     fun setMorabarabaDifficulty(ctx: Context, v: Int) = prefs(ctx).edit().putInt(KEY_MORABARABA_DIFFICULTY, v).apply()
     fun morabarabaAiDepth(ctx: Context) = when (getMorabarabaDifficulty(ctx)) { 0 -> 3; 2 -> 7; else -> 5 }
     fun morabarabaAiTimeLimitMs(ctx: Context): Long = when (getMorabarabaDifficulty(ctx)) { 0 -> 600L; 2 -> 2500L; else -> 1200L }
@@ -93,6 +93,12 @@ object SettingsManager {
             else -> minOf(6, hardCap)  // Medium
         }
     }
+
+    // ── Movement sounds ──────────────────────────────────────────────────────
+    private const val KEY_MOVEMENT_SOUNDS = "movement_sounds"
+    fun isMovementSoundsEnabled(ctx: Context) = prefs(ctx).getBoolean(KEY_MOVEMENT_SOUNDS, true)
+    fun setMovementSoundsEnabled(ctx: Context, v: Boolean) =
+        prefs(ctx).edit().putBoolean(KEY_MOVEMENT_SOUNDS, v).apply()
 
     // ── Light mode ───────────────────────────────────────────────────────────
     private const val KEY_LIGHT_MODE = "light_mode"

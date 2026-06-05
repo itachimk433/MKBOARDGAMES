@@ -292,6 +292,20 @@ class MorabaraBoardView(context: Context) : View(context) {
         invalidate()
     }
 
+    /** Immediately abort any in-progress animation and unlock the board for state reset (e.g. Undo). */
+    fun cancelAnim() {
+        ++animGen                          // invalidates any pending onAnimationEnd callbacks
+        animator?.cancel();     animator     = null
+        captureAnim?.cancel();  captureAnim  = null
+        millBannerAnim?.cancel(); millBannerAnim = null
+        pendingMove = null
+        animNode = -1; animColor = null; animProgress = 0f
+        captureNodes = emptyList(); captureAlpha = 0f
+        millBannerAlpha = 0f
+        isLocked = false
+        invalidate()
+    }
+
     fun animateExternalMove(move: Move) = startAnim(move)
 
     // ─── Drawing ─────────────────────────────────────────────────────────────

@@ -60,7 +60,15 @@ object SoundPlayer {
         ready = true
     }
 
+    /** Set to false to silence movement/game sounds while keeping UI click sounds audible. */
+    var movementSoundsEnabled: Boolean = true
+
     fun play(key: String, volume: Float = 1f) {
         ids[key]?.let { pool?.play(it, volume, volume, 0, 0, 1f) }
+    }
+
+    /** Play a movement/game sound only when movement sounds are enabled. */
+    fun playMovement(key: String, volume: Float = 1f) {
+        if (movementSoundsEnabled) play(key, volume)
     }
 }
