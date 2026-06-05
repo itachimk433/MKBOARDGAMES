@@ -7,7 +7,7 @@ class NexBoardApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        if (hasHms()) {
+        if (hasHms(this)) {
             try {
                 com.huawei.hms.ads.HwAds.init(this)
             } catch (_: Throwable) {}
