@@ -42,28 +42,31 @@ class MainActivity : AppCompatActivity() {
         }
         root.addView(menu, android.widget.LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, 0).apply { weight = 1f })
-        var bannerView: com.huawei.hms.ads.banner.BannerView? = null
-        try {
-            com.huawei.hms.ads.HwAds.init(this)
-            bannerView = com.huawei.hms.ads.banner.BannerView(this).apply {
-                adId = "g2jnehr5cv"
-                bannerAdSize = com.huawei.hms.ads.BannerAdSize.BANNER_SIZE_320_50
-                setAdListener(object : com.huawei.hms.ads.AdListener() {
-                    override fun onAdLoaded() {
-                        android.widget.Toast.makeText(this@MainActivity, "Banner loaded ✓", android.widget.Toast.LENGTH_SHORT).show()
-                    }
-                    override fun onAdFailed(errorCode: Int) {
-                        android.widget.Toast.makeText(this@MainActivity, "Banner error: $errorCode", android.widget.Toast.LENGTH_LONG).show()
-                    }
-                })
+        if (NexBoardApp.hasHms(this)) {
+            try {
+                val bannerView = com.huawei.hms.ads.banner.BannerView(this).apply {
+                    setAdId("g2jnehr5cv")
+                    bannerAdSize = com.huawei.hms.ads.BannerAdSize.BANNER_SIZE_320_50
+                    setAdListener(object : com.huawei.hms.ads.AdListener() {
+                        override fun onAdLoaded() {
+                            android.widget.Toast.makeText(this@MainActivity, "Banner loaded ✓", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                        override fun onAdFailed(errorCode: Int) {
+                            android.widget.Toast.makeText(this@MainActivity, "Banner error: $errorCode", android.widget.Toast.LENGTH_LONG).show()
+                        }
+                    })
+                }
+                root.addView(bannerView, android.widget.LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+                setContentView(root)
+                bannerView.loadAd(com.huawei.hms.ads.AdParam.Builder().build())
+            } catch (e: Exception) {
+                android.widget.Toast.makeText(this, "HMS banner error: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
+                setContentView(root)
             }
-            root.addView(bannerView, android.widget.LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
-        } catch (e: Exception) {
-            android.widget.Toast.makeText(this, "HMS init failed: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
+        } else {
+            setContentView(root)
         }
-        setContentView(root)
-        bannerView?.loadAd(com.huawei.hms.ads.AdParam.Builder().build())
 
         if (!SettingsManager.hasConsentAccepted(this)) showConsentDialog()
 
