@@ -211,4 +211,9 @@ object SettingsManager {
         }
         edit.apply()
     }
+
+    // ── Privacy consent (Huawei AppGallery requirement) ───────────────────────
+    private const val KEY_CONSENT = "privacy_policy_accepted"
+    fun hasConsentAccepted(ctx: Context) = prefs(ctx).getBoolean(KEY_CONSENT, false)
+    fun setConsentAccepted(ctx: Context) = prefs(ctx).edit().putBoolean(KEY_CONSENT, true).apply()
 }
