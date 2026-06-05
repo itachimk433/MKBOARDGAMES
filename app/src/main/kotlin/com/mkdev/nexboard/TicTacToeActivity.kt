@@ -130,13 +130,12 @@ class TicTacToeActivity : AppCompatActivity() {
     }
 
     private fun showBoardSizeDialog(fromMode: Boolean) {
-        // Win lengths: 3→3, 4→4, 5→4, 6→5, 7→5
+        // Win lengths: 3→3, 4→4, 5→4, 6→5
         val sizeLabels = arrayOf(
             "3×3 — Classic  (3 in a row)",
             "4×4 — Medium   (4 in a row)",
             "5×5 — Large    (4 in a row)",
-            "6×6 — X-Large  (5 in a row)",
-            "7×7 — Mega     (5 in a row)"
+            "6×6 — X-Large  (5 in a row)"
         )
         AlertDialog.Builder(this).setTitle("Board Size")
             .setItems(sizeLabels) { _, which ->
@@ -156,7 +155,7 @@ class TicTacToeActivity : AppCompatActivity() {
         3    -> 3
         4    -> 4
         5    -> 4
-        else -> 5   // 6×6, 7×7
+        else -> 5   // 6×6
     }
 
     private fun showColorPickerDialog() {
@@ -190,7 +189,6 @@ Board Sizes & Win Conditions
 • 4×4 board: get 4 in a row to win
 • 5×5 board: get 4 in a row to win
 • 6×6 board: get 5 in a row to win
-• 7×7 board: get 5 in a row to win
 
 ─────────────────────────
 

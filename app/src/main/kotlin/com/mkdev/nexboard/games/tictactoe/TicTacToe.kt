@@ -110,15 +110,15 @@ class TicTacToeRuleEngine(
                     val ps = line.map { state.board[it] as? TicTacToePiece }
                     val w  = ps.count { it?.color == PieceColor.WHITE }
                     val b  = ps.count { it?.color == PieceColor.BLACK }
-                    // Urgently weight threats one step from winning/losing
+                    // Critically weight threats one step from winning/losing — must dominate all heuristics
                     if (b == 0 && w > 0) score += when (w) {
-                        winLength - 1 -> 800   // one move from winning — seize/block immediately
-                        winLength - 2 -> 80    // building toward win
+                        winLength - 1 -> 50_000  // one move from winning — seize immediately
+                        winLength - 2 -> 200     // building toward win
                         else          -> w * w
                     }
                     if (w == 0 && b > 0) score -= when (b) {
-                        winLength - 1 -> 800   // must block — opponent one move from winning
-                        winLength - 2 -> 80
+                        winLength - 1 -> 50_000  // must block — opponent one move from winning
+                        winLength - 2 -> 200
                         else          -> b * b
                     }
                 }

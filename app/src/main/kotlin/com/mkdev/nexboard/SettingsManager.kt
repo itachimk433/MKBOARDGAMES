@@ -86,7 +86,7 @@ object SettingsManager {
     fun setTttDifficulty(ctx: Context, v: Int) = prefs(ctx).edit().putInt(KEY_TTT_DIFFICULTY, v).apply()
     /** Depth scales with both difficulty and board size so the AI always responds fast. */
     fun tttAiDepth(ctx: Context, boardSize: Int): Int {
-        val hardCap = when (boardSize) { 3 -> 9; 4 -> 7; 5 -> 6; else -> 5 }
+        val hardCap = when (boardSize) { 3 -> 9; 4 -> 7; 5 -> 6; else -> 6 }  // max 6×6
         return when (getTttDifficulty(ctx)) {
             0    -> minOf(3, hardCap)  // Easy — makes mistakes, beatable
             2    -> hardCap             // Hard — near-perfect

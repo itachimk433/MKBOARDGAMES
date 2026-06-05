@@ -3,9 +3,12 @@ package com.mkdev.nexboard
 import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.*
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.VibrationEffect
+import android.os.Vibrator
 import android.view.*
 import android.view.animation.OvershootInterpolator
 import android.widget.*
@@ -112,6 +115,21 @@ class ReplayActivity : AppCompatActivity() {
     private var interstitialAd: InterstitialAd? = null
     private var entryTimeMs = 0L
     private val minAdIntervalMs = 2 * 60 * 1000L   // show ad only if ≥ 2 min elapsed
+
+    // ─── Vibration ────────────────────────────────────────────────────────────
+
+    private fun vibrateMove() {
+        try {
+            @Suppress("DEPRECATION")
+            val vib = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator ?: return
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                vib.vibrate(VibrationEffect.createOneShot(22L, 60))
+            } else {
+                @Suppress("DEPRECATION")
+                vib.vibrate(22L)
+            }
+        } catch (_: Exception) {}
+    }
 
     // ─── Speed ────────────────────────────────────────────────────────────────
 
@@ -313,6 +331,7 @@ class ReplayActivity : AppCompatActivity() {
             captureView.update(captureSnapshots.getOrNull(cursor) ?: CaptureSnapshot(emptyList(), emptyList()))
             controlsView.invalidate()
 
+            vibrateMove()
             boardView?.let { bv ->
                 bv.gameState = states[cursor - 1]
                 bv.onMoveMade = {
