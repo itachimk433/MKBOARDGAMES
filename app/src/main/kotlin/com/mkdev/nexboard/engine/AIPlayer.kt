@@ -79,11 +79,8 @@ class AIPlayer(
         fun isRepeat(m: Move) = myPrior != null && m.from == myPrior.to && m.to == myPrior.from
 
         // Variety window — wider at low depth so the AI never plays the same game twice.
-        // Collapse to zero when the best score indicates a win/block threat (≥ 40_000 in magnitude)
-        // so the AI always seizes wins and blocks threats without random variation.
-        val urgentThreshold = 40_000
-        val isUrgent = if (maximising) bestScore >= urgentThreshold else bestScore <= -urgentThreshold
-        val window = if (isUrgent) 0 else when {
+        // Narrower at high depth for stronger, more consistent play.
+        val window = when {
             maxDepth <= 3 -> 60
             maxDepth <= 5 -> 30
             else          -> 15

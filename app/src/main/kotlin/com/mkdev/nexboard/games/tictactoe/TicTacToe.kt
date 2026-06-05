@@ -1,6 +1,7 @@
 package com.mkdev.nexboard.games.tictactoe
 
 import com.mkdev.nexboard.engine.*
+import kotlin.math.abs
 
 data class TicTacToePiece(override val color: PieceColor) : Piece(color) {
     override fun symbol() = if (color == PieceColor.WHITE) "✕" else "○"
@@ -56,11 +57,26 @@ class TicTacToeRuleEngine(
 
     override fun legalMovesFrom(state: GameState, position: Position) = emptyList<Move>()
 
+    /**
+     * Returns all legal placement moves, sorted centre-first so alpha-beta
+     * pruning cuts off weak branches earlier and the AI always explores the
+     * most promising cells first — eliminating the top-row ordering bias.
+     */
     override fun allLegalMoves(state: GameState, color: PieceColor): List<Move> {
         if (state.status != GameStatus.IN_PROGRESS) return emptyList()
+        val cx = (boardSize - 1) / 2.0
+        val cy = (boardSize - 1) / 2.0
         return (0 until boardSize * boardSize)
             .filter { state.board[it] == null }
-            .map { Move(PLACE, Position(it / boardSize, it % boardSize)) }
+            .map { idx ->
+                val r = idx / boardSize
+                val c = idx % boardSize
+                // Chebyshev distance to centre — centre = 0, corners = farthest
+                val dist = maxOf(abs(r - cx), abs(c - cy))
+                Triple(dist, r * boardSize + c, Move(PLACE, Position(r, c)))
+            }
+            .sortedWith(compareBy({ it.first }, { it.second }))
+            .map { it.third }
     }
 
     override fun applyMove(state: GameState, move: Move): GameState {
@@ -110,15 +126,17 @@ class TicTacToeRuleEngine(
                     val ps = line.map { state.board[it] as? TicTacToePiece }
                     val w  = ps.count { it?.color == PieceColor.WHITE }
                     val b  = ps.count { it?.color == PieceColor.BLACK }
-                    // Critically weight threats one step from winning/losing — must dominate all heuristics
+                    // 5 000 for one-from-winning dominates any positional accumulation,
+                    // so the AI always seizes a win or blocks a losing threat first.
+                    // 150 for two-from-winning builds meaningful attack pressure.
                     if (b == 0 && w > 0) score += when (w) {
-                        winLength - 1 -> 50_000  // one move from winning — seize immediately
-                        winLength - 2 -> 200     // building toward win
+                        winLength - 1 -> 5_000   // one move from winning — seize/block
+                        winLength - 2 -> 150     // building toward win
                         else          -> w * w
                     }
                     if (w == 0 && b > 0) score -= when (b) {
-                        winLength - 1 -> 50_000  // must block — opponent one move from winning
-                        winLength - 2 -> 200
+                        winLength - 1 -> 5_000   // must block — opponent one move from winning
+                        winLength - 2 -> 150
                         else          -> b * b
                     }
                 }
