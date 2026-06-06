@@ -42,20 +42,16 @@ class MainActivity : AppCompatActivity() {
         }
         root.addView(menu, android.widget.LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, 0).apply { weight = 1f })
-        if (NexBoardApp.hasHms(this)) {
-            try {
-                val bannerView = com.huawei.hms.ads.banner.BannerView(this).apply {
-                    setAdId("g2jnehr5cv")
-                    bannerAdSize = com.huawei.hms.ads.BannerAdSize.BANNER_SIZE_320_50
-                }
-                root.addView(bannerView, android.widget.LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
-                setContentView(root)
-                bannerView.loadAd(com.huawei.hms.ads.AdParam.Builder().build())
-            } catch (_: Exception) {
-                setContentView(root)
+        try {
+            val bannerView = com.huawei.hms.ads.banner.BannerView(this).apply {
+                setAdId("g2jnehr5cv")
+                bannerAdSize = com.huawei.hms.ads.BannerAdSize.BANNER_SIZE_320_50
             }
-        } else {
+            root.addView(bannerView, android.widget.LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+            setContentView(root)
+            bannerView.loadAd(com.huawei.hms.ads.AdParam.Builder().build())
+        } catch (_: Throwable) {
             setContentView(root)
         }
 

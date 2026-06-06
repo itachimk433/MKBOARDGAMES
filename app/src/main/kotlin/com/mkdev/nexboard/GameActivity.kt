@@ -86,20 +86,16 @@ class GameActivity : AppCompatActivity() {
         topCaptureView.visibility    = if (showCaptures) View.VISIBLE else View.GONE
         bottomCaptureView.visibility = if (showCaptures) View.VISIBLE else View.GONE
 
-        if (NexBoardApp.hasHms(this)) {
-            try {
-                val bannerView = com.huawei.hms.ads.banner.BannerView(this).apply {
-                    setAdId("g2jnehr5cv")
-                    bannerAdSize = com.huawei.hms.ads.BannerAdSize.BANNER_SIZE_320_50
-                }
-                container.addView(bannerView,
-                    android.widget.LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
-                setContentView(container)
-                bannerView.loadAd(com.huawei.hms.ads.AdParam.Builder().build())
-            } catch (_: Exception) {
-                setContentView(container)
+        try {
+            val bannerView = com.huawei.hms.ads.banner.BannerView(this).apply {
+                setAdId("g2jnehr5cv")
+                bannerAdSize = com.huawei.hms.ads.BannerAdSize.BANNER_SIZE_320_50
             }
-        } else {
+            container.addView(bannerView,
+                android.widget.LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+            setContentView(container)
+            bannerView.loadAd(com.huawei.hms.ads.AdParam.Builder().build())
+        } catch (_: Throwable) {
             setContentView(container)
         }
 
