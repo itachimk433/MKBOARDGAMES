@@ -69,7 +69,7 @@ class MorabarabaActivity : AppCompatActivity() {
         if (NexBoardApp.hasHms(this)) {
             try {
                 val bannerView = com.huawei.hms.ads.banner.BannerView(this).apply {
-                    setAdId("g2jnehr5cv")
+                    setAdId("testw9dlkn08qs")
                     bannerAdSize = com.huawei.hms.ads.BannerAdSize.BANNER_SIZE_320_50
                     setAdListener(object : com.huawei.hms.ads.AdListener() {
                         override fun onAdLoaded() {
