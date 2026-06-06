@@ -69,22 +69,13 @@ class MorabarabaActivity : AppCompatActivity() {
         if (NexBoardApp.hasHms(this)) {
             try {
                 val bannerView = com.huawei.hms.ads.banner.BannerView(this).apply {
-                    setAdId("testw9dlkn08qs")
+                    setAdId("g2jnehr5cv")
                     bannerAdSize = com.huawei.hms.ads.BannerAdSize.BANNER_SIZE_320_50
-                    setAdListener(object : com.huawei.hms.ads.AdListener() {
-                        override fun onAdLoaded() {
-                            android.widget.Toast.makeText(this@MorabarabaActivity, "Banner loaded ✓", android.widget.Toast.LENGTH_SHORT).show()
-                        }
-                        override fun onAdFailed(errorCode: Int) {
-                            android.widget.Toast.makeText(this@MorabarabaActivity, "Banner error: $errorCode", android.widget.Toast.LENGTH_LONG).show()
-                        }
-                    })
                 }
                 root.addView(bannerView, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
                 setContentView(root)
                 bannerView.loadAd(com.huawei.hms.ads.AdParam.Builder().build())
-            } catch (e: Exception) {
-                android.widget.Toast.makeText(this, "HMS banner error: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
+            } catch (_: Exception) {
                 setContentView(root)
             }
         } else {
