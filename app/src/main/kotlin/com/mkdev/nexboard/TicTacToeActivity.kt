@@ -32,6 +32,10 @@ class TicTacToeActivity : AppCompatActivity() {
 
     /** Stats recorded once per game — prevents double-counting on re-shown result dialog. */
     private var resultRecorded = false
+    private var interstitialAd: Any? = null
+
+    private val redoGameStates   = ArrayDeque<GameState>()
+    private val redoRemovedMoves = ArrayDeque<List<GameState>>()
 
     private lateinit var hudView:   HudView
     private lateinit var boardView: TicBoardView
@@ -216,6 +220,9 @@ Strategy
 
     private fun startGame() {
         resultRecorded = false
+        interstitialAd = null
+        redoGameStates.clear(); redoRemovedMoves.clear()
+        AdManager.loadInterstitial(this) { interstitialAd = it }
         SettingsManager.activateGameTheme(this, "ttt")
         if (vsAI) SettingsManager.setActiveGame(this, "ttt")
         SoundPlayer.init(this)
@@ -232,6 +239,7 @@ Strategy
     internal fun handleMove(move: Move) {
         if (boardView.isLocked) return
         val moverWasX = gameState.currentTurn == PieceColor.WHITE
+        redoGameStates.clear(); redoRemovedMoves.clear()
         moveHistory.addLast(gameState)
         gameState = engine.applyMove(gameState, move)
         boardView.setGameState(gameState, lastMove = move.to)
@@ -247,6 +255,9 @@ Strategy
             boardView.showWinLine(engine.winningLine(gameState))
             updateHud()
             recordResult()
+            val ad = interstitialAd; interstitialAd = null
+            AdManager.showInterstitial(this, ad)
+            AdManager.loadInterstitial(this) { interstitialAd = it }
             scope.launch { delay(1200); showResultDialog() }
             return
         }
@@ -295,15 +306,34 @@ Strategy
             vsAI && gameState.currentTurn == playerColor -> "Your turn"
             else -> "${if (isX) "X" else "O"}'s turn"
         }
-        hudView.setInfo(label, canUndo = moveHistory.isNotEmpty(), isX = isX)
+        hudView.setInfo(label, canUndo = moveHistory.isNotEmpty(), canRedo = redoGameStates.isNotEmpty(), isX = isX)
     }
 
     fun onUndoClicked() {
         if (moveHistory.isEmpty() || boardView.isLocked) return
         scope.coroutineContext.cancelChildren()
         hudView.setThinking(false)
-        if (vsAI && moveHistory.size >= 2) moveHistory.removeLast()
-        gameState = moveHistory.removeLastOrNull() ?: return
+        val prevState = gameState
+        val removed   = mutableListOf<GameState>()
+        if (vsAI && moveHistory.size >= 2) removed.add(moveHistory.removeLast())
+        val restored  = moveHistory.removeLastOrNull() ?: return
+        removed.add(restored)
+        gameState = restored
+        redoGameStates.addLast(prevState)
+        redoRemovedMoves.addLast(removed)
+        boardView.isLocked = false
+        boardView.reset(gameState)
+        updateHud()
+    }
+
+    fun onRedoClicked() {
+        if (redoGameStates.isEmpty() || boardView.isLocked) return
+        scope.coroutineContext.cancelChildren()
+        hudView.setThinking(false)
+        val nextState = redoGameStates.removeLast()
+        val removed   = redoRemovedMoves.removeLast()
+        for (i in removed.indices.reversed()) moveHistory.addLast(removed[i])
+        gameState = nextState
         boardView.isLocked = false
         boardView.reset(gameState)
         updateHud()
@@ -563,6 +593,7 @@ Strategy
     inner class HudView(ctx: Context) : View(ctx) {
         private var label    = "X's turn"
         private var canUndo  = false
+        private var canRedo  = false
         private var thinking = false
         private var isX      = true
 
@@ -588,18 +619,22 @@ Strategy
             textSize = 10f * sp.coerceAtMost(3f)
         }
 
-        private val backRect = RectF(); private val undoRect = RectF(); private val menuRect = RectF()
+        private val backRect = RectF()
+        private val undoRect = RectF()
+        private val redoRect = RectF()
+        private val menuRect = RectF()
 
-        fun setInfo(l: String, canUndo: Boolean, isX: Boolean) {
-            label = l; this.canUndo = canUndo; this.isX = isX; invalidate()
+        fun setInfo(l: String, canUndo: Boolean, canRedo: Boolean, isX: Boolean) {
+            label = l; this.canUndo = canUndo; this.canRedo = canRedo; this.isX = isX; invalidate()
         }
         fun setThinking(t: Boolean) { thinking = t; invalidate() }
 
         override fun onSizeChanged(w: Int, h: Int, ow: Int, oh: Int) {
-            val bw = 48f * dp; val bh = 26f * dp; val by = (h - bh) / 2f
-            backRect.set(6f*dp, by, 6f*dp+bw, by+bh)
-            undoRect.set(w-bw*2.2f, by, w-bw*1.1f, by+bh)
-            menuRect.set(w-bw*1.05f, by, w-4f*dp, by+bh)
+            val bw = 42f * dp; val bh = 26f * dp; val by = (h - bh) / 2f
+            backRect.set(6f*dp,        by, 6f*dp+bw,    by+bh)
+            undoRect.set(w-bw*3.3f,   by, w-bw*2.2f,   by+bh)
+            redoRect.set(w-bw*2.15f,  by, w-bw*1.1f,   by+bh)
+            menuRect.set(w-bw*1.05f,  by, w-4f*dp,     by+bh)
         }
 
         @Suppress("DEPRECATION")
@@ -608,6 +643,7 @@ Strategy
                 when {
                     backRect.contains(e.x, e.y) -> { SoundPlayer.play("ui_click"); this@TicTacToeActivity.onBackPressed() }
                     undoRect.contains(e.x, e.y) -> { SoundPlayer.play("ui_click"); onUndoClicked() }
+                    redoRect.contains(e.x, e.y) -> { SoundPlayer.play("ui_click"); onRedoClicked() }
                     menuRect.contains(e.x, e.y) -> { SoundPlayer.play("ui_click"); onMenuClicked() }
                 }
             }
@@ -621,9 +657,11 @@ Strategy
             val rr = 5f * dp
             canvas.drawRoundRect(backRect, rr, rr, btnBgP)
             canvas.drawRoundRect(undoRect, rr, rr, btnBgP)
+            canvas.drawRoundRect(redoRect, rr, rr, btnBgP)
             canvas.drawRoundRect(menuRect, rr, rr, btnBgP)
             canvas.drawText("← Back", backRect.centerX(), backRect.centerY()+btnP.textSize*0.36f, btnP)
             canvas.drawText("Undo",   undoRect.centerX(), undoRect.centerY()+btnP.textSize*0.36f, if (canUndo) btnP else dimP)
+            canvas.drawText("Redo",   redoRect.centerX(), redoRect.centerY()+btnP.textSize*0.36f, if (canRedo) btnP else dimP)
             canvas.drawText("Menu",   menuRect.centerX(), menuRect.centerY()+btnP.textSize*0.36f, btnP)
             val cx = w / 2f
             txtP.color = if (isX) Color.parseColor("#EF5350") else Color.parseColor("#7FC8F8")

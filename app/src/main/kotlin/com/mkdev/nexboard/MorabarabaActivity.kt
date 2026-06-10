@@ -36,6 +36,12 @@ class MorabarabaActivity : AppCompatActivity() {
 
     /** Stats recorded once per game. */
     private var resultRecorded = false
+    private var interstitialAd: Any? = null
+
+    private val redoGameStates = ArrayDeque<GameState>()
+    private val redoCaptures   = ArrayDeque<Pair<List<Piece>, List<Piece>>>()
+    private val redoMoves      = ArrayDeque<List<GameState>>()
+    private val redoCapSnaps   = ArrayDeque<List<Pair<List<Piece>, List<Piece>>>>()
 
     private var capturedByWhite    = mutableListOf<Piece>()
     private var capturedByBlack    = mutableListOf<Piece>()
@@ -139,6 +145,9 @@ class MorabarabaActivity : AppCompatActivity() {
 
     private fun startGame() {
         resultRecorded = false
+        interstitialAd = null
+        redoGameStates.clear(); redoCaptures.clear(); redoMoves.clear(); redoCapSnaps.clear()
+        AdManager.loadInterstitial(this) { interstitialAd = it }
         aiJob?.cancel(); aiJob = null
         moveHistory.clear()
         capturedByWhite.clear(); capturedByBlack.clear(); captureSnapshots.clear()
@@ -183,6 +192,7 @@ class MorabarabaActivity : AppCompatActivity() {
                 else capturedByBlack.add(capPiece)
             }
             captureSnapshots.addLast(capturedByWhite.toList() to capturedByBlack.toList())
+            redoGameStates.clear(); redoCaptures.clear(); redoMoves.clear(); redoCapSnaps.clear()
             gameState           = engine.applyMove(gameState, move)
             moveHistory.addLast(prev)
             boardView.gameState = gameState
@@ -192,6 +202,9 @@ class MorabarabaActivity : AppCompatActivity() {
             playMorabarabaSound(prev, move)
             if (gameState.status != GameStatus.IN_PROGRESS) {
                 recordResult()
+                val ad = interstitialAd; interstitialAd = null
+                AdManager.showInterstitial(this, ad)
+                AdManager.loadInterstitial(this) { interstitialAd = it }
                 showResult()
                 return
             }
@@ -299,12 +312,13 @@ class MorabarabaActivity : AppCompatActivity() {
 
         val label = if (vsAI && gameState.currentTurn == playerColor) "Your turn"
                     else "${if (gameState.currentTurn == PieceColor.WHITE) "White" else "Black"} to move"
-        hudView.update(label, sub1, sub2, canUndo = moveHistory.isNotEmpty())
+        hudView.update(label, sub1, sub2, canUndo = moveHistory.isNotEmpty(), canRedo = redoGameStates.isNotEmpty())
     }
 
     @Suppress("DEPRECATION")
     fun onBack()  { onBackPressed() }
     fun onUndo()  { doUndo() }
+    fun onRedo()  { doRedo() }
     fun onMenu()  { showMenuDialog() }
 
     private fun showMenuDialog() {
@@ -360,13 +374,40 @@ class MorabarabaActivity : AppCompatActivity() {
         aiJob?.cancel(); aiJob = null
         boardView.cancelAnim()
         hudView.setThinking(false)
-        if (vsAI && moveHistory.size >= 2) {
-            moveHistory.removeLast()
-            captureSnapshots.removeLastOrNull()
-        }
-        gameState = moveHistory.removeLastOrNull() ?: engine.initialState()
-        captureSnapshots.removeLastOrNull()
+        val prevState = gameState
+        val prevCap   = capturedByWhite.toList() to capturedByBlack.toList()
+        val rMoves    = mutableListOf<GameState>()
+        val rSnaps    = mutableListOf<Pair<List<Piece>, List<Piece>>>()
+        if (vsAI && moveHistory.size >= 2) rMoves.add(moveHistory.removeLast())
+        val restored  = moveHistory.removeLastOrNull() ?: return
+        rMoves.add(restored)
+        repeat(rMoves.size) { rSnaps.add(captureSnapshots.removeLastOrNull() ?: (emptyList<Piece>() to emptyList<Piece>())) }
+        gameState = restored
         val (cw, cb) = captureSnapshots.lastOrNull() ?: (emptyList<Piece>() to emptyList<Piece>())
+        capturedByWhite = cw.toMutableList(); capturedByBlack = cb.toMutableList()
+        redoGameStates.addLast(prevState); redoCaptures.addLast(prevCap)
+        redoMoves.addLast(rMoves);         redoCapSnaps.addLast(rSnaps)
+        topCaptureView.update(capturedByBlack)
+        bottomCaptureView.update(capturedByWhite)
+        boardView.gameState = gameState
+        updateHud()
+    }
+
+    private fun doRedo() {
+        if (redoGameStates.isEmpty()) return
+        aiJob?.cancel(); aiJob = null
+        boardView.cancelAnim()
+        hudView.setThinking(false)
+        val nextState = redoGameStates.removeLast()
+        val nextCap   = redoCaptures.removeLast()
+        val rMoves    = redoMoves.removeLast()
+        val rSnaps    = redoCapSnaps.removeLast()
+        for (i in rMoves.indices.reversed()) {
+            captureSnapshots.addLast(rSnaps[i])
+            moveHistory.addLast(rMoves[i])
+        }
+        gameState = nextState
+        val (cw, cb) = nextCap
         capturedByWhite = cw.toMutableList(); capturedByBlack = cb.toMutableList()
         topCaptureView.update(capturedByBlack)
         bottomCaptureView.update(capturedByWhite)
@@ -505,22 +546,25 @@ You win by either:
         private var sub1     = ""
         private var sub2     = ""
         private var canUndo  = false
+        private var canRedo  = false
         private var thinking = false
 
         private val backRect = RectF()
         private val undoRect = RectF()
+        private val redoRect = RectF()
         private val menuRect = RectF()
 
-        fun update(t: String, s1: String, s2: String = "", canUndo: Boolean) {
-            title = t; sub1 = s1; sub2 = s2; this.canUndo = canUndo; invalidate()
+        fun update(t: String, s1: String, s2: String = "", canUndo: Boolean, canRedo: Boolean) {
+            title = t; sub1 = s1; sub2 = s2; this.canUndo = canUndo; this.canRedo = canRedo; invalidate()
         }
         fun setThinking(t: Boolean) { thinking = t; invalidate() }
 
         override fun onSizeChanged(w: Int, h: Int, ow: Int, oh: Int) {
-            val bw = 50f * dp; val bh = 28f * dp; val by = (h - bh) / 2f
-            backRect.set(6f * dp, by, 6f * dp + bw, by + bh)
-            undoRect.set(w - bw * 2.2f, by, w - bw * 1.1f, by + bh)
-            menuRect.set(w - bw * 1.05f, by, w - 4f * dp, by + bh)
+            val bw = 44f * dp; val bh = 28f * dp; val by = (h - bh) / 2f
+            backRect.set(6f * dp,        by, 6f * dp + bw,   by + bh)
+            undoRect.set(w - bw * 3.3f,  by, w - bw * 2.2f,  by + bh)
+            redoRect.set(w - bw * 2.15f, by, w - bw * 1.1f,  by + bh)
+            menuRect.set(w - bw * 1.05f, by, w - 4f * dp,    by + bh)
         }
 
         override fun onTouchEvent(e: MotionEvent): Boolean {
@@ -528,6 +572,7 @@ You win by either:
                 when {
                     backRect.contains(e.x, e.y) -> { SoundPlayer.play("ui_click"); onBack() }
                     undoRect.contains(e.x, e.y) -> { SoundPlayer.play("ui_click"); onUndo() }
+                    redoRect.contains(e.x, e.y) -> { SoundPlayer.play("ui_click"); onRedo() }
                     menuRect.contains(e.x, e.y) -> { SoundPlayer.play("ui_click"); onMenu() }
                 }
             }
@@ -542,10 +587,13 @@ You win by either:
             val rr = 5f * dp
             canvas.drawRoundRect(backRect, rr, rr, btnBgP)
             canvas.drawRoundRect(undoRect, rr, rr, btnBgP)
+            canvas.drawRoundRect(redoRect, rr, rr, btnBgP)
             canvas.drawRoundRect(menuRect, rr, rr, btnBgP)
             canvas.drawText("← Back", backRect.centerX(), backRect.centerY() + btnP.textSize * 0.36f, btnP)
             canvas.drawText("Undo",   undoRect.centerX(), undoRect.centerY() + btnP.textSize * 0.36f,
                 if (canUndo) btnP else dimP)
+            canvas.drawText("Redo",   redoRect.centerX(), redoRect.centerY() + btnP.textSize * 0.36f,
+                if (canRedo) btnP else dimP)
             canvas.drawText("Menu",   menuRect.centerX(), menuRect.centerY() + btnP.textSize * 0.36f, btnP)
 
             val cx = w / 2f

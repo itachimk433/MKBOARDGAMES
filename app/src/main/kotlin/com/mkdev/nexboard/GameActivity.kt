@@ -41,6 +41,11 @@ class GameActivity : AppCompatActivity() {
     private var resultRecorded = false
     private var interstitialAd: Any? = null
 
+    private val redoGameStates = ArrayDeque<GameState>()
+    private val redoCaptures   = ArrayDeque<Pair<List<Piece>, List<Piece>>>()
+    private val redoMoves      = ArrayDeque<List<GameState>>()
+    private val redoCapSnaps   = ArrayDeque<List<Pair<List<Piece>, List<Piece>>>>()
+
     private var capturedByWhite = mutableListOf<Piece>()
     private var capturedByBlack = mutableListOf<Piece>()
     private val captureSnapshots = ArrayDeque<Pair<List<Piece>, List<Piece>>>()
@@ -287,6 +292,7 @@ Checkmate your opponent's King.
     private fun startGame() {
         resultRecorded = false
         interstitialAd = null
+        redoGameStates.clear(); redoCaptures.clear(); redoMoves.clear(); redoCapSnaps.clear()
         AdManager.loadInterstitial(this) { interstitialAd = it }
         moveHistory.clear(); capturedByWhite.clear(); capturedByBlack.clear(); captureSnapshots.clear()
         SettingsManager.activateGameTheme(this, gameType.lowercase())
@@ -331,6 +337,7 @@ Checkmate your opponent's King.
                 else capturedByBlack.add(capPiece)
             }
             captureSnapshots.addLast(capturedByWhite.toList() to capturedByBlack.toList())
+            redoGameStates.clear(); redoCaptures.clear(); redoMoves.clear(); redoCapSnaps.clear()
             moveHistory.addLast(gameState)
             gameState = engine.applyMove(gameState, move)
             boardView.gameState = gameState
@@ -349,7 +356,7 @@ Checkmate your opponent's King.
                 recordResult()
                 val ad = interstitialAd
                 interstitialAd = null
-                AdManager.showInterstitial(ad)
+                AdManager.showInterstitial(this, ad)
                 AdManager.loadInterstitial(this) { interstitialAd = it }
                 showResultDialog()
                 return
@@ -486,16 +493,41 @@ Checkmate your opponent's King.
     private fun updateHud() {
         val turn  = if (gameState.currentTurn == PieceColor.WHITE) "White" else "Black"
         val label = if (vsAI && gameState.currentTurn == playerColor) "Your turn" else "$turn to move"
-        hudView.setInfo(label, canUndo = moveHistory.isNotEmpty())
+        hudView.setInfo(label, canUndo = moveHistory.isNotEmpty(), canRedo = redoGameStates.isNotEmpty())
     }
 
     fun onUndoClicked() {
         if (moveHistory.isEmpty() || boardView.isLocked) return
-        var undoCount = 1
-        if (vsAI && moveHistory.size >= 2) { moveHistory.removeLast(); undoCount = 2 }
-        gameState = moveHistory.removeLastOrNull() ?: return
-        repeat(undoCount) { captureSnapshots.removeLastOrNull() }
+        val prevState = gameState
+        val prevCap   = capturedByWhite.toList() to capturedByBlack.toList()
+        val rMoves    = mutableListOf<GameState>()
+        val rSnaps    = mutableListOf<Pair<List<Piece>, List<Piece>>>()
+        if (vsAI && moveHistory.size >= 2) rMoves.add(moveHistory.removeLast())
+        val restored  = moveHistory.removeLastOrNull() ?: return
+        rMoves.add(restored)
+        repeat(rMoves.size) { rSnaps.add(captureSnapshots.removeLastOrNull() ?: (emptyList<Piece>() to emptyList<Piece>())) }
+        gameState = restored
         val (cw, cb) = captureSnapshots.lastOrNull() ?: (emptyList<Piece>() to emptyList<Piece>())
+        capturedByWhite = cw.toMutableList(); capturedByBlack = cb.toMutableList()
+        redoGameStates.addLast(prevState); redoCaptures.addLast(prevCap)
+        redoMoves.addLast(rMoves);         redoCapSnaps.addLast(rSnaps)
+        topCaptureView.update(capturedByBlack)
+        bottomCaptureView.update(capturedByWhite)
+        boardView.isLocked = false; boardView.gameState = gameState; updateHud()
+    }
+
+    fun onRedoClicked() {
+        if (redoGameStates.isEmpty() || boardView.isLocked) return
+        val nextState = redoGameStates.removeLast()
+        val nextCap   = redoCaptures.removeLast()
+        val rMoves    = redoMoves.removeLast()
+        val rSnaps    = redoCapSnaps.removeLast()
+        for (i in rMoves.indices.reversed()) {
+            captureSnapshots.addLast(rSnaps[i])
+            moveHistory.addLast(rMoves[i])
+        }
+        gameState = nextState
+        val (cw, cb) = nextCap
         capturedByWhite = cw.toMutableList(); capturedByBlack = cb.toMutableList()
         topCaptureView.update(capturedByBlack)
         bottomCaptureView.update(capturedByWhite)
@@ -601,45 +633,48 @@ Checkmate your opponent's King.
     inner class HudView(ctx: Context) : View(ctx) {
         private var title    = "White to move"
         private var canUndo  = false
+        private var canRedo  = false
         private var thinking = false
 
         private val dp = resources.displayMetrics.density
         private val sp = resources.displayMetrics.scaledDensity
 
-        private val bgPaint        = Paint().apply { color = Color.parseColor("#1A1A1A") }
-        private val divPaint       = Paint().apply { color = Color.parseColor("#2A2A2A") }
-        private val txtPaint       = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        private val bgPaint    = Paint().apply { color = Color.parseColor("#1A1A1A") }
+        private val divPaint   = Paint().apply { color = Color.parseColor("#2A2A2A") }
+        private val txtPaint   = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE; textAlign = Paint.Align.LEFT; isFakeBoldText = true
             textSize = 15f * sp.coerceAtMost(3f)
         }
-        private val subPaint       = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        private val subPaint   = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.parseColor("#7FC8F8"); textAlign = Paint.Align.LEFT
             textSize = 11f * sp.coerceAtMost(3f)
         }
-        private val btnBgPaint     = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#252525") }
-        private val btnPaint       = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        private val btnBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#252525") }
+        private val btnPaint   = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.parseColor("#7FC8F8"); textAlign = Paint.Align.CENTER
             textSize = 11f * sp.coerceAtMost(3f)
         }
-        private val dimPaint       = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        private val dimPaint   = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.parseColor("#555555"); textAlign = Paint.Align.CENTER
             textSize = 11f * sp.coerceAtMost(3f)
         }
 
         private val backRect = RectF()
         private val undoRect = RectF()
+        private val redoRect = RectF()
         private val menuRect = RectF()
 
-        fun setInfo(label: String, canUndo: Boolean) {
-            title = label; this.canUndo = canUndo; invalidate()
+        fun setInfo(label: String, canUndo: Boolean, canRedo: Boolean) {
+            title = label; this.canUndo = canUndo; this.canRedo = canRedo; invalidate()
         }
         fun setThinking(t: Boolean) { thinking = t; invalidate() }
 
         override fun onSizeChanged(w: Int, h: Int, ow: Int, oh: Int) {
-            val bw = 50f * dp; val bh = 28f * dp; val by = (h - bh) / 2f
-            backRect.set(6f * dp, by, 6f * dp + bw, by + bh)
-            undoRect.set(w - bw * 2.2f, by, w - bw * 1.1f, by + bh)
-            menuRect.set(w - bw * 1.05f, by, w - 4f * dp, by + bh)
+            val bw = 44f * dp; val bh = 28f * dp; val by = (h - bh) / 2f
+            backRect.set(6f * dp,        by, 6f * dp + bw,   by + bh)
+            undoRect.set(w - bw * 3.3f,  by, w - bw * 2.2f,  by + bh)
+            redoRect.set(w - bw * 2.15f, by, w - bw * 1.1f,  by + bh)
+            menuRect.set(w - bw * 1.05f, by, w - 4f * dp,    by + bh)
         }
 
         @Suppress("DEPRECATION")
@@ -648,6 +683,7 @@ Checkmate your opponent's King.
                 when {
                     backRect.contains(e.x, e.y) -> { SoundPlayer.play("ui_click"); this@GameActivity.onBackPressed() }
                     undoRect.contains(e.x, e.y) -> { SoundPlayer.play("ui_click"); onUndoClicked() }
+                    redoRect.contains(e.x, e.y) -> { SoundPlayer.play("ui_click"); onRedoClicked() }
                     menuRect.contains(e.x, e.y) -> { SoundPlayer.play("ui_click"); onMenuClicked() }
                 }
             }
@@ -662,10 +698,13 @@ Checkmate your opponent's King.
             val rr = 5f * dp
             canvas.drawRoundRect(backRect, rr, rr, btnBgPaint)
             canvas.drawRoundRect(undoRect, rr, rr, btnBgPaint)
+            canvas.drawRoundRect(redoRect, rr, rr, btnBgPaint)
             canvas.drawRoundRect(menuRect, rr, rr, btnBgPaint)
             canvas.drawText("← Back", backRect.centerX(), backRect.centerY() + btnPaint.textSize * 0.36f, btnPaint)
             canvas.drawText("Undo", undoRect.centerX(), undoRect.centerY() + btnPaint.textSize * 0.36f,
                 if (canUndo) btnPaint else dimPaint)
+            canvas.drawText("Redo", redoRect.centerX(), redoRect.centerY() + btnPaint.textSize * 0.36f,
+                if (canRedo) btnPaint else dimPaint)
             canvas.drawText("Menu", menuRect.centerX(), menuRect.centerY() + btnPaint.textSize * 0.36f, btnPaint)
 
             val cx = (backRect.right + undoRect.left) / 2f
