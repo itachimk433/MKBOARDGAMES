@@ -39,6 +39,7 @@ class GameActivity : AppCompatActivity() {
 
     // Result guard: stats recorded exactly once per game
     private var resultRecorded = false
+    private var interstitialAd: Any? = null
 
     private var capturedByWhite = mutableListOf<Piece>()
     private var capturedByBlack = mutableListOf<Piece>()
@@ -86,18 +87,8 @@ class GameActivity : AppCompatActivity() {
         topCaptureView.visibility    = if (showCaptures) View.VISIBLE else View.GONE
         bottomCaptureView.visibility = if (showCaptures) View.VISIBLE else View.GONE
 
-        try {
-            val bannerView = com.huawei.hms.ads.banner.BannerView(this).apply {
-                setAdId("g2jnehr5cv")
-                bannerAdSize = com.huawei.hms.ads.BannerAdSize.BANNER_SIZE_320_50
-            }
-            container.addView(bannerView,
-                android.widget.LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
-            setContentView(container)
-            bannerView.loadAd(com.huawei.hms.ads.AdParam.Builder().build())
-        } catch (_: Throwable) {
-            setContentView(container)
-        }
+        AdManager.attachBanner(container)
+        setContentView(container)
 
         @Suppress("DEPRECATION")
         window.decorView.setOnSystemUiVisibilityChangeListener { vis ->
@@ -295,6 +286,8 @@ Checkmate your opponent's King.
 
     private fun startGame() {
         resultRecorded = false
+        interstitialAd = null
+        AdManager.loadInterstitial(this) { interstitialAd = it }
         moveHistory.clear(); capturedByWhite.clear(); capturedByBlack.clear(); captureSnapshots.clear()
         SettingsManager.activateGameTheme(this, gameType.lowercase())
         if (vsAI) SettingsManager.setActiveGame(this, gameType.lowercase())
@@ -354,6 +347,10 @@ Checkmate your opponent's King.
             if (gameType == "OTHELLO") playOthelloSound(move)
             if (gameState.status != GameStatus.IN_PROGRESS) {
                 recordResult()
+                val ad = interstitialAd
+                interstitialAd = null
+                AdManager.showInterstitial(ad)
+                AdManager.loadInterstitial(this) { interstitialAd = it }
                 showResultDialog()
                 return
             }

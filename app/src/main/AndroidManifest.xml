@@ -18,6 +18,10 @@
             android:name="com.huawei.hms.client.appid"
             android:value="appid=117932217"/>
 
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-4975030890366420~8179344701"/>
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

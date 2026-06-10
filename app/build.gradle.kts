@@ -48,5 +48,6 @@ plugins {
       implementation("androidx.appcompat:appcompat:1.6.1")
       implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
       implementation("com.huawei.hms:ads-lite:13.4.85.301")
+      implementation("com.google.android.gms:play-services-ads:23.2.0")
   }
   

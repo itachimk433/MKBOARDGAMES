@@ -42,18 +42,8 @@ class MainActivity : AppCompatActivity() {
         }
         root.addView(menu, android.widget.LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, 0).apply { weight = 1f })
-        try {
-            val bannerView = com.huawei.hms.ads.banner.BannerView(this).apply {
-                setAdId("g2jnehr5cv")
-                bannerAdSize = com.huawei.hms.ads.BannerAdSize.BANNER_SIZE_320_50
-            }
-            root.addView(bannerView, android.widget.LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
-            setContentView(root)
-            bannerView.loadAd(com.huawei.hms.ads.AdParam.Builder().build())
-        } catch (_: Throwable) {
-            setContentView(root)
-        }
+        AdManager.attachBanner(root)
+        setContentView(root)
 
         if (!SettingsManager.hasConsentAccepted(this)) showConsentDialog()
 
@@ -324,7 +314,7 @@ class MainActivity : AppCompatActivity() {
         content.addView(txt("Privacy Policy & Terms of Service", bold = true, colorHex = "#FFFFFF", sizeSp = 13f))
         content.addView(sep())
         content.addView(txt("NexBoard does not collect personal data. Game statistics (wins/losses/draws) are stored locally on your device and never transmitted to external servers."))
-        content.addView(txt("\nADVERTISING: We display ads via Huawei Petal Ads (HMS). These networks may collect device identifiers and usage data under their own privacy policies. Opt out in device Settings \u203a Privacy \u203a Ads."))
+        content.addView(txt("\nADVERTISING: We display ads via Google AdMob (on Google Play devices) and Huawei Petal Ads (on Huawei devices). These networks may collect device identifiers and usage data under their own privacy policies. Opt out in device Settings \u203a Privacy \u203a Ads."))
         content.addView(txt("\nPERMISSIONS: Internet \u2014 ads; Network State \u2014 ads; Vibrate \u2014 gameplay haptics."))
         content.addView(txt("\nTERMS: Use NexBoard lawfully. The app is provided \u201cas is\u201d without warranty. Continued use constitutes acceptance of these terms."))
         content.addView(txt("\nContact: mkdev4360@gmail.com", colorHex = "#888888"))
@@ -342,7 +332,7 @@ class MainActivity : AppCompatActivity() {
         content.addView(txt("隐私政策与服务条款", bold = true, colorHex = "#FFFFFF", sizeSp = 13f))
         content.addView(sep())
         content.addView(txt("NexBoard 不收集任何个人数据。游戏统计数据（胜负/平局）仅存储在您的本地设备上，不会上传至外部服务器。"))
-        content.addView(txt("\n广告说明：我们通过华为花瓣广告（HMS）展示广告。华为花瓣广告可能依据其隐私政策收集设备标识符和使用数据。您可在设备设置 \u203a 隐私 \u203a 广告中关闭个性化广告。"))
+        content.addView(txt("\n广告说明：我们在 Google Play 设备上通过 Google AdMob、在华为设备上通过华为花瓣广告（HMS）展示广告。这些广告网络可能依据各自的隐私政策收集设备标识符和使用数据。您可在设备设置 \u203a 隐私 \u203a 广告中关闭个性化广告。"))
         content.addView(txt("\n权限说明：网络访问权限（广告）；网络状态权限（广告）；振动权限（游戏触觉反馈）。"))
         content.addView(txt("\n服务条款：请合法使用本应用。本应用按\"现状\"提供，不附任何保证。继续使用即表示您接受上述条款。"))
         content.addView(txt("\n联系方式：mkdev4360@gmail.com", colorHex = "#888888"))

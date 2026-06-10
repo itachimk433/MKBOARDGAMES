@@ -66,17 +66,8 @@ class MorabarabaActivity : AppCompatActivity() {
         root.addView(boardView,        LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0).apply { weight = 1f })
         root.addView(bottomCaptureView, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, capH))
 
-        try {
-            val bannerView = com.huawei.hms.ads.banner.BannerView(this).apply {
-                setAdId("g2jnehr5cv")
-                bannerAdSize = com.huawei.hms.ads.BannerAdSize.BANNER_SIZE_320_50
-            }
-            root.addView(bannerView, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
-            setContentView(root)
-            bannerView.loadAd(com.huawei.hms.ads.AdParam.Builder().build())
-        } catch (_: Throwable) {
-            setContentView(root)
-        }
+        AdManager.attachBanner(root)
+        setContentView(root)
         showModeDialog()
     }
 
