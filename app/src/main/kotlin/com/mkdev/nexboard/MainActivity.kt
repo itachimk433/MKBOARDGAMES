@@ -27,6 +27,8 @@ class MainActivity : AppCompatActivity() {
                     startActivity(Intent(this, MorabarabaActivity::class.java))
                 MenuView.GameType.TICTACTOE ->
                     startActivity(Intent(this, TicTacToeActivity::class.java))
+                MenuView.GameType.LUDO ->
+                    startActivity(Intent(this, LudoActivity::class.java))
                 else ->
                     startActivity(Intent(this, GameActivity::class.java).apply {
                         putExtra(GameActivity.EXTRA_GAME, type.name)
