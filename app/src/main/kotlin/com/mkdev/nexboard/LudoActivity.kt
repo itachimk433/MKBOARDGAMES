@@ -9,831 +9,821 @@ import android.view.*
 import android.widget.*
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import kotlin.math.*
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LUDO GAME ENGINE  (adapted from LudoGameEngine.kt + LudoAI.kt references)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+private const val RING_SIZE    = 52       // main track
+private const val HOME_DEPTH   = 6       // cells per home column (incl. finish)
+private const val FINISH_POS   = 57      // logical position when piece is done
+private const val IN_YARD      = -1      // piece not yet on board
+private const val PIECES_EACH  = 4
+
+private enum class LC(val idx: Int) { RED(0), BLUE(1), GREEN(2), YELLOW(3) }
+
+// Where each colour enters the ring (ring index)
+private val RING_ENTRY = mapOf(LC.RED to 0, LC.BLUE to 13, LC.GREEN to 26, LC.YELLOW to 39)
+
+// Safe squares: start cells + midpoints  (from LudoGameEngine reference)
+private val SAFE = setOf(0, 8, 13, 21, 26, 34, 39, 47)
+
+// ─── 52-cell ring (col, row) in a 15×15 grid ─────────────────────────────────
+// Clockwise, (0,0) = top-left.
+// Red  starts at 0,  Blue at 13, Green at 26, Yellow at 39.
+// Each colour has exactly 13 ring cells before the next colour's start.
+private val RING = listOf(
+    // Red segment  [0-12]:  col 6 up, row 8 left, left-edge down
+    6 to 14, 6 to 13, 6 to 12, 6 to 11, 6 to 10, 6 to 9,
+    5 to 8,  4 to 8,  3 to 8,  2 to 8,  1 to 8,  0 to 8,  0 to 7,
+    // Blue segment [13-25]: left-edge up, row 6 right, col 6 up
+    0 to 6,  1 to 6,  2 to 6,  3 to 6,  4 to 6,  5 to 6,
+    6 to 5,  6 to 4,  6 to 3,  6 to 2,  6 to 1,  6 to 0,  7 to 0,
+    // Green segment[26-38]: top-edge right, col 8 down, row 6 right
+    8 to 0,  8 to 1,  8 to 2,  8 to 3,  8 to 4,  8 to 5,  8 to 6,
+    9 to 6,  10 to 6, 11 to 6, 12 to 6, 13 to 6, 14 to 6,
+    // Yellow segment[39-51]: col 14 down, row 8 left, col 8 down
+    14 to 8, 13 to 8, 12 to 8, 11 to 8, 10 to 8,  9 to 8,
+    8 to 9,  8 to 10, 8 to 11, 8 to 12, 8 to 13,  8 to 14, 7 to 14
+)
+
+// ─── Home columns: 6 cells from ring-exit toward centre (col, row) ────────────
+private val HOME_COL = mapOf(
+    LC.RED    to listOf(7 to 13, 7 to 12, 7 to 11, 7 to 10, 7 to 9,  7 to 8),
+    LC.BLUE   to listOf(1 to 7,  2 to 7,  3 to 7,  4 to 7,  5 to 7,  6 to 7),
+    LC.GREEN  to listOf(7 to 1,  7 to 2,  7 to 3,  7 to 4,  7 to 5,  7 to 6),
+    LC.YELLOW to listOf(13 to 7, 12 to 7, 11 to 7, 10 to 7, 9 to 7,  8 to 7)
+)
+
+// ─── Yard slots (col, row) as floats – 4 circles per yard ────────────────────
+private val YARD_SLOTS = mapOf(
+    LC.RED    to listOf(1.5f to 10.5f, 3.5f to 10.5f, 1.5f to 12.5f, 3.5f to 12.5f),
+    LC.BLUE   to listOf(1.5f to  1.5f, 3.5f to  1.5f, 1.5f to  3.5f, 3.5f to  3.5f),
+    LC.GREEN  to listOf(10.5f to 1.5f, 12.5f to 1.5f, 10.5f to 3.5f, 12.5f to 3.5f),
+    LC.YELLOW to listOf(10.5f to 10.5f,12.5f to 10.5f,10.5f to 12.5f,12.5f to 12.5f)
+)
+
+// ─── Piece ────────────────────────────────────────────────────────────────────
+private data class Piece(
+    val color: LC,
+    val id: Int,
+    var pos: Int = IN_YARD,
+    var done: Boolean = false
+)
+
+// ─── Player ───────────────────────────────────────────────────────────────────
+private data class Player(
+    val color: LC,
+    val pieces: List<Piece> = List(PIECES_EACH) { Piece(color, it) },
+    var human: Boolean = true
+) {
+    val allDone get() = pieces.all { it.done }
+}
+
+// ─── Movement rules ───────────────────────────────────────────────────────────
+private object Rules {
+
+    /** Relative clockwise distance from [start] to [pos] on the 52-ring. */
+    private fun relDist(start: Int, pos: Int) =
+        if (pos >= start) pos - start else RING_SIZE - start + pos
+
+    /**
+     * New logical position after [steps] from [from] for colour [c].
+     * Returns IN_YARD when the move is illegal (overshoot / no 6 from yard).
+     */
+    fun advance(c: LC, from: Int, steps: Int): Int {
+        if (from == IN_YARD)  return if (steps == 6) RING_ENTRY[c]!! else IN_YARD
+        if (from >= RING_SIZE) {            // already in home column
+            val np = from + steps
+            return when {
+                np == FINISH_POS -> FINISH_POS
+                np > FINISH_POS  -> IN_YARD  // overshoot
+                else             -> np
+            }
+        }
+        val entry    = RING_ENTRY[c]!!
+        val traveled = relDist(entry, from)
+        val total    = traveled + steps
+        return when {
+            total >= RING_SIZE -> {
+                val homeStep = total - RING_SIZE
+                if (homeStep >= HOME_DEPTH) IN_YARD else RING_SIZE + homeStep
+            }
+            else -> (entry + total) % RING_SIZE
+        }
+    }
+
+    /** All pieces of [p] that can legally move with [dice]. */
+    fun movable(p: Player, dice: Int): List<Piece> =
+        p.pieces.filter { !it.done && advance(it.color, it.pos, dice) != IN_YARD }
+
+    /** Find an opponent piece at [pos] that can be captured (not on safe cell). */
+    fun captureAt(pos: Int, mover: LC, all: List<Player>): Piece? {
+        if (pos < 0 || pos >= RING_SIZE || pos in SAFE) return null
+        for (pl in all) {
+            if (pl.color == mover) continue
+            for (p in pl.pieces) if (p.pos == pos && !p.done) return p
+        }
+        return null
+    }
+}
+
+// ─── AI (adapted from LudoAI.kt reference) ───────────────────────────────────
+private object AI {
+    fun pick(player: Player, dice: Int, all: List<Player>): Piece? {
+        val cands = Rules.movable(player, dice)
+        if (cands.isEmpty()) return null
+        data class C(val p: Piece, val np: Int, val caps: Boolean, val wins: Boolean)
+        val rich = cands.map { p ->
+            val np   = Rules.advance(p.color, p.pos, dice)
+            val caps = np in 0 until RING_SIZE && Rules.captureAt(np, player.color, all) != null
+            val wins = np == FINISH_POS
+            C(p, np, caps, wins)
+        }
+        // Priority 1 – finish a piece immediately
+        rich.firstOrNull { it.wins }?.let { return it.p }
+        // Priority 2 – capture an opponent
+        rich.firstOrNull { it.caps }?.let { return it.p }
+        // Priority 3 – advance piece almost home
+        rich.filter { it.np in 48..FINISH_POS }.maxByOrNull { it.np }?.let { return it.p }
+        // Priority 4 – enter board from yard
+        rich.firstOrNull { it.p.pos == IN_YARD }?.let { return it.p }
+        // Priority 5 – advance furthest piece
+        rich.maxByOrNull { it.np }?.let { return it.p }
+        return cands.first()
+    }
+}
+
+// ─── Cell centre lookup (col·float, row·float) ───────────────────────────────
+private fun pieceCell(piece: Piece): Pair<Float, Float>? {
+    if (piece.done) return 7.5f to 7.5f
+    val pos = piece.pos
+    return when {
+        pos == IN_YARD -> YARD_SLOTS[piece.color]?.getOrNull(piece.id)
+        pos in 0 until RING_SIZE ->
+            RING.getOrNull(pos)?.let { (c, r) -> c + 0.5f to r + 0.5f }
+        pos in RING_SIZE..FINISH_POS ->
+            HOME_COL[piece.color]?.getOrNull(pos - RING_SIZE)?.let { (c, r) -> c + 0.5f to r + 0.5f }
+        else -> null
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// BOARD VIEW
+// ═══════════════════════════════════════════════════════════════════════════════
+
+private class BoardView(ctx: Context) : View(ctx) {
+
+    var players:  List<Player>  = emptyList(); set(v) { field = v; invalidate() }
+    var movable:  List<Piece>   = emptyList(); set(v) { field = v; invalidate() }
+    var selected: Piece?        = null;        set(v) { field = v; invalidate() }
+    var onTap: ((Piece) -> Unit)? = null
+
+    private val path = Path()
+    private val pp   = Paint(Paint.ANTI_ALIAS_FLAG)
+    private var cell = 0f
+
+    // Board colours
+    private val COL = intArrayOf(
+        Color.parseColor("#EF5350"),   // Red
+        Color.parseColor("#42A5F5"),   // Blue
+        Color.parseColor("#66BB6A"),   // Green
+        Color.parseColor("#FFCA28")    // Yellow
+    )
+    private val YARD_COL = intArrayOf(
+        Color.parseColor("#3D0E0E"),
+        Color.parseColor("#0A1835"),
+        Color.parseColor("#0D3519"),
+        Color.parseColor("#3D3300")
+    )
+
+    override fun onMeasure(ws: Int, hs: Int) {
+        val s = min(MeasureSpec.getSize(ws), MeasureSpec.getSize(hs))
+        setMeasuredDimension(s, s)
+    }
+    override fun onSizeChanged(w: Int, h: Int, ow: Int, oh: Int) { cell = w / 15f }
+
+    private fun cl(c: Float)  = c * cell         // left edge of column c
+    private fun ct(r: Float)  = r * cell         // top edge of row r
+    private fun cx(c: Float)  = (c + 0.5f) * cell  // centre-x of col c
+    private fun cy(r: Float)  = (r + 0.5f) * cell  // centre-y of row r
+
+    // ─── Draw ────────────────────────────────────────────────────────────────
+
+    override fun onDraw(canvas: Canvas) {
+        if (cell == 0f) return
+        drawBackground(canvas)
+        drawTrackCross(canvas)
+        drawYards(canvas)
+        drawHomeColumns(canvas)
+        drawCentreHome(canvas)
+        drawSafeStars(canvas)
+        drawGridLines(canvas)
+        drawPieces(canvas)
+    }
+
+    private fun drawBackground(canvas: Canvas) {
+        pp.color = Color.parseColor("#1A1B22"); pp.style = Paint.Style.FILL
+        canvas.drawRect(0f, 0f, cell * 15, cell * 15, pp)
+    }
+
+    private fun drawTrackCross(canvas: Canvas) {
+        pp.color = Color.parseColor("#23242F"); pp.style = Paint.Style.FILL
+        canvas.drawRect(0f,      ct(6f), cell * 15, ct(9f), pp)   // horizontal
+        canvas.drawRect(cl(6f),  0f,     cl(9f),    cell * 15, pp) // vertical
+    }
+
+    private fun drawYards(canvas: Canvas) {
+        val defs = listOf(
+            LC.RED    to (0 to 9),   // bottom-left
+            LC.BLUE   to (0 to 0),   // top-left
+            LC.GREEN  to (9 to 0),   // top-right
+            LC.YELLOW to (9 to 9)    // bottom-right
+        )
+        defs.forEach { (lc, cr) ->
+            val (col, row) = cr
+            val ci = lc.idx
+
+            // Outer block
+            pp.color = YARD_COL[ci]; pp.style = Paint.Style.FILL
+            canvas.drawRect(cl(col.toFloat()), ct(row.toFloat()),
+                            cl(col + 6f), ct(row + 6f), pp)
+            // Inner recess
+            pp.color = Color.parseColor("#141520")
+            canvas.drawRect(cl(col + 1f), ct(row + 1f),
+                            cl(col + 5f), ct(row + 5f), pp)
+
+            // 4 yard circles
+            val sColF = listOf(col+1.5f, col+3.5f, col+1.5f, col+3.5f)
+            val sRowF = listOf(row+1.5f, row+1.5f, row+3.5f, row+3.5f)
+            for (i in 0..3) {
+                pp.color = COL[ci]; pp.style = Paint.Style.FILL
+                canvas.drawCircle(cx(sColF[i]), cy(sRowF[i]), cell * 0.38f, pp)
+                pp.color = Color.parseColor("#141520")
+                canvas.drawCircle(cx(sColF[i]), cy(sRowF[i]), cell * 0.26f, pp)
+            }
+        }
+    }
+
+    private fun drawHomeColumns(canvas: Canvas) {
+        for (lc in LC.values()) {
+            val cells = HOME_COL[lc] ?: continue
+            cells.forEach { (c, r) ->
+                pp.color = COL[lc.idx]; pp.alpha = 110; pp.style = Paint.Style.FILL
+                canvas.drawRect(cl(c.toFloat()), ct(r.toFloat()),
+                                cl(c + 1f), ct(r + 1f), pp)
+                pp.alpha = 255
+            }
+        }
+    }
+
+    private fun drawCentreHome(canvas: Canvas) {
+        val ccx = cx(7f); val ccy = cy(7f)
+        val tl = cl(6f) to ct(6f); val tr = cl(9f) to ct(6f)
+        val bl = cl(6f) to ct(9f); val br = cl(9f) to ct(9f)
+        val ctr = ccx to ccy
+        listOf(
+            LC.BLUE   to (tl to tr),
+            LC.RED    to (bl to br),
+            LC.GREEN  to (tr to br),
+            LC.YELLOW to (tl to bl)
+        ).forEach { (lc, pts) ->
+            path.reset()
+            path.moveTo(ctr.first,     ctr.second)
+            path.lineTo(pts.first.first, pts.first.second)
+            path.lineTo(pts.second.first, pts.second.second)
+            path.close()
+            pp.color = COL[lc.idx]; pp.style = Paint.Style.FILL; pp.alpha = 230
+            canvas.drawPath(path, pp)
+            pp.alpha = 255
+        }
+    }
+
+    private fun drawSafeStars(canvas: Canvas) {
+        val starts = RING_ENTRY.values.toSet()
+        SAFE.filter { it !in starts }.forEach { pos ->
+            val (c, r) = RING[pos]
+            drawStar(canvas, cx(c.toFloat()), cy(r.toFloat()), cell * 0.28f)
+        }
+    }
+
+    private fun drawStar(canvas: Canvas, x: Float, y: Float, outer: Float) {
+        val inner = outer * 0.45f; val pts = 5
+        val step  = Math.PI / pts
+        path.reset()
+        for (i in 0 until pts * 2) {
+            val a  = i * step - Math.PI / 2
+            val r  = if (i % 2 == 0) outer else inner
+            val px = x + (r * cos(a)).toFloat()
+            val py = y + (r * sin(a)).toFloat()
+            if (i == 0) path.moveTo(px, py) else path.lineTo(px, py)
+        }
+        path.close()
+        pp.color = Color.parseColor("#FFD700"); pp.style = Paint.Style.FILL; pp.alpha = 200
+        canvas.drawPath(path, pp)
+        pp.alpha = 255
+    }
+
+    private fun drawGridLines(canvas: Canvas) {
+        pp.color = Color.parseColor("#2C2D3A"); pp.style = Paint.Style.STROKE; pp.strokeWidth = 0.8f
+        for (i in 0..15) {
+            canvas.drawLine(cl(i.toFloat()), 0f,      cl(i.toFloat()), cell * 15, pp)
+            canvas.drawLine(0f,             ct(i.toFloat()), cell * 15, ct(i.toFloat()), pp)
+        }
+        pp.style = Paint.Style.FILL
+    }
+
+    // ─── Pieces ───────────────────────────────────────────────────────────────
+
+    private fun drawPieces(canvas: Canvas) {
+        val all = players.flatMap { it.pieces }
+
+        // Group by cell for stacking offset
+        val groups = mutableMapOf<Pair<Float, Float>, MutableList<Piece>>()
+        all.filter { !it.done }.forEach { p ->
+            val cell = pieceCell(p) ?: return@forEach
+            groups.getOrPut(cell) { mutableListOf() }.add(p)
+        }
+
+        groups.forEach { (cellCentre, pieces) ->
+            val pcx = cellCentre.first  * cell
+            val pcy = cellCentre.second * cell
+            val n   = pieces.size
+            val offs = stackOffsets(n)
+            pieces.forEachIndexed { i, piece ->
+                val ox = offs.getOrElse(i) { 0f to 0f }.first
+                val oy = offs.getOrElse(i) { 0f to 0f }.second
+                drawOnePiece(canvas, pcx + ox, pcy + oy, piece)
+            }
+        }
+
+        // Finished pieces huddle at centre
+        val done = all.filter { it.done }
+        done.forEachIndexed { i, piece ->
+            val small = listOf(-0.15f to -0.15f, 0.15f to -0.15f,
+                                -0.15f to  0.15f, 0.15f to  0.15f,
+                                 0f    to  0f,   -0.3f  to  0f,
+                                 0.3f  to  0f,    0f    to -0.3f)
+            val off = small.getOrElse(i) { 0f to 0f }
+            val pcx = cx(7f) + off.first  * cell
+            val pcy = cy(7f) + off.second * cell
+            pp.color = COL[piece.color.idx]; pp.alpha = 220; pp.style = Paint.Style.FILL
+            canvas.drawCircle(pcx, pcy, cell * 0.18f, pp)
+            pp.alpha = 255
+        }
+    }
+
+    private fun drawOnePiece(canvas: Canvas, pcx: Float, pcy: Float, piece: Piece) {
+        val isMovable  = movable.contains(piece)
+        val isSelected = selected == piece
+        val radius     = cell * 0.32f
+
+        if (isMovable) {
+            pp.color = if (isSelected) Color.parseColor("#00E5FF") else Color.WHITE
+            pp.style = Paint.Style.STROKE; pp.strokeWidth = cell * 0.10f; pp.alpha = 220
+            canvas.drawCircle(pcx, pcy, radius + cell * 0.07f, pp)
+            pp.alpha = 255
+        }
+
+        pp.style = Paint.Style.FILL
+        pp.color = Color.BLACK; pp.alpha = 60
+        canvas.drawCircle(pcx + cell * 0.04f, pcy + cell * 0.04f, radius, pp)
+
+        pp.color = COL[piece.color.idx]; pp.alpha = 255
+        canvas.drawCircle(pcx, pcy, radius, pp)
+
+        pp.color = Color.WHITE; pp.alpha = 65
+        canvas.drawCircle(pcx - radius * 0.22f, pcy - radius * 0.22f, radius * 0.38f, pp)
+
+        pp.color = Color.BLACK; pp.alpha = 90
+        canvas.drawCircle(pcx, pcy, cell * 0.085f, pp)
+        pp.alpha = 255
+    }
+
+    private fun stackOffsets(n: Int): List<Pair<Float, Float>> {
+        val d = cell * 0.18f
+        return when (n) {
+            1    -> listOf(0f to 0f)
+            2    -> listOf(-d to 0f, d to 0f)
+            3    -> listOf(-d to d*0.5f, d to d*0.5f, 0f to -d*0.7f)
+            else -> listOf(-d to -d, d to -d, -d to d, d to d)
+        }
+    }
+
+    // ─── Touch ────────────────────────────────────────────────────────────────
+
+    override fun onTouchEvent(e: MotionEvent): Boolean {
+        if (e.action != MotionEvent.ACTION_UP || cell == 0f || movable.isEmpty()) return true
+        val tx = e.x; val ty = e.y
+        var best: Piece? = null; var bestD = Float.MAX_VALUE
+        for (piece in movable) {
+            val (cf, rf) = pieceCell(piece) ?: continue
+            val px = cf * cell; val py = rf * cell
+            val d  = sqrt((tx - px).pow(2) + (ty - py).pow(2))
+            if (d < cell * 0.55f && d < bestD) { bestD = d; best = piece }
+        }
+        best?.let { onTap?.invoke(it) }
+        return true
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// HUD VIEW
+// ═══════════════════════════════════════════════════════════════════════════════
+
+private class HudView(ctx: Context) : View(ctx) {
+
+    var playerColor: Int = Color.parseColor("#EF5350"); set(v) { field = v; invalidate() }
+    var status: String = "Roll the dice";              set(v) { field = v; invalidate() }
+    var diceVal: Int = 0;                              set(v) { field = v; invalidate() }
+    var diceEnabled: Boolean = true;                   set(v) { field = v; invalidate() }
+
+    var onBack: (() -> Unit)? = null
+    var onDice: (() -> Unit)? = null
+
+    private val dp  = ctx.resources.displayMetrics.density
+    private val sp  = ctx.resources.displayMetrics.scaledDensity
+    private val pp  = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val diceRct = RectF()
+    private val backRct = RectF()
+
+    override fun onDraw(canvas: Canvas) {
+        val w = width.toFloat(); val h = height.toFloat()
+
+        // Background
+        pp.color = Color.parseColor("#1A1B22"); pp.style = Paint.Style.FILL
+        canvas.drawRect(0f, 0f, w, h, pp)
+        pp.color = Color.parseColor("#2C2D3A")
+        canvas.drawRect(0f, h - dp, w, h, pp)
+
+        // ← back
+        backRct.set(dp * 4f, dp * 8f, dp * 46f, h - dp * 8f)
+        pp.color = Color.parseColor("#7FC8F8"); pp.textAlign = Paint.Align.CENTER
+        pp.textSize = 22f * sp; pp.isFakeBoldText = true; pp.style = Paint.Style.FILL
+        canvas.drawText("←", backRct.centerX(), backRct.centerY() + pp.textSize * 0.36f, pp)
+
+        // Player colour dot
+        val dotX = dp * 64f; val dotR = h * 0.18f
+        pp.color = playerColor
+        canvas.drawCircle(dotX, h / 2f, dotR, pp)
+        pp.color = Color.WHITE; pp.style = Paint.Style.STROKE; pp.strokeWidth = 1.5f
+        canvas.drawCircle(dotX, h / 2f, dotR, pp)
+        pp.style = Paint.Style.FILL
+
+        // Status text
+        pp.color = Color.WHITE; pp.textAlign = Paint.Align.CENTER; pp.textSize = 13f * sp; pp.isFakeBoldText = false
+        canvas.drawText(status, w / 2f, h / 2f + pp.textSize * 0.36f, pp)
+
+        // Dice
+        val ds = h * 0.68f
+        val dx = w - dp * 10f - ds; val dy = h * 0.16f
+        diceRct.set(dx, dy, dx + ds, dy + ds)
+        drawDice(canvas, diceRct, diceVal, diceEnabled)
+    }
+
+    private fun drawDice(canvas: Canvas, r: RectF, v: Int, enabled: Boolean) {
+        val corner = r.width() * 0.18f
+        // Shadow
+        pp.color = Color.argb(60, 0, 0, 0)
+        canvas.drawRoundRect(r.left + 2, r.top + 2, r.right + 2, r.bottom + 2, corner, corner, pp)
+        // Face
+        pp.color = if (enabled) Color.parseColor("#F5F5F5") else Color.parseColor("#444455")
+        canvas.drawRoundRect(r, corner, corner, pp)
+        // Border
+        pp.color = Color.parseColor("#BDBDBD"); pp.style = Paint.Style.STROKE; pp.strokeWidth = 1.5f
+        canvas.drawRoundRect(r, corner, corner, pp)
+        pp.style = Paint.Style.FILL
+
+        if (v in 1..6) {
+            val dotR   = r.width() * 0.09f
+            val iL     = r.left   + r.width()  * 0.18f
+            val iT     = r.top    + r.height()  * 0.18f
+            val iW     = r.width()  * 0.64f
+            val dotCol = if (v == 6) Color.parseColor("#EF5350") else Color.parseColor("#212121")
+            val dots   = when (v) {
+                1 -> listOf(0.5f to 0.5f)
+                2 -> listOf(0.25f to 0.25f, 0.75f to 0.75f)
+                3 -> listOf(0.25f to 0.25f, 0.5f  to 0.5f,  0.75f to 0.75f)
+                4 -> listOf(0.25f to 0.25f, 0.75f to 0.25f, 0.25f to 0.75f, 0.75f to 0.75f)
+                5 -> listOf(0.25f to 0.25f, 0.75f to 0.25f, 0.5f  to 0.5f,  0.25f to 0.75f, 0.75f to 0.75f)
+                6 -> listOf(0.25f to 0.2f,  0.75f to 0.2f,  0.25f to 0.5f,  0.75f to 0.5f,  0.25f to 0.8f,  0.75f to 0.8f)
+                else -> emptyList()
+            }
+            pp.color = dotCol
+            dots.forEach { (rx, ry) ->
+                canvas.drawCircle(iL + rx * iW, iT + ry * iW, dotR, pp)
+            }
+        } else {
+            pp.color = Color.parseColor("#666688"); pp.textAlign = Paint.Align.CENTER
+            pp.textSize = r.width() * 0.46f
+            canvas.drawText("?", r.centerX(), r.centerY() + pp.textSize * 0.36f, pp)
+            pp.textAlign = Paint.Align.LEFT
+        }
+    }
+
+    override fun onTouchEvent(e: MotionEvent): Boolean {
+        if (e.action == MotionEvent.ACTION_UP) {
+            when {
+                backRct.contains(e.x, e.y)              -> onBack?.invoke()
+                diceRct.contains(e.x, e.y) && diceEnabled -> onDice?.invoke()
+            }
+        }
+        return true
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ACTIVITY
+// ═══════════════════════════════════════════════════════════════════════════════
 
 class LudoActivity : AppCompatActivity() {
 
-    // ─── Board constants ──────────────────────────────────────────────────────
-    companion object {
-        const val P_RED    = 0
-        const val P_YELLOW = 2   // opposite diagonal
+    private val handler  = Handler(Looper.getMainLooper())
+    private lateinit var board: BoardView
+    private lateinit var hud:   HudView
 
-        // 52-square main track: (row, col). Position 0 = Red's entry.
-        val TRACK = arrayOf(
-            // Red arm — row 6 going right [0-4]
-            intArrayOf(6,1),intArrayOf(6,2),intArrayOf(6,3),intArrayOf(6,4),intArrayOf(6,5),
-            // Up col 6 [5-10]
-            intArrayOf(5,6),intArrayOf(4,6),intArrayOf(3,6),intArrayOf(2,6),intArrayOf(1,6),intArrayOf(0,6),
-            // Top connector [11-12]
-            intArrayOf(0,7),intArrayOf(0,8),
-            // Down col 8 — Green-start marker at 13 [13-17]
-            intArrayOf(1,8),intArrayOf(2,8),intArrayOf(3,8),intArrayOf(4,8),intArrayOf(5,8),
-            // Row 6 right [18-22]
-            intArrayOf(6,9),intArrayOf(6,10),intArrayOf(6,11),intArrayOf(6,12),intArrayOf(6,13),
-            // Right edge — skip row 7 (Yellow home) [23-24]
-            intArrayOf(6,14),intArrayOf(8,14),
-            // Row 8 left — Yellow enters at 26 [25-30]
-            intArrayOf(8,13),intArrayOf(8,12),intArrayOf(8,11),intArrayOf(8,10),intArrayOf(8,9),intArrayOf(8,8),
-            // Down col 8 bottom arm [31-36]
-            intArrayOf(9,8),intArrayOf(10,8),intArrayOf(11,8),intArrayOf(12,8),intArrayOf(13,8),intArrayOf(14,8),
-            // Bottom connector [37-38]
-            intArrayOf(14,7),intArrayOf(14,6),
-            // Up col 6 — Blue-start marker at 39 [39-44]
-            intArrayOf(13,6),intArrayOf(12,6),intArrayOf(11,6),intArrayOf(10,6),intArrayOf(9,6),intArrayOf(8,6),
-            // Row 8 left [45-50]
-            intArrayOf(8,5),intArrayOf(8,4),intArrayOf(8,3),intArrayOf(8,2),intArrayOf(8,1),intArrayOf(8,0),
-            // Corner — last square before Red home [51]
-            intArrayOf(7,0)
-        )
+    // Game state
+    private var players    = listOf<Player>()
+    private var curIdx     = 0
+    private var dice       = 0
+    private var rolled     = false
+    private var canMove    = listOf<Piece>()
+    private var vsAI       = true
+    private var over       = false
+    private var consec6    = 0
 
-        // Home columns: 5 squares per player, index 0 = entry square
-        val HOME_COL = arrayOf(
-            arrayOf(intArrayOf(7,1),intArrayOf(7,2),intArrayOf(7,3),intArrayOf(7,4),intArrayOf(7,5)),   // Red →
-            arrayOf(intArrayOf(1,7),intArrayOf(2,7),intArrayOf(3,7),intArrayOf(4,7),intArrayOf(5,7)),   // Green ↓
-            arrayOf(intArrayOf(7,13),intArrayOf(7,12),intArrayOf(7,11),intArrayOf(7,10),intArrayOf(7,9)), // Yellow ←
-            arrayOf(intArrayOf(13,7),intArrayOf(12,7),intArrayOf(11,7),intArrayOf(10,7),intArrayOf(9,7)) // Blue ↑
-        )
+    private val COLORS = intArrayOf(
+        Color.parseColor("#EF5350"),  // RED
+        Color.parseColor("#42A5F5"),  // BLUE
+        Color.parseColor("#66BB6A"),  // GREEN
+        Color.parseColor("#FFCA28")   // YELLOW
+    )
 
-        // Piece starting slots in each player's yard (4 pieces)
-        val YARD_SLOTS = arrayOf(
-            arrayOf(intArrayOf(2,2),intArrayOf(2,3),intArrayOf(3,2),intArrayOf(3,3)),   // Red
-            arrayOf(intArrayOf(2,11),intArrayOf(2,12),intArrayOf(3,11),intArrayOf(3,12)),// Green
-            arrayOf(intArrayOf(11,11),intArrayOf(11,12),intArrayOf(12,11),intArrayOf(12,12)), // Yellow
-            arrayOf(intArrayOf(11,2),intArrayOf(11,3),intArrayOf(12,2),intArrayOf(12,3)) // Blue
-        )
+    private val cur get() = players.getOrNull(curIdx)
 
-        // Where each player enters the main track
-        val START_POS = intArrayOf(0, 13, 26, 39)
-
-        // Safe squares (stars + player starts) — no captures allowed here
-        val SAFE = setOf(0, 8, 13, 21, 26, 34, 39, 47)
-
-        // Encoded position constants
-        const val POS_YARD     = -1
-        const val POS_FINISHED = 57
-        const val HOME_START   = 52  // 52-56 = home col indices 0-4
-
-        val COLORS = intArrayOf(
-            Color.parseColor("#EF5350"), // Red
-            Color.parseColor("#66BB6A"), // Green
-            Color.parseColor("#FFCA28"), // Yellow
-            Color.parseColor("#42A5F5")  // Blue
-        )
-        val DARK_COLORS = intArrayOf(
-            Color.parseColor("#B71C1C"),
-            Color.parseColor("#1B5E20"),
-            Color.parseColor("#F57F17"),
-            Color.parseColor("#0D47A1")
-        )
-        val YARD_BG = intArrayOf(
-            Color.parseColor("#4A1515"),
-            Color.parseColor("#154A15"),
-            Color.parseColor("#4A4A10"),
-            Color.parseColor("#10204A")
-        )
-    }
-
-    // ─── State ────────────────────────────────────────────────────────────────
-
-    private val pieces = Array(4) { IntArray(4) { POS_YARD } }
-    private var currentPlayer = P_RED
-    private var diceValue     = 0
-    private var diceRolled    = false
-    private var gameOver      = false
-    private var vsAI          = true
-    private var humanPlayer   = P_RED
-    private var aiPlayer      = P_YELLOW
-
-    private val handler = Handler(Looper.getMainLooper())
-
-    private lateinit var boardView: LudoBoardView
-    private lateinit var hudView:   LudoHudView
-
-    // ─── Lifecycle ────────────────────────────────────────────────────────────
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
+    override fun onCreate(s: Bundle?) {
+        super.onCreate(s)
         makeFullscreen()
+
         val dp   = resources.displayMetrics.density
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor("#0D0D0D"))
+            setBackgroundColor(Color.parseColor("#121212"))
         }
-        hudView   = LudoHudView(this)
-        boardView = LudoBoardView(this)
-        root.addView(hudView,   LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (70 * dp).toInt()))
-        root.addView(boardView, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0).apply { weight = 1f })
+
+        hud   = HudView(this)
+        board = BoardView(this)
+
+        root.addView(hud,   LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (58 * dp).toInt()))
+        root.addView(board, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0).apply { weight = 1f })
         AdManager.attachBanner(root)
         setContentView(root)
+
+        hud.onBack = { onBackPressedDispatcher.onBackPressed() }
+        hud.onDice = { tapDice() }
+        board.onTap = { tapPiece(it) }
+
+        @Suppress("DEPRECATION")
+        window.decorView.setOnSystemUiVisibilityChangeListener { vis ->
+            if (vis and View.SYSTEM_UI_FLAG_FULLSCREEN == 0)
+                window.decorView.postDelayed({ makeFullscreen() }, 200)
+        }
+
         showModeDialog()
     }
 
-    override fun onResume() { super.onResume(); makeFullscreen() }
-    override fun onWindowFocusChanged(h: Boolean) { super.onWindowFocusChanged(h); if (h) makeFullscreen() }
+    override fun onResume() {
+        super.onResume(); makeFullscreen()
+        SoundPlayer.movementSoundsEnabled = SettingsManager.isMovementSoundsEnabled(this)
+    }
+
     override fun onDestroy() { super.onDestroy(); handler.removeCallbacksAndMessages(null) }
 
-    @Deprecated("Deprecated in Java")
-    override fun onBackPressed() {
-        if (!gameOver) {
-            AlertDialog.Builder(this).setTitle("Leave Game?")
-                .setMessage("Your progress will be lost.")
-                .setPositiveButton("Leave") { _, _ -> @Suppress("DEPRECATION") super.onBackPressed() }
-                .setNegativeButton("Keep Playing", null).show()
-        } else { @Suppress("DEPRECATION") super.onBackPressed() }
-    }
-
-    // ─── Dialogs ──────────────────────────────────────────────────────────────
+    // ─── Mode dialog ─────────────────────────────────────────────────────────
 
     private fun showModeDialog() {
-        AlertDialog.Builder(this).setTitle("Ludo")
-            .setItems(arrayOf("vs AI", "2 Players", "How to Play")) { _, w ->
-                when (w) {
-                    0 -> { vsAI = true;  humanPlayer = P_RED; aiPlayer = P_YELLOW; startGame() }
-                    1 -> { vsAI = false; humanPlayer = P_RED; aiPlayer = P_YELLOW; startGame() }
-                    2 -> showTutorial()
-                }
-            }
-            .setCancelable(true)
-            .setOnCancelListener { if (!gameOver) finish() }
+        AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_MinWidth)
+            .setTitle("Ludo")
+            .setMessage("Choose mode")
+            .setCancelable(false)
+            .setPositiveButton("vs AI") { _, _ -> vsAI = true;  newGame() }
+            .setNeutralButton("2 Players") { _, _ -> vsAI = false; newGame() }
+            .setNegativeButton("How to Play") { _, _ -> showRules() }
             .show()
+            .window?.setBackgroundDrawable(
+                android.graphics.drawable.ColorDrawable(Color.parseColor("#1A1A1A")))
     }
 
-    private fun showTutorial() {
+    private fun showRules() {
         val dp = resources.displayMetrics.density
         val tv = TextView(this).apply {
-            setTextColor(Color.parseColor("#E0E0E0")); textSize = 14f
-            setPadding((16*dp).toInt(),(12*dp).toInt(),(16*dp).toInt(),(12*dp).toInt())
-            setLineSpacing(4f*dp, 1f)
-            text = """
-LUDO — Rules
+            text = """Ludo — How to Play
 
-Overview
-Two players (Red vs Yellow) each have 4 tokens to race around the board.
-First to get all 4 tokens home wins.
+GOAL
+Move all 4 pieces from your yard into the centre home triangle.
 
-─────────────────────────
+ROLLING
+• Tap the dice on your turn.
+• You need a 6 to bring a piece out of the yard.
+• Rolling a 6 gives you a bonus turn.
+• Three 6s in a row forfeits your turn.
 
-Rolling the Dice
-Tap anywhere on the top bar to roll the dice on your turn.
+MOVING
+• Pieces travel clockwise around the 52-square outer ring.
+• After a full loop, pieces enter your coloured home column.
+• The piece must land exactly on the finish square.
+• Pieces in the home column cannot be captured.
 
-─────────────────────────
+CAPTURING
+• Land on an opponent piece to send it back to their yard.
+• Stars (⭐) are safe squares — no captures allowed there.
+• Capturing gives a bonus turn.
 
-Starting a Token
-Tokens begin in your yard. You need to roll a 6 to bring one out.
-Rolling a 6 also gives you an extra turn.
+WINNING
+• First player to finish all 4 pieces wins!
 
-─────────────────────────
-
-Moving Tokens
-After rolling, tap one of your highlighted tokens to move it forward.
-Tokens travel clockwise around the board.
-
-─────────────────────────
-
-Home Column
-After completing a full lap, tokens enter your coloured home column.
-You must roll the exact number to advance through it.
-
-─────────────────────────
-
-Capturing
-Landing on an opponent's token (not on a ★ safe square) sends it back to their yard.
-
-─────────────────────────
-
-Winning
-Get all 4 of your tokens into the home column to win!
-            """.trimIndent()
+In vs-AI mode you play Red; AI plays Yellow."""
+            setTextColor(Color.parseColor("#CCCCCC"))
+            setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 13f)
+            setPadding((16*dp).toInt(), (12*dp).toInt(), (16*dp).toInt(), (12*dp).toInt())
         }
-        val sv = ScrollView(this).apply { setBackgroundColor(Color.parseColor("#1A1A1A")); addView(tv) }
-        AlertDialog.Builder(this).setTitle("How to Play Ludo").setView(sv)
-            .setPositiveButton("Got it!") { _, _ -> showModeDialog() }.show()
-            .window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.parseColor("#1A1A1A")))
+        val sv = ScrollView(this).apply { addView(tv) }
+        AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_MinWidth)
+            .setView(sv)
+            .setPositiveButton("Play") { _, _ -> showModeDialog() }
+            .setNegativeButton("Back") { _, _ -> showModeDialog() }
+            .show()
+            .window?.setBackgroundDrawable(
+                android.graphics.drawable.ColorDrawable(Color.parseColor("#1A1A1A")))
     }
 
-    private fun showMenuDialog() {
-        val inProgress = !gameOver
-        val items = mutableListOf("New Game")
-        if (inProgress) items.add("Forfeit & Quit")
-        items.add("Main Menu")
-        AlertDialog.Builder(this).setTitle("Menu")
-            .setItems(items.toTypedArray()) { _, w ->
-                when (items[w]) {
-                    "New Game" -> showModeDialog()
-                    "Forfeit & Quit" -> finish()
-                    "Main Menu" -> finish()
-                }
-            }.show()
-    }
+    // ─── Game setup ──────────────────────────────────────────────────────────
 
-    // ─── Game start ───────────────────────────────────────────────────────────
-
-    private fun startGame() {
-        handler.removeCallbacksAndMessages(null)
-        for (p in 0..3) pieces[p].fill(POS_YARD)
-        currentPlayer = P_RED
-        diceValue = 0
-        diceRolled = false
-        gameOver   = false
+    private fun newGame() {
+        players  = listOf(
+            Player(LC.RED,    human = true),
+            Player(LC.YELLOW, human = !vsAI)
+        )
+        curIdx   = 0; dice = 0; rolled = false; canMove = emptyList()
+        over     = false; consec6 = 0
         SoundPlayer.play("game_start")
-        updateHud("${playerLabel(currentPlayer)}'s turn", "Tap to roll")
-        boardView.clearHighlights()
-        boardView.invalidate()
-        // AI goes first if current player is AI (not in 2P mode)
-        if (vsAI && currentPlayer == aiPlayer) handler.postDelayed({ triggerAI() }, 600)
+        syncBoard(); syncHud()
     }
 
-    // ─── Core logic ───────────────────────────────────────────────────────────
+    // ─── Input handlers ───────────────────────────────────────────────────────
 
-    /** Relative position (0-51) for a piece on the track, from this player's perspective. */
-    private fun relPos(player: Int, absPos: Int) = (absPos - START_POS[player] + 52) % 52
+    private fun tapDice() {
+        val p = cur ?: return
+        if (over || rolled || !p.human) return
+        roll()
+    }
 
-    /** Absolute track index given a player and their relative position. */
-    private fun absPos(player: Int, rel: Int) = (START_POS[player] + rel) % 52
+    private fun tapPiece(piece: Piece) {
+        val p = cur ?: return
+        if (over || !rolled || !p.human || !canMove.contains(piece)) return
+        board.selected = piece
+        executeMove(piece)
+    }
 
-    /** Pieces this player can legally move with the given dice roll. */
-    private fun validMoves(player: Int, dice: Int): List<Int> {
-        val moves = mutableListOf<Int>()
-        for (i in 0..3) {
-            val pos = pieces[player][i]
-            when {
-                pos == POS_FINISHED -> continue
-                pos == POS_YARD -> if (dice == 6) moves.add(i)
-                pos in HOME_START..56 -> {
-                    val hIdx = pos - HOME_START
-                    if (hIdx + dice <= 5) moves.add(i)   // 5 = exactly done
-                }
-                else -> {
-                    val rel = relPos(player, pos)
-                    val relNew = rel + dice
-                    if (relNew < 52) moves.add(i)          // stays on track
-                    else if (relNew - 52 <= 4) moves.add(i) // enters home col (max 5 squares)
-                    else if (relNew == 57) moves.add(i)     // exact finish via home
-                }
-            }
+    // ─── Roll ─────────────────────────────────────────────────────────────────
+
+    private fun roll() {
+        val p = cur ?: return
+        dice   = (1..6).random()
+        rolled = true
+        SoundPlayer.play("ui_click")
+
+        if (dice == 6) consec6++ else consec6 = 0
+
+        // Three 6s: forfeit
+        if (consec6 == 3) {
+            consec6 = 0; canMove = emptyList()
+            syncBoard(); syncHud("Three 6s — turn forfeited!")
+            handler.postDelayed({ nextTurn() }, 1000)
+            return
         }
-        return moves
-    }
 
-    /** Apply the move and return true if the player gets an extra turn. */
-    private fun applyMove(player: Int, pieceIdx: Int, dice: Int): Boolean {
-        val pos = pieces[player][pieceIdx]
+        canMove = Rules.movable(p, dice)
+        syncBoard(); syncHud()
+
         when {
-            pos == POS_YARD -> {
-                pieces[player][pieceIdx] = START_POS[player]
-                checkCapture(player, pieces[player][pieceIdx])
-                SoundPlayer.playMovement("mora_place")
+            canMove.isEmpty() -> {
+                // No legal moves
+                handler.postDelayed({
+                    if (dice != 6) nextTurn() else { rolled = false; syncHud() }
+                }, 800)
             }
-            pos in HOME_START..56 -> {
-                val hIdx = pos - HOME_START
-                val newH = hIdx + dice
-                pieces[player][pieceIdx] = if (newH >= 5) POS_FINISHED else HOME_START + newH
-                SoundPlayer.playMovement("mora_move")
+            !p.human -> {
+                // AI picks
+                handler.postDelayed({
+                    val choice = AI.pick(p, dice, players)
+                    if (choice != null) executeMove(choice) else nextTurn()
+                }, 700)
             }
-            else -> {
-                val rel    = relPos(player, pos)
-                val relNew = rel + dice
-                if (relNew < 52) {
-                    pieces[player][pieceIdx] = absPos(player, relNew)
-                    checkCapture(player, pieces[player][pieceIdx])
-                } else {
-                    val hIdx = relNew - 52
-                    pieces[player][pieceIdx] = if (hIdx >= 5) POS_FINISHED else HOME_START + hIdx
-                }
-                SoundPlayer.playMovement("mora_move")
-            }
-        }
-        if (pieces[player].all { it == POS_FINISHED }) {
-            gameOver = true
-            return false
-        }
-        return dice == 6   // extra turn on rolling 6
-    }
-
-    private fun checkCapture(mover: Int, trackPos: Int) {
-        if (trackPos in SAFE || trackPos >= HOME_START) return
-        val opponent = if (mover == P_RED) P_YELLOW else P_RED
-        for (i in 0..3) {
-            if (pieces[opponent][i] == trackPos) {
-                pieces[opponent][i] = POS_YARD
-                SoundPlayer.playMovement("mora_capture")
-            }
+            // Human waits for tapPiece
         }
     }
 
-    // ─── Human turn ───────────────────────────────────────────────────────────
+    // ─── Execute a move ───────────────────────────────────────────────────────
 
-    fun humanRoll() {
-        if (gameOver || diceRolled) return
-        if (vsAI && currentPlayer != humanPlayer) return
-        if (!vsAI && currentPlayer != P_RED && currentPlayer != P_YELLOW) return
-        performRoll(currentPlayer, isHuman = true)
-    }
+    private fun executeMove(piece: Piece) {
+        val np      = Rules.advance(piece.color, piece.pos, dice)
+        val fromYard = piece.pos == IN_YARD
 
-    fun humanPieceTapped(pieceIdx: Int) {
-        if (gameOver || !diceRolled) return
-        val isHumanTurn = vsAI && currentPlayer == humanPlayer ||
-                          !vsAI && (currentPlayer == P_RED || currentPlayer == P_YELLOW)
-        if (!isHumanTurn) return
-        val valid = validMoves(currentPlayer, diceValue)
-        if (pieceIdx !in valid) return
+        // Capture
+        val captured = if (np in 0 until RING_SIZE) Rules.captureAt(np, piece.color, players) else null
+        captured?.let { it.pos = IN_YARD; SoundPlayer.play("mora_capture") }
 
-        val extra = applyMove(currentPlayer, pieceIdx, diceValue)
-        diceRolled = false
-        boardView.clearHighlights()
-        boardView.invalidate()
+        // Move piece
+        piece.pos = np
+        if (np == FINISH_POS) { piece.done = true; SoundPlayer.play("mora_place") }
+        else SoundPlayer.play("mora_move")
 
-        if (gameOver) { showResult(currentPlayer); return }
+        board.selected = null; canMove = emptyList()
+        syncBoard()
 
-        if (extra) {
-            updateHud("${playerLabel(currentPlayer)}'s turn  (+1)", "Tap to roll again")
+        val p = cur ?: return
+
+        // Win check
+        if (p.allDone) {
+            over = true; syncHud()
+            handler.postDelayed({ showWin(p) }, 500)
+            return
+        }
+
+        val bonus = dice == 6 || captured != null || piece.done
+        if (bonus) {
+            rolled = false; consec6 = if (dice == 6) consec6 else 0
+            syncHud()
+            if (!p.human) handler.postDelayed({ roll() }, 900)
         } else {
             nextTurn()
         }
     }
 
-    private fun performRoll(player: Int, isHuman: Boolean) {
-        diceValue  = (1..6).random()
-        diceRolled = true
-        val valid  = validMoves(player, diceValue)
-        boardView.highlightedPieces = if (isHuman) valid else emptyList()
-        boardView.invalidate()
-
-        if (valid.isEmpty()) {
-            updateHud("${playerLabel(player)}'s turn", "Rolled $diceValue — no moves, tap to pass")
-            if (!isHuman) handler.postDelayed({ autoPass() }, 900)
-        } else {
-            val extra = if (diceValue == 6) "  ★ roll again!" else ""
-            updateHud("${playerLabel(player)}'s turn", "Rolled $diceValue$extra — tap a piece")
-            if (!isHuman) handler.postDelayed({ aiPickPiece(valid) }, 900)
-        }
-    }
-
-    private fun autoPass() {
-        diceRolled = false
-        boardView.clearHighlights()
-        nextTurn()
-    }
+    // ─── Turn management ──────────────────────────────────────────────────────
 
     private fun nextTurn() {
-        currentPlayer = if (currentPlayer == P_RED) P_YELLOW else P_RED
-        updateHud("${playerLabel(currentPlayer)}'s turn", "Tap to roll")
-        boardView.invalidate()
-        if (vsAI && currentPlayer == aiPlayer) handler.postDelayed({ triggerAI() }, 500)
+        curIdx  = (curIdx + 1) % players.size
+        dice    = 0; rolled = false; canMove = emptyList(); consec6 = 0
+        board.selected = null
+        syncBoard(); syncHud()
+        val p = cur ?: return
+        if (!p.human) handler.postDelayed({ roll() }, 900)
     }
 
-    // ─── AI ───────────────────────────────────────────────────────────────────
+    // ─── Win dialog ───────────────────────────────────────────────────────────
 
-    private fun triggerAI() {
-        if (gameOver || currentPlayer != aiPlayer) return
-        updateHud("AI thinking…", "")
-        handler.postDelayed({ performRoll(aiPlayer, isHuman = false) }, 600)
-    }
-
-    private fun aiPickPiece(valid: List<Int>) {
-        val pick = chooseBestAIMove(valid)
-        val extra = applyMove(aiPlayer, pick, diceValue)
-        diceRolled = false
-        boardView.clearHighlights()
-        boardView.invalidate()
-
-        if (gameOver) { showResult(aiPlayer); return }
-
-        if (extra) {
-            updateHud("AI's turn  (+1)", "Rolling again…")
-            handler.postDelayed({ triggerAI() }, 700)
-        } else {
-            nextTurn()
-        }
-    }
-
-    private fun chooseBestAIMove(valid: List<Int>): Int {
-        // 1. Capture opponent
-        for (i in valid) {
-            val pos = pieces[aiPlayer][i]
-            if (pos == POS_YARD || pos >= HOME_START) continue
-            val rel    = relPos(aiPlayer, pos)
-            val relNew = rel + diceValue
-            if (relNew < 52) {
-                val newAbs = absPos(aiPlayer, relNew)
-                if (newAbs !in SAFE) {
-                    for (j in 0..3) if (pieces[humanPlayer][j] == newAbs) return i
-                }
-            }
-        }
-        // 2. Bring a new piece out on 6
-        if (diceValue == 6) { val yard = valid.firstOrNull { pieces[aiPlayer][it] == POS_YARD }; if (yard != null) return yard }
-        // 3. Advance piece closest to home (highest progress)
-        return valid.maxByOrNull { i ->
-            val pos = pieces[aiPlayer][i]
-            when {
-                pos == POS_YARD -> -1
-                pos >= HOME_START -> 52 + (pos - HOME_START)
-                else -> relPos(aiPlayer, pos)
-            }
-        } ?: valid[0]
-    }
-
-    // ─── UI helpers ───────────────────────────────────────────────────────────
-
-    private fun playerLabel(player: Int) = if (player == P_RED) "Red" else "Yellow"
-
-    private fun updateHud(title: String, sub: String) {
-        hudView.update(title, sub, diceValue, diceRolled, currentPlayer)
-    }
-
-    private fun showResult(winner: Int) {
-        val msg = when {
-            vsAI && winner == humanPlayer -> "You win! 🎉"
-            vsAI -> "AI wins!"
-            else -> "${playerLabel(winner)} wins!"
-        }
+    private fun showWin(winner: Player) {
         SoundPlayer.play("game_end")
-        handler.postDelayed({
-            AlertDialog.Builder(this).setTitle("Game Over")
-                .setMessage(msg)
-                .setPositiveButton("Play Again") { _, _ -> showModeDialog() }
-                .setNegativeButton("Main Menu")  { _, _ -> finish() }
-                .setCancelable(false).show()
-        }, 400)
+        val name = colorName(winner.color)
+        AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_MinWidth)
+            .setTitle("🏆  $name Wins!")
+            .setMessage("All pieces made it home.")
+            .setCancelable(false)
+            .setPositiveButton("Play Again") { _, _ -> showModeDialog() }
+            .setNegativeButton("Menu") { _, _ -> finish() }
+            .show()
+            .window?.setBackgroundDrawable(
+                android.graphics.drawable.ColorDrawable(Color.parseColor("#1A1A1A")))
     }
 
-    @Suppress("DEPRECATION")
+    // ─── UI sync ──────────────────────────────────────────────────────────────
+
+    private fun syncBoard() {
+        board.players = players; board.movable = canMove
+    }
+
+    private fun syncHud(override: String? = null) {
+        val p = cur ?: return
+        hud.playerColor  = COLORS[p.color.idx]
+        hud.diceVal      = dice
+        hud.diceEnabled  = !rolled && p.human && !over
+        hud.status       = override ?: when {
+            over                          -> "Game over"
+            !rolled &&  p.human           -> "${colorName(p.color)}'s turn — tap dice"
+            !rolled && !p.human           -> "AI thinking…"
+            canMove.isEmpty() && dice != 6 -> "No moves — passing"
+            canMove.isEmpty() && dice == 6 -> "No moves — roll again"
+            p.human                       -> "Choose a piece"
+            else                          -> "AI moving…"
+        }
+    }
+
+    private fun colorName(c: LC) = when (c) {
+        LC.RED -> "Red"; LC.YELLOW -> "Yellow"; LC.GREEN -> "Green"; LC.BLUE -> "Blue"
+    }
+
+    // ─── Fullscreen ───────────────────────────────────────────────────────────
+
     private fun makeFullscreen() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        @Suppress("DEPRECATION")
         window.decorView.systemUiVisibility = (
-            View.SYSTEM_UI_FLAG_LAYOUT_STABLE or View.SYSTEM_UI_FLAG_FULLSCREEN
-            or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+            View.SYSTEM_UI_FLAG_LAYOUT_STABLE          or View.SYSTEM_UI_FLAG_FULLSCREEN
+            or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN   or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
             or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
         )
-    }
-
-    // ─── Board View ───────────────────────────────────────────────────────────
-
-    inner class LudoBoardView(ctx: Context) : View(ctx) {
-        private val dp = resources.displayMetrics.density
-        var highlightedPieces: List<Int> = emptyList()
-        fun clearHighlights() { highlightedPieces = emptyList() }
-
-        private val bgP       = Paint().apply { color = Color.parseColor("#111118") }
-        private val trackP    = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#22222E") }
-        private val safeTrackP= Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#2A2A3A") }
-        private val borderP   = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#33334A"); style = Paint.Style.STROKE; strokeWidth = 0.8f * dp
-        }
-        private val starTxtP  = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
-        private val arrowP    = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
-
-        private var cellSize  = 0f
-        private var bLeft     = 0f
-        private var bTop      = 0f
-
-        // Touch targets for Red and Yellow pieces
-        private val pRects = Array(4) { Array(4) { RectF() } }
-
-        override fun onSizeChanged(w: Int, h: Int, ow: Int, oh: Int) {
-            val sz = minOf(w.toFloat(), h.toFloat())
-            cellSize = sz / 15f
-            bLeft = (w - sz) / 2f
-            bTop  = (h - sz) / 2f
-        }
-
-        private fun cx(col: Int) = bLeft + col * cellSize + cellSize / 2f
-        private fun cy(row: Int) = bTop  + row * cellSize + cellSize / 2f
-        private fun cellL(col: Int) = bLeft + col * cellSize
-        private fun cellT(row: Int) = bTop  + row * cellSize
-
-        override fun onDraw(canvas: Canvas) {
-            canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgP)
-            drawYards(canvas)
-            drawTrack(canvas)
-            drawHomeColumns(canvas)
-            drawCenter(canvas)
-            drawPieces(canvas)
-        }
-
-        private fun drawYards(canvas: Canvas) {
-            // All 4 yards always shown (dimmed if unused in 2P)
-            val bounds = arrayOf(
-                floatArrayOf(0f,0f,6f,6f),    // Red  cols 0-5, rows 0-5
-                floatArrayOf(9f,0f,15f,6f),   // Green
-                floatArrayOf(9f,9f,15f,15f),  // Yellow
-                floatArrayOf(0f,9f,6f,15f)    // Blue
-            )
-            val activePl = intArrayOf(P_RED, P_YELLOW)
-
-            for (p in 0..3) {
-                val b = bounds[p]; val c1 = b[0]; val r1 = b[1]; val c2 = b[2]; val r2 = b[3]
-                val active = p in activePl
-                val bgAlpha = if (active) 255 else 80
-                val yardBgP = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = YARD_BG[p]; alpha = bgAlpha }
-                canvas.drawRect(cellL(c1.toInt()), cellT(r1.toInt()),
-                                cellL(c2.toInt()), cellT(r2.toInt()), yardBgP)
-                val rimP = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = COLORS[p]; style = Paint.Style.STROKE; strokeWidth = 2f * dp
-                    alpha = bgAlpha
-                }
-                canvas.drawRect(cellL(c1.toInt()), cellT(r1.toInt()),
-                                cellL(c2.toInt()), cellT(r2.toInt()), rimP)
-                // Inner circle background
-                val icCx = bLeft + (c1 + c2) / 2f * cellSize
-                val icCy = bTop  + (r1 + r2) / 2f * cellSize
-                val icR  = cellSize * 1.8f
-                val icP  = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = DARK_COLORS[p]; alpha = if (active) 160 else 50 }
-                canvas.drawCircle(icCx, icCy, icR, icP)
-
-                if (active) {
-                    // Piece slots
-                    for (i in 0..3) {
-                        val (sr, sc) = YARD_SLOTS[p][i].let { it[0] to it[1] }
-                        val slotP = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                            color = DARK_COLORS[p]; alpha = 120
-                        }
-                        canvas.drawCircle(cx(sc), cy(sr), cellSize * 0.32f, slotP)
-                    }
-                }
-            }
-        }
-
-        private fun drawTrack(canvas: Canvas) {
-            for (i in TRACK.indices) {
-                val (r, c) = TRACK[i][0] to TRACK[i][1]
-                val safe = i in SAFE
-                val rect = RectF(cellL(c), cellT(r), cellL(c) + cellSize, cellT(r) + cellSize)
-                canvas.drawRoundRect(rect, 3f * dp, 3f * dp, if (safe) safeTrackP else trackP)
-                canvas.drawRoundRect(rect, 3f * dp, 3f * dp, borderP)
-                if (safe) {
-                    starTxtP.textSize = cellSize * 0.52f; starTxtP.color = Color.parseColor("#FFD700")
-                    canvas.drawText("★", cx(c), cy(r) + starTxtP.textSize * 0.36f, starTxtP)
-                }
-                // Start arrow for each player
-                val sPlayer = when (i) { 0 -> P_RED; 26 -> P_YELLOW; else -> -1 }
-                if (sPlayer >= 0) {
-                    arrowP.textSize = cellSize * 0.44f; arrowP.color = COLORS[sPlayer]
-                    val arrow = if (sPlayer == P_RED) "▶" else "◀"
-                    canvas.drawText(arrow, cx(c), cy(r) + arrowP.textSize * 0.36f, arrowP)
-                }
-            }
-        }
-
-        private fun drawHomeColumns(canvas: Canvas) {
-            for (p in intArrayOf(P_RED, P_YELLOW)) {
-                val hcP = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = COLORS[p]; alpha = 170 }
-                val hbP = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = COLORS[p]; style = Paint.Style.STROKE; strokeWidth = 1f * dp
-                }
-                for (i in 0..4) {
-                    val (r, c) = HOME_COL[p][i][0] to HOME_COL[p][i][1]
-                    val rect = RectF(cellL(c), cellT(r), cellL(c) + cellSize, cellT(r) + cellSize)
-                    canvas.drawRoundRect(rect, 3f * dp, 3f * dp, hcP)
-                    canvas.drawRoundRect(rect, 3f * dp, 3f * dp, hbP)
-                }
-            }
-        }
-
-        private fun drawCenter(canvas: Canvas) {
-            // 3×3 center at rows/cols 6-8
-            val cBgP = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#111118") }
-            canvas.drawRect(cellL(6), cellT(6), cellL(9), cellT(9), cBgP)
-
-            val midX = bLeft + 7.5f * cellSize
-            val midY = bTop  + 7.5f * cellSize
-            val hs   = cellSize * 1.48f
-
-            // Red triangle (left)
-            drawTriangle(canvas, P_RED,
-                midX - hs, midY - hs,
-                midX - hs, midY + hs,
-                midX, midY)
-            // Yellow triangle (right)
-            drawTriangle(canvas, P_YELLOW,
-                midX + hs, midY - hs,
-                midX + hs, midY + hs,
-                midX, midY)
-
-            // Center star
-            val sP = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.parseColor("#FFFFFF"); textAlign = Paint.Align.CENTER
-                textSize = cellSize * 1.1f
-            }
-            canvas.drawText("★", midX, midY + sP.textSize * 0.36f, sP)
-        }
-
-        private fun drawTriangle(canvas: Canvas, player: Int,
-                                  x1: Float, y1: Float, x2: Float, y2: Float, x3: Float, y3: Float) {
-            val p = Path()
-            p.moveTo(x1, y1); p.lineTo(x2, y2); p.lineTo(x3, y3); p.close()
-            val tp = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = COLORS[player]; alpha = 200 }
-            canvas.drawPath(p, tp)
-        }
-
-        private fun drawPieces(canvas: Canvas) {
-            for (p in intArrayOf(P_RED, P_YELLOW)) {
-                for (i in 0..3) {
-                    val pos = pieces[p][i]
-                    if (pos == POS_FINISHED) continue
-
-                    val (row, col) = when {
-                        pos == POS_YARD -> YARD_SLOTS[p][i][0] to YARD_SLOTS[p][i][1]
-                        pos in HOME_START..56 -> HOME_COL[p][pos - HOME_START][0] to HOME_COL[p][pos - HOME_START][1]
-                        else -> TRACK[pos][0] to TRACK[pos][1]
-                    }
-
-                    val pcx   = cx(col)
-                    val pcy   = cy(row)
-                    val r     = cellSize * 0.32f
-                    val isHl  = (diceRolled && currentPlayer == p && i in highlightedPieces)
-
-                    // Glow for valid-move pieces
-                    if (isHl) {
-                        val glowP = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                            color = COLORS[p]; alpha = 90
-                            maskFilter = BlurMaskFilter(cellSize * 0.5f, BlurMaskFilter.Blur.NORMAL)
-                        }
-                        canvas.drawCircle(pcx, pcy, r * 1.7f, glowP)
-                    }
-
-                    // Shadow
-                    val shP = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                        color = Color.argb(90, 0, 0, 0)
-                        maskFilter = BlurMaskFilter(3f * dp, BlurMaskFilter.Blur.NORMAL)
-                    }
-                    canvas.drawCircle(pcx + dp, pcy + 2f * dp, r, shP)
-
-                    // Body
-                    val bodyP = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = COLORS[p] }
-                    canvas.drawCircle(pcx, pcy, r, bodyP)
-
-                    // Highlight sheen
-                    val sheenP = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                        color = Color.WHITE; alpha = 55
-                    }
-                    canvas.drawCircle(pcx - r * 0.25f, pcy - r * 0.3f, r * 0.45f, sheenP)
-
-                    // Outline
-                    val outP = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                        color = if (isHl) Color.WHITE else DARK_COLORS[p]
-                        style = Paint.Style.STROKE
-                        strokeWidth = (if (isHl) 2.5f else 1.5f) * dp
-                    }
-                    canvas.drawCircle(pcx, pcy, r, outP)
-
-                    // Number label
-                    val numP = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                        color = Color.WHITE; textAlign = Paint.Align.CENTER
-                        textSize = r * 1.0f; isFakeBoldText = true
-                    }
-                    canvas.drawText("${i + 1}", pcx, pcy + numP.textSize * 0.36f, numP)
-
-                    // Touch target
-                    pRects[p][i].set(pcx - r * 1.8f, pcy - r * 1.8f, pcx + r * 1.8f, pcy + r * 1.8f)
-                }
-            }
-        }
-
-        override fun onTouchEvent(ev: MotionEvent): Boolean {
-            if (ev.action != MotionEvent.ACTION_UP) return true
-            val x = ev.x; val y = ev.y
-
-            // Check piece taps for the current player
-            val checkPlayer = if (vsAI) humanPlayer else currentPlayer
-            for (i in 0..3) {
-                if (pRects[checkPlayer][i].contains(x, y)) {
-                    SoundPlayer.play("ui_click")
-                    humanPieceTapped(i)
-                    return true
-                }
-            }
-
-            // Tap anywhere else to pass when no moves
-            if (diceRolled && validMoves(currentPlayer, diceValue).isEmpty()) {
-                autoPass()
-            }
-            return true
-        }
-    }
-
-    // ─── HUD View ─────────────────────────────────────────────────────────────
-
-    inner class LudoHudView(ctx: Context) : View(ctx) {
-        private val dp  = resources.displayMetrics.density
-        private val sp  = resources.displayMetrics.scaledDensity
-        private val bgP = Paint().apply { color = Color.parseColor("#1A1A1A") }
-        private val divP= Paint().apply { color = Color.parseColor("#2A2A2A") }
-        private val ttP = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.WHITE; isFakeBoldText = true; textAlign = Paint.Align.LEFT
-            textSize = 13f * sp.coerceAtMost(3f)
-        }
-        private val subP= Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#9E9E9E"); textAlign = Paint.Align.LEFT
-            textSize = 10f * sp.coerceAtMost(3f)
-        }
-        private val btnBg = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#252525") }
-        private val btnTxt= Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#7FC8F8"); textAlign = Paint.Align.CENTER
-            textSize = 11f * sp.coerceAtMost(3f)
-        }
-
-        private var titleTxt  = ""
-        private var subTxt    = ""
-        private var diceVal   = 0
-        private var diceRldSt = false
-        private var curPlayer = P_RED
-
-        private val backR = RectF(); private val menuR = RectF()
-        private val diceR = RectF()
-
-        fun update(t: String, s: String, dv: Int, dr: Boolean, cp: Int) {
-            titleTxt = t; subTxt = s; diceVal = dv; diceRldSt = dr; curPlayer = cp; invalidate()
-        }
-
-        override fun onSizeChanged(w: Int, h: Int, ow: Int, oh: Int) {
-            val bw = 50f*dp; val bh = 28f*dp; val by = (h - bh)/2f
-            backR.set(6f*dp, by, 6f*dp+bw, by+bh)
-            menuR.set(w-bw-6f*dp, by, w-6f*dp, by+bh)
-            val ds = 46f*dp
-            diceR.set(w-bw-6f*dp-ds-8f*dp, (h-ds)/2f, w-bw-6f*dp-8f*dp, (h+ds)/2f)
-        }
-
-        override fun onTouchEvent(ev: MotionEvent): Boolean {
-            if (ev.action == MotionEvent.ACTION_UP) {
-                when {
-                    backR.contains(ev.x, ev.y) -> { SoundPlayer.play("ui_click"); @Suppress("DEPRECATION") (context as LudoActivity).onBackPressed() }
-                    menuR.contains(ev.x, ev.y) -> { SoundPlayer.play("ui_click"); showMenuDialog() }
-                    else -> { SoundPlayer.play("ui_click"); humanRoll() }
-                }
-            }
-            return true
-        }
-
-        override fun onDraw(canvas: Canvas) {
-            val w = width.toFloat(); val h = height.toFloat()
-            canvas.drawRect(0f, 0f, w, h, bgP)
-            canvas.drawRect(0f, h - dp, w, h, divP)
-
-            val rr = 5f*dp
-            canvas.drawRoundRect(backR, rr, rr, btnBg)
-            canvas.drawRoundRect(menuR, rr, rr, btnBg)
-            canvas.drawText("← Back", backR.centerX(), backR.centerY() + btnTxt.textSize*0.36f, btnTxt)
-            canvas.drawText("Menu",   menuR.centerX(), menuR.centerY() + btnTxt.textSize*0.36f, btnTxt)
-
-            // Draw dice
-            drawDice(canvas, diceR)
-
-            // Title + sub — between Back button and dice
-            val infoLeft = backR.right + 10f*dp
-            val infoRight = diceR.left - 6f*dp
-            if (infoLeft < infoRight) {
-                ttP.textAlign  = Paint.Align.LEFT
-                subP.textAlign = Paint.Align.LEFT
-                // Player color dot
-                val dotP = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = COLORS[curPlayer]
-                }
-                canvas.drawCircle(infoLeft + 5f*dp, h*0.35f, 5f*dp, dotP)
-                canvas.drawText(titleTxt, infoLeft + 16f*dp, h*0.35f + ttP.textSize*0.36f, ttP)
-                canvas.drawText(subTxt,  infoLeft + 6f*dp,  h*0.72f + subP.textSize*0.36f, subP)
-            }
-        }
-
-        private fun drawDice(canvas: Canvas, r: RectF) {
-            val active = diceRldSt && ((!diceRolled) || currentPlayer == humanPlayer || !vsAI)
-            val diceBg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = if (diceVal > 0 && diceRldSt) Color.parseColor("#1E2E1E") else Color.parseColor("#222222")
-            }
-            canvas.drawRoundRect(r, 8f*dp, 8f*dp, diceBg)
-
-            if (diceVal == 0) {
-                val tp = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = Color.parseColor("#7FC8F8"); textAlign = Paint.Align.CENTER
-                    textSize = 22f * (resources.displayMetrics.scaledDensity.coerceAtMost(3f))
-                }
-                canvas.drawText("🎲", r.centerX(), r.centerY() + tp.textSize*0.36f, tp)
-            } else {
-                drawDiceDots(canvas, r, diceVal)
-            }
-
-            val border = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = if (diceRldSt) Color.parseColor("#7FC8F8") else Color.parseColor("#444444")
-                style = Paint.Style.STROKE; strokeWidth = 1.5f*dp
-            }
-            canvas.drawRoundRect(r, 8f*dp, 8f*dp, border)
-        }
-
-        private fun drawDiceDots(canvas: Canvas, r: RectF, v: Int) {
-            val dotR = r.width() * 0.09f
-            val off  = r.width() * 0.28f
-            val cx   = r.centerX(); val cy = r.centerY()
-            val dotP = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
-            val pts  = when (v) {
-                1 -> listOf(cx to cy)
-                2 -> listOf(cx-off to cy-off, cx+off to cy+off)
-                3 -> listOf(cx-off to cy-off, cx to cy, cx+off to cy+off)
-                4 -> listOf(cx-off to cy-off, cx+off to cy-off, cx-off to cy+off, cx+off to cy+off)
-                5 -> listOf(cx-off to cy-off, cx+off to cy-off, cx to cy, cx-off to cy+off, cx+off to cy+off)
-                6 -> listOf(cx-off to cy-off, cx+off to cy-off, cx-off to cy, cx+off to cy, cx-off to cy+off, cx+off to cy+off)
-                else -> emptyList()
-            }
-            pts.forEach { (px, py) -> canvas.drawCircle(px, py, dotR, dotP) }
-        }
     }
 }
