@@ -64,7 +64,7 @@ class MorabarabaActivity : AppCompatActivity() {
         boardView        = MorabaraBoardView(this)
         bottomCaptureView = CaptureStripView(this).also { it.dividerOnTop = true }
 
-        val hudH = (72 * dp).toInt()
+        val hudH = (82 * dp).toInt()
         val capH = (36 * dp).toInt()
 
         root.addView(hudView,          LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, hudH))
@@ -298,16 +298,16 @@ class MorabarabaActivity : AppCompatActivity() {
 
         val (sub1, sub2) = if (inPlace) {
             val wLeft = pc - wPlaced; val bLeft = pc - bPlaced
-            "Place  W:$wLeft left  B:$bLeft left" to "$wCount vs $bCount on board"
+            "W: $wLeft to place  •  B: $bLeft to place" to "$wCount vs $bCount on board"
         } else {
             val flyTag = when {
-                flyingMe  -> "  ✈ You can fly to any empty spot!"
-                aiFlying  -> "  ✈ AI is in flying mode!"
-                wFlying && !vsAI -> "  ✈ White is flying"
-                bFlying && !vsAI -> "  ✈ Black is flying"
+                flyingMe  -> "✈ You can fly!"
+                aiFlying  -> "✈ AI is flying!"
+                wFlying && !vsAI -> "✈ White is flying"
+                bFlying && !vsAI -> "✈ Black is flying"
                 else -> ""
             }
-            "W: $wCount pieces   B: $bCount pieces" to flyTag
+            "W: $wCount  •  B: $bCount" to flyTag
         }
 
         val label = if (vsAI && gameState.currentTurn == playerColor) "Your turn"
@@ -598,9 +598,9 @@ You win by either:
 
             val cx = w / 2f
             val titleStr = if (thinking) "Thinking…" else title
-            canvas.drawText(titleStr, cx, h * 0.38f, txtP)
-            canvas.drawText(sub1, cx, h * 0.62f, subP)
-            if (sub2.isNotEmpty()) canvas.drawText(sub2, cx, h * 0.82f, sub2P)
+            canvas.drawText(titleStr, cx, h * 0.24f, txtP)
+            canvas.drawText(sub1, cx, h * 0.70f, subP)
+            if (sub2.isNotEmpty()) canvas.drawText(sub2, cx, h * 0.88f, sub2P)
         }
     }
 }
