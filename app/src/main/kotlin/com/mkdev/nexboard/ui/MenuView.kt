@@ -25,12 +25,13 @@ class MenuView(context: Context) : View(context) {
         com.mkdev.nexboard.SoundPlayer.init(context)
     }
 
-    enum class GameType { CHESS, CHECKERS, OTHELLO, MORABARABA, TICTACTOE }
+    enum class GameType { CHESS, CHECKERS, OTHELLO, MORABARABA, TICTACTOE, LUDO }
 
     private data class Card(val type: GameType, var rect: RectF = RectF())
     private val cards = listOf(
         Card(GameType.CHESS), Card(GameType.CHECKERS),
-        Card(GameType.OTHELLO), Card(GameType.MORABARABA), Card(GameType.TICTACTOE)
+        Card(GameType.OTHELLO), Card(GameType.MORABARABA), Card(GameType.TICTACTOE),
+        Card(GameType.LUDO)
     )
 
     private val dp = context.resources.displayMetrics.density
@@ -262,6 +263,7 @@ class MenuView(context: Context) : View(context) {
             GameType.OTHELLO     -> "Othello"      to "vs AI  •  2 Players"
             GameType.MORABARABA  -> "Morabaraba"   to "vs AI  •  2 Players"
             GameType.TICTACTOE   -> "Tic-Tac-Toe"  to "vs AI  •  2 Players"
+            GameType.LUDO        -> "Ludo"         to "vs AI  •  2 Players"
         }
 
         canvas.drawText(title, textCx, midY - 9f * dp + cardTitlePaint.textSize * 0.4f, cardTitlePaint)
@@ -275,6 +277,7 @@ class MenuView(context: Context) : View(context) {
             GameType.OTHELLO    -> drawOthelloMini(canvas, left, top, size)
             GameType.MORABARABA -> drawMorabarabaMini(canvas, left, top, size)
             GameType.TICTACTOE  -> drawTicTacToeMini(canvas, left, top, size)
+            GameType.LUDO       -> drawLudoMini(canvas, left, top, size)
         }
     }
 
@@ -376,6 +379,46 @@ class MenuView(context: Context) : View(context) {
         val xc = left + cell * 1.5f; val yr = top + cell * 0.5f; val rr = cell * 0.22f
         canvas.drawLine(xc - rr, yr - rr, xc + rr, yr + rr, xp)
         canvas.drawLine(xc + rr, yr - rr, xc - rr, yr + rr, xp)
+    }
+
+    private fun drawLudoMini(canvas: Canvas, left: Float, top: Float, size: Float) {
+        val cell = size / 5f
+        // Background
+        val bgP = Paint().apply { color = Color.parseColor("#111118") }
+        canvas.drawRect(left, top, left + size, top + size, bgP)
+        // Yard corner fills
+        fun yard(col: Int, row: Int, color: Int) {
+            val x = left + col * cell; val y = top + row * cell
+            val yP = Paint().apply { this.color = color }
+            canvas.drawRect(x, y, x + cell * 2f, y + cell * 2f, yP)
+        }
+        yard(0, 0, Color.parseColor("#4A1515"))   // Red TL
+        yard(3, 0, Color.parseColor("#154A15"))   // Green TR
+        yard(3, 3, Color.parseColor("#4A4A10"))   // Yellow BR
+        yard(0, 3, Color.parseColor("#10204A"))   // Blue BL
+        // Cross track (horizontal + vertical bar)
+        val trackP = Paint().apply { color = Color.parseColor("#22222E") }
+        canvas.drawRect(left, top + cell * 2f, left + size, top + cell * 3f, trackP)
+        canvas.drawRect(left + cell * 2f, top, left + cell * 3f, top + size, trackP)
+        // Player home column colour strips
+        val rColP = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#EF5350"); alpha = 170 }
+        val yColP = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#FFCA28"); alpha = 170 }
+        canvas.drawRect(left,              top + cell * 2.15f, left + cell * 2f, top + cell * 2.85f, rColP)
+        canvas.drawRect(left + cell * 3f,  top + cell * 2.15f, left + size,     top + cell * 2.85f, yColP)
+        // Centre star
+        val sP = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#7FC8F8"); textAlign = Paint.Align.CENTER; textSize = cell * 0.75f
+        }
+        canvas.drawText("★", left + size / 2f, top + size / 2f + sP.textSize * 0.36f, sP)
+        // Two tokens on the horizontal arm
+        val rP = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#EF5350") }
+        val yP = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#FFCA28") }
+        val pr = cell * 0.27f
+        canvas.drawCircle(left + cell * 0.75f, top + cell * 2.5f, pr, rP)
+        canvas.drawCircle(left + cell * 4.25f, top + cell * 2.5f, pr, yP)
+        val rimP = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; style = Paint.Style.STROKE; strokeWidth = 0.6f; alpha = 160 }
+        canvas.drawCircle(left + cell * 0.75f, top + cell * 2.5f, pr, rimP)
+        canvas.drawCircle(left + cell * 4.25f, top + cell * 2.5f, pr, rimP)
     }
 
     private fun drawGear(canvas: Canvas) {
