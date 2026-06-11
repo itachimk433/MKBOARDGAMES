@@ -263,14 +263,102 @@ class MainActivity : AppCompatActivity() {
         val tosUrl = "https://banelemk12.github.io/Nexboard-Terms/terms-of-service.html"
         val (ppRow, _) = settingRow("🔒", "Privacy Policy", "›")
         ppRow.setOnClickListener {
-            try { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(ppUrl))) } catch (_: Exception) {}
+            val ppContent = LinearLayout(ctx).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding((16*dp).toInt(), (12*dp).toInt(), (16*dp).toInt(), (12*dp).toInt())
+            }
+            fun pTxt(t: String, bold: Boolean = false, accent: Boolean = false) = TextView(ctx).apply {
+                text = t
+                setTextColor(if (accent) Color.parseColor("#7FC8F8") else Color.parseColor("#CCCCCC"))
+                setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12.5f)
+                if (bold) setTypeface(typeface, android.graphics.Typeface.BOLD)
+                setPadding(0, (4*dp).toInt(), 0, (4*dp).toInt())
+            }
+            ppContent.addView(pTxt("Privacy Policy — NexBoard v1.2", bold = true, accent = true))
+            ppContent.addView(pTxt("Effective date: June 2026", bold = false))
+            ppContent.addView(pTxt("\nDATA COLLECTION\nNexBoard does not collect or transmit personal data. Game statistics (wins, losses, draws) are stored only on your device."))
+            ppContent.addView(pTxt("\nADVERTISING\nStarting in v1.2, NexBoard displays ads served by Google AdMob (Google Play devices) and Huawei Petal Ads (Huawei devices). These ad networks may collect device identifiers (Advertising ID), approximate location, and usage data to serve personalised ads under their own privacy policies:\n• Google AdMob: policies.google.com/privacy\n• Huawei Petal Ads: consumer.huawei.com/privacy\n\nTo opt out of personalised ads, go to: Settings › Privacy › Ads on your device."))
+            ppContent.addView(pTxt("\nPERMISSIONS\n• Internet — required for ad delivery\n• Network State — ad SDK connectivity checks\n• Vibrate — in-game haptic feedback"))
+            ppContent.addView(pTxt("\nCONTACT\nmkdev4360@gmail.com", bold = false))
+            val ppScroll = ScrollView(ctx).apply {
+                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (320*dp).toInt())
+            }
+            ppScroll.addView(ppContent)
+            val ppWrapper = LinearLayout(ctx).apply {
+                orientation = LinearLayout.VERTICAL
+                setBackgroundColor(Color.parseColor("#1A1A1A"))
+            }
+            ppWrapper.addView(ppScroll)
+            AlertDialog.Builder(ctx, android.R.style.Theme_Material_Dialog_MinWidth)
+                .setView(ppWrapper)
+                .setPositiveButton("Close", null)
+                .setNeutralButton("Open in Browser") { _, _ ->
+                    try { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(ppUrl))) } catch (_: Exception) {}
+                }
+                .create()
+                .apply {
+                    window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.parseColor("#1A1A1A")))
+                    show()
+                }
         }
         root.addView(ppRow); root.addView(divider())
         val (tosRow, _) = settingRow("📄", "Terms of Service", "›")
         tosRow.setOnClickListener {
-            try { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(tosUrl))) } catch (_: Exception) {}
+            val tosContent = LinearLayout(ctx).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding((16*dp).toInt(), (12*dp).toInt(), (16*dp).toInt(), (12*dp).toInt())
+            }
+            fun tTxt(t: String, bold: Boolean = false, accent: Boolean = false) = TextView(ctx).apply {
+                text = t
+                setTextColor(if (accent) Color.parseColor("#7FC8F8") else Color.parseColor("#CCCCCC"))
+                setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12.5f)
+                if (bold) setTypeface(typeface, android.graphics.Typeface.BOLD)
+                setPadding(0, (4*dp).toInt(), 0, (4*dp).toInt())
+            }
+            tosContent.addView(tTxt("Terms of Service — NexBoard v1.2", bold = true, accent = true))
+            tosContent.addView(tTxt("Effective date: June 2026", bold = false))
+            tosContent.addView(tTxt("\n1. ACCEPTANCE\nBy installing or using NexBoard you agree to these terms. If you do not agree, uninstall the app."))
+            tosContent.addView(tTxt("\n2. LICENCE\nNexBoard is provided free of charge for personal, non-commercial use. You may not reverse-engineer, redistribute, or sell the app or any part of it."))
+            tosContent.addView(tTxt("\n3. ADVERTISING\nAs of v1.2, NexBoard is supported by advertising. Ads are served by Google AdMob and/or Huawei Petal Ads. By using the app you consent to the display of ads. Ad networks operate under their own terms and privacy policies."))
+            tosContent.addView(tTxt("\n4. DISCLAIMER\nNexBoard is provided \"as is\" without warranties of any kind. MKDEV is not liable for any loss or damage arising from use of the app."))
+            tosContent.addView(tTxt("\n5. CHANGES\nThese terms may be updated at any time. Continued use after an update constitutes acceptance of the revised terms."))
+            tosContent.addView(tTxt("\nCONTACT\nmkdev4360@gmail.com", bold = false))
+            val tosScroll = ScrollView(ctx).apply {
+                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (320*dp).toInt())
+            }
+            tosScroll.addView(tosContent)
+            val tosWrapper = LinearLayout(ctx).apply {
+                orientation = LinearLayout.VERTICAL
+                setBackgroundColor(Color.parseColor("#1A1A1A"))
+            }
+            tosWrapper.addView(tosScroll)
+            AlertDialog.Builder(ctx, android.R.style.Theme_Material_Dialog_MinWidth)
+                .setView(tosWrapper)
+                .setPositiveButton("Close", null)
+                .setNeutralButton("Open in Browser") { _, _ ->
+                    try { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(tosUrl))) } catch (_: Exception) {}
+                }
+                .create()
+                .apply {
+                    window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.parseColor("#1A1A1A")))
+                    show()
+                }
         }
-        root.addView(tosRow)
+        root.addView(tosRow); root.addView(divider())
+
+        // ── Contact ──
+        val (contactRow, _) = settingRow("✉", "Contact Us", "›")
+        contactRow.setOnClickListener {
+            try {
+                startActivity(Intent(Intent.ACTION_SENDTO).apply {
+                    data = Uri.parse("mailto:mkdev4360@gmail.com")
+                    putExtra(Intent.EXTRA_SUBJECT, "NexBoard Support")
+                })
+            } catch (_: Exception) {
+                android.widget.Toast.makeText(ctx, "mkdev4360@gmail.com", android.widget.Toast.LENGTH_LONG).show()
+            }
+        }
+        root.addView(contactRow)
 
         val dialog = AlertDialog.Builder(ctx, android.R.style.Theme_Material_Dialog_MinWidth)
             .setView(wrapper).setPositiveButton("Done", null).create()
