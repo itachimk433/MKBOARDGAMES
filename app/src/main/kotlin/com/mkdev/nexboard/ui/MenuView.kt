@@ -191,7 +191,7 @@ class MenuView(context: Context) : View(context) {
         drawTitle(canvas)    // fixed — not affected by scroll
         drawGear(canvas)     // fixed — top-right corner
         // Version label — fixed top-left corner
-        canvas.drawText("v1.0", 12f * dp, 12f * dp + versionPaint.textSize, versionPaint)
+        canvas.drawText("v1.2", 12f * dp, 12f * dp + versionPaint.textSize, versionPaint)
 
         // Scrollable region: cards + footer
         canvas.save()
