@@ -288,7 +288,20 @@ Strategy
         scope.launch {
             val move = withContext(Dispatchers.Default) {
                 try {
-                    AIPlayer(engine, maxDepth = SettingsManager.tttAiDepth(this@TicTacToeActivity, boardSize), timeLimitMs = 2500L).bestMove(gameState)
+                    val depth = SettingsManager.tttAiDepth(this@TicTacToeActivity, boardSize)
+                    val diff  = SettingsManager.getTttDifficulty(this@TicTacToeActivity)
+                    // Easy: 40% chance of a fully random legal move — guarantees beatable play.
+                    // Medium: small variety window for natural-feeling but still strong play.
+                    // Hard: variety window = 0 → always picks the deterministic best move.
+                    //   Without this, a complete-depth search finds all moves tie at score 0
+                    //   (forced draw on 3×3), causing the AI to pick randomly — paradoxically
+                    //   making Hard feel weaker than Easy which uses heuristics consistently.
+                    if (diff == 0 && Math.random() < 0.40) {
+                        engine.allLegalMoves(gameState, gameState.currentTurn).randomOrNull()
+                    } else {
+                        val varWindow = when (diff) { 0 -> 80; 2 -> 0; else -> 25 }
+                        AIPlayer(engine, maxDepth = depth, timeLimitMs = 2500L, varietyWindowOverride = varWindow).bestMove(gameState)
+                    }
                 } catch (e: Throwable) { null }
             }
             hudView.setThinking(false)

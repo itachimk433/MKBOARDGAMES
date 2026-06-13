@@ -13,7 +13,8 @@ class AIPlayer(
     private val engine: RuleEngine,
     val maxDepth: Int = 3,
     private val timeLimitMs: Long = 1000L,
-    private val quiesceDepth: Int = 0
+    private val quiesceDepth: Int = 0,
+    private val varietyWindowOverride: Int = -1   // -1 = auto; 0 = always deterministic best
 ) {
 
     @Volatile private var deadline = Long.MAX_VALUE
@@ -80,10 +81,19 @@ class AIPlayer(
 
         // Variety window — wider at low depth so the AI never plays the same game twice.
         // Narrower at high depth for stronger, more consistent play.
+        // varietyWindowOverride >= 0 forces a specific window (0 = always deterministic best).
         val window = when {
+            varietyWindowOverride >= 0 -> varietyWindowOverride
             maxDepth <= 3 -> 60
             maxDepth <= 5 -> 30
             else          -> 15
+        }
+
+        // Window = 0 (Hard mode): always return the deterministic best move (first in ordered list).
+        // This prevents the "all moves score 0 → random" failure on solved games like 3×3 TicTacToe.
+        if (window == 0) {
+            val strict = allScored.filter { (_, s) -> s == bestScore }.map { it.first }
+            return strict.firstOrNull() ?: bestMove ?: allScored.first().first
         }
 
         val pool = allScored.filter { (m, s) ->

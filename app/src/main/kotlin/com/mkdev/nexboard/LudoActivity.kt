@@ -465,6 +465,68 @@ private class DicePanel(ctx: Context) : View(ctx) {
     private var diceRect = RectF()
     private var pressAnim: ValueAnimator? = null
 
+    // ── 3-D roll animation ───────────────────────────────────────────────────
+    private val rollCam      = android.graphics.Camera()
+    private var spinAngle    = 0f      // current Y-rotation while rolling (0–360°)
+    private var displayValue = 0       // face shown during animation
+    private var spinAnim: ValueAnimator? = null
+    val isSpinning get() = spinAnim?.isRunning == true
+
+    fun animateRoll(finalValue: Int) {
+        spinAnim?.cancel()
+        // Build a face sequence: 5 random intermediate faces, then the real result
+        val steps = 6
+        val faces = IntArray(steps) { i ->
+            if (i == steps - 1) finalValue
+            else { val r = (1..6).random(); if (r == finalValue) r % 6 + 1 else r }
+        }
+        var lastStep = -1
+        displayValue = faces[0]
+
+        spinAnim = ValueAnimator.ofFloat(0f, steps * 180f).apply {
+            duration = 780L
+            interpolator = android.view.animation.DecelerateInterpolator(2.3f)
+            addUpdateListener { va ->
+                val total = va.animatedValue as Float
+                spinAngle = total % 360f
+                val step  = (total / 180f).toInt().coerceAtMost(steps - 1)
+                if (step != lastStep) { lastStep = step; displayValue = faces[step] }
+                invalidate()
+            }
+            addListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(a: Animator) {
+                    spinAngle = 0f; displayValue = finalValue; invalidate()
+                }
+                override fun onAnimationCancel(a: Animator) {
+                    spinAngle = 0f; invalidate()
+                }
+            })
+            start()
+        }
+    }
+
+    private fun draw3DDiceSpin(canvas: Canvas, r: RectF, enabled: Boolean) {
+        rollCam.save()
+        // Push camera back so perspective doesn't over-distort on large screens
+        rollCam.setLocation(0f, 0f, -14f * dp)
+        rollCam.rotateY(spinAngle)
+        // Slight X wobble gives the impression of a tumbling die
+        val wobble = (sin(Math.toRadians(spinAngle * 2.1)) * 24).toFloat()
+        rollCam.rotateX(wobble)
+        val matrix = Matrix()
+        rollCam.getMatrix(matrix)
+        rollCam.restore()
+
+        val px = r.centerX(); val py = r.centerY()
+        matrix.preTranslate(-px, -py)
+        matrix.postTranslate(px, py)
+
+        canvas.save()
+        canvas.concat(matrix)
+        drawDiceFace(canvas, r, displayValue, enabled)
+        canvas.restore()
+    }
+
     override fun onTouchEvent(e: MotionEvent): Boolean {
         when (e.action) {
             MotionEvent.ACTION_DOWN -> {
@@ -532,7 +594,8 @@ private class DicePanel(ctx: Context) : View(ctx) {
         val cx = diceRect.centerX(); val cy = diceRect.centerY()
         canvas.save()
         canvas.scale(scaleX2, scaleY2, cx, cy)
-        drawDiceFace(canvas, diceRect, diceVal, diceEnabled)
+        if (isSpinning) draw3DDiceSpin(canvas, diceRect, diceEnabled)
+        else            drawDiceFace(canvas, diceRect, diceVal, diceEnabled)
         canvas.restore()
 
         // "TAP TO ROLL" label below dice
@@ -846,6 +909,7 @@ In vs-AI mode you play Red; AI plays Yellow."""
 
         canMove = Rules.movable(p, dice)
         syncBoard(); syncHud()
+        dicePanel.animateRoll(dice)
 
         when {
             canMove.isEmpty() -> handler.postDelayed({
