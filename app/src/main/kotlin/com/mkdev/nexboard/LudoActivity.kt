@@ -515,21 +515,33 @@ private class DicePanel(ctx: Context) : View(ctx) {
 
     // ── Rotation state ────────────────────────────────────────────────────────
 
-    private var rotX = 18f   // current Euler X angle (degrees)
-    private var rotY = 22f   // current Euler Y angle (degrees)
+    private var rotX = -30f  // current Euler X angle (degrees)
+    private var rotY =  20f  // current Euler Y angle (degrees)
 
     private var spinAnim: ValueAnimator? = null
     val isSpinning get() = spinAnim?.isRunning == true
 
-    // Landing orientations: slightly off-axis so 2-3 faces stay visible at rest.
-    // Verified: each entry places the target face's rn[2] ≥ 0.88 (most visible).
+    // Landing orientations — result face appears prominently on TOP of the cube.
+    //
+    // Convention: the camera is at +Z. For a face to sit "on top" its rotated
+    // normal must have rn[1] > 0 (projects above centre on screen) AND rn[2] > 0
+    // (visible from the front). Derived analytically for each face normal:
+    //
+    //   +Z (v=1): n=(0,0,1)  → rotX=-60  makes rn=(·, 0.87, 0.50)  TOP ✓
+    //   -Z (v=6): n=(0,0,-1) → rotY≈180, rotX=-60                  TOP ✓
+    //   +Y (v=5): n=(0,1,0)  → rotX=+30  makes rn=(·, 0.87, 0.50)  TOP ✓
+    //   -Y (v=2): n=(0,-1,0) → rotX=-120 makes rn=(·, 0.50, 0.87)  best for bottom face
+    //   +X (v=4): n=(1,0,0)  → rotY≈-90, rotX=-60                  TOP ✓
+    //   -X (v=3): n=(-1,0,0) → rotY≈+90, rotX=-60                  TOP ✓
+    //
+    // rotY offset (±20°) gives a slight side-angle so 2-3 faces are always visible.
     private val LAND = mapOf(
-        1 to ( 18f to  22f),   // face +Z toward camera
-        6 to ( 18f to 182f),   // face -Z toward camera
-        5 to ( 72f to  22f),   // face +Y toward camera
-        2 to (-72f to  22f),   // face -Y toward camera
-        4 to ( 18f to -68f),   // face +X toward camera
-        3 to ( 18f to 112f),   // face -X toward camera
+        1 to (-60f to  20f),
+        6 to (-60f to 200f),
+        5 to ( 30f to  20f),
+        2 to (-120f to 20f),
+        4 to (-60f to -70f),
+        3 to (-60f to 110f),
     )
 
     private fun snapToFace(v: Int) {
@@ -638,8 +650,9 @@ private class DicePanel(ctx: Context) : View(ctx) {
                 lineTo(c2[0], c2[1]); lineTo(c3[0], c3[1]); close()
             }
 
-            // Face fill — ivory tinted by Lambertian shading
-            val base = if (diceEnabled) 0xF0F0F8 else 0x2A2B38
+            // Face fill — ivory when enabled, warm dark-slate when disabled.
+            // Disabled keeps enough brightness so pips remain readable.
+            val base = if (diceEnabled) 0xF0F0F8 else 0x3C3D52
             pp.color = Color.rgb(
                 ((base shr 16 and 0xFF) * light).toInt().coerceIn(0, 255),
                 ((base shr  8 and 0xFF) * light).toInt().coerceIn(0, 255),
@@ -653,11 +666,13 @@ private class DicePanel(ctx: Context) : View(ctx) {
             canvas.drawPath(path, pp)
             pp.style = Paint.Style.FILL
 
-            // Pip dots — rendered as projected 3-D points on the face surface
+            // Pip dots — rendered as projected 3-D points on the face surface.
+            // Face 6 always gets red pips (enabled or disabled) for easy identification.
+            // Other faces: crisp dark navy when enabled, readable slate-blue when disabled.
             val pips = PIPS[face.v] ?: continue
             val pipBase = when {
-                face.v == 6    -> 0xEF5350
-                !diceEnabled   -> 0x555566
+                face.v == 6    -> if (diceEnabled) 0xEF5350 else 0xCC3333
+                !diceEnabled   -> 0x8888BB
                 else           -> 0x1A1A2E
             }
             pp.color = Color.rgb(
