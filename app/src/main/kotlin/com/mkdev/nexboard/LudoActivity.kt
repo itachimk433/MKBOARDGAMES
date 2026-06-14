@@ -463,7 +463,7 @@ private class BoardView(ctx: Context) : View(ctx) {
 
 private class DicePanel(ctx: Context) : View(ctx) {
 
-    var diceVal:     Int     = 0;    set(v) { field = v; if (v in 1..6) snapToFace(v); invalidate() }
+    var diceVal:     Int     = 0;    set(v) { field = v; invalidate() }
     var diceEnabled: Boolean = true; set(v) { field = v; invalidate() }
     var playerColor: Int     = Color.parseColor("#EF5350"); set(v) { field = v; invalidate() }
     var statusText:  String  = "";   set(v) { field = v; invalidate() }
