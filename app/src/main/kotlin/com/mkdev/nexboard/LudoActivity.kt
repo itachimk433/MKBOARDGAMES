@@ -446,12 +446,24 @@ private class BoardView(ctx: Context) : View(ctx) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// DICE PANEL  (full-width area below the board, tap anywhere to roll)
+// DICE PANEL  — True 3-D projected cube rendered on Canvas
 // ═══════════════════════════════════════════════════════════════════════════════
+//
+// Architecture:
+//   • Six FaceDef records describe the cube faces in model space (half-size 1).
+//     Each face carries its outward normal and two orthogonal tangent axes.
+//   • rot() applies the current Euler (rotX, rotY) to any model-space vector.
+//   • proj() does perspective projection (camera at z = -∞, looking in +Z).
+//   • drawCube() culls back-faces, sorts visible ones back-to-front (painter's
+//     algorithm), then fills each quad and draws its pip dots as projected 3-D
+//     points with Lambertian shading.
+//   • animateRoll() spins the die 3 full Y-rotations then decelerates to the
+//     landing orientation that puts the correct face closest to the camera,
+//     with a decaying X-axis wobble for convincing tumble physics.
 
 private class DicePanel(ctx: Context) : View(ctx) {
 
-    var diceVal:     Int     = 0;    set(v) { field = v; invalidate() }
+    var diceVal:     Int     = 0;    set(v) { field = v; if (v in 1..6) snapToFace(v); invalidate() }
     var diceEnabled: Boolean = true; set(v) { field = v; invalidate() }
     var playerColor: Int     = Color.parseColor("#EF5350"); set(v) { field = v; invalidate() }
     var statusText:  String  = "";   set(v) { field = v; invalidate() }
@@ -465,67 +477,206 @@ private class DicePanel(ctx: Context) : View(ctx) {
     private var diceRect = RectF()
     private var pressAnim: ValueAnimator? = null
 
-    // ── 3-D roll animation ───────────────────────────────────────────────────
-    private val rollCam      = android.graphics.Camera()
-    private var spinAngle    = 0f      // current Y-rotation while rolling (0–360°)
-    private var displayValue = 0       // face shown during animation
+    // ── Face definitions ──────────────────────────────────────────────────────
+    //
+    // Standard die: 1 opposite 6, 2 opposite 5, 3 opposite 4.
+    // Each face = (pip value, outward normal n̂, right tangent û, up tangent v̂).
+    // All vectors are unit-length; n̂, û, v̂ are mutually orthogonal.
+    // Face corners in model space: n̂ ± û ± v̂  (half-size 1 per axis).
+
+    private data class FaceDef(
+        val v: Int,
+        val nx: Float, val ny: Float, val nz: Float,   // outward normal
+        val ux: Float, val uy: Float, val uz: Float,   // right tangent
+        val vx: Float, val vy: Float, val vz: Float    // up tangent
+    )
+
+    private val FACES = listOf(
+        FaceDef(1,  0f, 0f, 1f,   1f, 0f, 0f,   0f, 1f, 0f),   // +Z  front
+        FaceDef(6,  0f, 0f,-1f,  -1f, 0f, 0f,   0f, 1f, 0f),   // -Z  back
+        FaceDef(5,  0f, 1f, 0f,   1f, 0f, 0f,   0f, 0f,-1f),   // +Y  top
+        FaceDef(2,  0f,-1f, 0f,   1f, 0f, 0f,   0f, 0f, 1f),   // -Y  bottom
+        FaceDef(4,  1f, 0f, 0f,   0f, 0f,-1f,   0f, 1f, 0f),   // +X  right
+        FaceDef(3, -1f, 0f, 0f,   0f, 0f, 1f,   0f, 1f, 0f),   // -X  left
+    )
+
+    // Pip positions in local (u, v) face space; range ≈ ±0.38 / ±0.50
+    private val PIPS = mapOf(
+        1 to listOf(0f to 0f),
+        2 to listOf(-0.38f to  0.38f,  0.38f to -0.38f),
+        3 to listOf(-0.38f to  0.38f,  0f    to  0f,    0.38f to -0.38f),
+        4 to listOf(-0.38f to  0.38f,  0.38f to  0.38f, -0.38f to -0.38f, 0.38f to -0.38f),
+        5 to listOf(-0.38f to  0.38f,  0.38f to  0.38f,  0f    to  0f,
+                    -0.38f to -0.38f,  0.38f to -0.38f),
+        6 to listOf(-0.38f to  0.50f,  0.38f to  0.50f,
+                    -0.38f to  0f,     0.38f to  0f,
+                    -0.38f to -0.50f,  0.38f to -0.50f),
+    )
+
+    // ── Rotation state ────────────────────────────────────────────────────────
+
+    private var rotX = 18f   // current Euler X angle (degrees)
+    private var rotY = 22f   // current Euler Y angle (degrees)
+
     private var spinAnim: ValueAnimator? = null
     val isSpinning get() = spinAnim?.isRunning == true
 
+    // Landing orientations: slightly off-axis so 2-3 faces stay visible at rest.
+    // Verified: each entry places the target face's rn[2] ≥ 0.88 (most visible).
+    private val LAND = mapOf(
+        1 to ( 18f to  22f),   // face +Z toward camera
+        6 to ( 18f to 182f),   // face -Z toward camera
+        5 to ( 72f to  22f),   // face +Y toward camera
+        2 to (-72f to  22f),   // face -Y toward camera
+        4 to ( 18f to -68f),   // face +X toward camera
+        3 to ( 18f to 112f),   // face -X toward camera
+    )
+
+    private fun snapToFace(v: Int) {
+        val (rx, ry) = LAND[v] ?: return; rotX = rx; rotY = ry
+    }
+
+    // ── Roll animation ────────────────────────────────────────────────────────
+
     fun animateRoll(finalValue: Int) {
         spinAnim?.cancel()
-        // Build a face sequence: 5 random intermediate faces, then the real result
-        val steps = 6
-        val faces = IntArray(steps) { i ->
-            if (i == steps - 1) finalValue
-            else { val r = (1..6).random(); if (r == finalValue) r % 6 + 1 else r }
-        }
-        var lastStep = -1
-        displayValue = faces[0]
+        val (tX, tY) = LAND[finalValue] ?: return
+        val startX = rotX; val startY = rotY
 
-        spinAnim = ValueAnimator.ofFloat(0f, steps * 180f).apply {
-            duration = 780L
-            interpolator = android.view.animation.DecelerateInterpolator(2.3f)
+        // Always spin forward at least 3 full Y-rotations, land at tY
+        val offset = ((tY - startY % 360f) % 360f + 360f) % 360f
+        val endY   = startY + 3f * 360f + offset
+
+        spinAnim = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration     = 1100L
+            interpolator = android.view.animation.DecelerateInterpolator(2.5f)
             addUpdateListener { va ->
-                val total = va.animatedValue as Float
-                spinAngle = total % 360f
-                val step  = (total / 180f).toInt().coerceAtMost(steps - 1)
-                if (step != lastStep) { lastStep = step; displayValue = faces[step] }
+                val t = va.animatedValue as Float
+                // X: linear blend to landing angle + decaying wobble
+                rotX = startX + (tX - startX) * t +
+                       sin(t * PI.toFloat() * 6f).toFloat() * 36f * (1f - t)
+                // Y: smooth deceleration over full spin arc
+                rotY = startY + (endY - startY) * t
                 invalidate()
             }
             addListener(object : AnimatorListenerAdapter() {
-                override fun onAnimationEnd(a: Animator) {
-                    spinAngle = 0f; displayValue = finalValue; invalidate()
-                }
-                override fun onAnimationCancel(a: Animator) {
-                    spinAngle = 0f; invalidate()
-                }
+                override fun onAnimationEnd(a: Animator)    { rotX = tX; rotY = tY; invalidate() }
+                override fun onAnimationCancel(a: Animator) { invalidate() }
             })
             start()
         }
     }
 
-    private fun draw3DDiceSpin(canvas: Canvas, r: RectF, enabled: Boolean) {
-        rollCam.save()
-        // Push camera back so perspective doesn't over-distort on large screens
-        rollCam.setLocation(0f, 0f, -14f * dp)
-        rollCam.rotateY(spinAngle)
-        // Slight X wobble gives the impression of a tumbling die
-        val wobble = (sin(Math.toRadians(spinAngle * 2.1)) * 24).toFloat()
-        rollCam.rotateX(wobble)
-        val matrix = Matrix()
-        rollCam.getMatrix(matrix)
-        rollCam.restore()
+    // ── 3-D math ──────────────────────────────────────────────────────────────
 
-        val px = r.centerX(); val py = r.centerY()
-        matrix.preTranslate(-px, -py)
-        matrix.postTranslate(px, py)
-
-        canvas.save()
-        canvas.concat(matrix)
-        drawDiceFace(canvas, r, displayValue, enabled)
-        canvas.restore()
+    /** Rotate a model-space vector by the current (rotX, rotY) Euler angles. */
+    private fun rot(x: Float, y: Float, z: Float): FloatArray {
+        val rx = Math.toRadians(rotX.toDouble()).toFloat()
+        val ry = Math.toRadians(rotY.toDouble()).toFloat()
+        val x1 =  x * cos(ry) + z * sin(ry)     // Y-axis first
+        val y1 =  y
+        val z1 = -x * sin(ry) + z * cos(ry)
+        val x2 = x1                              // then X-axis
+        val y2 =  y1 * cos(rx) - z1 * sin(rx)
+        val z2 =  y1 * sin(rx) + z1 * cos(rx)
+        return floatArrayOf(x2, y2, z2)
     }
+
+    /**
+     * Perspective-project a rotated point onto screen coords.
+     * Camera at z = -∞ looking in +Z; cube spans ±1 in model space.
+     * dist = 4.5 gives pleasant depth without excessive distortion.
+     */
+    private fun proj(p: FloatArray, cx: Float, cy: Float, sc: Float): FloatArray {
+        val d = 4.5f
+        val w = d / (d + p[2] + 1f)
+        return floatArrayOf(cx + p[0] * sc * w, cy - p[1] * sc * w)
+    }
+
+    // ── Cube renderer ─────────────────────────────────────────────────────────
+
+    private fun drawCube(canvas: Canvas, r: RectF) {
+        val cx = r.centerX(); val cy = r.centerY()
+        val sc = r.width() * 0.46f        // 1 model unit → sc pixels
+
+        // Fixed world-space light direction (normalised)
+        val lx = 0.45f; val ly = 0.8f; val lz = 0.55f
+        val lInv = 1f / sqrt(lx * lx + ly * ly + lz * lz)
+
+        data class Drawable(
+            val face: FaceDef,
+            val rn: FloatArray, val ru: FloatArray, val rv: FloatArray,
+            val depth: Float, val light: Float
+        )
+
+        val visible = ArrayList<Drawable>(6)
+        for (f in FACES) {
+            val rn = rot(f.nx, f.ny, f.nz)
+            if (rn[2] <= 0f) continue                    // back-face cull
+            val ru = rot(f.ux, f.uy, f.uz)
+            val rv = rot(f.vx, f.vy, f.vz)
+            // Lambertian diffuse + ambient
+            val lit = (0.28f + 0.72f * maxOf(0f,
+                (rn[0] * lx + rn[1] * ly + rn[2] * lz) * lInv)).coerceIn(0f, 1f)
+            visible += Drawable(f, rn, ru, rv, rn[2], lit)
+        }
+        visible.sortBy { it.depth }                      // painter's algorithm
+
+        for ((face, rn, ru, rv, _, light) in visible) {
+
+            // Four corners: face_center ± û ± v̂
+            fun corner(su: Float, sv: Float) = proj(floatArrayOf(
+                rn[0] + su * ru[0] + sv * rv[0],
+                rn[1] + su * ru[1] + sv * rv[1],
+                rn[2] + su * ru[2] + sv * rv[2]), cx, cy, sc)
+
+            val c0 = corner(-1f, -1f); val c1 = corner( 1f, -1f)
+            val c2 = corner( 1f,  1f); val c3 = corner(-1f,  1f)
+
+            val path = Path().apply {
+                moveTo(c0[0], c0[1]); lineTo(c1[0], c1[1])
+                lineTo(c2[0], c2[1]); lineTo(c3[0], c3[1]); close()
+            }
+
+            // Face fill — ivory tinted by Lambertian shading
+            val base = if (diceEnabled) 0xF0F0F8 else 0x2A2B38
+            pp.color = Color.rgb(
+                ((base shr 16 and 0xFF) * light).toInt().coerceIn(0, 255),
+                ((base shr  8 and 0xFF) * light).toInt().coerceIn(0, 255),
+                ((base        and 0xFF) * light).toInt().coerceIn(0, 255))
+            pp.style = Paint.Style.FILL
+            canvas.drawPath(path, pp)
+
+            // Edge outline (subtle — shaded by same light)
+            pp.color = Color.argb((90 * light).toInt().coerceIn(20, 120), 0, 0, 30)
+            pp.style = Paint.Style.STROKE; pp.strokeWidth = dp * 1.8f
+            canvas.drawPath(path, pp)
+            pp.style = Paint.Style.FILL
+
+            // Pip dots — rendered as projected 3-D points on the face surface
+            val pips = PIPS[face.v] ?: continue
+            val pipBase = when {
+                face.v == 6    -> 0xEF5350
+                !diceEnabled   -> 0x555566
+                else           -> 0x1A1A2E
+            }
+            pp.color = Color.rgb(
+                ((pipBase shr 16 and 0xFF) * light).toInt().coerceIn(0, 255),
+                ((pipBase shr  8 and 0xFF) * light).toInt().coerceIn(0, 255),
+                ((pipBase        and 0xFF) * light).toInt().coerceIn(0, 255))
+
+            val dotR = sc * 0.105f
+            for ((pu, pv) in pips) {
+                val p2 = proj(floatArrayOf(
+                    rn[0] + pu * ru[0] + pv * rv[0],
+                    rn[1] + pu * ru[1] + pv * rv[1],
+                    rn[2] + pu * ru[2] + pv * rv[2]), cx, cy, sc)
+                canvas.drawCircle(p2[0], p2[1], dotR, pp)
+            }
+        }
+    }
+
+    // ── Touch & press animation ───────────────────────────────────────────────
 
     override fun onTouchEvent(e: MotionEvent): Boolean {
         when (e.action) {
@@ -535,10 +686,7 @@ private class DicePanel(ctx: Context) : View(ctx) {
             }
             MotionEvent.ACTION_UP -> {
                 if (diceEnabled) {
-                    animatePress(1.08f, 120) {
-                        animatePress(1f, 80)
-                        onRoll?.invoke()
-                    }
+                    animatePress(1.08f, 120) { animatePress(1f, 80); onRoll?.invoke() }
                 }
                 return true
             }
@@ -552,7 +700,7 @@ private class DicePanel(ctx: Context) : View(ctx) {
 
     private fun animatePress(to: Float, dur: Long, onEnd: (() -> Unit)? = null) {
         pressAnim?.cancel()
-        val fromX = scaleX2; val fromY = scaleY2
+        val fromX = scaleX2
         pressAnim = ValueAnimator.ofFloat(0f, 1f).apply {
             duration = dur
             interpolator = AccelerateDecelerateInterpolator()
@@ -569,6 +717,8 @@ private class DicePanel(ctx: Context) : View(ctx) {
         }
     }
 
+    // ── onDraw ────────────────────────────────────────────────────────────────
+
     override fun onDraw(canvas: Canvas) {
         val w = width.toFloat(); val h = height.toFloat()
 
@@ -583,23 +733,21 @@ private class DicePanel(ctx: Context) : View(ctx) {
         pp.textSize = 13f * sp.coerceAtMost(3f)
         canvas.drawText(statusText, w / 2f, dp * 18f + pp.textSize * 0.4f, pp)
 
-        // Dice
+        // Dice allocation rect
         val maxDice = minOf(w * 0.40f, h * 0.62f)
-        val diceS   = maxDice
-        val dLeft   = (w - diceS) / 2f
+        val dLeft   = (w - maxDice) / 2f
         val dTop    = dp * 32f
-        diceRect.set(dLeft, dTop, dLeft + diceS, dTop + diceS)
+        diceRect.set(dLeft, dTop, dLeft + maxDice, dTop + maxDice)
 
-        // Scale around centre for press animation
+        // Scale around centre for tap press animation
         val cx = diceRect.centerX(); val cy = diceRect.centerY()
         canvas.save()
         canvas.scale(scaleX2, scaleY2, cx, cy)
-        if (isSpinning) draw3DDiceSpin(canvas, diceRect, diceEnabled)
-        else            drawDiceFace(canvas, diceRect, diceVal, diceEnabled)
+        drawCube(canvas, diceRect)
         canvas.restore()
 
-        // "TAP TO ROLL" label below dice
-        val labelY = dTop + diceS + dp * 16f
+        // "TAP TO ROLL" label below the cube
+        val labelY = dTop + maxDice + dp * 16f
         if (diceEnabled) {
             pp.color = playerColor; pp.textAlign = Paint.Align.CENTER
             pp.textSize = 12f * sp.coerceAtMost(3f); pp.isFakeBoldText = true
@@ -617,53 +765,6 @@ private class DicePanel(ctx: Context) : View(ctx) {
         pp.color = Color.WHITE; pp.style = Paint.Style.STROKE; pp.strokeWidth = dp * 1.5f
         canvas.drawCircle(w - dp * 20f, h - dp * 16f, dp * 8f, pp)
         pp.style = Paint.Style.FILL
-    }
-
-    private fun drawDiceFace(canvas: Canvas, r: RectF, v: Int, enabled: Boolean) {
-        val corner = r.width() * 0.17f
-        // Shadow
-        val sR = RectF(r.left + dp * 3, r.top + dp * 3, r.right + dp * 3, r.bottom + dp * 3)
-        pp.color = Color.argb(70, 0, 0, 0); pp.style = Paint.Style.FILL
-        canvas.drawRoundRect(sR, corner, corner, pp)
-
-        // Face
-        pp.color = if (enabled) Color.parseColor("#F0F0F8") else Color.parseColor("#2A2B38")
-        canvas.drawRoundRect(r, corner, corner, pp)
-
-        // Border
-        pp.color = if (enabled) Color.parseColor("#BBBBD0") else Color.parseColor("#33334A")
-        pp.style = Paint.Style.STROKE; pp.strokeWidth = dp * 1.5f
-        canvas.drawRoundRect(r, corner, corner, pp)
-        pp.style = Paint.Style.FILL
-
-        if (v in 1..6) {
-            val dotR   = r.width() * 0.085f
-            val iL     = r.left  + r.width()  * 0.20f
-            val iT     = r.top   + r.height() * 0.20f
-            val iW     = r.width()  * 0.60f
-            val dotCol = if (v == 6) Color.parseColor("#EF5350")
-                         else if (!enabled) Color.parseColor("#555566")
-                         else Color.parseColor("#1A1A2E")
-            val dots = when (v) {
-                1 -> listOf(0.5f to 0.5f)
-                2 -> listOf(0.25f to 0.25f, 0.75f to 0.75f)
-                3 -> listOf(0.25f to 0.25f, 0.5f to 0.5f, 0.75f to 0.75f)
-                4 -> listOf(0.25f to 0.25f, 0.75f to 0.25f, 0.25f to 0.75f, 0.75f to 0.75f)
-                5 -> listOf(0.25f to 0.25f, 0.75f to 0.25f, 0.5f to 0.5f, 0.25f to 0.75f, 0.75f to 0.75f)
-                6 -> listOf(0.25f to 0.17f, 0.75f to 0.17f, 0.25f to 0.5f, 0.75f to 0.5f, 0.25f to 0.83f, 0.75f to 0.83f)
-                else -> emptyList()
-            }
-            pp.color = dotCol
-            dots.forEach { (rx, ry) ->
-                canvas.drawCircle(iL + rx * iW, iT + ry * iW, dotR, pp)
-            }
-        } else {
-            // Unrolled — show question mark
-            pp.color = if (enabled) Color.parseColor("#7FC8F8") else Color.parseColor("#444455")
-            pp.textAlign = Paint.Align.CENTER; pp.textSize = r.width() * 0.48f
-            canvas.drawText("?", r.centerX(), r.centerY() + pp.textSize * 0.36f, pp)
-            pp.textAlign = Paint.Align.LEFT
-        }
     }
 }
 
