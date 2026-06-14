@@ -521,41 +521,29 @@ private class DicePanel(ctx: Context) : View(ctx) {
     private var spinAnim: ValueAnimator? = null
     val isSpinning get() = spinAnim?.isRunning == true
 
-    // Landing orientations — result face appears prominently on TOP of the cube.
-    //
-    // Convention: the camera is at +Z. For a face to sit "on top" its rotated
-    // normal must have rn[1] > 0 (projects above centre on screen) AND rn[2] > 0
-    // (visible from the front). Derived analytically for each face normal:
-    //
-    //   +Z (v=1): n=(0,0,1)  → rotX=-60  makes rn=(·, 0.87, 0.50)  TOP ✓
-    //   -Z (v=6): n=(0,0,-1) → rotY≈180, rotX=-60                  TOP ✓
-    //   +Y (v=5): n=(0,1,0)  → rotX=+30  makes rn=(·, 0.87, 0.50)  TOP ✓
-    //   -Y (v=2): n=(0,-1,0) → rotX=-120 makes rn=(·, 0.50, 0.87)  best for bottom face
-    //   +X (v=4): n=(1,0,0)  → rotY≈-90, rotX=-60                  TOP ✓
-    //   -X (v=3): n=(-1,0,0) → rotY≈+90, rotX=-60                  TOP ✓
-    //
-    // rotY offset (±20°) gives a slight side-angle so 2-3 faces are always visible.
+    // Landing orientations for the SPINNING 3-D cube — these only affect the
+    // last few frames of the tumble animation. After the spin ends, onDraw
+    // switches to drawDiceTopView() which always shows the result face flat on
+    // top regardless of rotX/rotY, so the exact landing angle is flexible.
+    // We use a consistent "looking slightly down" pose (rotX≈60°) with small
+    // rotY variety so successive rolls feel different.
     private val LAND = mapOf(
-        1 to (-60f to  20f),
-        6 to (-60f to 200f),
-        5 to ( 30f to  20f),
-        2 to (-120f to 20f),
-        4 to (-60f to -70f),
-        3 to (-60f to 110f),
+        1 to (58f to  15f),
+        2 to (62f to  30f),
+        3 to (55f to  10f),
+        4 to (65f to  25f),
+        5 to (60f to  20f),
+        6 to (58f to   5f),
     )
-
-    private fun snapToFace(v: Int) {
-        val (rx, ry) = LAND[v] ?: return; rotX = rx; rotY = ry
-    }
 
     // ── Roll animation ────────────────────────────────────────────────────────
 
     fun animateRoll(finalValue: Int) {
         spinAnim?.cancel()
-        val (tX, tY) = LAND[finalValue] ?: return
+        val (tX, tY) = LAND[finalValue] ?: (60f to 20f)
         val startX = rotX; val startY = rotY
 
-        // Always spin forward at least 3 full Y-rotations, land at tY
+        // Spin at least 3 full Y-rotations then decelerate to tY
         val offset = ((tY - startY % 360f) % 360f + 360f) % 360f
         val endY   = startY + 3f * 360f + offset
 
@@ -564,10 +552,9 @@ private class DicePanel(ctx: Context) : View(ctx) {
             interpolator = android.view.animation.DecelerateInterpolator(2.5f)
             addUpdateListener { va ->
                 val t = va.animatedValue as Float
-                // X: linear blend to landing angle + decaying wobble
+                // X: blend to landing angle + decaying tumble wobble
                 rotX = startX + (tX - startX) * t +
-                       sin(t * PI.toFloat() * 6f).toFloat() * 36f * (1f - t)
-                // Y: smooth deceleration over full spin arc
+                       sin(t * PI.toFloat() * 6f).toFloat() * 40f * (1f - t)
                 rotY = startY + (endY - startY) * t
                 invalidate()
             }
@@ -597,19 +584,20 @@ private class DicePanel(ctx: Context) : View(ctx) {
     /**
      * Perspective-project a rotated point onto screen coords.
      * Camera at z = -∞ looking in +Z; cube spans ±1 in model space.
-     * dist = 4.5 gives pleasant depth without excessive distortion.
+     * d=8.0 is a mild perspective — the front/back scale ratio is only
+     * 8/10 = 0.80 vs 8/8 = 1.0, so the cube looks cubic and undistorted.
      */
     private fun proj(p: FloatArray, cx: Float, cy: Float, sc: Float): FloatArray {
-        val d = 4.5f
+        val d = 8.0f
         val w = d / (d + p[2] + 1f)
         return floatArrayOf(cx + p[0] * sc * w, cy - p[1] * sc * w)
     }
 
-    // ── Cube renderer ─────────────────────────────────────────────────────────
+    // ── Cube renderer (used only while spinning) ───────────────────────────────
 
     private fun drawCube(canvas: Canvas, r: RectF) {
         val cx = r.centerX(); val cy = r.centerY()
-        val sc = r.width() * 0.46f        // 1 model unit → sc pixels
+        val sc = r.width() * 0.38f        // 1 model unit → sc pixels; slightly smaller for breathing room
 
         // Fixed world-space light direction (normalised)
         val lx = 0.45f; val ly = 0.8f; val lz = 0.55f
@@ -691,6 +679,127 @@ private class DicePanel(ctx: Context) : View(ctx) {
         }
     }
 
+    // ── Top-view renderer (used when not spinning) ────────────────────────────
+    //
+    // Draws the die in a cabinet / oblique projection: the result face is drawn
+    // as a flat rounded square on top, with two thin parallelogram side strips
+    // (right and bottom) giving an unambiguous "looking from slightly above"
+    // 3-D hint. This is always perfectly readable — no perspective distortion,
+    // no guessing which face is the result.
+    //
+    // Geometry (all lengths relative to face width W):
+    //   dx = W × 0.13   horizontal distance to the far edge of each side strip
+    //   dy = W × 0.07   vertical drop to the far edge of each side strip
+    //   The top face rect is shifted (−dx, −dy) relative to r so the side strips
+    //   fit within the original allocation rect r.
+
+    private fun drawDiceTopView(canvas: Canvas, r: RectF) {
+        val dx = r.width()  * 0.13f
+        val dy = r.height() * 0.07f
+
+        // Top face lives in the upper-left part of r; sides extend to its right/bottom
+        val face = RectF(r.left, r.top, r.right - dx, r.bottom - dy)
+        val cr   = face.width() * 0.14f   // corner radius
+
+        val en = diceEnabled
+        val faceCol  = if (en) Color.parseColor("#F2F2FA") else Color.parseColor("#3C3D52")
+        val rightCol = if (en) Color.parseColor("#C4C4DA") else Color.parseColor("#2C2D42")
+        val botCol   = if (en) Color.parseColor("#AAAABF") else Color.parseColor("#252535")
+        val edgeCol  = if (en) Color.parseColor("#9090AA") else Color.parseColor("#4A4B66")
+
+        // Drop shadow (painted first, beneath everything)
+        pp.color = Color.argb(70, 0, 0, 0); pp.style = Paint.Style.FILL
+        canvas.drawRoundRect(
+            RectF(face.left + dx + dp*2, face.top + dy + dp*2,
+                  face.right + dx + dp*2, face.bottom + dy + dp*2),
+            cr, cr, pp)
+
+        // Right side strip: parallelogram connecting the face's right edge to
+        // the right edge shifted by (dx, dy)
+        pp.color = rightCol
+        canvas.drawPath(Path().apply {
+            moveTo(face.right, face.top  + cr)
+            lineTo(face.right + dx, face.top  + cr + dy)
+            lineTo(face.right + dx, face.bottom     + dy)
+            lineTo(face.right,      face.bottom)
+            close()
+        }, pp)
+
+        // Bottom side strip
+        pp.color = botCol
+        canvas.drawPath(Path().apply {
+            moveTo(face.left  + cr, face.bottom)
+            lineTo(face.left  + cr + dx, face.bottom + dy)
+            lineTo(face.right + dx,      face.bottom + dy)
+            lineTo(face.right,           face.bottom)
+            close()
+        }, pp)
+
+        // Corner connector (bottom-right join of the two strips)
+        pp.color = botCol
+        canvas.drawPath(Path().apply {
+            moveTo(face.right, face.bottom)
+            lineTo(face.right + dx, face.bottom + dy)
+            lineTo(face.right + dx, face.top + cr + dy)
+            lineTo(face.right, face.top + cr)
+            close()
+        }, pp)
+
+        // Top face fill
+        pp.color = faceCol; pp.style = Paint.Style.FILL
+        canvas.drawRoundRect(face, cr, cr, pp)
+
+        // Top face border
+        pp.color = edgeCol; pp.style = Paint.Style.STROKE; pp.strokeWidth = dp * 1.6f
+        canvas.drawRoundRect(face, cr, cr, pp)
+        pp.style = Paint.Style.FILL
+
+        // Pips on the top face
+        val v = diceVal
+        if (v in 1..6) {
+            val pipR  = face.width() * 0.082f
+            val fcx   = face.centerX(); val fcy = face.centerY()
+            val spr   = face.width() * 0.235f   // pip spread from centre
+            val sprV  = face.height() * 0.235f
+
+            val pipCol = when {
+                v == 6  -> if (en) Color.parseColor("#EF5350") else Color.parseColor("#C03030")
+                !en     -> Color.parseColor("#8888BB")
+                else    -> Color.parseColor("#1A1A2E")
+            }
+            pp.color = pipCol
+
+            // Inner pip highlight (makes each dot look slightly raised)
+            val hlCol = Color.argb(80, 255, 255, 255)
+
+            val dots: List<Pair<Float, Float>> = when (v) {
+                1 -> listOf(0f to 0f)
+                2 -> listOf(-spr to -sprV, spr to sprV)
+                3 -> listOf(-spr to -sprV, 0f to 0f, spr to sprV)
+                4 -> listOf(-spr to -sprV, spr to -sprV, -spr to sprV, spr to sprV)
+                5 -> listOf(-spr to -sprV, spr to -sprV, 0f to 0f, -spr to sprV, spr to sprV)
+                6 -> listOf(-spr to -sprV*1.25f, spr to -sprV*1.25f,
+                            -spr to 0f,          spr to 0f,
+                            -spr to  sprV*1.25f, spr to  sprV*1.25f)
+                else -> emptyList()
+            }
+            dots.forEach { (ox, oy) ->
+                pp.color = pipCol
+                canvas.drawCircle(fcx + ox, fcy + oy, pipR, pp)
+                // specular highlight on each pip
+                pp.color = hlCol
+                canvas.drawCircle(fcx + ox - pipR * 0.28f, fcy + oy - pipR * 0.28f, pipR * 0.35f, pp)
+            }
+        } else {
+            // Before first roll — show a question mark
+            pp.color = if (en) Color.parseColor("#7FC8F8") else Color.parseColor("#555566")
+            pp.textAlign = Paint.Align.CENTER
+            pp.textSize  = face.width() * 0.44f
+            canvas.drawText("?", face.centerX(), face.centerY() + pp.textSize * 0.36f, pp)
+            pp.textAlign = Paint.Align.LEFT
+        }
+    }
+
     // ── Touch & press animation ───────────────────────────────────────────────
 
     override fun onTouchEvent(e: MotionEvent): Boolean {
@@ -758,7 +867,8 @@ private class DicePanel(ctx: Context) : View(ctx) {
         val cx = diceRect.centerX(); val cy = diceRect.centerY()
         canvas.save()
         canvas.scale(scaleX2, scaleY2, cx, cy)
-        drawCube(canvas, diceRect)
+        if (isSpinning) drawCube(canvas, diceRect)
+        else            drawDiceTopView(canvas, diceRect)
         canvas.restore()
 
         // "TAP TO ROLL" label below the cube
