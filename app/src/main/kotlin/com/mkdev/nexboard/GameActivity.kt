@@ -59,14 +59,6 @@ class GameActivity : AppCompatActivity() {
 
         gameType = intent.getStringExtra(EXTRA_GAME) ?: "CHESS"
 
-        // Guard: if we somehow receive "LUDO" here, redirect to LudoActivity.
-        // Ludo has its own dedicated activity and should never be handled here.
-        if (gameType == "LUDO") {
-            startActivity(Intent(this, LudoActivity::class.java))
-            finish()
-            return
-        }
-
         engine   = when (gameType) {
             "OTHELLO"   -> OthelloRuleEngine()
             "CHECKERS"  -> CheckersRuleEngine()

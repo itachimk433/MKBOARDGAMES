@@ -27,8 +27,12 @@ class MainActivity : AppCompatActivity() {
                     startActivity(Intent(this, MorabarabaActivity::class.java))
                 MenuView.GameType.TICTACTOE ->
                     startActivity(Intent(this, TicTacToeActivity::class.java))
-                MenuView.GameType.LUDO ->
-                    startActivity(Intent(this, LudoActivity::class.java))
+                MenuView.GameType.GO ->
+                    androidx.appcompat.app.AlertDialog.Builder(this)
+                        .setTitle("Go")
+                        .setMessage("Go is coming soon!\n\nFull 19×19 gameplay is in development.")
+                        .setPositiveButton("OK", null)
+                        .show()
                 else ->
                     startActivity(Intent(this, GameActivity::class.java).apply {
                         putExtra(GameActivity.EXTRA_GAME, type.name)
