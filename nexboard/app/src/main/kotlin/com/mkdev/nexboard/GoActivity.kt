@@ -244,15 +244,21 @@ Strategy
     }
 
     private fun applyAndProcess(move: Move) {
+        val prevBCaps = gameState.metadata["blackCaptures"] as? Int ?: 0
+        val prevWCaps = gameState.metadata["whiteCaptures"] as? Int ?: 0
         moveHistory.addLast(gameState)
         gameState = engine.applyMove(gameState, move)
         boardView.setGameState(gameState, if (move.to == PASS_POS) null else move.to)
 
+        val newBCaps = gameState.metadata["blackCaptures"] as? Int ?: 0
+        val newWCaps = gameState.metadata["whiteCaptures"] as? Int ?: 0
+        val captured = (newBCaps > prevBCaps) || (newWCaps > prevWCaps)
+
         // Sound
         when {
-            move.to == PASS_POS       -> SoundPlayer.play("game_start")
-            move.captures.isNotEmpty()-> SoundPlayer.playMovement("othello_flip")
-            else                      -> SoundPlayer.playMovement("othello_place")
+            move.to == PASS_POS -> SoundPlayer.play("game_start")
+            captured            -> SoundPlayer.playMovement("othello_flip")
+            else                -> SoundPlayer.playMovement("othello_place")
         }
 
         updateScore()
