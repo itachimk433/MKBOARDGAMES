@@ -57,6 +57,11 @@
             android:screenOrientation="portrait"
             android:configChanges="orientation|screenSize" />
 
+        <activity
+            android:name=".GoActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:configChanges="orientation|screenSize" />
 
     </application>
 
