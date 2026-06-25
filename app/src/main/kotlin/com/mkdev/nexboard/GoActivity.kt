@@ -53,6 +53,10 @@ class GoActivity : AppCompatActivity() {
     private var aiJob: Job?    = null
     private var interstitialAd: Any? = null
     private var resultRecorded = false
+    private var savedBlackScore  = 0.0
+    private var savedWhiteScore  = 0.0
+    private var replayBoards: List<IntArray> = emptyList()
+    private var replayLastPts: List<Int?>    = emptyList()
 
     // ── Views ─────────────────────────────────────────────────────────────────
     private lateinit var hudView:   HudView
@@ -144,9 +148,9 @@ class GoActivity : AppCompatActivity() {
     private fun showBoardSizeDialog() {
         AlertDialog.Builder(this).setTitle("Board Size")
             .setItems(arrayOf(
-                "9×9   — Quick  (~20 min)",
-                "13×13 — Medium (~60 min)",
-                "19×19 — Full   (~90 min)"
+                "9×9   — Small",
+                "13×13 — Medium",
+                "19×19 — Full"
             )) { _, which ->
                 boardSize = when (which) { 0 -> 9; 1 -> 13; else -> 19 }
                 boardView.updateBoardSize(boardSize)
@@ -325,7 +329,13 @@ Tips
         AdManager.showInterstitial(this, ad)
         AdManager.loadInterstitial(this) { interstitialAd = it }
 
-        scope.launch { delay(500L); showResultDialog(blackFinal, whiteFinal) }
+        // Save scores and board replay before the result dialog
+        savedBlackScore = blackFinal
+        savedWhiteScore = whiteFinal
+        replayBoards    = history.map { it.board.copyOf() } + listOf(board.copyOf())
+        replayLastPts   = history.map { it.lastPt } + listOf(lastMovePt)
+
+        scope.launch { delay(500L); showResultDialog() }
     }
 
     private fun recordResult(b: Double, w: Double) {
@@ -339,7 +349,9 @@ Tips
         }
     }
 
-    private fun showResultDialog(blackScore: Double, whiteScore: Double) {
+    private fun showResultDialog() {
+        val blackScore = savedBlackScore
+        val whiteScore = savedWhiteScore
         val winner    = if (blackScore > whiteScore) "Black" else "White"
         val margin    = "%.1f".format(kotlin.math.abs(blackScore - whiteScore))
         val resultMsg = if (vsAI) {
@@ -356,8 +368,88 @@ Tips
         AlertDialog.Builder(this).setTitle("Game Over")
             .setMessage(msg)
             .setPositiveButton("Play Again") { _, _ -> showModeDialog() }
+            .setNeutralButton("Watch Replay") { _, _ -> showReplayDialog() }
             .setNegativeButton("Main Menu")  { _, _ -> finish() }
             .setCancelable(true).show()
+    }
+
+    private fun showReplayDialog() {
+        if (replayBoards.isEmpty()) return
+        val ctx   = this
+        val dp    = resources.displayMetrics.density
+        val total = replayBoards.size
+        var frameIdx = 0
+
+        val replayBoardView = GoBoardView(ctx)
+        replayBoardView.isLocked = true
+        replayBoardView.updateBoardSize(boardSize)
+
+        val frameLabel = android.widget.TextView(ctx).apply {
+            textAlignment = android.view.View.TEXT_ALIGNMENT_CENTER
+            setTextColor(Color.parseColor("#AAAAAA"))
+            setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12f)
+            setPadding(0, (4 * dp).toInt(), 0, (4 * dp).toInt())
+        }
+
+        fun showFrame(idx: Int) {
+            frameIdx = idx.coerceIn(0, total - 1)
+            replayBoardView.reset(replayBoards[frameIdx], boardSize, replayLastPts[frameIdx])
+            replayBoardView.isLocked = true
+            frameLabel.text = if (frameIdx == 0) "Start" else "Move $frameIdx / ${total - 1}"
+        }
+
+        val prevBtn = android.widget.Button(ctx).apply {
+            text = "◀ Prev"
+            setBackgroundColor(Color.parseColor("#252525"))
+            setTextColor(Color.parseColor("#7FC8F8"))
+            setOnClickListener { showFrame(frameIdx - 1) }
+        }
+        val nextBtn = android.widget.Button(ctx).apply {
+            text = "Next ▶"
+            setBackgroundColor(Color.parseColor("#252525"))
+            setTextColor(Color.parseColor("#7FC8F8"))
+            setOnClickListener { showFrame(frameIdx + 1) }
+        }
+        val lastBtn = android.widget.Button(ctx).apply {
+            text = "Final ▶▶"
+            setBackgroundColor(Color.parseColor("#252525"))
+            setTextColor(Color.parseColor("#7FC8F8"))
+            setOnClickListener { showFrame(total - 1) }
+        }
+
+        val btnRow = LinearLayout(ctx).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER
+            setPadding(0, (6 * dp).toInt(), 0, (6 * dp).toInt())
+            val lp = LinearLayout.LayoutParams(0, android.view.ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+            addView(prevBtn, lp); addView(nextBtn, lp); addView(lastBtn, lp)
+        }
+
+        val root = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.parseColor("#121212"))
+        }
+        val boardPx = (minOf(resources.displayMetrics.widthPixels,
+                             resources.displayMetrics.heightPixels) * 0.82f).toInt()
+        root.addView(replayBoardView, LinearLayout.LayoutParams(
+            android.view.ViewGroup.LayoutParams.MATCH_PARENT, boardPx))
+        root.addView(frameLabel, LinearLayout.LayoutParams(
+            android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+            android.view.ViewGroup.LayoutParams.WRAP_CONTENT))
+        root.addView(btnRow, LinearLayout.LayoutParams(
+            android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+            android.view.ViewGroup.LayoutParams.WRAP_CONTENT))
+
+        showFrame(0)
+
+        AlertDialog.Builder(ctx)
+            .setTitle("Game Replay  (${total - 1} moves)")
+            .setView(root)
+            .setPositiveButton("Close", null)
+            .setCancelable(true)
+            .show()
+            .window?.setBackgroundDrawable(
+                android.graphics.drawable.ColorDrawable(Color.parseColor("#121212")))
     }
 
     // ── Undo ──────────────────────────────────────────────────────────────────
@@ -406,8 +498,8 @@ Tips
                     "AI Difficulty" -> {
                         AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_MinWidth)
                             .setTitle("AI Difficulty")
-                            .setSingleChoiceItems(arrayOf("Easy", "Medium", "Hard"), difficulty) { d, i ->
-                                difficulty = i; d.dismiss()
+                            .setSingleChoiceItems(arrayOf("Easy", "Medium", "Hard"), SettingsManager.getGoDifficulty(this)) { d, i ->
+                                SettingsManager.setGoDifficulty(this, i); difficulty = i; d.dismiss()
                             }.show()
                     }
                     "Main Menu" -> if (inProgress) {
@@ -541,12 +633,14 @@ Tips
     private fun triggerAI() {
         boardView.isLocked = true
         hudView.setThinking(true)
+        val diff = SettingsManager.getGoDifficulty(this)
         val snap = Snapshot(board.copyOf(), currentColor, capturedByBlack, capturedByWhite, koPoint, lastBoard?.copyOf(), consecutivePasses, lastMovePt)
         aiJob = scope.launch {
             val move = withContext(Dispatchers.Default) {
-                try { aiPickMove(snap.board, snap.color, snap.ko, boardSize, difficulty) }
+                try { aiPickMove(snap.board, snap.color, snap.ko, boardSize, diff) }
                 catch (_: Throwable) { null }
             }
+            delay(700L)  // visual pause so the player's stone finishes animating before AI plays
             hudView.setThinking(false)
             boardView.isLocked = false
             when {
@@ -726,7 +820,8 @@ Tips
         private fun animateStone(idx: Int) {
             animIdx = idx; animScale = 0f
             ValueAnimator.ofFloat(0f, 1f).apply {
-                duration = 180L
+                duration = 320L
+                interpolator = android.view.animation.OvershootInterpolator(1.15f)
                 addUpdateListener { animScale = it.animatedValue as Float; invalidate() }
                 start()
             }

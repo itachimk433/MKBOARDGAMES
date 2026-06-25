@@ -22,6 +22,7 @@ object SettingsManager {
     private const val KEY_OTHELLO_THEME    = "othello_theme"
     private const val KEY_MORABARABA_THEME = "morabaraba_theme"
     private const val KEY_TTT_THEME        = "ttt_theme"
+    private const val KEY_GO_THEME         = "go_theme"
 
     // ── Global stats keys (legacy / overall) ─────────────────────────────────
     private const val KEY_STATS_WINS     = "stats_wins"
@@ -80,13 +81,20 @@ object SettingsManager {
     fun morabarabaAiDepth(ctx: Context) = when (getMorabarabaDifficulty(ctx)) { 0 -> 3; 2 -> 7; else -> 5 }
     fun morabarabaAiTimeLimitMs(ctx: Context): Long = when (getMorabarabaDifficulty(ctx)) { 0 -> 600L; 2 -> 2500L; else -> 1200L }
 
+    // ── Go ───────────────────────────────────────────────────────────────────
+    private const val KEY_GO_DIFFICULTY = "go_ai_difficulty"
+    fun getGoDifficulty(ctx: Context) = prefs(ctx).getInt(KEY_GO_DIFFICULTY, 0)
+    fun setGoDifficulty(ctx: Context, v: Int) = prefs(ctx).edit().putInt(KEY_GO_DIFFICULTY, v).apply()
+    fun getGoTheme(ctx: Context) = prefs(ctx).getInt(KEY_GO_THEME, 0)
+    fun setGoTheme(ctx: Context, v: Int) = prefs(ctx).edit().putInt(KEY_GO_THEME, v).apply()
+
     // ── Tic-Tac-Toe ──────────────────────────────────────────────────────────
     private const val KEY_TTT_DIFFICULTY = "ttt_ai_difficulty"
-    fun getTttDifficulty(ctx: Context) = prefs(ctx).getInt(KEY_TTT_DIFFICULTY, 0) // 0 = Easy (default)
+    fun getTttDifficulty(ctx: Context) = prefs(ctx).getInt(KEY_TTT_DIFFICULTY, 0)
     fun setTttDifficulty(ctx: Context, v: Int) = prefs(ctx).edit().putInt(KEY_TTT_DIFFICULTY, v).apply()
     /** Depth scales with both difficulty and board size so the AI always responds fast. */
     fun tttAiDepth(ctx: Context, boardSize: Int): Int {
-        val hardCap = when (boardSize) { 3 -> 9; 4 -> 7; 5 -> 6; else -> 6 }  // max 6×6
+        val hardCap = when (boardSize) { 3 -> 9; 4 -> 7; else -> 6 }  // 5×5 max
         return when (getTttDifficulty(ctx)) {
             0    -> minOf(3, hardCap)  // Easy — makes mistakes, beatable
             2    -> hardCap             // Hard — near-perfect
@@ -145,6 +153,7 @@ object SettingsManager {
             "othello"    -> getOthelloTheme(ctx)
             "morabaraba" -> getMorabarabaTheme(ctx)
             "ttt"        -> getTttTheme(ctx)
+            "go"         -> getGoTheme(ctx)
             else         -> getTheme(ctx)
         }
         setTheme(ctx, idx)
@@ -205,14 +214,14 @@ object SettingsManager {
         val edit = prefs(ctx).edit()
         edit.putInt(KEY_STATS_WINS, 0).putInt(KEY_STATS_LOSSES, 0)
             .putInt(KEY_STATS_DRAWS, 0).putInt(KEY_STATS_FORFEITS, 0)
-        for (g in listOf("chess", "checkers", "othello", "morabaraba", "ttt", "overall")) {
+        for (g in listOf("chess", "checkers", "othello", "morabaraba", "ttt", "go", "overall")) {
             edit.putInt(winKey(g), 0).putInt(lossKey(g), 0)
                 .putInt(drawKey(g), 0).putInt(forfeitKey(g), 0)
         }
         edit.apply()
     }
 
-    // ── Privacy consent (Huawei AppGallery requirement) ───────────────────────
+    // ── Privacy consent ───────────────────────────────────────────────────────
     private const val KEY_CONSENT = "privacy_policy_accepted"
     fun hasConsentAccepted(ctx: Context) = prefs(ctx).getBoolean(KEY_CONSENT, false)
     fun setConsentAccepted(ctx: Context) = prefs(ctx).edit().putBoolean(KEY_CONSENT, true).apply()

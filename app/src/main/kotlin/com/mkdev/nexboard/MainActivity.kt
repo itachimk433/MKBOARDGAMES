@@ -259,6 +259,19 @@ class MainActivity : AppCompatActivity() {
             { SettingsManager.getTttTheme(ctx) },
             { v -> SettingsManager.setTttTheme(ctx, v) }).first)
 
+        // ── Go ──
+        root.addView(sectionHeader("⚪  GO"))
+        var goDiff = SettingsManager.getGoDifficulty(ctx)
+        val (goDiffRow, goDiffVal) = settingRow("🎯", "AI Difficulty", diffs[goDiff])
+        goDiffRow.setOnClickListener {
+            AlertDialog.Builder(ctx, android.R.style.Theme_Material_Dialog_MinWidth)
+                .setTitle("Go · AI Difficulty")
+                .setSingleChoiceItems(diffs, goDiff) { d, i ->
+                    SettingsManager.setGoDifficulty(ctx, i); goDiff = i; goDiffVal.text = diffs[i]; d.dismiss()
+                }.show()
+        }
+        root.addView(goDiffRow)
+
         // ── Legal ──
         root.addView(sectionHeader("📋  LEGAL"))
         val ppUrl  = "https://banelemk12.github.io/Nexboard-Terms/privacy-policy.html"
@@ -279,8 +292,8 @@ class MainActivity : AppCompatActivity() {
             ppContent.addView(pTxt("Privacy Policy — NexBoard v1.2", bold = true, accent = true))
             ppContent.addView(pTxt("Effective date: June 2026", bold = false))
             ppContent.addView(pTxt("\nDATA COLLECTION\nNexBoard does not collect or transmit personal data. Game statistics (wins, losses, draws) are stored only on your device."))
-            ppContent.addView(pTxt("\nADVERTISING\nStarting in v1.2, NexBoard displays ads served by Google AdMob (Google Play devices) and Huawei Petal Ads (Huawei devices). These ad networks may collect device identifiers (Advertising ID), approximate location, and usage data to serve personalised ads under their own privacy policies:\n• Google AdMob: policies.google.com/privacy\n• Huawei Petal Ads: consumer.huawei.com/privacy\n\nTo opt out of personalised ads, go to: Settings › Privacy › Ads on your device."))
-            ppContent.addView(pTxt("\nPERMISSIONS\n• Internet — required for ad delivery\n• Network State — ad SDK connectivity checks\n• Vibrate — in-game haptic feedback"))
+            ppContent.addView(pTxt("\nADVERTISING\nThis version of NexBoard contains no advertising. Ads may be introduced in a future update via Google AdMob, in which case this policy will be updated accordingly."))
+            ppContent.addView(pTxt("\nPERMISSIONS\n• Vibrate — in-game haptic feedback"))
             ppContent.addView(pTxt("\nCONTACT\nmkdev4360@gmail.com", bold = false))
             val ppScroll = ScrollView(ctx).apply {
                 layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (320*dp).toInt())
@@ -321,7 +334,7 @@ class MainActivity : AppCompatActivity() {
             tosContent.addView(tTxt("Effective date: June 2026", bold = false))
             tosContent.addView(tTxt("\n1. ACCEPTANCE\nBy installing or using NexBoard you agree to these terms. If you do not agree, uninstall the app."))
             tosContent.addView(tTxt("\n2. LICENCE\nNexBoard is provided free of charge for personal, non-commercial use. You may not reverse-engineer, redistribute, or sell the app or any part of it."))
-            tosContent.addView(tTxt("\n3. ADVERTISING\nAs of v1.2, NexBoard is supported by advertising. Ads are served by Google AdMob and/or Huawei Petal Ads. By using the app you consent to the display of ads. Ad networks operate under their own terms and privacy policies."))
+            tosContent.addView(tTxt("\n3. ADVERTISING\nThis version of NexBoard is ad-free. Ads may be introduced in a future release. If advertising is added, the relevant ad networks will operate under their own terms and privacy policies and this section will be updated."))
             tosContent.addView(tTxt("\n4. DISCLAIMER\nNexBoard is provided \"as is\" without warranties of any kind. MKDEV is not liable for any loss or damage arising from use of the app."))
             tosContent.addView(tTxt("\n5. CHANGES\nThese terms may be updated at any time. Continued use after an update constitutes acceptance of the revised terms."))
             tosContent.addView(tTxt("\nCONTACT\nmkdev4360@gmail.com", bold = false))
@@ -404,8 +417,8 @@ class MainActivity : AppCompatActivity() {
         content.addView(txt("Privacy Policy & Terms of Service", bold = true, colorHex = "#FFFFFF", sizeSp = 13f))
         content.addView(sep())
         content.addView(txt("NexBoard does not collect personal data. Game statistics (wins/losses/draws) are stored locally on your device and never transmitted to external servers."))
-        content.addView(txt("\nADVERTISING: We display ads via Google AdMob (on Google Play devices) and Huawei Petal Ads (on Huawei devices). These networks may collect device identifiers and usage data under their own privacy policies. Opt out in device Settings \u203a Privacy \u203a Ads."))
-        content.addView(txt("\nPERMISSIONS: Internet \u2014 ads; Network State \u2014 ads; Vibrate \u2014 gameplay haptics."))
+        content.addView(txt("\nADVERTISING: This version of NexBoard contains no advertising. Ads may be added in a future update."))
+        content.addView(txt("\nPERMISSIONS: Vibrate \u2014 gameplay haptics."))
         content.addView(txt("\nTERMS: Use NexBoard lawfully. The app is provided \u201cas is\u201d without warranty. Continued use constitutes acceptance of these terms."))
         content.addView(txt("\nContact: mkdev4360@gmail.com", colorHex = "#888888"))
 
@@ -422,8 +435,8 @@ class MainActivity : AppCompatActivity() {
         content.addView(txt("隐私政策与服务条款", bold = true, colorHex = "#FFFFFF", sizeSp = 13f))
         content.addView(sep())
         content.addView(txt("NexBoard 不收集任何个人数据。游戏统计数据（胜负/平局）仅存储在您的本地设备上，不会上传至外部服务器。"))
-        content.addView(txt("\n广告说明：我们在 Google Play 设备上通过 Google AdMob、在华为设备上通过华为花瓣广告（HMS）展示广告。这些广告网络可能依据各自的隐私政策收集设备标识符和使用数据。您可在设备设置 \u203a 隐私 \u203a 广告中关闭个性化广告。"))
-        content.addView(txt("\n权限说明：网络访问权限（广告）；网络状态权限（广告）；振动权限（游戏触觉反馈）。"))
+        content.addView(txt("\n广告说明：当前版本的 NexBoard 不含广告。未来版本可能会添加广告。"))
+        content.addView(txt("\n权限说明：振动权限（游戏触觉反馈）。"))
         content.addView(txt("\n服务条款：请合法使用本应用。本应用按\"现状\"提供，不附任何保证。继续使用即表示您接受上述条款。"))
         content.addView(txt("\n联系方式：mkdev4360@gmail.com", colorHex = "#888888"))
 
@@ -500,7 +513,8 @@ class MainActivity : AppCompatActivity() {
             Page("Checkers",   "⬤",  "checkers"),
             Page("Othello",    "◉",  "othello"),
             Page("Morabaraba", "⬡",  "morabaraba"),
-            Page("Tic-Tac-Toe","✕",  "ttt")
+            Page("Tic-Tac-Toe","✕",  "ttt"),
+            Page("Go",         "⚪", "go")
         )
 
         var currentPage = 0

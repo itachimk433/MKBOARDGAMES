@@ -6,6 +6,12 @@ import android.widget.LinearLayout
 
 object AdManager {
 
+    /**
+     * Set to true once ads have been approved in Google Play.
+     * Keep false for the initial Play Store submission.
+     */
+    private const val ADS_ENABLED = false
+
     private const val ADMOB_BANNER_ID       = "ca-app-pub-4975030890366420/2351564268"
     private const val ADMOB_INTERSTITIAL_ID = "ca-app-pub-4975030890366420/6223360665"
     private const val HMS_BANNER_ID         = "g2jnehr5cv"
@@ -17,10 +23,11 @@ object AdManager {
     } catch (_: Exception) { false }
 
     /**
-     * Appends a banner ad to [container] using Huawei Ads on HMS devices and
-     * Google AdMob on all other (GMS) devices.
+     * Appends a banner ad to [container].
+     * No-ops when ADS_ENABLED is false.
      */
     fun attachBanner(container: LinearLayout) {
+        if (!ADS_ENABLED) return
         val ctx = container.context
         try {
             if (isHmsDevice(ctx)) {
@@ -44,11 +51,10 @@ object AdManager {
     }
 
     /**
-     * Pre-loads an interstitial ad and delivers it via [onResult].
-     * Uses Huawei Ads on HMS devices and Google AdMob on all other devices.
-     * The caller receives null on load failure.
+     * Pre-loads an interstitial ad. No-ops when ADS_ENABLED is false.
      */
     fun loadInterstitial(context: Context, onResult: (Any?) -> Unit) {
+        if (!ADS_ENABLED) { onResult(null); return }
         try {
             if (isHmsDevice(context)) {
                 val ad = com.huawei.hms.ads.InterstitialAd(context).apply {
@@ -77,9 +83,9 @@ object AdManager {
         } catch (_: Throwable) { onResult(null) }
     }
 
-    /** Shows a pre-loaded interstitial if it is ready. Safe to call with null. */
+    /** Shows a pre-loaded interstitial if ready. No-ops when ADS_ENABLED is false. */
     fun showInterstitial(context: Context, ad: Any?) {
-        if (ad == null) return
+        if (!ADS_ENABLED || ad == null) return
         try {
             when (ad) {
                 is com.huawei.hms.ads.InterstitialAd ->
