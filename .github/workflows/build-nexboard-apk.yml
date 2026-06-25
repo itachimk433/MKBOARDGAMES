@@ -26,6 +26,31 @@ jobs:
         with:
           gradle-version: "8.9"
 
+      - name: Delete old artifacts to free quota
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          REPO="${{ github.repository }}"
+          for NAME in "NexBoard-debug-latest" "NexBoard-release-SIGNED-latest"; do
+            IDS=$(curl -s -H "Authorization: Bearer $GH_TOKEN" \
+              "https://api.github.com/repos/$REPO/actions/artifacts?name=$NAME&per_page=100" \
+              | jq -r '.artifacts[].id')
+            for ID in $IDS; do
+              echo "Deleting artifact $ID ($NAME)"
+              curl -s -X DELETE -H "Authorization: Bearer $GH_TOKEN" \
+                "https://api.github.com/repos/$REPO/actions/artifacts/$ID"
+            done
+          done
+          # Also delete all older run-numbered artifacts to reclaim quota
+          curl -s -H "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/$REPO/actions/artifacts?per_page=100" \
+            | jq -r '.artifacts[] | select(.name | startswith("NexBoard")) | .id' \
+            | while read ID; do
+              echo "Deleting legacy artifact $ID"
+              curl -s -X DELETE -H "Authorization: Bearer $GH_TOKEN" \
+                "https://api.github.com/repos/$REPO/actions/artifacts/$ID" || true
+            done
+
       - name: Make gradlew executable
         run: chmod +x gradlew
 
@@ -38,6 +63,7 @@ jobs:
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: NexBoard-debug-latest
           path: app/build/outputs/apk/debug/*.apk
@@ -79,6 +105,7 @@ jobs:
       - name: Upload signed release APK
         if: env.HAS_KEYSTORE == 'true'
         uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: NexBoard-release-SIGNED-latest
           path: app/build/outputs/apk/release/*.apk
