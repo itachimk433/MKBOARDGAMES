@@ -39,9 +39,10 @@ jobs:
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: NexBoard-debug-${{ github.run_number }}
+          name: NexBoard-debug-latest
           path: app/build/outputs/apk/debug/*.apk
-          retention-days: 30
+          retention-days: 7
+          overwrite: true
 
       - name: Decode signing keystore
         env:
@@ -79,9 +80,10 @@ jobs:
         if: env.HAS_KEYSTORE == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: NexBoard-release-SIGNED-${{ github.run_number }}
+          name: NexBoard-release-SIGNED-latest
           path: app/build/outputs/apk/release/*.apk
-          retention-days: 30
+          retention-days: 7
+          overwrite: true
 
       - name: Print APK info
         if: always()
