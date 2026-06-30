@@ -1,4 +1,4 @@
-name: Build NexBoard APK
+name: Build NexBoard APK + AAB
 
 on:
   push:
@@ -70,15 +70,32 @@ jobs:
             --no-build-cache \
             --stacktrace
 
-      - name: Print APK info
+      - name: Build signed release AAB (for Google Play)
+        if: env.HAS_KEYSTORE == 'true'
+        env:
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          ./gradlew bundleRelease \
+            --no-daemon \
+            --no-build-cache \
+            --stacktrace
+
+      - name: Print build outputs
         if: always()
         run: |
-          echo "=== NexBoard APK Build Summary ==="
+          echo "=== NexBoard Build Summary ==="
+          echo "-- APKs --"
           find app/build/outputs/apk -name "*.apk" 2>/dev/null | while read f; do
             echo "  $f  ($(du -sh "$f" | cut -f1))"
           done || echo "No APKs found"
+          echo "-- AABs --"
+          find app/build/outputs/bundle -name "*.aab" 2>/dev/null | while read f; do
+            echo "  $f  ($(du -sh "$f" | cut -f1))"
+          done || echo "No AABs found"
 
-      - name: Publish APKs to GitHub Releases
+      - name: Publish builds to GitHub Releases
         if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -91,9 +108,9 @@ jobs:
 
           ### Downloads
           - **app-debug.apk** – debug build, install directly (enable Unknown Sources)
-          - **app-release.apk** – signed release build (if keystore is configured)"
+          - **app-release.apk** – signed release APK (sideload/direct install)
+          - **app-release.aab** – signed AAB for uploading to Google Play Console"
 
-          # Rename APKs to include build number for clarity
           cp app/build/outputs/apk/debug/app-debug.apk \
              app-debug-build${{ github.run_number }}.apk
 
@@ -102,10 +119,11 @@ jobs:
           if [ "$HAS_KEYSTORE" = "true" ]; then
             cp app/build/outputs/apk/release/app-release.apk \
                app-release-signed-build${{ github.run_number }}.apk
-            ASSETS="$ASSETS app-release-signed-build${{ github.run_number }}.apk"
+            cp app/build/outputs/bundle/release/app-release.aab \
+               app-release-build${{ github.run_number }}.aab
+            ASSETS="$ASSETS app-release-signed-build${{ github.run_number }}.apk app-release-build${{ github.run_number }}.aab"
           fi
 
-          # Delete existing latest-build release/tag and recreate fresh
           gh release delete "$TAG" --yes 2>/dev/null || true
           git push origin --delete "$TAG" 2>/dev/null || true
 
