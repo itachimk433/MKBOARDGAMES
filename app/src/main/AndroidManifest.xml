@@ -1,13 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- INTERNET and ACCESS_NETWORK_STATE are only needed when ads are enabled.
-         Removed for the ad-free build to match the privacy policy. -->
     <uses-permission android:name="android.permission.VIBRATE" />
-
-    <!-- Block REQUEST_INSTALL_PACKAGES injected by HMS/AdMob SDKs — this app never installs APKs -->
-    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" tools:node="remove"/>
 
     <application
         android:name=".NexBoardApp"
@@ -17,14 +11,6 @@
         android:label="@string/app_name"
         android:theme="@style/Theme.NexBoard"
         android:supportsRtl="true">
-
-        <meta-data
-            android:name="com.huawei.hms.client.appid"
-            android:value="appid=117932217"/>
-
-        <meta-data
-            android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-4975030890366420~8179344701"/>
 
         <activity
             android:name=".MainActivity"
