@@ -236,7 +236,7 @@ Strategy
         if (boardView.isLocked) return
         val moverWasX = gameState.currentTurn == PieceColor.WHITE
         redoGameStates.clear(); redoRemovedMoves.clear()
-        moveHistory.addLast(gameState)
+        moveHistory.add(gameState)
         gameState = engine.applyMove(gameState, move)
         boardView.setGameState(gameState, lastMove = move.to)
 
@@ -328,8 +328,8 @@ Strategy
         val restored  = moveHistory.removeLastOrNull() ?: return
         removed.add(restored)
         gameState = restored
-        redoGameStates.addLast(prevState)
-        redoRemovedMoves.addLast(removed)
+        redoGameStates.add(prevState)
+        redoRemovedMoves.add(removed)
         boardView.isLocked = false
         boardView.reset(gameState)
         updateHud()
@@ -341,7 +341,7 @@ Strategy
         hudView.setThinking(false)
         val nextState = redoGameStates.removeLast()
         val removed   = redoRemovedMoves.removeLast()
-        for (i in removed.indices.reversed()) moveHistory.addLast(removed[i])
+        for (i in removed.indices.reversed()) moveHistory.add(removed[i])
         gameState = nextState
         boardView.isLocked = false
         boardView.reset(gameState)
