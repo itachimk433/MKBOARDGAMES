@@ -10,7 +10,7 @@ object AdManager {
      * Set to true once ads have been approved in Google Play.
      * Keep false for the initial Play Store submission.
      */
-    private const val ADS_ENABLED = false
+    internal const val ADS_ENABLED = false
 
     private const val ADMOB_BANNER_ID       = "ca-app-pub-4975030890366420/2351564268"
     private const val ADMOB_INTERSTITIAL_ID = "ca-app-pub-4975030890366420/6223360665"
