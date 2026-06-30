@@ -191,10 +191,10 @@ class MorabarabaActivity : AppCompatActivity() {
                 if (moverColor == PieceColor.WHITE) capturedByWhite.add(capPiece)
                 else capturedByBlack.add(capPiece)
             }
-            captureSnapshots.addLast(capturedByWhite.toList() to capturedByBlack.toList())
+            captureSnapshots.add(capturedByWhite.toList() to capturedByBlack.toList())
             redoGameStates.clear(); redoCaptures.clear(); redoMoves.clear(); redoCapSnaps.clear()
             gameState           = engine.applyMove(gameState, move)
-            moveHistory.addLast(prev)
+            moveHistory.add(prev)
             boardView.gameState = gameState
             topCaptureView.update(capturedByBlack)
             bottomCaptureView.update(capturedByWhite)
@@ -385,8 +385,8 @@ class MorabarabaActivity : AppCompatActivity() {
         gameState = restored
         val (cw, cb) = captureSnapshots.lastOrNull() ?: (emptyList<Piece>() to emptyList<Piece>())
         capturedByWhite = cw.toMutableList(); capturedByBlack = cb.toMutableList()
-        redoGameStates.addLast(prevState); redoCaptures.addLast(prevCap)
-        redoMoves.addLast(rMoves);         redoCapSnaps.addLast(rSnaps)
+        redoGameStates.add(prevState); redoCaptures.add(prevCap)
+        redoMoves.add(rMoves);         redoCapSnaps.add(rSnaps)
         topCaptureView.update(capturedByBlack)
         bottomCaptureView.update(capturedByWhite)
         boardView.gameState = gameState
@@ -403,8 +403,8 @@ class MorabarabaActivity : AppCompatActivity() {
         val rMoves    = redoMoves.removeLast()
         val rSnaps    = redoCapSnaps.removeLast()
         for (i in rMoves.indices.reversed()) {
-            captureSnapshots.addLast(rSnaps[i])
-            moveHistory.addLast(rMoves[i])
+            captureSnapshots.add(rSnaps[i])
+            moveHistory.add(rMoves[i])
         }
         gameState = nextState
         val (cw, cb) = nextCap
