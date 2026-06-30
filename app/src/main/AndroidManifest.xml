@@ -1,9 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- INTERNET and ACCESS_NETWORK_STATE are only needed when ads are enabled.
          Removed for the ad-free build to match the privacy policy. -->
     <uses-permission android:name="android.permission.VIBRATE" />
+
+    <!-- Block REQUEST_INSTALL_PACKAGES injected by HMS/AdMob SDKs — this app never installs APKs -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" tools:node="remove"/>
 
     <application
         android:name=".NexBoardApp"
