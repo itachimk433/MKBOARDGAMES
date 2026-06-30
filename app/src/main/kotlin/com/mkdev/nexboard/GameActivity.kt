@@ -337,9 +337,9 @@ Checkmate your opponent's King.
                 if (moverColor == PieceColor.WHITE) capturedByWhite.add(capPiece)
                 else capturedByBlack.add(capPiece)
             }
-            captureSnapshots.addLast(capturedByWhite.toList() to capturedByBlack.toList())
+            captureSnapshots.add(capturedByWhite.toList() to capturedByBlack.toList())
             redoGameStates.clear(); redoCaptures.clear(); redoMoves.clear(); redoCapSnaps.clear()
-            moveHistory.addLast(gameState)
+            moveHistory.add(gameState)
             gameState = engine.applyMove(gameState, move)
             boardView.gameState = gameState
             // Othello: pop-animate placed disc + all flipped discs
@@ -510,8 +510,8 @@ Checkmate your opponent's King.
         gameState = restored
         val (cw, cb) = captureSnapshots.lastOrNull() ?: (emptyList<Piece>() to emptyList<Piece>())
         capturedByWhite = cw.toMutableList(); capturedByBlack = cb.toMutableList()
-        redoGameStates.addLast(prevState); redoCaptures.addLast(prevCap)
-        redoMoves.addLast(rMoves);         redoCapSnaps.addLast(rSnaps)
+        redoGameStates.add(prevState); redoCaptures.add(prevCap)
+        redoMoves.add(rMoves);         redoCapSnaps.add(rSnaps)
         topCaptureView.update(capturedByBlack)
         bottomCaptureView.update(capturedByWhite)
         boardView.isLocked = false; boardView.gameState = gameState; updateHud()
@@ -524,8 +524,8 @@ Checkmate your opponent's King.
         val rMoves    = redoMoves.removeLast()
         val rSnaps    = redoCapSnaps.removeLast()
         for (i in rMoves.indices.reversed()) {
-            captureSnapshots.addLast(rSnaps[i])
-            moveHistory.addLast(rMoves[i])
+            captureSnapshots.add(rSnaps[i])
+            moveHistory.add(rMoves[i])
         }
         gameState = nextState
         val (cw, cb) = nextCap
