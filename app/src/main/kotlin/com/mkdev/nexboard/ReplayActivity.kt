@@ -23,9 +23,6 @@ import com.mkdev.nexboard.games.tictactoe.TicTacToePiece
 import com.mkdev.nexboard.games.tictactoe.TicTacToeRuleEngine
 import com.mkdev.nexboard.ui.BoardView
 import com.mkdev.nexboard.ui.MorabaraBoardView
-import com.huawei.hms.ads.AdListener
-import com.huawei.hms.ads.AdParam
-import com.huawei.hms.ads.InterstitialAd
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -108,11 +105,6 @@ class ReplayActivity : AppCompatActivity() {
     private var resultText = ""
     private var gameType   = "CHESS"
 
-    // ─── Ads ─────────────────────────────────────────────────────────────────
-    private var interstitialAd: InterstitialAd? = null
-    private var shouldFinishOnAdClose = false
-    private var entryTimeMs = 0L
-    private val minAdIntervalMs = 2 * 60 * 1000L   // show ad only if ≥ 2 min elapsed
 
     // ─── Vibration ────────────────────────────────────────────────────────────
 
@@ -280,33 +272,6 @@ class ReplayActivity : AppCompatActivity() {
         })
 
         stepTo(0)
-        entryTimeMs = System.currentTimeMillis()
-        loadInterstitial()
-    }
-
-    // ─── Ad helpers ───────────────────────────────────────────────────────────
-
-    private fun loadInterstitial() {
-        val ad = InterstitialAd(this)
-        ad.adId = "v1nyf9xhiq"
-        ad.adListener = object : AdListener() {
-            override fun onAdLoaded() { interstitialAd = ad }
-            override fun onAdFailed(errorCode: Int) { interstitialAd = null }
-            override fun onAdClosed() { if (shouldFinishOnAdClose) finish() }
-        }
-        ad.loadAd(AdParam.Builder().build())
-    }
-
-    private fun showAdThenFinish() {
-        stopAutoPlay()
-        val ad = interstitialAd
-        val elapsed = System.currentTimeMillis() - entryTimeMs
-        if (ad != null && ad.isLoaded && elapsed >= minAdIntervalMs) {
-            shouldFinishOnAdClose = true
-            try { ad.show(this) } catch (_: Exception) { finish() }
-        } else {
-            finish()
-        }
     }
 
     // ─── Navigation ───────────────────────────────────────────────────────────
@@ -382,7 +347,7 @@ class ReplayActivity : AppCompatActivity() {
     override fun onDestroy() { super.onDestroy(); stopAutoPlay() }
 
     @Deprecated("Deprecated in Java")
-    override fun onBackPressed() { showAdThenFinish() }
+    override fun onBackPressed() { finish() }
 
     override fun onResume()                          { super.onResume(); makeFullscreen() }
     override fun onWindowFocusChanged(h: Boolean) { super.onWindowFocusChanged(h); if (h) makeFullscreen() }
@@ -545,7 +510,7 @@ class ReplayActivity : AppCompatActivity() {
 
         override fun onTouchEvent(e: MotionEvent): Boolean {
             if (e.action == MotionEvent.ACTION_UP) {
-                if (backRect.contains(e.x, e.y))  { showAdThenFinish(); return true }
+                if (backRect.contains(e.x, e.y))  { finish(); return true }
                 if (speedRect.contains(e.x, e.y)) { cycleSpeed(); return true }
             }
             return true
