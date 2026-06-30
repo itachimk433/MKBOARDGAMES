@@ -44,10 +44,10 @@ class MainActivity : AppCompatActivity() {
         }
         root.addView(menu, android.widget.LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, 0).apply { weight = 1f })
-        AdManager.attachBanner(root)
+
         setContentView(root)
 
-        if (!SettingsManager.hasConsentAccepted(this)) showConsentDialog()
+
 
         @Suppress("DEPRECATION")
         window.decorView.setOnSystemUiVisibilityChangeListener { visibility ->
@@ -386,119 +386,6 @@ class MainActivity : AppCompatActivity() {
 
     // ─── First-run consent dialog (Huawei AppGallery requirement) ────────────
 
-    private fun showConsentDialog() {
-        val dp     = resources.displayMetrics.density
-        val ctx    = this
-        val accent = "#7FC8F8"
-
-        fun sep() = View(ctx).apply {
-            setBackgroundColor(Color.parseColor("#2A2A2A"))
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, (1 * dp).toInt()
-            ).also { it.setMargins(0, (8 * dp).toInt(), 0, (8 * dp).toInt()) }
-        }
-
-        fun txt(text: String, bold: Boolean = false, colorHex: String = "#CCCCCC", sizeSp: Float = 12f) =
-            TextView(ctx).apply {
-                this.text = text
-                setTextColor(Color.parseColor(colorHex))
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, sizeSp)
-                if (bold) setTypeface(typeface, Typeface.BOLD)
-                setPadding(0, (3 * dp).toInt(), 0, (3 * dp).toInt())
-            }
-
-        val content = LinearLayout(ctx).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding((16 * dp).toInt(), (12 * dp).toInt(), (16 * dp).toInt(), (4 * dp).toInt())
-        }
-
-        // ─ English ────────────────────────────────────────────────────────────
-        content.addView(txt("NexBoard — MKDEV", bold = true, colorHex = accent, sizeSp = 13f))
-        content.addView(txt("Privacy Policy & Terms of Service", bold = true, colorHex = "#FFFFFF", sizeSp = 13f))
-        content.addView(sep())
-        content.addView(txt("NexBoard does not collect personal data. Game statistics (wins/losses/draws) are stored locally on your device and never transmitted to external servers."))
-        content.addView(txt("\nADVERTISING: This version of NexBoard contains no advertising. Ads may be added in a future update."))
-        content.addView(txt("\nPERMISSIONS: Vibrate \u2014 gameplay haptics."))
-        content.addView(txt("\nTERMS: Use NexBoard lawfully. The app is provided \u201cas is\u201d without warranty. Continued use constitutes acceptance of these terms."))
-        content.addView(txt("\nContact: mkdev4360@gmail.com", colorHex = "#888888"))
-
-        // ─ Divider ────────────────────────────────────────────────────────────
-        content.addView(View(ctx).apply {
-            setBackgroundColor(Color.parseColor("#333333"))
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, (1 * dp).toInt()
-            ).also { it.setMargins(0, (14 * dp).toInt(), 0, (14 * dp).toInt()) }
-        })
-
-        // ─ Chinese ────────────────────────────────────────────────────────────
-        content.addView(txt("NexBoard — MKDEV", bold = true, colorHex = accent, sizeSp = 13f))
-        content.addView(txt("隐私政策与服务条款", bold = true, colorHex = "#FFFFFF", sizeSp = 13f))
-        content.addView(sep())
-        content.addView(txt("NexBoard 不收集任何个人数据。游戏统计数据（胜负/平局）仅存储在您的本地设备上，不会上传至外部服务器。"))
-        content.addView(txt("\n广告说明：当前版本的 NexBoard 不含广告。未来版本可能会添加广告。"))
-        content.addView(txt("\n权限说明：振动权限（游戏触觉反馈）。"))
-        content.addView(txt("\n服务条款：请合法使用本应用。本应用按\"现状\"提供，不附任何保证。继续使用即表示您接受上述条款。"))
-        content.addView(txt("\n联系方式：mkdev4360@gmail.com", colorHex = "#888888"))
-
-        // ─ Full policy link ───────────────────────────────────────────────────
-        content.addView(TextView(ctx).apply {
-            text = "View full policy / 查看完整政策 →"
-            setTextColor(Color.parseColor(accent))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
-            setPadding(0, (14 * dp).toInt(), 0, (6 * dp).toInt())
-            isClickable = true; isFocusable = true
-            setOnClickListener {
-                try {
-                    startActivity(Intent(Intent.ACTION_VIEW,
-                        Uri.parse("https://banelemk12.github.io/Nexboard-Terms/privacy-policy.html")))
-                } catch (_: Exception) {}
-            }
-        })
-
-        val scroll = ScrollView(ctx).apply {
-            val lp = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                (300 * dp).toInt()
-            )
-            layoutParams = lp
-        }
-        scroll.addView(content)
-
-        val wrapper = LinearLayout(ctx).apply {
-            orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor("#1A1A1A"))
-        }
-        wrapper.addView(TextView(ctx).apply {
-            text = "Privacy Policy & Terms\n隐私政策与服务条款"
-            setTextColor(Color.parseColor(accent))
-            setTypeface(typeface, Typeface.BOLD)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
-            textAlignment = View.TEXT_ALIGNMENT_CENTER
-            setPadding((16 * dp).toInt(), (16 * dp).toInt(), (16 * dp).toInt(), (12 * dp).toInt())
-        })
-        wrapper.addView(View(ctx).apply {
-            setBackgroundColor(Color.parseColor("#2A2A2A"))
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (1 * dp).toInt())
-        })
-        wrapper.addView(scroll)
-
-        AlertDialog.Builder(ctx, android.R.style.Theme_Material_Dialog_MinWidth)
-            .setView(wrapper)
-            .setCancelable(false)
-            .setPositiveButton("I Agree / 同意并继续") { _, _ ->
-                SettingsManager.setConsentAccepted(ctx)
-            }
-            .setNegativeButton("Decline / 拒绝") { _, _ ->
-                finish()
-            }
-            .create()
-            .apply {
-                setCanceledOnTouchOutside(false)
-                window?.setBackgroundDrawable(
-                    android.graphics.drawable.ColorDrawable(Color.parseColor("#1A1A1A")))
-                show()
-            }
-    }
 
     // ─── Stats Dialog — swipeable per-game pages ──────────────────────────────
 
