@@ -11,8 +11,8 @@ plugins {
           applicationId = "com.mkdev.nexboard"
           minSdk = 24
           targetSdk = 35
-          versionCode = 6
-          versionName = "1.6"
+          versionCode = 7
+          versionName = "1.7"
       }
 
       signingConfigs {
@@ -47,7 +47,5 @@ plugins {
       implementation("androidx.core:core-ktx:1.12.0")
       implementation("androidx.appcompat:appcompat:1.6.1")
       implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
-      implementation("com.huawei.hms:ads-lite:13.4.85.301")
-      implementation("com.google.android.gms:play-services-ads:23.2.0")
   }
   
