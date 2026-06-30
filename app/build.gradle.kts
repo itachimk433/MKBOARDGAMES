@@ -4,15 +4,15 @@ plugins {
   }
 
   android {
-      compileSdk = 34
+      compileSdk = 35
       namespace = "com.mkdev.nexboard"
 
       defaultConfig {
           applicationId = "com.mkdev.nexboard"
           minSdk = 24
-          targetSdk = 34
-          versionCode = 2
-          versionName = "1.2"
+          targetSdk = 35
+          versionCode = 3
+          versionName = "1.3"
       }
 
       signingConfigs {
