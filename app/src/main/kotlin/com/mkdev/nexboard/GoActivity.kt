@@ -269,7 +269,7 @@ Tips
         val newBoard = applyStone(board, idx, currentColor, koPoint, boardSize) ?: return
         val captured = countCaptures(board, newBoard, currentColor)
 
-        history.addLast(Snapshot(board.copyOf(), currentColor, capturedByBlack, capturedByWhite, koPoint, lastBoard?.copyOf(), consecutivePasses, lastMovePt))
+        history.add(Snapshot(board.copyOf(), currentColor, capturedByBlack, capturedByWhite, koPoint, lastBoard?.copyOf(), consecutivePasses, lastMovePt))
 
         val newKo = computeKo(board, newBoard, idx, currentColor, boardSize)
 
@@ -293,7 +293,7 @@ Tips
     internal fun handlePass() {
         if (gameOver || boardView.isLocked) return
 
-        history.addLast(Snapshot(board.copyOf(), currentColor, capturedByBlack, capturedByWhite, koPoint, lastBoard?.copyOf(), consecutivePasses, lastMovePt))
+        history.add(Snapshot(board.copyOf(), currentColor, capturedByBlack, capturedByWhite, koPoint, lastBoard?.copyOf(), consecutivePasses, lastMovePt))
 
         consecutivePasses++
         lastBoard    = board.copyOf()
