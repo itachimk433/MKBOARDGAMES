@@ -1,7 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.VIBRATE" />
+
+    <!--
+      NexBoard does not show ads, use the Advertising ID, query installed
+      packages, or install packages from within the app. These permissions
+      are explicitly stripped from the merged manifest in case any library
+      (present now or added later) tries to pull them in transitively, so
+      the Play Console policy declarations for these permissions stay
+      accurate.
+    -->
+    <uses-permission android:name="com.google.android.gms.permission.AD_ID" tools:node="remove" />
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" tools:node="remove" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" tools:node="remove" />
 
     <application
         android:name=".NexBoardApp"
