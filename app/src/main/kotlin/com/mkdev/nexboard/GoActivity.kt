@@ -287,6 +287,7 @@ Tips
         updateHud()
         SoundPlayer.playMovement(if (currentColor == WHITE) "ttt_x" else "ttt_o")
 
+        if (autoPassIfNoLegalMoves()) return
         if (vsAI && !gameOver && currentColor != playerColor) triggerAI()
     }
 
@@ -307,7 +308,30 @@ Tips
         SoundPlayer.play("ui_click")
 
         if (consecutivePasses >= 2) { endGame(); return }
+        if (autoPassIfNoLegalMoves()) return
         if (vsAI && !gameOver && currentColor != playerColor) triggerAI()
+    }
+
+    /**
+     * If the board is full (or otherwise leaves the player to move with no legal
+     * placement anywhere — e.g. every empty point would be suicide/ko), the game
+     * used to just sit there waiting for someone to notice and tap Pass. Instead,
+     * auto-pass on their behalf so the game naturally ends via two-passes-in-a-row
+     * instead of stalling. Returns true if it handled the turn (either by passing
+     * again into game-over, or by auto-passing and letting the other side move).
+     */
+    private fun autoPassIfNoLegalMoves(): Boolean {
+        if (gameOver) return true
+        if (legalMoves(board, currentColor, koPoint, boardSize).isNotEmpty()) return false
+
+        val noticeColor = currentColor
+        android.widget.Toast.makeText(
+            this,
+            "${if (noticeColor == BLACK) "Black" else "White"} has no legal moves — passing automatically.",
+            android.widget.Toast.LENGTH_SHORT
+        ).show()
+        handlePass()
+        return true
     }
 
     private fun endGame() {
@@ -370,7 +394,11 @@ Tips
             .setPositiveButton("Play Again") { _, _ -> showModeDialog() }
             .setNeutralButton("Watch Replay") { _, _ -> showReplayDialog() }
             .setNegativeButton("Main Menu")  { _, _ -> finish() }
-            .setCancelable(true).show()
+            // Not cancelable: a stray tap outside the dialog (e.g. on the board)
+            // used to dismiss it with no way to bring it back, since the board is
+            // locked once the game is over. Forcing an explicit button choice
+            // avoids that dead end.
+            .setCancelable(false).show()
     }
 
     private fun showReplayDialog() {
