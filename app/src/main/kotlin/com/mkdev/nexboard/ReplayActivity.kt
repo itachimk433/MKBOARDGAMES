@@ -10,6 +10,7 @@ import android.os.Looper
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.view.*
+import android.view.animation.AccelerateInterpolator
 import android.view.animation.OvershootInterpolator
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
@@ -312,7 +313,7 @@ class ReplayActivity : AppCompatActivity() {
                 bv.animateExternalMove(move)
             }
             ticBoardView?.showState(states[cursor])
-            connectBoardView?.showState(states[cursor])
+            connectBoardView?.showState(states[cursor], animate = true)
             moraBoardView?.let { mbv ->
                 mbv.gameState = states[cursor - 1]
                 mbv.isLocked  = true
@@ -493,9 +494,12 @@ class ReplayActivity : AppCompatActivity() {
         private val connectEngine: ConnectFourRuleEngine
     ) : View(ctx) {
         private var state = connectEngine.initialState()
-        private var prevState = connectEngine.initialState()
         private var winLine: List<Int>? = null
-        private val cellScale = HashMap<Int, Float>()
+        private var fallingAnimator: ValueAnimator? = null
+        private var fallingIndex: Int? = null
+        private var fallingColor: PieceColor? = null
+        private var fallingProgress = 0f
+        private var animationGeneration = 0
         private val dp = resources.displayMetrics.density
         private var boardLeft = 0f
         private var boardTop = 0f
@@ -506,6 +510,9 @@ class ReplayActivity : AppCompatActivity() {
         private val holeP = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#101820") }
         private val redP = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#EF5350") }
         private val yellowP = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#FFD54F") }
+        private val highlightP = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(55, 127, 200, 248)
+        }
         private val winP = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE; style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND
         }
@@ -522,24 +529,48 @@ class ReplayActivity : AppCompatActivity() {
             winP.strokeWidth = cellSize * 0.065f
         }
 
-        fun showState(newState: GameState) {
-            val old = prevState
-            prevState = newState
+        fun showState(newState: GameState, animate: Boolean = false) {
+            animationGeneration++
+            fallingAnimator?.cancel()
+            fallingAnimator = null
+            fallingIndex = null
+            fallingColor = null
+            fallingProgress = 0f
             state = newState
-            winLine = connectEngine.winningLine(newState)
-            for (idx in newState.board.indices) {
-                if (old.board[idx] == null && newState.board[idx] != null) {
-                    cellScale[idx] = 0f
-                    ValueAnimator.ofFloat(0f, 1f).apply {
-                        duration = 240L
-                        interpolator = OvershootInterpolator(1.35f)
+            winLine = if (animate) null else connectEngine.winningLine(newState)
+
+            if (animate) {
+                val move = newState.lastMove
+                val piece = move?.let { newState.get(it.to) as? ConnectFourPiece }
+                if (move != null && piece != null) {
+                    val idx = move.to.row * ConnectFourRuleEngine.COLUMNS + move.to.col
+                    fallingIndex = idx
+                    fallingColor = piece.color
+                    val generation = animationGeneration
+                    val animator = ValueAnimator.ofFloat(0f, 1f).apply {
+                        // Match the live board: lower landing slots take longer.
+                        duration = 250L + (move.to.row + 1) * 55L
+                        interpolator = AccelerateInterpolator(1.25f)
                         addUpdateListener {
-                            cellScale[idx] = it.animatedValue as Float
+                            fallingProgress = it.animatedValue as Float
                             invalidate()
                         }
-                        start()
+                        addListener(object : android.animation.AnimatorListenerAdapter() {
+                            override fun onAnimationEnd(animation: android.animation.Animator) {
+                                if (generation != animationGeneration) return
+                                fallingAnimator = null
+                                fallingIndex = null
+                                fallingColor = null
+                                fallingProgress = 0f
+                                winLine = connectEngine.winningLine(state)
+                                invalidate()
+                            }
+                        })
                     }
-                    break
+                    fallingAnimator = animator
+                    animator.start()
+                } else {
+                    winLine = connectEngine.winningLine(newState)
                 }
             }
             invalidate()
@@ -550,23 +581,51 @@ class ReplayActivity : AppCompatActivity() {
             if (cellSize <= 0f) return
             val right = boardLeft + ConnectFourRuleEngine.COLUMNS * cellSize
             val bottom = boardTop + ConnectFourRuleEngine.ROWS * cellSize
+            val fallingRow = fallingIndex?.div(ConnectFourRuleEngine.COLUMNS)
+            val fallingCol = fallingIndex?.rem(ConnectFourRuleEngine.COLUMNS)
+            val fallingX = fallingCol?.let { boardLeft + it * cellSize + cellSize / 2f }
+            val fallingTargetY = fallingRow?.let { boardTop + it * cellSize + cellSize / 2f }
+            val fallingStartY = boardTop - cellSize * 0.85f
+            val fallingY = fallingTargetY?.let {
+                fallingStartY + (it - fallingStartY) * fallingProgress
+            }
+            val fallingRadius = cellSize * 0.31f
+
+            if (fallingX != null && fallingY != null && fallingColor != null && fallingY < boardTop) {
+                drawDisc(canvas, fallingX, fallingY, fallingRadius, fallingColor!!)
+            }
+
             canvas.drawRoundRect(
                 boardLeft, boardTop, right, bottom, cellSize * .14f, cellSize * .14f, boardP
             )
+            val holePath = Path()
             for (row in 0 until ConnectFourRuleEngine.ROWS) for (col in 0 until ConnectFourRuleEngine.COLUMNS) {
                 val cx = boardLeft + col * cellSize + cellSize / 2f
                 val cy = boardTop + row * cellSize + cellSize / 2f
                 canvas.drawCircle(cx, cy, cellSize * .36f, holeP)
+                holePath.addCircle(cx, cy, cellSize * .36f, Path.Direction.CW)
             }
+
+            if (fallingX != null && fallingY != null && fallingColor != null && fallingY >= boardTop) {
+                canvas.save()
+                canvas.clipPath(holePath)
+                drawDisc(canvas, fallingX, fallingY, fallingRadius, fallingColor!!)
+                canvas.restore()
+            }
+
+            state.lastMove?.let { move ->
+                val cx = boardLeft + move.to.col * cellSize + cellSize / 2f
+                val cy = boardTop + move.to.row * cellSize + cellSize / 2f
+                canvas.drawCircle(cx, cy, cellSize * 0.43f, highlightP)
+            }
+
             for (row in 0 until ConnectFourRuleEngine.ROWS) for (col in 0 until ConnectFourRuleEngine.COLUMNS) {
                 val piece = state.get(row, col) as? ConnectFourPiece ?: continue
                 val idx = row * ConnectFourRuleEngine.COLUMNS + col
+                if (idx == fallingIndex) continue
                 val cx = boardLeft + col * cellSize + cellSize / 2f
                 val cy = boardTop + row * cellSize + cellSize / 2f
-                canvas.drawCircle(
-                    cx, cy, cellSize * .31f * (cellScale[idx] ?: 1f),
-                    if (piece.color == PieceColor.WHITE) redP else yellowP
-                )
+                drawDisc(canvas, cx, cy, cellSize * 0.31f, piece.color)
             }
             winLine?.takeIf { it.size >= 2 }?.let { line ->
                 val first = line.first()
@@ -579,6 +638,21 @@ class ReplayActivity : AppCompatActivity() {
                     winP
                 )
             }
+        }
+
+        private fun drawDisc(canvas: Canvas, cx: Float, cy: Float, radius: Float, color: PieceColor) {
+            canvas.drawCircle(
+                cx,
+                cy,
+                radius,
+                if (color == PieceColor.WHITE) redP else yellowP
+            )
+            canvas.drawCircle(
+                cx - radius * 0.22f,
+                cy - radius * 0.25f,
+                radius * 0.15f,
+                Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = Color.argb(70, 255, 255, 255) }
+            )
         }
     }
 
