@@ -26,14 +26,15 @@ class MenuView(context: Context) : View(context) {
     }
 
     enum class GameType {
-        CHESS, CHECKERS, INTERNATIONAL_DRAUGHTS, OTHELLO, MORABARABA, TICTACTOE
+        CHESS, CHECKERS, INTERNATIONAL_DRAUGHTS, OTHELLO, MORABARABA, TICTACTOE, CONNECT_FOUR
     }
 
     private data class Card(val type: GameType, var rect: RectF = RectF())
     private val cards = listOf(
         Card(GameType.CHESS), Card(GameType.CHECKERS),
         Card(GameType.INTERNATIONAL_DRAUGHTS),
-        Card(GameType.OTHELLO), Card(GameType.MORABARABA), Card(GameType.TICTACTOE)
+        Card(GameType.OTHELLO), Card(GameType.MORABARABA),
+        Card(GameType.TICTACTOE), Card(GameType.CONNECT_FOUR)
     )
 
     private val dp = context.resources.displayMetrics.density
@@ -282,6 +283,7 @@ class MenuView(context: Context) : View(context) {
             GameType.OTHELLO     -> "Othello"      to "vs AI  •  2 Players"
             GameType.MORABARABA  -> "Morabaraba"   to "vs AI  •  2 Players"
             GameType.TICTACTOE   -> "Tic-Tac-Toe"  to "vs AI  •  2 Players"
+            GameType.CONNECT_FOUR -> "Connect Four" to "vs AI  •  2 Players"
         }
 
         val titleLines = if (title == "International Draughts") {
@@ -310,6 +312,7 @@ class MenuView(context: Context) : View(context) {
             GameType.OTHELLO    -> drawOthelloMini(canvas, left, top, size)
             GameType.MORABARABA -> drawMorabarabaMini(canvas, left, top, size)
             GameType.TICTACTOE  -> drawTicTacToeMini(canvas, left, top, size)
+            GameType.CONNECT_FOUR -> drawConnectFourMini(canvas, left, top, size)
         }
     }
 
@@ -412,6 +415,28 @@ class MenuView(context: Context) : View(context) {
         val xc = left + cell * 1.5f; val yr = top + cell * 0.5f; val rr = cell * 0.22f
         canvas.drawLine(xc - rr, yr - rr, xc + rr, yr + rr, xp)
         canvas.drawLine(xc + rr, yr - rr, xc - rr, yr + rr, xp)
+    }
+
+    private fun drawConnectFourMini(canvas: Canvas, left: Float, top: Float, size: Float) {
+        val cols = 7
+        val rows = 6
+        val cell = size / cols
+        val boardP = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#24527A") }
+        val holeP = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#101820") }
+        val redP = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#EF5350") }
+        val yellowP = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#FFD54F") }
+        canvas.drawRoundRect(left, top, left + size, top + cell * rows, cell * .12f, cell * .12f, boardP)
+        for (r in 0 until rows) for (c in 0 until cols) {
+            val cx = left + c * cell + cell / 2f
+            val cy = top + r * cell + cell / 2f
+            canvas.drawCircle(cx, cy, cell * .35f, holeP)
+        }
+        fun piece(row: Int, col: Int, paint: Paint) {
+            canvas.drawCircle(left + col * cell + cell / 2f, top + row * cell + cell / 2f, cell * .29f, paint)
+        }
+        piece(5, 0, redP); piece(5, 1, yellowP); piece(4, 1, redP)
+        piece(5, 3, redP); piece(4, 3, yellowP); piece(3, 3, redP)
+        piece(5, 5, yellowP); piece(5, 6, redP)
     }
 
     private fun drawGear(canvas: Canvas) {

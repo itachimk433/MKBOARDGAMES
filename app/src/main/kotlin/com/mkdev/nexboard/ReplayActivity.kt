@@ -19,6 +19,8 @@ import com.mkdev.nexboard.games.checkers.CheckersRuleEngine
 import com.mkdev.nexboard.games.checkers.InternationalDraughtsRuleEngine
 import com.mkdev.nexboard.games.chess.ChessPiece
 import com.mkdev.nexboard.games.chess.ChessRuleEngine
+import com.mkdev.nexboard.games.connectfour.ConnectFourPiece
+import com.mkdev.nexboard.games.connectfour.ConnectFourRuleEngine
 import com.mkdev.nexboard.games.morabaraba.MorabarabaRuleEngine
 import com.mkdev.nexboard.games.tictactoe.TicTacToePiece
 import com.mkdev.nexboard.games.tictactoe.TicTacToeRuleEngine
@@ -88,6 +90,7 @@ class ReplayActivity : AppCompatActivity() {
 
     private var boardView:     BoardView?          = null
     private var ticBoardView:  TicReplayBoard?     = null
+    private var connectBoardView: ConnectReplayBoard? = null
     private var moraBoardView: MorabaraBoardView?  = null
     private lateinit var seekBar:      SeekBar
     private lateinit var controlsView: ReplayControlsView
@@ -160,10 +163,12 @@ class ReplayActivity : AppCompatActivity() {
         val ticBoardSize  = intent.getIntExtra(EXTRA_BOARD_SIZE, 3)
 
         val isTicTacToe  = gameType == "TICTACTOE"
+        val isConnectFour = gameType == "CONNECTFOUR"
         val isMorabaraba = gameType == "MORABARABA"
 
         val engine: RuleEngine = when (gameType) {
             "TICTACTOE"  -> TicTacToeRuleEngine(ticBoardSize, ticBoardSize)
+            "CONNECTFOUR" -> ConnectFourRuleEngine()
             "CHECKERS"   -> CheckersRuleEngine()
             "INTERNATIONAL_DRAUGHTS" -> InternationalDraughtsRuleEngine()
             "MORABARABA" -> MorabarabaRuleEngine()
@@ -183,7 +188,7 @@ class ReplayActivity : AppCompatActivity() {
         moveLabels = allLabels
 
         // Build per-state capture snapshots (not meaningful for TicTacToe or Othello)
-        val hasCaptures = !isTicTacToe && gameType != "OTHELLO"
+        val hasCaptures = !isTicTacToe && !isConnectFour && gameType != "OTHELLO"
         val snaps = mutableListOf(CaptureSnapshot(emptyList(), emptyList()))
         if (hasCaptures) {
             for ((idx, move) in moves.withIndex()) {
@@ -237,6 +242,11 @@ class ReplayActivity : AppCompatActivity() {
                 val tbv = TicReplayBoard(this, ticBoardSize, engine as TicTacToeRuleEngine)
                 ticBoardView = tbv
                 root.addView(tbv, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0).apply { weight = 1f })
+            }
+            isConnectFour -> {
+                val cbv = ConnectReplayBoard(this, engine as ConnectFourRuleEngine)
+                connectBoardView = cbv
+                root.addView(cbv, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0).apply { weight = 1f })
             }
             isMorabaraba -> {
                 val mbv = MorabaraBoardView(this).apply {
@@ -302,6 +312,7 @@ class ReplayActivity : AppCompatActivity() {
                 bv.animateExternalMove(move)
             }
             ticBoardView?.showState(states[cursor])
+            connectBoardView?.showState(states[cursor])
             moraBoardView?.let { mbv ->
                 mbv.gameState = states[cursor - 1]
                 mbv.isLocked  = true
@@ -316,6 +327,7 @@ class ReplayActivity : AppCompatActivity() {
             cursor              = newCursor
             boardView?.let { it.gameState = states[cursor]; it.isLocked = true }
             ticBoardView?.showState(states[cursor])
+            connectBoardView?.showState(states[cursor])
             moraBoardView?.let { it.gameState = states[cursor]; it.isLocked = true }
             seekBar.progress    = cursor
             val label = moveLabels.getOrElse(cursor) { "Move $cursor" }
@@ -471,6 +483,102 @@ class ReplayActivity : AppCompatActivity() {
             val bx = boardLeft + (line.last()  % bs) * cellSize + cellSize / 2f
             val by = boardTop  + (line.last()  / bs) * cellSize + cellSize / 2f
             canvas.drawLine(ax, ay, bx, by, winP)
+        }
+    }
+
+    // ─── Connect Four replay board ────────────────────────────────────────────
+
+    inner class ConnectReplayBoard(
+        ctx: Context,
+        private val connectEngine: ConnectFourRuleEngine
+    ) : View(ctx) {
+        private var state = connectEngine.initialState()
+        private var prevState = connectEngine.initialState()
+        private var winLine: List<Int>? = null
+        private val cellScale = HashMap<Int, Float>()
+        private val dp = resources.displayMetrics.density
+        private var boardLeft = 0f
+        private var boardTop = 0f
+        private var cellSize = 0f
+
+        private val bgP = Paint().apply { color = Color.parseColor("#121212") }
+        private val boardP = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#24527A") }
+        private val holeP = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#101820") }
+        private val redP = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#EF5350") }
+        private val yellowP = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#FFD54F") }
+        private val winP = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE; style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND
+        }
+
+        override fun onSizeChanged(w: Int, h: Int, ow: Int, oh: Int) {
+            if (w <= 0 || h <= 0) return
+            val pad = 20f * dp
+            cellSize = minOf(
+                (w - pad * 2) / ConnectFourRuleEngine.COLUMNS,
+                (h - pad * 2) / ConnectFourRuleEngine.ROWS
+            )
+            boardLeft = (w - cellSize * ConnectFourRuleEngine.COLUMNS) / 2f
+            boardTop = (h - cellSize * ConnectFourRuleEngine.ROWS) / 2f
+            winP.strokeWidth = cellSize * 0.065f
+        }
+
+        fun showState(newState: GameState) {
+            val old = prevState
+            prevState = newState
+            state = newState
+            winLine = connectEngine.winningLine(newState)
+            for (idx in newState.board.indices) {
+                if (old.board[idx] == null && newState.board[idx] != null) {
+                    cellScale[idx] = 0f
+                    ValueAnimator.ofFloat(0f, 1f).apply {
+                        duration = 240L
+                        interpolator = OvershootInterpolator(1.35f)
+                        addUpdateListener {
+                            cellScale[idx] = it.animatedValue as Float
+                            invalidate()
+                        }
+                        start()
+                    }
+                    break
+                }
+            }
+            invalidate()
+        }
+
+        override fun onDraw(canvas: Canvas) {
+            canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgP)
+            if (cellSize <= 0f) return
+            val right = boardLeft + ConnectFourRuleEngine.COLUMNS * cellSize
+            val bottom = boardTop + ConnectFourRuleEngine.ROWS * cellSize
+            canvas.drawRoundRect(
+                boardLeft, boardTop, right, bottom, cellSize * .14f, cellSize * .14f, boardP
+            )
+            for (row in 0 until ConnectFourRuleEngine.ROWS) for (col in 0 until ConnectFourRuleEngine.COLUMNS) {
+                val cx = boardLeft + col * cellSize + cellSize / 2f
+                val cy = boardTop + row * cellSize + cellSize / 2f
+                canvas.drawCircle(cx, cy, cellSize * .36f, holeP)
+            }
+            for (row in 0 until ConnectFourRuleEngine.ROWS) for (col in 0 until ConnectFourRuleEngine.COLUMNS) {
+                val piece = state.get(row, col) as? ConnectFourPiece ?: continue
+                val idx = row * ConnectFourRuleEngine.COLUMNS + col
+                val cx = boardLeft + col * cellSize + cellSize / 2f
+                val cy = boardTop + row * cellSize + cellSize / 2f
+                canvas.drawCircle(
+                    cx, cy, cellSize * .31f * (cellScale[idx] ?: 1f),
+                    if (piece.color == PieceColor.WHITE) redP else yellowP
+                )
+            }
+            winLine?.takeIf { it.size >= 2 }?.let { line ->
+                val first = line.first()
+                val last = line.last()
+                canvas.drawLine(
+                    boardLeft + (first % ConnectFourRuleEngine.COLUMNS) * cellSize + cellSize / 2f,
+                    boardTop + (first / ConnectFourRuleEngine.COLUMNS) * cellSize + cellSize / 2f,
+                    boardLeft + (last % ConnectFourRuleEngine.COLUMNS) * cellSize + cellSize / 2f,
+                    boardTop + (last / ConnectFourRuleEngine.COLUMNS) * cellSize + cellSize / 2f,
+                    winP
+                )
+            }
         }
     }
 

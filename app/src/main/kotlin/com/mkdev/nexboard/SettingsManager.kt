@@ -11,6 +11,7 @@ object SettingsManager {
     private const val KEY_CHECKERS_DIFFICULTY   = "checkers_ai_difficulty"
     private const val KEY_INTERNATIONAL_DRAUGHTS_DIFFICULTY = "international_draughts_ai_difficulty"
     private const val KEY_MORABARABA_DIFFICULTY = "morabaraba_ai_difficulty"
+    private const val KEY_CONNECT_FOUR_DIFFICULTY = "connect_four_ai_difficulty"
 
     // ── Hints keys ───────────────────────────────────────────────────────────
     private const val KEY_CHESS_HINTS    = "chess_show_hints"
@@ -24,6 +25,7 @@ object SettingsManager {
     private const val KEY_OTHELLO_THEME    = "othello_theme"
     private const val KEY_MORABARABA_THEME = "morabaraba_theme"
     private const val KEY_TTT_THEME        = "ttt_theme"
+    private const val KEY_CONNECT_FOUR_THEME = "connect_four_theme"
 
     // ── Global stats keys (legacy / overall) ─────────────────────────────────
     private const val KEY_STATS_WINS     = "stats_wins"
@@ -90,6 +92,19 @@ object SettingsManager {
     fun morabarabaAiDepth(ctx: Context) = when (getMorabarabaDifficulty(ctx)) { 0 -> 3; 2 -> 7; else -> 5 }
     fun morabarabaAiTimeLimitMs(ctx: Context): Long = when (getMorabarabaDifficulty(ctx)) { 0 -> 600L; 2 -> 2500L; else -> 1200L }
 
+    // ── Connect Four ─────────────────────────────────────────────────────────
+    fun getConnectFourDifficulty(ctx: Context) =
+        prefs(ctx).getInt(KEY_CONNECT_FOUR_DIFFICULTY, 0)
+    fun setConnectFourDifficulty(ctx: Context, v: Int) =
+        prefs(ctx).edit().putInt(KEY_CONNECT_FOUR_DIFFICULTY, v).apply()
+    fun connectFourAiDepth(ctx: Context) = when (getConnectFourDifficulty(ctx)) {
+        0 -> 3
+        2 -> 7
+        else -> 5
+    }
+    fun connectFourAiTimeLimitMs(ctx: Context): Long =
+        when (getConnectFourDifficulty(ctx)) { 0 -> 700L; 2 -> 2500L; else -> 1400L }
+
     // ── Tic-Tac-Toe ──────────────────────────────────────────────────────────
     private const val KEY_TTT_DIFFICULTY = "ttt_ai_difficulty"
     fun getTttDifficulty(ctx: Context) = prefs(ctx).getInt(KEY_TTT_DIFFICULTY, 0)
@@ -151,6 +166,9 @@ object SettingsManager {
     fun setMorabarabaTheme(ctx: Context, v: Int) = prefs(ctx).edit().putInt(KEY_MORABARABA_THEME, v).apply()
     fun getTttTheme(ctx: Context)            = prefs(ctx).getInt(KEY_TTT_THEME, 0)
     fun setTttTheme(ctx: Context, v: Int)    = prefs(ctx).edit().putInt(KEY_TTT_THEME, v).apply()
+    fun getConnectFourTheme(ctx: Context)    = prefs(ctx).getInt(KEY_CONNECT_FOUR_THEME, 0)
+    fun setConnectFourTheme(ctx: Context, v: Int) =
+        prefs(ctx).edit().putInt(KEY_CONNECT_FOUR_THEME, v).apply()
 
     fun activateGameTheme(ctx: Context, gameKey: String) {
         val idx = when (gameKey) {
@@ -160,6 +178,7 @@ object SettingsManager {
             "othello"    -> getOthelloTheme(ctx)
             "morabaraba" -> getMorabarabaTheme(ctx)
             "ttt"        -> getTttTheme(ctx)
+            "connect_four" -> getConnectFourTheme(ctx)
             else         -> getTheme(ctx)
         }
         setTheme(ctx, idx)
@@ -222,7 +241,7 @@ object SettingsManager {
             .putInt(KEY_STATS_DRAWS, 0).putInt(KEY_STATS_FORFEITS, 0)
         for (g in listOf(
             "chess", "checkers", "international_draughts",
-            "othello", "morabaraba", "ttt", "overall"
+            "othello", "morabaraba", "ttt", "connect_four", "overall"
         )) {
             edit.putInt(winKey(g), 0).putInt(lossKey(g), 0)
                 .putInt(drawKey(g), 0).putInt(forfeitKey(g), 0)

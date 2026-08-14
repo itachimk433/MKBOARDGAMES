@@ -35,6 +35,8 @@ class MainActivity : AppCompatActivity() {
                     startActivity(Intent(this, MorabarabaActivity::class.java))
                 MenuView.GameType.TICTACTOE ->
                     startActivity(Intent(this, TicTacToeActivity::class.java))
+                MenuView.GameType.CONNECT_FOUR ->
+                    startActivity(Intent(this, ConnectFourActivity::class.java))
                 else ->
                     startActivity(Intent(this, GameActivity::class.java).apply {
                         putExtra(GameActivity.EXTRA_GAME, type.name)
@@ -308,6 +310,26 @@ class MainActivity : AppCompatActivity() {
             { SettingsManager.getTttTheme(ctx) },
             { v -> SettingsManager.setTttTheme(ctx, v) }).first)
 
+        // ── Connect Four ──
+        root.addView(sectionHeader("●  CONNECT FOUR"))
+        var connectFourDiff = SettingsManager.getConnectFourDifficulty(ctx)
+        val (connectFourDiffRow, connectFourDiffVal) =
+            settingRow("🎯", "AI Difficulty", diffs[connectFourDiff])
+        connectFourDiffRow.setOnClickListener {
+            AlertDialog.Builder(ctx, android.R.style.Theme_Material_Dialog_MinWidth)
+                .setTitle("Connect Four · AI Difficulty")
+                .setSingleChoiceItems(diffs, connectFourDiff) { d, i ->
+                    SettingsManager.setConnectFourDifficulty(ctx, i)
+                    connectFourDiff = i
+                    connectFourDiffVal.text = diffs[i]
+                    d.dismiss()
+                }.show()
+        }
+        root.addView(connectFourDiffRow); root.addView(divider())
+        root.addView(themeRow("Connect Four",
+            { SettingsManager.getConnectFourTheme(ctx) },
+            { v -> SettingsManager.setConnectFourTheme(ctx, v) }).first)
+
         // ── Legal ──
         root.addView(sectionHeader("📋  LEGAL"))
         val ppUrl  = PRIVACY_POLICY_URL
@@ -438,6 +460,7 @@ class MainActivity : AppCompatActivity() {
             Page("Othello",    "◉",  "othello"),
             Page("Morabaraba", "⬡",  "morabaraba"),
             Page("Tic-Tac-Toe","✕",  "ttt"),
+            Page("Connect Four", "●", "connect_four"),
         )
 
         var currentPage = 0
