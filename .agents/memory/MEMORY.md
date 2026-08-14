@@ -1,2 +1,3 @@
 - [Android checkout handling](android-checkout-handling.md) — when a repository is copied into the workspace, verify its Git root before fetching or resetting; the workspace root may be the actual checkout.
 - [GitHub repository auth](github-auth.md) — Git operations use GitHub’s standard basic-auth token header; never put the token in a remote URL or output.
+- [Fox & Geese rendering](fox-geese-rendering.md) — initialize the game state before dialogs, and route custom board colors through the shared theme palette.
