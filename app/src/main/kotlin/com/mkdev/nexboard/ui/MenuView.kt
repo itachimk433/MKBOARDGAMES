@@ -44,8 +44,21 @@ class MenuView(context: Context) : View(context) {
     } catch (e: Exception) { null }
 
     private val bgPaint        = Paint().apply { color = Color.parseColor("#121212") }
-    private val cardPaint      = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#1E1E1E") }
-    private val cardHiPaint    = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#2A2A2A") }
+    private val cardPaint      = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#202429") }
+    private val cardHiPaint    = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#2B3138") }
+    private val cardBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#343A42")
+        style = Paint.Style.STROKE
+        strokeWidth = 1f * dp
+    }
+    private val previewFramePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#171A1E")
+    }
+    private val previewFrameBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#343B44")
+        style = Paint.Style.STROKE
+        strokeWidth = 1f * dp
+    }
     private val accentPaint    = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#7FC8F8"); style = Paint.Style.FILL }
     private val titlePaint     = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE; textAlign = Paint.Align.CENTER; isFakeBoldText = true
@@ -253,13 +266,33 @@ class MenuView(context: Context) : View(context) {
             color = Color.argb(50, 0, 0, 0)
             maskFilter = BlurMaskFilter(10f, BlurMaskFilter.Blur.NORMAL)
         }
-        canvas.drawRoundRect(RectF(r.left + 3f, r.top + 4f, r.right + 3f, r.bottom + 4f), 16f * dp, 16f * dp, shadowP)
-        canvas.drawRoundRect(r, 16f * dp, 16f * dp, if (pressed) cardHiPaint else cardPaint)
-        canvas.drawRoundRect(RectF(r.left, r.top, r.right, r.top + 5f * dp), 3f * dp, 3f * dp, accentPaint)
+        val cardRadius = 18f * dp
+        canvas.drawRoundRect(
+            RectF(r.left + 3f * dp, r.top + 4f * dp, r.right + 3f * dp, r.bottom + 4f * dp),
+            cardRadius, cardRadius, shadowP
+        )
+        canvas.drawRoundRect(r, cardRadius, cardRadius, if (pressed) cardHiPaint else cardPaint)
+        canvas.drawRoundRect(
+            RectF(r.left + 0.5f * dp, r.top + 0.5f * dp, r.right - 0.5f * dp, r.bottom - 0.5f * dp),
+            cardRadius, cardRadius, cardBorderPaint
+        )
 
         val previewSz   = minOf(r.height() * 0.46f, r.width() * 0.64f)
         val previewLeft = r.centerX() - previewSz / 2f
         val previewTop  = r.top + 10f * dp
+        val framePad = 7f * dp
+        val previewFrame = RectF(
+            previewLeft - framePad, previewTop - framePad,
+            previewLeft + previewSz + framePad, previewTop + previewSz + framePad
+        )
+        canvas.drawRoundRect(previewFrame, 12f * dp, 12f * dp, previewFramePaint)
+        canvas.drawRoundRect(
+            RectF(
+                previewFrame.left + 0.5f * dp, previewFrame.top + 0.5f * dp,
+                previewFrame.right - 0.5f * dp, previewFrame.bottom - 0.5f * dp
+            ),
+            12f * dp, 12f * dp, previewFrameBorderPaint
+        )
         drawMiniBoard(canvas, previewLeft, previewTop, previewSz, card.type)
 
         val (title, desc) = when (card.type) {
@@ -416,7 +449,10 @@ class MenuView(context: Context) : View(context) {
         if (isLightMode) {
             bgPaint.color        = Color.parseColor("#F5F5F5")
             cardPaint.color      = Color.parseColor("#FFFFFF")
-            cardHiPaint.color    = Color.parseColor("#EFEFEF")
+            cardHiPaint.color    = Color.parseColor("#F4F7FA")
+            cardBorderPaint.color = Color.parseColor("#E0E5EA")
+            previewFramePaint.color = Color.parseColor("#F3F5F7")
+            previewFrameBorderPaint.color = Color.parseColor("#DDE3E8")
             titlePaint.color     = Color.parseColor("#1A1A1A")
             subPaint.color       = Color.parseColor("#666666")
             cardTitlePaint.color = Color.parseColor("#1A1A1A")
@@ -424,8 +460,11 @@ class MenuView(context: Context) : View(context) {
             copyrightPaint.color = Color.parseColor("#999999")
         } else {
             bgPaint.color        = Color.parseColor("#121212")
-            cardPaint.color      = Color.parseColor("#1E1E1E")
-            cardHiPaint.color    = Color.parseColor("#2A2A2A")
+            cardPaint.color      = Color.parseColor("#202429")
+            cardHiPaint.color    = Color.parseColor("#2B3138")
+            cardBorderPaint.color = Color.parseColor("#343A42")
+            previewFramePaint.color = Color.parseColor("#171A1E")
+            previewFrameBorderPaint.color = Color.parseColor("#343B44")
             titlePaint.color     = Color.WHITE
             subPaint.color       = Color.parseColor("#9E9E9E")
             cardTitlePaint.color = Color.WHITE
