@@ -9,6 +9,7 @@ object SettingsManager {
     // ── Difficulty keys ──────────────────────────────────────────────────────
     private const val KEY_CHESS_DIFFICULTY      = "chess_ai_difficulty"
     private const val KEY_CHECKERS_DIFFICULTY   = "checkers_ai_difficulty"
+    private const val KEY_INTERNATIONAL_DRAUGHTS_DIFFICULTY = "international_draughts_ai_difficulty"
     private const val KEY_MORABARABA_DIFFICULTY = "morabaraba_ai_difficulty"
 
     // ── Hints keys ───────────────────────────────────────────────────────────
@@ -19,6 +20,7 @@ object SettingsManager {
     private const val KEY_THEME            = "board_theme"
     private const val KEY_CHESS_THEME      = "chess_theme"
     private const val KEY_CHECKERS_THEME   = "checkers_theme"
+    private const val KEY_INTERNATIONAL_DRAUGHTS_THEME = "international_draughts_theme"
     private const val KEY_OTHELLO_THEME    = "othello_theme"
     private const val KEY_MORABARABA_THEME = "morabaraba_theme"
     private const val KEY_TTT_THEME        = "ttt_theme"
@@ -70,6 +72,14 @@ object SettingsManager {
     fun getCheckersDifficulty(ctx: Context) = prefs(ctx).getInt(KEY_CHECKERS_DIFFICULTY, 0)
     fun setCheckersDifficulty(ctx: Context, v: Int) = prefs(ctx).edit().putInt(KEY_CHECKERS_DIFFICULTY, v).apply()
     fun checkersAiDepth(ctx: Context) = when (getCheckersDifficulty(ctx)) { 0 -> 2; 2 -> 8; else -> 5 }
+
+    // ── International Draughts ──────────────────────────────────────────────
+    fun getInternationalDraughtsDifficulty(ctx: Context) =
+        prefs(ctx).getInt(KEY_INTERNATIONAL_DRAUGHTS_DIFFICULTY, 0)
+    fun setInternationalDraughtsDifficulty(ctx: Context, v: Int) =
+        prefs(ctx).edit().putInt(KEY_INTERNATIONAL_DRAUGHTS_DIFFICULTY, v).apply()
+    fun internationalDraughtsAiDepth(ctx: Context) =
+        when (getInternationalDraughtsDifficulty(ctx)) { 0 -> 2; 2 -> 8; else -> 5 }
 
     // ── Othello — always hard (no user-facing difficulty) ────────────────────
     fun othelloAiDepth(@Suppress("UNUSED_PARAMETER") ctx: Context) = 7
@@ -131,6 +141,10 @@ object SettingsManager {
     fun setChessTheme(ctx: Context, v: Int)  = prefs(ctx).edit().putInt(KEY_CHESS_THEME, v).apply()
     fun getCheckersTheme(ctx: Context)       = prefs(ctx).getInt(KEY_CHECKERS_THEME, 0)
     fun setCheckersTheme(ctx: Context, v: Int) = prefs(ctx).edit().putInt(KEY_CHECKERS_THEME, v).apply()
+    fun getInternationalDraughtsTheme(ctx: Context) =
+        prefs(ctx).getInt(KEY_INTERNATIONAL_DRAUGHTS_THEME, 0)
+    fun setInternationalDraughtsTheme(ctx: Context, v: Int) =
+        prefs(ctx).edit().putInt(KEY_INTERNATIONAL_DRAUGHTS_THEME, v).apply()
     fun getOthelloTheme(ctx: Context)        = prefs(ctx).getInt(KEY_OTHELLO_THEME, 0)
     fun setOthelloTheme(ctx: Context, v: Int)  = prefs(ctx).edit().putInt(KEY_OTHELLO_THEME, v).apply()
     fun getMorabarabaTheme(ctx: Context)     = prefs(ctx).getInt(KEY_MORABARABA_THEME, 0)
@@ -142,7 +156,7 @@ object SettingsManager {
         val idx = when (gameKey) {
             "chess"      -> getChessTheme(ctx)
             "checkers"   -> getCheckersTheme(ctx)
-            "international_draughts" -> getCheckersTheme(ctx)
+            "international_draughts" -> getInternationalDraughtsTheme(ctx)
             "othello"    -> getOthelloTheme(ctx)
             "morabaraba" -> getMorabarabaTheme(ctx)
             "ttt"        -> getTttTheme(ctx)

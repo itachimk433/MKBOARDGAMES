@@ -261,9 +261,9 @@ class MenuView(context: Context) : View(context) {
 
         val (title, desc) = when (card.type) {
             GameType.CHESS       -> "Chess"        to "vs AI  •  2 Players"
-            GameType.CHECKERS    -> "Checkers"     to "vs AI  •  2 Players"
+            GameType.CHECKERS    -> "Draughts"     to "vs AI  •  2 Players"
             GameType.INTERNATIONAL_DRAUGHTS ->
-                "International Draughts" to "10×10  •  Flying kings"
+                "International Draughts" to "vs AI  •  2 Players"
             GameType.OTHELLO     -> "Othello"      to "vs AI  •  2 Players"
             GameType.MORABARABA  -> "Morabaraba"   to "vs AI  •  2 Players"
             GameType.TICTACTOE   -> "Tic-Tac-Toe"  to "vs AI  •  2 Players"

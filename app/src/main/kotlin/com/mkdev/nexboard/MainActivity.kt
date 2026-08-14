@@ -227,14 +227,14 @@ class MainActivity : AppCompatActivity() {
             { SettingsManager.getChessTheme(ctx) },
             { v -> SettingsManager.setChessTheme(ctx, v) }).first)
 
-        // ── Checkers ──
-        root.addView(sectionHeader("⬤  CHECKERS"))
+        // ── Draughts ──
+        root.addView(sectionHeader("⬤  DRAUGHTS"))
         var checkersDiff  = SettingsManager.getCheckersDifficulty(ctx)
         var checkersHints = SettingsManager.getCheckersHints(ctx)
         val (checkersDiffRow, checkersDiffVal) = settingRow("🎯", "AI Difficulty", diffs[checkersDiff])
         checkersDiffRow.setOnClickListener {
             AlertDialog.Builder(ctx, android.R.style.Theme_Material_Dialog_MinWidth)
-                .setTitle("Checkers · AI Difficulty")
+                .setTitle("Draughts · AI Difficulty")
                 .setSingleChoiceItems(diffs, checkersDiff) { d, i ->
                     SettingsManager.setCheckersDifficulty(ctx, i); checkersDiff = i; checkersDiffVal.text = diffs[i]; d.dismiss()
                 }.show()
@@ -246,9 +246,29 @@ class MainActivity : AppCompatActivity() {
             checkersHintsVal.text = if (checkersHints) "On" else "Off"
         }
         root.addView(checkersHintsRow); root.addView(divider())
-        root.addView(themeRow("Checkers",
+        root.addView(themeRow("Draughts",
             { SettingsManager.getCheckersTheme(ctx) },
             { v -> SettingsManager.setCheckersTheme(ctx, v) }).first)
+
+        // ── International Draughts ──
+        root.addView(sectionHeader("◉  INTERNATIONAL DRAUGHTS"))
+        var internationalDraughtsDiff = SettingsManager.getInternationalDraughtsDifficulty(ctx)
+        val (internationalDraughtsDiffRow, internationalDraughtsDiffVal) =
+            settingRow("🎯", "AI Difficulty", diffs[internationalDraughtsDiff])
+        internationalDraughtsDiffRow.setOnClickListener {
+            AlertDialog.Builder(ctx, android.R.style.Theme_Material_Dialog_MinWidth)
+                .setTitle("International Draughts · AI Difficulty")
+                .setSingleChoiceItems(diffs, internationalDraughtsDiff) { d, i ->
+                    SettingsManager.setInternationalDraughtsDifficulty(ctx, i)
+                    internationalDraughtsDiff = i
+                    internationalDraughtsDiffVal.text = diffs[i]
+                    d.dismiss()
+                }.show()
+        }
+        root.addView(internationalDraughtsDiffRow); root.addView(divider())
+        root.addView(themeRow("International Draughts",
+            { SettingsManager.getInternationalDraughtsTheme(ctx) },
+            { v -> SettingsManager.setInternationalDraughtsTheme(ctx, v) }).first)
 
         // ── Othello — difficulty fixed at hard; only theme is configurable ──
         root.addView(sectionHeader("◉  OTHELLO"))
@@ -413,7 +433,7 @@ class MainActivity : AppCompatActivity() {
         val pages = listOf(
             Page("Overall",    "★",  "overall"),
             Page("Chess",      "♟",  "chess"),
-            Page("Checkers",   "⬤",  "checkers"),
+            Page("Draughts",   "⬤",  "checkers"),
             Page("International Draughts", "⬤", "international_draughts"),
             Page("Othello",    "◉",  "othello"),
             Page("Morabaraba", "⬡",  "morabaraba"),

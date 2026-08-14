@@ -146,7 +146,7 @@ class GameActivity : AppCompatActivity() {
     private fun showModeDialog() {
         val gameName = when (gameType) {
             "OTHELLO"  -> "Othello"
-            "CHECKERS" -> "Checkers"
+            "CHECKERS" -> "Draughts"
             "INTERNATIONAL_DRAUGHTS" -> "International Draughts"
             else       -> "Chess"
         }
@@ -178,7 +178,7 @@ class GameActivity : AppCompatActivity() {
     private fun showRules(showModeAfter: Boolean = false) {
         val gameName = when (gameType) {
             "OTHELLO" -> "Othello"
-            "CHECKERS" -> "Checkers"
+            "CHECKERS" -> "Draughts"
             "INTERNATIONAL_DRAUGHTS" -> "International Draughts"
             else -> "Chess"
         }
@@ -211,7 +211,7 @@ When the board is full (or no legal moves remain), the player with more discs wi
             """.trimIndent()
 
             "CHECKERS" -> """
-CHECKERS — Rules
+DRAUGHTS — Rules
 
 Overview
 Played on the dark squares of an 8×8 board. You choose your colour when starting a game vs AI. Pieces start on the first 3 rows of each side.
@@ -495,8 +495,15 @@ Checkmate your opponent's King.
                             ai.bestMove(gameState)
                                 ?: engine.allLegalMoves(gameState, gameState.currentTurn).randomOrNull()
                         }
-                        "CHECKERS", "INTERNATIONAL_DRAUGHTS" -> {
+                        "CHECKERS" -> {
                             val ai = AIPlayer(engine, maxDepth = SettingsManager.checkersAiDepth(this@GameActivity))
+                            ai.bestMove(gameState)
+                        }
+                        "INTERNATIONAL_DRAUGHTS" -> {
+                            val ai = AIPlayer(
+                                engine,
+                                maxDepth = SettingsManager.internationalDraughtsAiDepth(this@GameActivity)
+                            )
                             ai.bestMove(gameState)
                         }
                         else -> {
@@ -598,9 +605,13 @@ Checkmate your opponent's King.
         val getDiff: () -> Int
         val setDiff: (Int) -> Unit
         when (gameType) {
-            "CHECKERS", "INTERNATIONAL_DRAUGHTS" -> {
+            "CHECKERS" -> {
                 getDiff = { SettingsManager.getCheckersDifficulty(this) }
                 setDiff = { v -> SettingsManager.setCheckersDifficulty(this, v) }
+            }
+            "INTERNATIONAL_DRAUGHTS" -> {
+                getDiff = { SettingsManager.getInternationalDraughtsDifficulty(this) }
+                setDiff = { v -> SettingsManager.setInternationalDraughtsDifficulty(this, v) }
             }
             else       -> { getDiff = { SettingsManager.getChessDifficulty(this) };    setDiff = { v -> SettingsManager.setChessDifficulty(this, v) } }
         }
