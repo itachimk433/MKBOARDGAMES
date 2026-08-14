@@ -25,11 +25,14 @@ class MenuView(context: Context) : View(context) {
         com.mkdev.nexboard.SoundPlayer.init(context)
     }
 
-    enum class GameType { CHESS, CHECKERS, OTHELLO, MORABARABA, TICTACTOE }
+    enum class GameType {
+        CHESS, CHECKERS, INTERNATIONAL_DRAUGHTS, OTHELLO, MORABARABA, TICTACTOE
+    }
 
     private data class Card(val type: GameType, var rect: RectF = RectF())
     private val cards = listOf(
         Card(GameType.CHESS), Card(GameType.CHECKERS),
+        Card(GameType.INTERNATIONAL_DRAUGHTS),
         Card(GameType.OTHELLO), Card(GameType.MORABARABA), Card(GameType.TICTACTOE)
     )
 
@@ -259,6 +262,8 @@ class MenuView(context: Context) : View(context) {
         val (title, desc) = when (card.type) {
             GameType.CHESS       -> "Chess"        to "vs AI  •  2 Players"
             GameType.CHECKERS    -> "Checkers"     to "vs AI  •  2 Players"
+            GameType.INTERNATIONAL_DRAUGHTS ->
+                "International Draughts" to "10×10  •  Flying kings"
             GameType.OTHELLO     -> "Othello"      to "vs AI  •  2 Players"
             GameType.MORABARABA  -> "Morabaraba"   to "vs AI  •  2 Players"
             GameType.TICTACTOE   -> "Tic-Tac-Toe"  to "vs AI  •  2 Players"
@@ -271,7 +276,8 @@ class MenuView(context: Context) : View(context) {
 
     private fun drawMiniBoard(canvas: Canvas, left: Float, top: Float, size: Float, type: GameType) {
         when (type) {
-            GameType.CHESS, GameType.CHECKERS -> drawChessCheckersMini(canvas, left, top, size, type)
+            GameType.CHESS, GameType.CHECKERS, GameType.INTERNATIONAL_DRAUGHTS ->
+                drawChessCheckersMini(canvas, left, top, size, type)
             GameType.OTHELLO    -> drawOthelloMini(canvas, left, top, size)
             GameType.MORABARABA -> drawMorabarabaMini(canvas, left, top, size)
             GameType.TICTACTOE  -> drawTicTacToeMini(canvas, left, top, size)
@@ -279,8 +285,9 @@ class MenuView(context: Context) : View(context) {
     }
 
     private fun drawChessCheckersMini(canvas: Canvas, left: Float, top: Float, size: Float, type: GameType) {
-        val cell = size / 4f
-        for (r in 0..3) for (c in 0..3) {
+        val boardSize = if (type == GameType.INTERNATIONAL_DRAUGHTS) 5 else 4
+        val cell = size / boardSize.toFloat()
+        for (r in 0 until boardSize) for (c in 0 until boardSize) {
             val l = left + c * cell; val t = top + r * cell
             canvas.drawRect(l, t, l + cell, t + cell, if ((r + c) % 2 == 0) miniLightPaint else miniDarkPaint)
         }

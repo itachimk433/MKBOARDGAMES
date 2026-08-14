@@ -142,6 +142,7 @@ object SettingsManager {
         val idx = when (gameKey) {
             "chess"      -> getChessTheme(ctx)
             "checkers"   -> getCheckersTheme(ctx)
+            "international_draughts" -> getCheckersTheme(ctx)
             "othello"    -> getOthelloTheme(ctx)
             "morabaraba" -> getMorabarabaTheme(ctx)
             "ttt"        -> getTttTheme(ctx)
@@ -205,7 +206,10 @@ object SettingsManager {
         val edit = prefs(ctx).edit()
         edit.putInt(KEY_STATS_WINS, 0).putInt(KEY_STATS_LOSSES, 0)
             .putInt(KEY_STATS_DRAWS, 0).putInt(KEY_STATS_FORFEITS, 0)
-        for (g in listOf("chess", "checkers", "othello", "morabaraba", "ttt", "overall")) {
+        for (g in listOf(
+            "chess", "checkers", "international_draughts",
+            "othello", "morabaraba", "ttt", "overall"
+        )) {
             edit.putInt(winKey(g), 0).putInt(lossKey(g), 0)
                 .putInt(drawKey(g), 0).putInt(forfeitKey(g), 0)
         }

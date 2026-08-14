@@ -93,7 +93,10 @@ class CheckersRuleEngine : RuleEngine {
                 results += Move(from, land, captures = newCaptured.toList())
             } else {
                 for (cont in continuations) {
-                    results += Move(from, cont.to, captures = newCaptured.toList() + cont.captures)
+                    // The recursive result already contains the complete chain.
+                    // Appending newCaptured again duplicates earlier victims and
+                    // makes replay/applyMove remove the same square twice.
+                    results += Move(from, cont.to, captures = cont.captures)
                 }
             }
         }

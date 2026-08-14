@@ -414,6 +414,7 @@ class MainActivity : AppCompatActivity() {
             Page("Overall",    "★",  "overall"),
             Page("Chess",      "♟",  "chess"),
             Page("Checkers",   "⬤",  "checkers"),
+            Page("International Draughts", "⬤", "international_draughts"),
             Page("Othello",    "◉",  "othello"),
             Page("Morabaraba", "⬡",  "morabaraba"),
             Page("Tic-Tac-Toe","✕",  "ttt"),

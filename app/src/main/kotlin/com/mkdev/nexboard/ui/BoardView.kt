@@ -21,6 +21,7 @@ class BoardView(context: Context) : View(context) {
     var gameState: GameState = GameState(arrayOfNulls(64))
         set(value) {
             field = value
+            updateBoardGeometry()
             selectedPos = null
             legalMoves  = emptyList()
             mustCapturePieces = if (showMustCaptureHints && ruleEngine != null)
@@ -49,7 +50,7 @@ class BoardView(context: Context) : View(context) {
         val engine = ruleEngine ?: return emptySet()
         if (state.status != GameStatus.IN_PROGRESS) return emptySet()
         val result = mutableSetOf<Position>()
-        for (row in 0..7) for (col in 0..7) {
+        for (row in 0 until state.boardSize) for (col in 0 until state.boardSize) {
             val pos = Position(row, col)
             if (state.get(pos)?.color != state.currentTurn) continue
             if (engine.legalMovesFrom(state, pos).any { it.isCapture }) result.add(pos)
@@ -114,12 +115,17 @@ class BoardView(context: Context) : View(context) {
 
     // ─── Size ────────────────────────────────────────────────────────────────
     override fun onSizeChanged(w: Int, h: Int, ow: Int, oh: Int) {
+        updateBoardGeometry()
+    }
+
+    private fun updateBoardGeometry() {
+        if (width <= 0 || height <= 0) return
         val dp      = resources.displayMetrics.density
         val margin  = 4f * dp
-        val boardSz = minOf(w.toFloat() - margin * 2, h.toFloat() - margin * 2)
-        cellSize  = boardSz / 8f
-        boardLeft = (w - boardSz) / 2f
-        boardTop  = (h - boardSz) / 2f
+        val boardSz = minOf(width.toFloat() - margin * 2, height.toFloat() - margin * 2)
+        cellSize  = boardSz / gameState.boardSize.toFloat()
+        boardLeft = (width - boardSz) / 2f
+        boardTop  = (height - boardSz) / 2f
         piecePaint.textSize       = cellSize * 0.60f
         labelPaint.textSize       = cellSize * 0.22f
         labelPaint.color          = Color.argb(130, 120, 80, 40)
@@ -219,8 +225,9 @@ class BoardView(context: Context) : View(context) {
     }
 
     private fun cellCenter(pos: Position): PointF {
-        val dr = if (isFlipped) 7 - pos.row else pos.row
-        val dc = if (isFlipped) 7 - pos.col else pos.col
+        val last = gameState.boardSize - 1
+        val dr = if (isFlipped) last - pos.row else pos.row
+        val dc = if (isFlipped) last - pos.col else pos.col
         return PointF(boardLeft + dc * cellSize + cellSize / 2f,
                       boardTop  + dr * cellSize + cellSize / 2f)
     }
@@ -231,7 +238,7 @@ class BoardView(context: Context) : View(context) {
     }
 
     private fun drawBoard(canvas: Canvas) {
-        for (row in 0..7) for (col in 0..7) {
+        for (row in 0 until gameState.boardSize) for (col in 0 until gameState.boardSize) {
             val l = boardLeft + col * cellSize; val t = boardTop + row * cellSize
             canvas.drawRect(l, t, l + cellSize, t + cellSize,
                 if ((row + col) % 2 == 0) lightPaint else darkPaint)
@@ -239,11 +246,12 @@ class BoardView(context: Context) : View(context) {
     }
 
     private fun drawLabels(canvas: Canvas) {
-        for (i in 0..7) {
-            val file = ('a' + if (isFlipped) 7 - i else i).toString()
-            val rank = ((if (isFlipped) i + 1 else 8 - i)).toString()
+        val size = gameState.boardSize
+        for (i in 0 until size) {
+            val file = ('a' + if (isFlipped) size - 1 - i else i).toString()
+            val rank = ((if (isFlipped) i + 1 else size - i)).toString()
             canvas.drawText(file, boardLeft + i * cellSize + cellSize * 0.86f,
-                boardTop + 8f * cellSize - cellSize * 0.06f, labelPaint)
+                boardTop + size * cellSize - cellSize * 0.06f, labelPaint)
             canvas.drawText(rank, boardLeft + cellSize * 0.10f,
                 boardTop + i * cellSize + cellSize * 0.28f, labelPaint)
         }
@@ -276,7 +284,7 @@ class BoardView(context: Context) : View(context) {
 
     private fun drawPieces(canvas: Canvas) {
         val skipPos = animFromPos
-        for (row in 0..7) for (col in 0..7) {
+        for (row in 0 until gameState.boardSize) for (col in 0 until gameState.boardSize) {
             if (skipPos != null && skipPos.row == row && skipPos.col == col) continue
             val piece = gameState.get(row, col) ?: continue
             val cx = boardLeft + boardCol(col) * cellSize + cellSize / 2f
@@ -370,15 +378,18 @@ class BoardView(context: Context) : View(context) {
 
     // ─── Coordinate helpers ───────────────────────────────────────────────────
 
-    private fun boardRow(logicRow: Int) = if (isFlipped) 7 - logicRow else logicRow
-    private fun boardCol(logicCol: Int) = if (isFlipped) 7 - logicCol else logicCol
+    private fun boardRow(logicRow: Int) =
+        if (isFlipped) gameState.boardSize - 1 - logicRow else logicRow
+    private fun boardCol(logicCol: Int) =
+        if (isFlipped) gameState.boardSize - 1 - logicCol else logicCol
 
     private fun screenToBoard(x: Float, y: Float): Position? {
         val col = ((x - boardLeft) / cellSize).toInt()
         val row = ((y - boardTop)  / cellSize).toInt()
-        if (col !in 0..7 || row !in 0..7) return null
-        val logicRow = if (isFlipped) 7 - row else row
-        val logicCol = if (isFlipped) 7 - col else col
+        val size = gameState.boardSize
+        if (col !in 0 until size || row !in 0 until size) return null
+        val logicRow = if (isFlipped) size - 1 - row else row
+        val logicCol = if (isFlipped) size - 1 - col else col
         return Position(logicRow, logicCol)
     }
 

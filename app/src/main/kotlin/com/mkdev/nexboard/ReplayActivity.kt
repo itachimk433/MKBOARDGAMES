@@ -16,6 +16,7 @@ import androidx.appcompat.app.AppCompatActivity
 import com.mkdev.nexboard.engine.*
 import com.mkdev.nexboard.games.checkers.CheckersPiece
 import com.mkdev.nexboard.games.checkers.CheckersRuleEngine
+import com.mkdev.nexboard.games.checkers.InternationalDraughtsRuleEngine
 import com.mkdev.nexboard.games.chess.ChessPiece
 import com.mkdev.nexboard.games.chess.ChessRuleEngine
 import com.mkdev.nexboard.games.morabaraba.MorabarabaRuleEngine
@@ -164,6 +165,7 @@ class ReplayActivity : AppCompatActivity() {
         val engine: RuleEngine = when (gameType) {
             "TICTACTOE"  -> TicTacToeRuleEngine(ticBoardSize, ticBoardSize)
             "CHECKERS"   -> CheckersRuleEngine()
+            "INTERNATIONAL_DRAUGHTS" -> InternationalDraughtsRuleEngine()
             "MORABARABA" -> MorabarabaRuleEngine()
             else         -> ChessRuleEngine()
         }

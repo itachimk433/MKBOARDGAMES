@@ -4,7 +4,7 @@ enum class GameStatus { IN_PROGRESS, WHITE_WINS, BLACK_WINS, DRAW }
 
 /**
  * Complete snapshot of a game at one point in time.
- * The board is a flat array [row * 8 + col] of nullable [Piece] references.
+ * The board is a flat array [row * boardSize + col] of nullable [Piece] references.
  * Immutable — every move produces a new [GameState].
  */
 data class GameState(

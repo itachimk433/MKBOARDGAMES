@@ -11,6 +11,7 @@ import androidx.appcompat.app.AppCompatActivity
 import com.mkdev.nexboard.engine.*
 import com.mkdev.nexboard.games.checkers.CheckersPiece
 import com.mkdev.nexboard.games.checkers.CheckersRuleEngine
+import com.mkdev.nexboard.games.checkers.InternationalDraughtsRuleEngine
 import com.mkdev.nexboard.games.chess.ChessPiece
 import com.mkdev.nexboard.games.chess.ChessRuleEngine
 import com.mkdev.nexboard.games.othello.OthelloRuleEngine
@@ -62,6 +63,7 @@ class GameActivity : AppCompatActivity() {
         engine   = when (gameType) {
             "OTHELLO"   -> OthelloRuleEngine()
             "CHECKERS"  -> CheckersRuleEngine()
+            "INTERNATIONAL_DRAUGHTS" -> InternationalDraughtsRuleEngine()
             else        -> ChessRuleEngine()   // covers "CHESS" and any future alias
         }
 
@@ -145,6 +147,7 @@ class GameActivity : AppCompatActivity() {
         val gameName = when (gameType) {
             "OTHELLO"  -> "Othello"
             "CHECKERS" -> "Checkers"
+            "INTERNATIONAL_DRAUGHTS" -> "International Draughts"
             else       -> "Chess"
         }
         AlertDialog.Builder(this).setTitle(gameName)
@@ -174,9 +177,10 @@ class GameActivity : AppCompatActivity() {
 
     private fun showRules(showModeAfter: Boolean = false) {
         val gameName = when (gameType) {
-            "OTHELLO"  -> "Othello"
+            "OTHELLO" -> "Othello"
             "CHECKERS" -> "Checkers"
-            else       -> "Chess"
+            "INTERNATIONAL_DRAUGHTS" -> "International Draughts"
+            else -> "Chess"
         }
         val rulesText = when (gameType) {
             "OTHELLO" -> """
@@ -228,6 +232,25 @@ Kinging
 When a piece reaches the far end of the board it becomes a King (marked ♔). Kings may move and jump diagonally in any direction.
 
 ─────────────────────────
+
+Winning
+Capture all of your opponent's pieces, or leave them with no legal moves.
+            """.trimIndent()
+
+            "INTERNATIONAL_DRAUGHTS" -> """
+INTERNATIONAL DRAUGHTS — Rules
+
+Overview
+Played on the dark squares of a 10×10 board with twenty pieces per side. You choose your colour when starting a game vs AI. White moves first.
+
+Moving
+Men move one square diagonally forward to an empty dark square. Men may capture forwards or backwards.
+
+Capturing
+Captures are compulsory. A capture sequence must take the greatest possible number of pieces. If two sequences take the same number, the one taking more kings is required.
+
+Flying Kings
+When a man reaches the far end it becomes a King. Kings move any distance diagonally and can capture a piece from any distance, landing on any empty square beyond it. A multi-capture continues after promotion.
 
 Winning
 Capture all of your opponent's pieces, or leave them with no legal moves.
@@ -301,7 +324,8 @@ Checkmate your opponent's King.
 
         gameState = engine.initialState()
         boardView.ruleEngine           = engine
-        boardView.showMustCaptureHints = (gameType == "CHECKERS")
+        boardView.showMustCaptureHints =
+            gameType == "CHECKERS" || gameType == "INTERNATIONAL_DRAUGHTS"
         boardView.directMoveMode       = (gameType == "OTHELLO")
         boardView.gameState            = gameState
         boardView.isFlipped            = false
@@ -321,7 +345,9 @@ Checkmate your opponent's King.
 
         topCaptureView.update(emptyList())
         bottomCaptureView.update(emptyList())
-        if (gameType == "CHESS" || gameType == "CHECKERS" || gameType == "OTHELLO") SoundPlayer.play("game_start")
+        if (gameType == "CHESS" || gameType == "CHECKERS" ||
+            gameType == "INTERNATIONAL_DRAUGHTS" || gameType == "OTHELLO"
+        ) SoundPlayer.play("game_start")
         updateHud()
         if (vsAI && gameState.currentTurn != playerColor) triggerAI()
     }
@@ -351,7 +377,8 @@ Checkmate your opponent's King.
             bottomCaptureView.update(capturedByWhite)
             updateHud()
             if (gameType == "CHESS") playChessSound(move)
-            if (gameType == "CHECKERS") playCheckersSound(move)
+            if (gameType == "CHECKERS" || gameType == "INTERNATIONAL_DRAUGHTS")
+                playCheckersSound(move)
             if (gameType == "OTHELLO") playOthelloSound(move)
             if (gameState.status != GameStatus.IN_PROGRESS) {
                 recordResult()
@@ -468,7 +495,7 @@ Checkmate your opponent's King.
                             ai.bestMove(gameState)
                                 ?: engine.allLegalMoves(gameState, gameState.currentTurn).randomOrNull()
                         }
-                        "CHECKERS" -> {
+                        "CHECKERS", "INTERNATIONAL_DRAUGHTS" -> {
                             val ai = AIPlayer(engine, maxDepth = SettingsManager.checkersAiDepth(this@GameActivity))
                             ai.bestMove(gameState)
                         }
@@ -571,7 +598,10 @@ Checkmate your opponent's King.
         val getDiff: () -> Int
         val setDiff: (Int) -> Unit
         when (gameType) {
-            "CHECKERS" -> { getDiff = { SettingsManager.getCheckersDifficulty(this) }; setDiff = { v -> SettingsManager.setCheckersDifficulty(this, v) } }
+            "CHECKERS", "INTERNATIONAL_DRAUGHTS" -> {
+                getDiff = { SettingsManager.getCheckersDifficulty(this) }
+                setDiff = { v -> SettingsManager.setCheckersDifficulty(this, v) }
+            }
             else       -> { getDiff = { SettingsManager.getChessDifficulty(this) };    setDiff = { v -> SettingsManager.setChessDifficulty(this, v) } }
         }
         val current = getDiff()
