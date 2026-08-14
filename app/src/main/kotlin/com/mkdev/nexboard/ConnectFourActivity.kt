@@ -182,14 +182,28 @@ Control the centre columns, build threats in more than one direction, and block 
         if (vsAI && gameState.currentTurn != playerColor) triggerAI()
     }
 
-    private fun handleMove(move: Move) {
-        if (boardView.isLocked) return
+    private fun handleMove(move: Move, fromAI: Boolean = false) {
+        if (boardView.isLocked && !fromAI) return
+        boardView.isLocked = true
         redoGameStates.clear()
         redoRemovedMoves.clear()
         moveHistory.add(gameState)
         gameState = engine.applyMove(gameState, move)
         val appliedMove = gameState.lastMove
-        boardView.setGameState(gameState, appliedMove?.to)
+        val onDropAnimationFinished: (() -> Unit)? =
+            if (gameState.status == GameStatus.IN_PROGRESS) {
+                {
+                    if (vsAI && gameState.currentTurn != playerColor) triggerAI()
+                    else boardView.isLocked = false
+                }
+            } else {
+                null
+            }
+        boardView.setGameState(
+            gameState,
+            appliedMove?.to,
+            onDropAnimationFinished = onDropAnimationFinished
+        )
         if (gameState.status != GameStatus.IN_PROGRESS) {
             boardView.isLocked = true
             when (gameState.status) {
@@ -211,10 +225,6 @@ Control the centre columns, build threats in more than one direction, and block 
         }
         SoundPlayer.playMovement(if (gameState.currentTurn == PieceColor.WHITE) "ttt_o" else "ttt_x")
         updateHud()
-        if (vsAI && gameState.currentTurn != playerColor) {
-            boardView.isLocked = true
-            triggerAI()
-        }
     }
 
     private fun recordResult() {
@@ -249,7 +259,7 @@ Control the centre columns, build threats in more than one direction, and block 
                 } catch (_: Throwable) { null }
             }
             hudView.setThinking(false)
-            if (move != null) { boardView.isLocked = false; handleMove(move) }
+            if (move != null) handleMove(move, fromAI = true)
             else boardView.isLocked = false
         }
     }
@@ -375,6 +385,7 @@ Control the centre columns, build threats in more than one direction, and block 
         private var fallingIndex: Int? = null
         private var fallingColor: PieceColor? = null
         private var fallingProgress = 0f
+        private var dropAnimationCompletion: (() -> Unit)? = null
         private val dp = resources.displayMetrics.density
         private var boardLeft = 0f; private var boardTop = 0f; private var cellSize = 0f
         private var boardColor = Color.parseColor("#24527A")
@@ -423,14 +434,20 @@ Control the centre columns, build threats in more than one direction, and block 
             return true
         }
 
-        fun setGameState(newState: GameState, last: Position? = null) {
+        fun setGameState(
+            newState: GameState,
+            last: Position? = null,
+            onDropAnimationFinished: (() -> Unit)? = null
+        ) {
             state = newState
             lastMove = last
+            dropAnimationCompletion = null
             fallingAnimator?.cancel()
             fallingAnimator = null
             fallingIndex = null
             fallingColor = null
             fallingProgress = 0f
+            dropAnimationCompletion = onDropAnimationFinished
             last?.let {
                 val idx = it.row * ConnectFourRuleEngine.COLUMNS + it.col
                 val piece = newState.get(it) as? ConnectFourPiece ?: return@let
@@ -450,13 +467,21 @@ Control the centre columns, build threats in more than one direction, and block 
                                 fallingAnimator = null
                                 fallingIndex = null
                                 fallingColor = null
+                                val completion = dropAnimationCompletion
+                                dropAnimationCompletion = null
                                 invalidate()
+                                completion?.invoke()
                             }
                         }
                     })
                 }
                 fallingAnimator = animator
                 animator.start()
+            }
+            if (last == null) {
+                val completion = dropAnimationCompletion
+                dropAnimationCompletion = null
+                completion?.invoke()
             }
             invalidate()
         }
@@ -470,6 +495,7 @@ Control the centre columns, build threats in more than one direction, and block 
             state = newState
             lastMove = null
             winLine = null
+            dropAnimationCompletion = null
             fallingAnimator?.cancel()
             fallingAnimator = null
             fallingIndex = null
