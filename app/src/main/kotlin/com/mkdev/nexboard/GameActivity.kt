@@ -546,7 +546,11 @@ Checkmate your opponent's King.
                             ai.bestMove(gameState)
                         }
                         "FOX_AND_GEESE" -> {
-                            val ai = AIPlayer(engine, maxDepth = 4, timeLimitMs = 1200L)
+                            val ai = AIPlayer(
+                                engine,
+                                maxDepth = SettingsManager.foxAndGeeseAiDepth(this@GameActivity),
+                                timeLimitMs = SettingsManager.foxAndGeeseAiTimeLimitMs(this@GameActivity)
+                            )
                             ai.bestMove(gameState)
                         }
                         else -> {
@@ -619,8 +623,9 @@ Checkmate your opponent's King.
     fun onMenuClicked() {
         val inProgress = gameState.status == GameStatus.IN_PROGRESS && moveHistory.isNotEmpty()
         val items = mutableListOf("New Game", "How to Play")
-        // Othello and Fox and Geese use fixed AI settings.
-        if (vsAI && gameType != "OTHELLO" && gameType != "FOX_AND_GEESE") items.add("AI Difficulty")
+        // Othello uses a fixed AI setting; the other games expose their
+        // difficulty because their search depth can be tuned safely.
+        if (vsAI && gameType != "OTHELLO") items.add("AI Difficulty")
         items.add("Main Menu")
         val arr = items.toTypedArray()
         AlertDialog.Builder(this).setTitle("Menu")
@@ -659,6 +664,10 @@ Checkmate your opponent's King.
             "INTERNATIONAL_DRAUGHTS" -> {
                 getDiff = { SettingsManager.getInternationalDraughtsDifficulty(this) }
                 setDiff = { v -> SettingsManager.setInternationalDraughtsDifficulty(this, v) }
+            }
+            "FOX_AND_GEESE" -> {
+                getDiff = { SettingsManager.getFoxAndGeeseDifficulty(this) }
+                setDiff = { v -> SettingsManager.setFoxAndGeeseDifficulty(this, v) }
             }
             else       -> { getDiff = { SettingsManager.getChessDifficulty(this) };    setDiff = { v -> SettingsManager.setChessDifficulty(this, v) } }
         }

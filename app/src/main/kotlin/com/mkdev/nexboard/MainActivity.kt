@@ -330,6 +330,26 @@ class MainActivity : AppCompatActivity() {
             { SettingsManager.getConnectFourTheme(ctx) },
             { v -> SettingsManager.setConnectFourTheme(ctx, v) }).first)
 
+        // ── Fox and Geese ──
+        root.addView(sectionHeader("🦊  FOX & GEESE"))
+        var foxAndGeeseDiff = SettingsManager.getFoxAndGeeseDifficulty(ctx)
+        val (foxAndGeeseDiffRow, foxAndGeeseDiffVal) =
+            settingRow("🎯", "AI Difficulty", diffs[foxAndGeeseDiff])
+        foxAndGeeseDiffRow.setOnClickListener {
+            AlertDialog.Builder(ctx, android.R.style.Theme_Material_Dialog_MinWidth)
+                .setTitle("Fox & Geese · AI Difficulty")
+                .setSingleChoiceItems(diffs, foxAndGeeseDiff) { d, i ->
+                    SettingsManager.setFoxAndGeeseDifficulty(ctx, i)
+                    foxAndGeeseDiff = i
+                    foxAndGeeseDiffVal.text = diffs[i]
+                    d.dismiss()
+                }.show()
+        }
+        root.addView(foxAndGeeseDiffRow); root.addView(divider())
+        root.addView(themeRow("Fox & Geese",
+            { SettingsManager.getFoxAndGeeseTheme(ctx) },
+            { v -> SettingsManager.setFoxAndGeeseTheme(ctx, v) }).first)
+
         // ── Legal ──
         root.addView(sectionHeader("📋  LEGAL"))
         val ppUrl  = PRIVACY_POLICY_URL
@@ -461,6 +481,7 @@ class MainActivity : AppCompatActivity() {
             Page("Morabaraba", "⬡",  "morabaraba"),
             Page("Tic-Tac-Toe","✕",  "ttt"),
             Page("Connect Four", "●", "connect_four"),
+            Page("Fox & Geese", "🦊", "fox_and_geese"),
         )
 
         var currentPage = 0
