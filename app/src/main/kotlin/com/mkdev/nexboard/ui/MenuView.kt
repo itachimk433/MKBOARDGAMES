@@ -57,11 +57,11 @@ class MenuView(context: Context) : View(context) {
     }
     private val cardTitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE; textAlign = Paint.Align.CENTER; isFakeBoldText = true
-        textSize = 18f * sp.coerceAtMost(3f)
+        textSize = 14f * sp.coerceAtMost(3f)
     }
     private val cardDescPaint  = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#BDBDBD"); textAlign = Paint.Align.CENTER
-        textSize = 12f * sp.coerceAtMost(3f)
+        textSize = 10f * sp.coerceAtMost(3f)
     }
     private val copyrightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#555555"); textAlign = Paint.Align.CENTER
@@ -84,8 +84,13 @@ class MenuView(context: Context) : View(context) {
     private val miniPiecePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
     private val bitmapPaint    = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
 
-    private val cardH = 82f * dp
-    private val cardW get() = width * 0.88f
+    private val gridColumns = 3
+    private val cardH = 136f * dp
+    private val gridPadding = 12f * dp
+    private val gridSpacing = 8f * dp
+    private val cardW get() =
+        ((width - (gridPadding * 2f) - (gridSpacing * (gridColumns - 1))) / gridColumns)
+            .coerceAtLeast(1f)
 
     private val gearRect  = RectF()
     private val gearTouch = RectF()
@@ -114,11 +119,12 @@ class MenuView(context: Context) : View(context) {
 
     override fun onSizeChanged(w: Int, h: Int, ow: Int, oh: Int) {
         headerH = h * 0.245f
-        val cx      = (w - cardW) / 2f
-        val spacing = 8f * dp
         for (i in cards.indices) {
-            val top = headerH + i * (cardH + spacing)
-            cards[i].rect = RectF(cx, top, cx + cardW, top + cardH)
+            val column = i % gridColumns
+            val row = i / gridColumns
+            val left = gridPadding + column * (cardW + gridSpacing)
+            val top = headerH + row * (cardH + gridSpacing)
+            cards[i].rect = RectF(left, top, left + cardW, top + cardH)
         }
         val contentBottom = cards.last().rect.bottom + 56f * dp   // room for two-line footer
         maxScrollY = maxOf(0f, contentBottom - h)
@@ -249,15 +255,12 @@ class MenuView(context: Context) : View(context) {
         }
         canvas.drawRoundRect(RectF(r.left + 3f, r.top + 4f, r.right + 3f, r.bottom + 4f), 16f * dp, 16f * dp, shadowP)
         canvas.drawRoundRect(r, 16f * dp, 16f * dp, if (pressed) cardHiPaint else cardPaint)
-        canvas.drawRoundRect(RectF(r.left, r.top, r.left + 5f * dp, r.bottom), 3f * dp, 3f * dp, accentPaint)
+        canvas.drawRoundRect(RectF(r.left, r.top, r.right, r.top + 5f * dp), 3f * dp, 3f * dp, accentPaint)
 
-        val previewSz   = r.height() * 0.72f
-        val previewLeft = r.right - previewSz - 14f * dp
-        val previewTop  = r.top + (r.height() - previewSz) / 2f
+        val previewSz   = minOf(r.height() * 0.46f, r.width() * 0.64f)
+        val previewLeft = r.centerX() - previewSz / 2f
+        val previewTop  = r.top + 10f * dp
         drawMiniBoard(canvas, previewLeft, previewTop, previewSz, card.type)
-
-        val textCx = r.left + (r.width() - previewSz - 28f * dp) / 2f + r.left
-        val midY   = r.centerY()
 
         val (title, desc) = when (card.type) {
             GameType.CHESS       -> "Chess"        to "vs AI  •  2 Players"
@@ -269,8 +272,22 @@ class MenuView(context: Context) : View(context) {
             GameType.TICTACTOE   -> "Tic-Tac-Toe"  to "vs AI  •  2 Players"
         }
 
-        canvas.drawText(title, textCx, midY - 9f * dp + cardTitlePaint.textSize * 0.4f, cardTitlePaint)
-        canvas.drawText(desc,  textCx, midY + 16f * dp, cardDescPaint)
+        val titleLines = if (title == "International Draughts") {
+            listOf("International", "Draughts")
+        } else {
+            listOf(title)
+        }
+        val titleStartY = previewTop + previewSz + cardTitlePaint.textSize + 5f * dp
+        titleLines.forEachIndexed { index, line ->
+            canvas.drawText(
+                line,
+                r.centerX(),
+                titleStartY + index * (cardTitlePaint.textSize + 1f * dp),
+                cardTitlePaint
+            )
+        }
+        val descY = titleStartY + titleLines.size * (cardTitlePaint.textSize + 1f * dp) + 2f * dp
+        canvas.drawText(desc, r.centerX(), descY, cardDescPaint)
         if (scale != 1f) canvas.restore()
     }
 
