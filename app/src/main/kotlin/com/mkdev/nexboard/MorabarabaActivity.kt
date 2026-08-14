@@ -19,6 +19,7 @@ class MorabarabaActivity : AppCompatActivity() {
 
     companion object {
         const val EXTRA_GAME = "MORABARABA"
+        const val GAME_NINE_MENS_MORRIS = "NINE_MENS_MORRIS"
     }
 
     private lateinit var boardView:         MorabaraBoardView
@@ -37,6 +38,13 @@ class MorabarabaActivity : AppCompatActivity() {
     /** Stats recorded once per game. */
     private var resultRecorded = false
     private var interstitialAd: Any? = null
+
+    private val isNineMensMorris: Boolean
+        get() = intent.getStringExtra(EXTRA_GAME) == GAME_NINE_MENS_MORRIS
+    private val gameKey: String
+        get() = if (isNineMensMorris) "nine_mens_morris" else "morabaraba"
+    private val gameTitle: String
+        get() = if (isNineMensMorris) "Nine Men's Morris" else "Morabaraba"
 
     private val redoGameStates = ArrayDeque<GameState>()
     private val redoCaptures   = ArrayDeque<Pair<List<Piece>, List<Piece>>>()
@@ -81,7 +89,7 @@ class MorabarabaActivity : AppCompatActivity() {
         super.onResume(); makeFullscreen()
         SoundPlayer.movementSoundsEnabled = SettingsManager.isMovementSoundsEnabled(this)
         if (::boardView.isInitialized) {
-            SettingsManager.activateGameTheme(this, "morabaraba")
+            SettingsManager.activateGameTheme(this, gameKey)
             boardView.applyTheme()
         }
     }
@@ -107,11 +115,14 @@ class MorabarabaActivity : AppCompatActivity() {
     // ─── Game flow ────────────────────────────────────────────────────────────
 
     private fun showModeDialog() {
-        AlertDialog.Builder(this).setTitle("Morabaraba")
+        AlertDialog.Builder(this).setTitle(gameTitle)
             .setItems(arrayOf("vs AI", "2 Players", "How to Play")) { _, w ->
                 when (w) {
-                    0 -> showVariantDialog(isVsAI = true)
-                    1 -> showVariantDialog(isVsAI = false)
+                    0 -> if (isNineMensMorris) showColorPickerDialog()
+                         else showVariantDialog(isVsAI = true)
+                    1 -> if (isNineMensMorris) {
+                             vsAI = false; playerColor = PieceColor.WHITE; startGame()
+                         } else showVariantDialog(isVsAI = false)
                     2 -> showTutorial(showModeAfter = moveHistory.isEmpty())
                 }
             }
@@ -139,7 +150,10 @@ class MorabarabaActivity : AppCompatActivity() {
                 startGame()
             }
             .setCancelable(true)
-            .setOnCancelListener { showVariantDialog(isVsAI = true) }
+            .setOnCancelListener {
+                if (isNineMensMorris) showModeDialog()
+                else showVariantDialog(isVsAI = true)
+            }
             .show()
     }
 
@@ -151,10 +165,10 @@ class MorabarabaActivity : AppCompatActivity() {
         aiJob?.cancel(); aiJob = null
         moveHistory.clear()
         capturedByWhite.clear(); capturedByBlack.clear(); captureSnapshots.clear()
-        SettingsManager.activateGameTheme(this, "morabaraba")
-        if (vsAI) SettingsManager.setActiveGame(this, "morabaraba")
+        SettingsManager.activateGameTheme(this, gameKey)
+        if (vsAI) SettingsManager.setActiveGame(this, gameKey)
         SoundPlayer.init(this)
-        engine                 = MorabarabaRuleEngine(pieceCount)
+        engine                 = MorabarabaRuleEngine(if (isNineMensMorris) 9 else pieceCount)
         gameState              = engine.initialState()
         boardView.ruleEngine   = engine
         boardView.gameState    = gameState
@@ -255,8 +269,12 @@ class MorabarabaActivity : AppCompatActivity() {
         hudView.setThinking(true)
         aiJob?.cancel()
         aiJob = scope.launch {
-            val depth  = SettingsManager.morabarabaAiDepth(this@MorabarabaActivity)
-            val timeMs = SettingsManager.morabarabaAiTimeLimitMs(this@MorabarabaActivity)
+            val depth  = if (isNineMensMorris)
+                SettingsManager.nineMensMorrisAiDepth(this@MorabarabaActivity)
+            else SettingsManager.morabarabaAiDepth(this@MorabarabaActivity)
+            val timeMs = if (isNineMensMorris)
+                SettingsManager.nineMensMorrisAiTimeLimitMs(this@MorabarabaActivity)
+            else SettingsManager.morabarabaAiTimeLimitMs(this@MorabarabaActivity)
             val ai = AIPlayer(engine, depth, timeMs)
             val move = withContext(Dispatchers.Default) {
                 val legal = engine.allLegalMoves(gameState, gameState.currentTurn)
@@ -353,11 +371,15 @@ class MorabarabaActivity : AppCompatActivity() {
     }
 
     private fun showDifficultyDialog() {
-        val current = SettingsManager.getMorabarabaDifficulty(this)
+        val current = if (isNineMensMorris)
+            SettingsManager.getNineMensMorrisDifficulty(this)
+        else SettingsManager.getMorabarabaDifficulty(this)
         AlertDialog.Builder(this).setTitle("AI Difficulty")
             .setSingleChoiceItems(arrayOf("Easy", "Medium", "Hard"), current) { dlg, which ->
                 val changed = which != current
-                SettingsManager.setMorabarabaDifficulty(this, which); dlg.dismiss()
+                if (isNineMensMorris) SettingsManager.setNineMensMorrisDifficulty(this, which)
+                else SettingsManager.setMorabarabaDifficulty(this, which)
+                dlg.dismiss()
                 if (changed && gameState.status == GameStatus.IN_PROGRESS && moveHistory.isNotEmpty()) {
                     AlertDialog.Builder(this).setTitle("Restart Match?")
                         .setMessage("Difficulty changed. Restart now?")
@@ -442,7 +464,7 @@ class MorabarabaActivity : AppCompatActivity() {
     private fun launchReplay(resultLabel: String) {
         val movesJson = ReplayActivity.buildMovesJson(gameState.moveHistory)
         startActivity(Intent(this, ReplayActivity::class.java).apply {
-            putExtra(ReplayActivity.EXTRA_GAME_TYPE,  "MORABARABA")
+            putExtra(ReplayActivity.EXTRA_GAME_TYPE,  if (isNineMensMorris) GAME_NINE_MENS_MORRIS else "MORABARABA")
             putExtra(ReplayActivity.EXTRA_MOVES_JSON, movesJson)
             putExtra(ReplayActivity.EXTRA_RESULT,     resultLabel)
         })
@@ -457,7 +479,34 @@ class MorabarabaActivity : AppCompatActivity() {
             textSize = 14f
             setPadding((16 * dp).toInt(), (12 * dp).toInt(), (16 * dp).toInt(), (12 * dp).toInt())
             setLineSpacing(4f * dp, 1f)
-            text = """
+            text = if (isNineMensMorris) """
+NINE MEN'S MORRIS — Rules
+
+Overview
+A traditional board game dating back to the Roman Empire. Each player has nine pieces.
+
+─────────────────────────
+Phase 1 — Placing Pieces
+Players alternate placing one piece per turn on any empty point.
+
+─────────────────────────
+Forming a Mill
+When 3 of your pieces line up along any marked line, you form a "mill". You immediately remove one opponent piece.
+• You cannot remove a piece already in a mill — unless those are the only pieces left.
+
+─────────────────────────
+Phase 2 — Moving Pieces
+Once all pieces are placed, players slide one piece at a time to an adjacent empty point along the lines.
+Forming a new mill still wins you a capture.
+
+─────────────────────────
+Flying
+When a player is reduced to exactly 3 pieces, they may fly — jump to any empty point instead of sliding.
+
+─────────────────────────
+Winning
+You win by reducing your opponent to fewer than 3 pieces, or by leaving them with no legal moves.
+            """.trimIndent() else """
 MORABARABA — Rules
 
 Overview
@@ -496,7 +545,7 @@ You win by either:
         val sv = ScrollView(this).apply {
             setBackgroundColor(Color.parseColor("#1A1A1A")); addView(tv)
         }
-        AlertDialog.Builder(this).setTitle("How to Play Morabaraba")
+        AlertDialog.Builder(this).setTitle("How to Play $gameTitle")
             .setView(sv)
             .setPositiveButton("Got it!") { _, _ -> if (showModeAfter) showModeDialog() }
             .show()

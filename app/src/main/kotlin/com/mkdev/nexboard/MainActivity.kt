@@ -33,6 +33,10 @@ class MainActivity : AppCompatActivity() {
             when (type) {
                 MenuView.GameType.MORABARABA ->
                     startActivity(Intent(this, MorabarabaActivity::class.java))
+                MenuView.GameType.NINE_MENS_MORRIS ->
+                    startActivity(Intent(this, MorabarabaActivity::class.java).apply {
+                        putExtra(MorabarabaActivity.EXTRA_GAME, MorabarabaActivity.GAME_NINE_MENS_MORRIS)
+                    })
                 MenuView.GameType.TICTACTOE ->
                     startActivity(Intent(this, TicTacToeActivity::class.java))
                 MenuView.GameType.CONNECT_FOUR ->
@@ -294,6 +298,26 @@ class MainActivity : AppCompatActivity() {
             { SettingsManager.getMorabarabaTheme(ctx) },
             { v -> SettingsManager.setMorabarabaTheme(ctx, v) }).first)
 
+        // ── Nine Men's Morris ──
+        root.addView(sectionHeader("⬡  NINE MEN'S MORRIS"))
+        var nineMensMorrisDiff = SettingsManager.getNineMensMorrisDifficulty(ctx)
+        val (nineMensMorrisDiffRow, nineMensMorrisDiffVal) =
+            settingRow("🎯", "AI Difficulty", diffs[nineMensMorrisDiff])
+        nineMensMorrisDiffRow.setOnClickListener {
+            AlertDialog.Builder(ctx, android.R.style.Theme_Material_Dialog_MinWidth)
+                .setTitle("Nine Men's Morris · AI Difficulty")
+                .setSingleChoiceItems(diffs, nineMensMorrisDiff) { d, i ->
+                    SettingsManager.setNineMensMorrisDifficulty(ctx, i)
+                    nineMensMorrisDiff = i
+                    nineMensMorrisDiffVal.text = diffs[i]
+                    d.dismiss()
+                }.show()
+        }
+        root.addView(nineMensMorrisDiffRow); root.addView(divider())
+        root.addView(themeRow("Nine Men's Morris",
+            { SettingsManager.getNineMensMorrisTheme(ctx) },
+            { v -> SettingsManager.setNineMensMorrisTheme(ctx, v) }).first)
+
         // ── Tic-Tac-Toe ──
         root.addView(sectionHeader("✕  TIC-TAC-TOE"))
         var tttDiff = SettingsManager.getTttDifficulty(ctx)
@@ -459,6 +483,7 @@ class MainActivity : AppCompatActivity() {
             Page("International Draughts", "⬤", "international_draughts"),
             Page("Othello",    "◉",  "othello"),
             Page("Morabaraba", "⬡",  "morabaraba"),
+            Page("Nine Men's Morris", "⬡", "nine_mens_morris"),
             Page("Tic-Tac-Toe","✕",  "ttt"),
             Page("Connect Four", "●", "connect_four"),
         )

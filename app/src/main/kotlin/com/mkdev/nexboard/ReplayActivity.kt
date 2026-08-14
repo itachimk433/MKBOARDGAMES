@@ -23,6 +23,7 @@ import com.mkdev.nexboard.games.chess.ChessRuleEngine
 import com.mkdev.nexboard.games.connectfour.ConnectFourPiece
 import com.mkdev.nexboard.games.connectfour.ConnectFourRuleEngine
 import com.mkdev.nexboard.games.morabaraba.MorabarabaRuleEngine
+import com.mkdev.nexboard.games.morabaraba.MorabarabaPiece
 import com.mkdev.nexboard.games.tictactoe.TicTacToePiece
 import com.mkdev.nexboard.games.tictactoe.TicTacToeRuleEngine
 import com.mkdev.nexboard.ui.BoardView
@@ -165,7 +166,7 @@ class ReplayActivity : AppCompatActivity() {
 
         val isTicTacToe  = gameType == "TICTACTOE"
         val isConnectFour = gameType == "CONNECTFOUR"
-        val isMorabaraba = gameType == "MORABARABA"
+        val isMorabaraba = gameType == "MORABARABA" || gameType == "NINE_MENS_MORRIS"
 
         val engine: RuleEngine = when (gameType) {
             "TICTACTOE"  -> TicTacToeRuleEngine(ticBoardSize, ticBoardSize)
@@ -173,6 +174,7 @@ class ReplayActivity : AppCompatActivity() {
             "CHECKERS"   -> CheckersRuleEngine()
             "INTERNATIONAL_DRAUGHTS" -> InternationalDraughtsRuleEngine()
             "MORABARABA" -> MorabarabaRuleEngine()
+            "NINE_MENS_MORRIS" -> MorabarabaRuleEngine(9)
             else         -> ChessRuleEngine()
         }
 
@@ -785,6 +787,8 @@ class ReplayActivity : AppCompatActivity() {
                                 else Color.parseColor("#9E9E9E")
             is CheckersPiece -> if (piece.color == PieceColor.WHITE) Color.parseColor("#E0E0E0")
                                 else Color.parseColor("#757575")
+            is MorabarabaPiece -> if (piece.color == PieceColor.WHITE) Color.parseColor("#F5F5F5")
+                                  else Color.parseColor("#9E9E9E")
             else             -> Color.parseColor("#AAAAAA")
         }
     }
