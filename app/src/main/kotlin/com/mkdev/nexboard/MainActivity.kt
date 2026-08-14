@@ -16,6 +16,14 @@ class MainActivity : AppCompatActivity() {
 
     private var activeSettingsDialog: AlertDialog? = null
 
+    private companion object {
+        const val SUPPORT_EMAIL = "mkdev4360@gmail.com"
+        const val PRIVACY_POLICY_URL =
+            "https://nexboard-terms-v1.pages.dev/privacy-policy"
+        const val TERMS_OF_SERVICE_URL =
+            "https://nexboard-terms-v1.pages.dev/terms-of-service"
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         makeFullscreen()
@@ -113,7 +121,12 @@ class MainActivity : AppCompatActivity() {
                 .also { it.setMargins((16*dp).toInt(), 0, (16*dp).toInt(), 0) }
         }
 
-        fun settingRow(icon: String, label: String, value: String): Pair<LinearLayout, TextView> {
+        fun settingRow(
+            icon: String,
+            label: String,
+            value: String,
+            iconRes: Int? = null
+        ): Pair<LinearLayout, TextView> {
             val valueView = TextView(ctx).apply {
                 text = value; setTextColor(Color.parseColor("#7FC8F8"))
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
@@ -142,7 +155,25 @@ class MainActivity : AppCompatActivity() {
                     orientation = LinearLayout.HORIZONTAL
                     layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                 }
-                val iconView  = TextView(ctx).apply { this.text = icon; setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f); setPadding(0,0,(12*dp).toInt(),0) }
+                val iconView: View = if (iconRes != null) {
+                    ImageView(ctx).apply {
+                        setImageResource(iconRes)
+                        imageTintList = android.content.res.ColorStateList.valueOf(
+                            Color.parseColor("#7FC8F8")
+                        )
+                        contentDescription = "$label icon"
+                        layoutParams = LinearLayout.LayoutParams(
+                            (24 * dp).toInt(),
+                            (24 * dp).toInt()
+                        ).also { it.marginEnd = (12 * dp).toInt() }
+                    }
+                } else {
+                    TextView(ctx).apply {
+                        this.text = icon
+                        setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
+                        setPadding(0, 0, (12 * dp).toInt(), 0)
+                    }
+                }
                 val labelView = TextView(ctx).apply { this.text = label; setTextColor(Color.parseColor("#EEEEEE")); setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f) }
                 leftGroup.addView(iconView); leftGroup.addView(labelView)
                 addView(leftGroup); addView(valueView)
@@ -274,8 +305,8 @@ class MainActivity : AppCompatActivity() {
 
         // ── Legal ──
         root.addView(sectionHeader("📋  LEGAL"))
-        val ppUrl  = "https://banelemk12.github.io/Nexboard-Terms/privacy-policy.html"
-        val tosUrl = "https://banelemk12.github.io/Nexboard-Terms/terms-of-service.html"
+        val ppUrl  = PRIVACY_POLICY_URL
+        val tosUrl = TERMS_OF_SERVICE_URL
         val (ppRow, _) = settingRow("🔒", "Privacy Policy", "›")
         ppRow.setOnClickListener {
             val ppContent = LinearLayout(ctx).apply {
@@ -294,7 +325,7 @@ class MainActivity : AppCompatActivity() {
             ppContent.addView(pTxt("\nDATA COLLECTION\nNexBoard does not collect or transmit personal data. Game statistics (wins, losses, draws) are stored only on your device."))
             ppContent.addView(pTxt("\nADVERTISING\nThis version of NexBoard contains no advertising. Ads may be introduced in a future update via Google AdMob, in which case this policy will be updated accordingly."))
             ppContent.addView(pTxt("\nPERMISSIONS\n• Vibrate — in-game haptic feedback"))
-            ppContent.addView(pTxt("\nCONTACT\nmkdev4360@gmail.com", bold = false))
+            ppContent.addView(pTxt("\nCONTACT\n$SUPPORT_EMAIL", bold = false))
             val ppScroll = ScrollView(ctx).apply {
                 layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (320*dp).toInt())
             }
@@ -337,7 +368,7 @@ class MainActivity : AppCompatActivity() {
             tosContent.addView(tTxt("\n3. ADVERTISING\nThis version of NexBoard is ad-free. Ads may be introduced in a future release. If advertising is added, the relevant ad networks will operate under their own terms and privacy policies and this section will be updated."))
             tosContent.addView(tTxt("\n4. DISCLAIMER\nNexBoard is provided \"as is\" without warranties of any kind. MKDEV is not liable for any loss or damage arising from use of the app."))
             tosContent.addView(tTxt("\n5. CHANGES\nThese terms may be updated at any time. Continued use after an update constitutes acceptance of the revised terms."))
-            tosContent.addView(tTxt("\nCONTACT\nmkdev4360@gmail.com", bold = false))
+            tosContent.addView(tTxt("\nCONTACT\n$SUPPORT_EMAIL", bold = false))
             val tosScroll = ScrollView(ctx).apply {
                 layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (320*dp).toInt())
             }
@@ -362,15 +393,15 @@ class MainActivity : AppCompatActivity() {
         root.addView(tosRow); root.addView(divider())
 
         // ── Contact ──
-        val (contactRow, _) = settingRow("✉", "Contact Us", "›")
+        val (contactRow, _) = settingRow("", "Contact Us", "›", R.drawable.ic_email)
         contactRow.setOnClickListener {
             try {
                 startActivity(Intent(Intent.ACTION_SENDTO).apply {
-                    data = Uri.parse("mailto:mkdev4360@gmail.com")
+                    data = Uri.parse("mailto:$SUPPORT_EMAIL")
                     putExtra(Intent.EXTRA_SUBJECT, "NexBoard Support")
                 })
             } catch (_: Exception) {
-                android.widget.Toast.makeText(ctx, "mkdev4360@gmail.com", android.widget.Toast.LENGTH_LONG).show()
+                android.widget.Toast.makeText(ctx, SUPPORT_EMAIL, android.widget.Toast.LENGTH_LONG).show()
             }
         }
         root.addView(contactRow)
