@@ -26,8 +26,7 @@ class MenuView(context: Context) : View(context) {
     }
 
     enum class GameType {
-        CHESS, CHECKERS, INTERNATIONAL_DRAUGHTS, OTHELLO, MORABARABA,
-        NINE_MENS_MORRIS, TICTACTOE, CONNECT_FOUR
+        CHESS, CHECKERS, INTERNATIONAL_DRAUGHTS, OTHELLO, MORABARABA, TICTACTOE, CONNECT_FOUR
     }
 
     private data class Card(val type: GameType, var rect: RectF = RectF())
@@ -35,7 +34,6 @@ class MenuView(context: Context) : View(context) {
         Card(GameType.CHESS), Card(GameType.CHECKERS),
         Card(GameType.INTERNATIONAL_DRAUGHTS),
         Card(GameType.OTHELLO), Card(GameType.MORABARABA),
-        Card(GameType.NINE_MENS_MORRIS),
         Card(GameType.TICTACTOE), Card(GameType.CONNECT_FOUR)
     )
 
@@ -284,7 +282,6 @@ class MenuView(context: Context) : View(context) {
                 "International Draughts" to "vs AI  •  2 Players"
             GameType.OTHELLO     -> "Othello"      to "vs AI  •  2 Players"
             GameType.MORABARABA  -> "Morabaraba"   to "vs AI  •  2 Players"
-            GameType.NINE_MENS_MORRIS -> "Nine Men's Morris" to "vs AI  •  2 Players"
             GameType.TICTACTOE   -> "Tic-Tac-Toe"  to "vs AI  •  2 Players"
             GameType.CONNECT_FOUR -> "Connect Four" to "vs AI  •  2 Players"
         }
@@ -313,8 +310,7 @@ class MenuView(context: Context) : View(context) {
             GameType.CHESS, GameType.CHECKERS, GameType.INTERNATIONAL_DRAUGHTS ->
                 drawChessCheckersMini(canvas, left, top, size, type)
             GameType.OTHELLO    -> drawOthelloMini(canvas, left, top, size)
-            GameType.MORABARABA, GameType.NINE_MENS_MORRIS ->
-                drawMorabarabaMini(canvas, left, top, size)
+            GameType.MORABARABA -> drawMorabarabaMini(canvas, left, top, size)
             GameType.TICTACTOE  -> drawTicTacToeMini(canvas, left, top, size)
             GameType.CONNECT_FOUR -> drawConnectFourMini(canvas, left, top, size)
         }
