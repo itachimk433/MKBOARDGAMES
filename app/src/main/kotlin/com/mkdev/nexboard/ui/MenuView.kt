@@ -26,7 +26,8 @@ class MenuView(context: Context) : View(context) {
     }
 
     enum class GameType {
-        CHESS, CHECKERS, INTERNATIONAL_DRAUGHTS, OTHELLO, MORABARABA, TICTACTOE, CONNECT_FOUR
+        CHESS, CHECKERS, INTERNATIONAL_DRAUGHTS, OTHELLO, MORABARABA, TICTACTOE, CONNECT_FOUR,
+        FOX_AND_GEESE
     }
 
     private data class Card(val type: GameType, var rect: RectF = RectF())
@@ -34,7 +35,8 @@ class MenuView(context: Context) : View(context) {
         Card(GameType.CHESS), Card(GameType.CHECKERS),
         Card(GameType.INTERNATIONAL_DRAUGHTS),
         Card(GameType.OTHELLO), Card(GameType.MORABARABA),
-        Card(GameType.TICTACTOE), Card(GameType.CONNECT_FOUR)
+        Card(GameType.TICTACTOE), Card(GameType.CONNECT_FOUR),
+        Card(GameType.FOX_AND_GEESE)
     )
 
     private val dp = context.resources.displayMetrics.density
@@ -284,6 +286,7 @@ class MenuView(context: Context) : View(context) {
             GameType.MORABARABA  -> "Morabaraba"   to "vs AI  •  2 Players"
             GameType.TICTACTOE   -> "Tic-Tac-Toe"  to "vs AI  •  2 Players"
             GameType.CONNECT_FOUR -> "Connect Four" to "vs AI  •  2 Players"
+            GameType.FOX_AND_GEESE -> "Fox and Geese" to "vs AI  •  2 Players"
         }
 
         val titleLines = if (title == "International Draughts") {
@@ -313,6 +316,7 @@ class MenuView(context: Context) : View(context) {
             GameType.MORABARABA -> drawMorabarabaMini(canvas, left, top, size)
             GameType.TICTACTOE  -> drawTicTacToeMini(canvas, left, top, size)
             GameType.CONNECT_FOUR -> drawConnectFourMini(canvas, left, top, size)
+            GameType.FOX_AND_GEESE -> drawFoxAndGeeseMini(canvas, left, top, size)
         }
     }
 
@@ -437,6 +441,31 @@ class MenuView(context: Context) : View(context) {
         piece(5, 0, redP); piece(5, 1, yellowP); piece(4, 1, redP)
         piece(5, 3, redP); piece(4, 3, yellowP); piece(3, 3, redP)
         piece(5, 5, yellowP); piece(5, 6, redP)
+    }
+
+    private fun drawFoxAndGeeseMini(canvas: Canvas, left: Float, top: Float, size: Float) {
+        val cell = size / 8f
+        for (r in 0 until 8) for (c in 0 until 8) {
+            val paint = if ((r + c) % 2 == 0) miniLightPaint else miniDarkPaint
+            canvas.drawRect(
+                left + c * cell, top + r * cell,
+                left + (c + 1) * cell, top + (r + 1) * cell, paint
+            )
+        }
+        val foxPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#F28C28") }
+        val goosePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#DDEBFF") }
+        fun piece(row: Int, col: Int, paint: Paint) {
+            canvas.drawCircle(
+                left + col * cell + cell / 2f,
+                top + row * cell + cell / 2f,
+                cell * 0.31f,
+                paint
+            )
+        }
+        piece(0, 3, foxPaint)
+        piece(6, 1, goosePaint); piece(6, 3, goosePaint); piece(6, 5, goosePaint)
+        piece(7, 0, goosePaint); piece(7, 2, goosePaint)
+        piece(7, 4, goosePaint); piece(7, 6, goosePaint)
     }
 
     private fun drawGear(canvas: Canvas) {

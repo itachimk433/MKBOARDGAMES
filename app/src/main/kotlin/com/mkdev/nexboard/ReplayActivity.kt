@@ -22,6 +22,7 @@ import com.mkdev.nexboard.games.chess.ChessPiece
 import com.mkdev.nexboard.games.chess.ChessRuleEngine
 import com.mkdev.nexboard.games.connectfour.ConnectFourPiece
 import com.mkdev.nexboard.games.connectfour.ConnectFourRuleEngine
+import com.mkdev.nexboard.games.foxandgeese.FoxAndGeeseRuleEngine
 import com.mkdev.nexboard.games.morabaraba.MorabarabaRuleEngine
 import com.mkdev.nexboard.games.tictactoe.TicTacToePiece
 import com.mkdev.nexboard.games.tictactoe.TicTacToeRuleEngine
@@ -173,6 +174,7 @@ class ReplayActivity : AppCompatActivity() {
             "CHECKERS"   -> CheckersRuleEngine()
             "INTERNATIONAL_DRAUGHTS" -> InternationalDraughtsRuleEngine()
             "MORABARABA" -> MorabarabaRuleEngine()
+            "FOX_AND_GEESE" -> FoxAndGeeseRuleEngine()
             else         -> ChessRuleEngine()
         }
 

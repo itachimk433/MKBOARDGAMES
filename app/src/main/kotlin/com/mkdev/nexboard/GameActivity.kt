@@ -14,6 +14,7 @@ import com.mkdev.nexboard.games.checkers.CheckersRuleEngine
 import com.mkdev.nexboard.games.checkers.InternationalDraughtsRuleEngine
 import com.mkdev.nexboard.games.chess.ChessPiece
 import com.mkdev.nexboard.games.chess.ChessRuleEngine
+import com.mkdev.nexboard.games.foxandgeese.FoxAndGeeseRuleEngine
 import com.mkdev.nexboard.games.othello.OthelloRuleEngine
 import com.mkdev.nexboard.ui.BoardView
 import com.mkdev.nexboard.ui.CaptureStripView
@@ -64,6 +65,7 @@ class GameActivity : AppCompatActivity() {
             "OTHELLO"   -> OthelloRuleEngine()
             "CHECKERS"  -> CheckersRuleEngine()
             "INTERNATIONAL_DRAUGHTS" -> InternationalDraughtsRuleEngine()
+            "FOX_AND_GEESE" -> FoxAndGeeseRuleEngine()
             else        -> ChessRuleEngine()   // covers "CHESS" and any future alias
         }
 
@@ -148,6 +150,7 @@ class GameActivity : AppCompatActivity() {
             "OTHELLO"  -> "Othello"
             "CHECKERS" -> "Draughts"
             "INTERNATIONAL_DRAUGHTS" -> "International Draughts"
+            "FOX_AND_GEESE" -> "Fox and Geese"
             else       -> "Chess"
         }
         AlertDialog.Builder(this).setTitle(gameName)
@@ -164,9 +167,13 @@ class GameActivity : AppCompatActivity() {
     }
 
     private fun showColorPickerDialog() {
+        val sides = if (gameType == "FOX_AND_GEESE")
+            arrayOf("Fox (moves first)", "Geese")
+        else
+            arrayOf("White (moves first)", "Black (moves second)")
         AlertDialog.Builder(this)
-            .setTitle("Play as")
-            .setItems(arrayOf("White (moves first)", "Black (moves second)")) { _, which ->
+            .setTitle(if (gameType == "FOX_AND_GEESE") "Choose your side" else "Play as")
+            .setItems(sides) { _, which ->
                 playerColor = if (which == 0) PieceColor.WHITE else PieceColor.BLACK
                 startGame()
             }
@@ -256,6 +263,28 @@ Winning
 Capture all of your opponent's pieces, or leave them with no legal moves.
             """.trimIndent()
 
+            "FOX_AND_GEESE" -> """
+FOX AND GEESE — Rules
+
+Overview
+An asymmetric hunt game. One player controls a fox; the other controls thirteen geese. The fox is powerful but outnumbered, while the geese work together to trap it.
+
+─────────────────────────
+
+The Fox
+The fox moves diagonally in any direction. It may jump over an adjacent goose into an empty square to capture it. Consecutive jumps may be combined into one move.
+
+─────────────────────────
+
+The Geese
+Geese move one square diagonally forward toward the fox. They do not capture, so their strength comes from surrounding and blocking the fox.
+
+─────────────────────────
+
+Winning
+The fox wins by capturing all the geese or by leaving the flock with no legal move. The geese win by trapping the fox so it has no legal move.
+            """.trimIndent()
+
             else -> """
 CHESS — Rules
 
@@ -337,16 +366,25 @@ Checkmate your opponent's King.
         boardView.refreshTheme()
 
         topCaptureView.setLabel(
-            if (!vsAI && gameType == "CHESS") "Black's captures" else "Black ⚔"
+            when {
+                gameType == "FOX_AND_GEESE" -> "Geese captured"
+                !vsAI && gameType == "CHESS" -> "Black's captures"
+                else -> "Black ⚔"
+            }
         )
         bottomCaptureView.setLabel(
-            if (!vsAI && gameType == "CHESS") "White's captures" else "White ⚔"
+            when {
+                gameType == "FOX_AND_GEESE" -> "Fox captured"
+                !vsAI && gameType == "CHESS" -> "White's captures"
+                else -> "White ⚔"
+            }
         )
 
         topCaptureView.update(emptyList())
         bottomCaptureView.update(emptyList())
         if (gameType == "CHESS" || gameType == "CHECKERS" ||
-            gameType == "INTERNATIONAL_DRAUGHTS" || gameType == "OTHELLO"
+            gameType == "INTERNATIONAL_DRAUGHTS" || gameType == "OTHELLO" ||
+            gameType == "FOX_AND_GEESE"
         ) SoundPlayer.play("game_start")
         updateHud()
         if (vsAI && gameState.currentTurn != playerColor) triggerAI()
@@ -506,6 +544,10 @@ Checkmate your opponent's King.
                             )
                             ai.bestMove(gameState)
                         }
+                        "FOX_AND_GEESE" -> {
+                            val ai = AIPlayer(engine, maxDepth = 4, timeLimitMs = 1200L)
+                            ai.bestMove(gameState)
+                        }
                         else -> {
                             // Chess — deeper search with quiescence and time limit
                             val depth    = SettingsManager.chessAiDepth(this@GameActivity)
@@ -638,15 +680,25 @@ Checkmate your opponent's King.
         if (gameState.status == GameStatus.IN_PROGRESS) return
         val msg = when (gameState.status) {
             GameStatus.WHITE_WINS ->
-                if (vsAI && playerColor == PieceColor.WHITE) "You win! 🎉" else "White wins!"
+                when {
+                    gameType == "FOX_AND_GEESE" && vsAI && playerColor == PieceColor.WHITE -> "You win!"
+                    gameType == "FOX_AND_GEESE" -> "The fox wins!"
+                    vsAI && playerColor == PieceColor.WHITE -> "You win! 🎉"
+                    else -> "White wins!"
+                }
             GameStatus.BLACK_WINS ->
-                if (vsAI && playerColor == PieceColor.BLACK) "You win! 🎉" else "Black wins!"
+                when {
+                    gameType == "FOX_AND_GEESE" && vsAI && playerColor == PieceColor.BLACK -> "You win!"
+                    gameType == "FOX_AND_GEESE" -> "The geese win!"
+                    vsAI && playerColor == PieceColor.BLACK -> "You win! 🎉"
+                    else -> "Black wins!"
+                }
             GameStatus.DRAW -> "Draw! Well played."
             else -> ""
         }
         val resultLabel = when (gameState.status) {
-            GameStatus.WHITE_WINS -> "White wins"
-            GameStatus.BLACK_WINS -> "Black wins"
+            GameStatus.WHITE_WINS -> if (gameType == "FOX_AND_GEESE") "Fox wins" else "White wins"
+            GameStatus.BLACK_WINS -> if (gameType == "FOX_AND_GEESE") "Geese win" else "Black wins"
             GameStatus.DRAW       -> "Draw"
             else -> ""
         }

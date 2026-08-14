@@ -13,6 +13,8 @@ import com.mkdev.nexboard.SettingsManager
 import com.mkdev.nexboard.engine.*
 import com.mkdev.nexboard.games.checkers.CheckersPiece
 import com.mkdev.nexboard.games.chess.ChessPiece
+import com.mkdev.nexboard.games.foxandgeese.FoxAndGeesePiece
+import com.mkdev.nexboard.games.foxandgeese.FoxAndGeesePieceType
 import com.mkdev.nexboard.games.othello.OthelloPiece
 
 class BoardView(context: Context) : View(context) {
@@ -305,6 +307,7 @@ class BoardView(context: Context) : View(context) {
         when (piece) {
             is ChessPiece    -> drawChessPiece(canvas, piece, cx, cy)
             is CheckersPiece -> drawCheckersPiece(canvas, piece, cx, cy)
+            is FoxAndGeesePiece -> drawFoxAndGeesePiece(canvas, piece, cx, cy)
             is OthelloPiece  -> drawOthelloPiece(canvas, piece, cx, cy, pos)
         }
     }
@@ -349,6 +352,44 @@ class BoardView(context: Context) : View(context) {
             }
             canvas.drawText("♛", cx, cy + r * 0.38f, kp)
         }
+    }
+
+    private fun drawFoxAndGeesePiece(
+        canvas: Canvas,
+        piece: FoxAndGeesePiece,
+        cx: Float,
+        cy: Float
+    ) {
+        val radius = cellSize * 0.36f
+        canvas.drawCircle(cx + 1.5f, cy + 2.5f, radius, shadowPaint)
+        val fill = if (piece.type == FoxAndGeesePieceType.FOX)
+            Color.parseColor("#F28C28")
+        else
+            Color.parseColor("#DDEBFF")
+        val edge = if (piece.type == FoxAndGeesePieceType.FOX)
+            Color.parseColor("#A94F12")
+        else
+            Color.parseColor("#6A8FB8")
+        Paint(Paint.ANTI_ALIAS_FLAG).also {
+            it.color = fill
+            canvas.drawCircle(cx, cy, radius, it)
+        }
+        Paint(Paint.ANTI_ALIAS_FLAG).also {
+            it.style = Paint.Style.STROKE
+            it.strokeWidth = radius * 0.11f
+            it.color = edge
+            canvas.drawCircle(cx, cy, radius * 0.92f, it)
+        }
+        val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (piece.type == FoxAndGeesePieceType.FOX)
+                Color.WHITE
+            else
+                Color.parseColor("#29415F")
+            textAlign = Paint.Align.CENTER
+            textSize = radius * 0.95f
+            isFakeBoldText = true
+        }
+        canvas.drawText(piece.symbol(), cx, cy + labelPaint.textSize * 0.36f, labelPaint)
     }
 
     private fun drawOthelloPiece(canvas: Canvas, piece: OthelloPiece, cx: Float, cy: Float, pos: Position? = null) {
