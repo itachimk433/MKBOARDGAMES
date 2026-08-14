@@ -122,16 +122,39 @@ class ConnectFourRuleEngine : RuleEngine {
             val pieces = window.map { state.board[it] as? ConnectFourPiece }
             val white = pieces.count { it?.color == PieceColor.WHITE }
             val black = pieces.count { it?.color == PieceColor.BLACK }
-            if (white > 0 && black == 0) score += windowScore(white)
-            if (black > 0 && white == 0) score -= windowScore(black)
+            if (white > 0 && black == 0) {
+                score += windowScore(state, window, white)
+            }
+            if (black > 0 && white == 0) {
+                score -= windowScore(state, window, black)
+            }
         }
         return score
     }
 
-    private fun windowScore(count: Int) = when (count) {
+    /**
+     * A three-piece window is only dangerous when its empty cell is actually
+     * playable. Weighting those threats heavily makes the evaluator prefer
+     * creating and stopping real winning drops instead of merely building
+     * attractive-looking patterns above unsupported cells.
+     */
+    private fun windowScore(
+        state: GameState,
+        window: List<Int>,
+        count: Int
+    ) = when (count) {
         1 -> 2
         2 -> 12
-        3 -> 80
+        3 -> {
+            val empty = window.firstOrNull { state.board[it] == null }
+            if (empty != null && isPlayableCell(state, empty)) 5_000 else 80
+        }
         else -> 0
+    }
+
+    private fun isPlayableCell(state: GameState, index: Int): Boolean {
+        val row = index / COLUMNS
+        val col = index % COLUMNS
+        return landingRow(state, col) == row
     }
 }

@@ -18,6 +18,7 @@ class AIPlayer(
 ) {
 
     @Volatile private var deadline = Long.MAX_VALUE
+    @Volatile private var searchAborted = false
 
     // ─── Transposition table ──────────────────────────────────────────────────
 
@@ -44,35 +45,54 @@ class AIPlayer(
 
     fun bestMove(state: GameState): Move? {
         deadline = System.currentTimeMillis() + timeLimitMs
+        searchAborted = false
         tt.clear()
         val moves = orderedMoves(state, state.currentTurn)
         if (moves.isEmpty()) return null
 
+        // Tactical moves must never be lost to search depth or a short time
+        // budget. This is especially important for gravity games such as
+        // Connect Four, where a playable three-in-a-row is an immediate threat.
+        immediateTacticalMove(state)?.let { return it }
+
         val maximising = state.currentTurn == PieceColor.WHITE
-        var bestMove: Move? = null
-        var bestScore = if (maximising) Int.MIN_VALUE else Int.MAX_VALUE
+        var completedBestMove: Move? = moves.first()
+        var completedBestScore = if (maximising) Int.MIN_VALUE else Int.MAX_VALUE
+        var completedScores = emptyList<Pair<Move, Int>>()
 
         // Iterative deepening — start shallow, go deeper within time limit
-        val allScored = mutableListOf<Pair<Move, Int>>()
         for (depth in 1..maxDepth) {
             if (System.currentTimeMillis() > deadline) break
-            allScored.clear()
+            searchAborted = false
+            val depthScored = mutableListOf<Pair<Move, Int>>()
             var depthBest = if (maximising) Int.MIN_VALUE else Int.MAX_VALUE
+            var depthBestMove: Move? = null
 
             for (move in moves) {
-                if (System.currentTimeMillis() > deadline) break
+                if (System.currentTimeMillis() > deadline) {
+                    searchAborted = true
+                    break
+                }
                 val next  = engine.applyMove(state, move)
                 val score = minimax(next, depth - 1, Int.MIN_VALUE, Int.MAX_VALUE, !maximising)
-                allScored.add(move to score)
+                if (searchAborted) break
+                depthScored.add(move to score)
                 when {
-                    maximising  && score > depthBest -> { depthBest = score; bestMove = move }
-                    !maximising && score < depthBest -> { depthBest = score; bestMove = move }
+                    maximising  && score > depthBest -> { depthBest = score; depthBestMove = move }
+                    !maximising && score < depthBest -> { depthBest = score; depthBestMove = move }
                 }
             }
-            bestScore = depthBest
+
+            // Never publish a result from a partially searched iteration.
+            // The old implementation could replace a good shallow result with
+            // whichever move happened to be visited before the timeout.
+            if (searchAborted || depthScored.size != moves.size || depthBestMove == null) break
+            completedScores = depthScored
+            completedBestMove = depthBestMove
+            completedBestScore = depthBest
         }
 
-        if (allScored.isEmpty()) return bestMove
+        if (completedScores.isEmpty()) return completedBestMove
 
         // Repetition guard: never immediately undo this player's last move
         val myPrior = if (state.moveHistory.size >= 2)
@@ -92,27 +112,59 @@ class AIPlayer(
         // Window = 0 (Hard mode): always return the deterministic best move (first in ordered list).
         // This prevents the "all moves score 0 → random" failure on solved games like 3×3 TicTacToe.
         if (window == 0) {
-            val strict = allScored.filter { (_, s) -> s == bestScore }.map { it.first }
-            return strict.firstOrNull() ?: bestMove ?: allScored.first().first
+            val strict = completedScores.filter { (_, s) -> s == completedBestScore }.map { it.first }
+            return strict.firstOrNull() ?: completedBestMove ?: completedScores.first().first
         }
 
-        val pool = allScored.filter { (m, s) ->
-            val inRange = if (maximising) s >= bestScore - window else s <= bestScore + window
+        val pool = completedScores.filter { (m, s) ->
+            val inRange = if (maximising) s >= completedBestScore - window else s <= completedBestScore + window
             inRange && !isRepeat(m)
         }.map { it.first }
 
         if (pool.isNotEmpty()) return pool.random()
 
-        val strict = allScored.filter { (_, s) -> s == bestScore }.map { it.first }
-        return strict.randomOrNull() ?: bestMove ?: allScored.first().first
+        val strict = completedScores.filter { (_, s) -> s == completedBestScore }.map { it.first }
+        return strict.randomOrNull() ?: completedBestMove ?: completedScores.first().first
     }
+
+    /**
+     * Return a move that wins immediately, or the only move that prevents an
+     * opponent win on their next turn. The opponent state is copied with its
+     * turn changed because RuleEngine.applyMove uses state.currentTurn.
+     */
+    private fun immediateTacticalMove(state: GameState): Move? {
+        val player = state.currentTurn
+        val opponent = player.opponent()
+
+        val winningMove = engine.allLegalMoves(state, player).firstOrNull { move ->
+            engine.applyMove(state, move).status == winStatus(player)
+        }
+        if (winningMove != null) return winningMove
+
+        val opponentState = state.copy(currentTurn = opponent)
+        val threats = engine.allLegalMoves(opponentState, opponent).filter { move ->
+            engine.applyMove(opponentState, move).status == winStatus(opponent)
+        }
+        if (threats.size != 1) return null
+
+        val threat = threats.first().to
+        return engine.allLegalMoves(state, player).firstOrNull { move ->
+            move.to == threat
+        }
+    }
+
+    private fun winStatus(color: PieceColor) =
+        if (color == PieceColor.WHITE) GameStatus.WHITE_WINS else GameStatus.BLACK_WINS
 
     // ─── Main search ──────────────────────────────────────────────────────────
 
     private fun minimax(
         state: GameState, depth: Int, alpha: Int, beta: Int, maximising: Boolean
     ): Int {
-        if (System.currentTimeMillis() > deadline) return engine.evaluate(state)
+        if (System.currentTimeMillis() > deadline) {
+            searchAborted = true
+            return engine.evaluate(state)
+        }
         if (state.status != GameStatus.IN_PROGRESS)  return engine.evaluate(state)
 
         // Transposition table lookup
@@ -142,7 +194,9 @@ class AIPlayer(
         if (maximising) {
             var best = Int.MIN_VALUE
             for (move in moves) {
-                best = maxOf(best, minimax(engine.applyMove(state, move), depth - 1, a, b, false))
+                val childScore = minimax(engine.applyMove(state, move), depth - 1, a, b, false)
+                if (searchAborted) return engine.evaluate(state)
+                best = maxOf(best, childScore)
                 a = maxOf(a, best)
                 if (b <= a) break
             }
@@ -150,7 +204,9 @@ class AIPlayer(
         } else {
             var best = Int.MAX_VALUE
             for (move in moves) {
-                best = minOf(best, minimax(engine.applyMove(state, move), depth - 1, a, b, true))
+                val childScore = minimax(engine.applyMove(state, move), depth - 1, a, b, true)
+                if (searchAborted) return engine.evaluate(state)
+                best = minOf(best, childScore)
                 b = minOf(b, best)
                 if (b <= a) break
             }
@@ -172,7 +228,10 @@ class AIPlayer(
     private fun quiescence(
         state: GameState, alpha: Int, beta: Int, maximising: Boolean, depthLeft: Int
     ): Int {
-        if (System.currentTimeMillis() > deadline) return engine.evaluate(state)
+        if (System.currentTimeMillis() > deadline) {
+            searchAborted = true
+            return engine.evaluate(state)
+        }
         if (state.status != GameStatus.IN_PROGRESS)  return engine.evaluate(state)
 
         val standPat = engine.evaluate(state)
@@ -186,8 +245,12 @@ class AIPlayer(
                 .filter { it.isCapture }
                 .sortedByDescending { mvvLva(state, it) }
             for (move in captures) {
-                if (System.currentTimeMillis() > deadline) break
+                if (System.currentTimeMillis() > deadline) {
+                    searchAborted = true
+                    break
+                }
                 val score = quiescence(engine.applyMove(state, move), a, beta, false, depthLeft - 1)
+                if (searchAborted) return engine.evaluate(state)
                 best = maxOf(best, score)
                 a    = maxOf(a, best)
                 if (beta <= a) break
@@ -202,8 +265,12 @@ class AIPlayer(
                 .filter { it.isCapture }
                 .sortedByDescending { mvvLva(state, it) }
             for (move in captures) {
-                if (System.currentTimeMillis() > deadline) break
+                if (System.currentTimeMillis() > deadline) {
+                    searchAborted = true
+                    break
+                }
                 val score = quiescence(engine.applyMove(state, move), alpha, b, true, depthLeft - 1)
+                if (searchAborted) return engine.evaluate(state)
                 best = minOf(best, score)
                 b    = minOf(b, best)
                 if (b <= alpha) break
