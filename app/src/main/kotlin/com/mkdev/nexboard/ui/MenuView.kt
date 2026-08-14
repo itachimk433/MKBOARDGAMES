@@ -25,13 +25,12 @@ class MenuView(context: Context) : View(context) {
         com.mkdev.nexboard.SoundPlayer.init(context)
     }
 
-    enum class GameType { CHESS, CHECKERS, OTHELLO, MORABARABA, TICTACTOE, GO }
+    enum class GameType { CHESS, CHECKERS, OTHELLO, MORABARABA, TICTACTOE }
 
     private data class Card(val type: GameType, var rect: RectF = RectF())
     private val cards = listOf(
         Card(GameType.CHESS), Card(GameType.CHECKERS),
-        Card(GameType.OTHELLO), Card(GameType.MORABARABA), Card(GameType.TICTACTOE),
-        Card(GameType.GO)
+        Card(GameType.OTHELLO), Card(GameType.MORABARABA), Card(GameType.TICTACTOE)
     )
 
     private val dp = context.resources.displayMetrics.density
@@ -263,7 +262,6 @@ class MenuView(context: Context) : View(context) {
             GameType.OTHELLO     -> "Othello"      to "vs AI  •  2 Players"
             GameType.MORABARABA  -> "Morabaraba"   to "vs AI  •  2 Players"
             GameType.TICTACTOE   -> "Tic-Tac-Toe"  to "vs AI  •  2 Players"
-            GameType.GO          -> "Go"           to "2 Players  •  19×19"
         }
 
         canvas.drawText(title, textCx, midY - 9f * dp + cardTitlePaint.textSize * 0.4f, cardTitlePaint)
@@ -277,7 +275,6 @@ class MenuView(context: Context) : View(context) {
             GameType.OTHELLO    -> drawOthelloMini(canvas, left, top, size)
             GameType.MORABARABA -> drawMorabarabaMini(canvas, left, top, size)
             GameType.TICTACTOE  -> drawTicTacToeMini(canvas, left, top, size)
-            GameType.GO         -> drawGoMini(canvas, left, top, size)
         }
     }
 
@@ -379,33 +376,6 @@ class MenuView(context: Context) : View(context) {
         val xc = left + cell * 1.5f; val yr = top + cell * 0.5f; val rr = cell * 0.22f
         canvas.drawLine(xc - rr, yr - rr, xc + rr, yr + rr, xp)
         canvas.drawLine(xc + rr, yr - rr, xc - rr, yr + rr, xp)
-    }
-
-    private fun drawGoMini(canvas: Canvas, left: Float, top: Float, size: Float) {
-        val lines = 4
-        val cell = size / lines.toFloat()
-        val bgP = Paint().apply { color = Color.parseColor("#2A1F0E") }
-        canvas.drawRect(left, top, left + size, top + size, bgP)
-        val lineP = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#8B6914"); style = Paint.Style.STROKE
-            strokeWidth = size * 0.025f
-        }
-        for (i in 0..lines) {
-            canvas.drawLine(left + i * cell, top, left + i * cell, top + size, lineP)
-            canvas.drawLine(left, top + i * cell, left + size, top + i * cell, lineP)
-        }
-        val bp   = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#1A1A1A") }
-        val wp   = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#F5F5F5") }
-        val rimP = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#888888"); style = Paint.Style.STROKE; strokeWidth = 0.8f
-        }
-        val r = cell * 0.38f
-        fun stone(xi: Int, yi: Int, p: Paint) {
-            val cx = left + xi * cell; val cy = top + yi * cell
-            canvas.drawCircle(cx, cy, r, p); canvas.drawCircle(cx, cy, r, rimP)
-        }
-        stone(1, 1, bp); stone(2, 2, wp); stone(3, 1, bp)
-        stone(1, 3, wp); stone(2, 3, bp); stone(3, 3, wp)
     }
 
     private fun drawGear(canvas: Canvas) {

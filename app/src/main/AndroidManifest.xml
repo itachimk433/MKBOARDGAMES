@@ -33,7 +33,7 @@
           and a hard portrait lock forces letterboxing or blocks the app
           outright on those form factors. Every board view already centers a
           square board using the smaller of width/height (see BoardView,
-          GoBoardView, MorabaraBoardView, TicTacToeActivity's board), so they
+          MorabarabaBoardView, TicTacToeActivity's board), so they
           already render correctly at any aspect ratio — only the manifest lock
           needed to change. "unspecified" lets the system pick the natural
           orientation per device (typically portrait on phones, landscape on
@@ -72,12 +72,6 @@
 
         <activity
             android:name=".TicTacToeActivity"
-            android:exported="false"
-            android:screenOrientation="unspecified"
-            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize" />
-
-        <activity
-            android:name=".GoActivity"
             android:exported="false"
             android:screenOrientation="unspecified"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize" />

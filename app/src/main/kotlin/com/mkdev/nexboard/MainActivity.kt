@@ -35,8 +35,6 @@ class MainActivity : AppCompatActivity() {
                     startActivity(Intent(this, MorabarabaActivity::class.java))
                 MenuView.GameType.TICTACTOE ->
                     startActivity(Intent(this, TicTacToeActivity::class.java))
-                MenuView.GameType.GO ->
-                    startActivity(Intent(this, GoActivity::class.java))
                 else ->
                     startActivity(Intent(this, GameActivity::class.java).apply {
                         putExtra(GameActivity.EXTRA_GAME, type.name)
@@ -290,19 +288,6 @@ class MainActivity : AppCompatActivity() {
             { SettingsManager.getTttTheme(ctx) },
             { v -> SettingsManager.setTttTheme(ctx, v) }).first)
 
-        // ── Go ──
-        root.addView(sectionHeader("⚪  GO"))
-        var goDiff = SettingsManager.getGoDifficulty(ctx)
-        val (goDiffRow, goDiffVal) = settingRow("🎯", "AI Difficulty", diffs[goDiff])
-        goDiffRow.setOnClickListener {
-            AlertDialog.Builder(ctx, android.R.style.Theme_Material_Dialog_MinWidth)
-                .setTitle("Go · AI Difficulty")
-                .setSingleChoiceItems(diffs, goDiff) { d, i ->
-                    SettingsManager.setGoDifficulty(ctx, i); goDiff = i; goDiffVal.text = diffs[i]; d.dismiss()
-                }.show()
-        }
-        root.addView(goDiffRow)
-
         // ── Legal ──
         root.addView(sectionHeader("📋  LEGAL"))
         val ppUrl  = PRIVACY_POLICY_URL
@@ -432,7 +417,6 @@ class MainActivity : AppCompatActivity() {
             Page("Othello",    "◉",  "othello"),
             Page("Morabaraba", "⬡",  "morabaraba"),
             Page("Tic-Tac-Toe","✕",  "ttt"),
-            Page("Go",         "⚪", "go")
         )
 
         var currentPage = 0
