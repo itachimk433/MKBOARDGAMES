@@ -5,10 +5,10 @@ plugins {
 
   android {
       compileSdk = 36
-      namespace = "com.mkdev.nexboard"
+      namespace = "com.mkdev.mkboardgames"
 
       defaultConfig {
-          applicationId = "com.mkdev.nexboard"
+          applicationId = "com.mkdev.mkboardgames"
           minSdk = 24
           targetSdk = 36
           versionCode = 24

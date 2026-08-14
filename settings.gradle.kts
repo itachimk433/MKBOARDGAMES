@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "NexBoard"
+rootProject.name = "MK~Board Games"
 include(":app")

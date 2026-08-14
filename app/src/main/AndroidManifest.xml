@@ -5,7 +5,7 @@
     <uses-permission android:name="android.permission.VIBRATE" />
 
     <!--
-      NexBoard does not show ads, use the Advertising ID, query installed
+      MK~Board Games does not show ads, use the Advertising ID, query installed
       packages, or install packages from within the app. These permissions
       are explicitly stripped from the merged manifest in case any library
       (present now or added later) tries to pull them in transitively, so
@@ -17,12 +17,12 @@
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" tools:node="remove" />
 
     <application
-        android:name=".NexBoardApp"
+        android:name=".MKBoardGamesApp"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"
-        android:theme="@style/Theme.NexBoard"
+        android:theme="@style/Theme.MKBoardGames"
         android:supportsRtl="true"
         android:resizeableActivity="true">
 
