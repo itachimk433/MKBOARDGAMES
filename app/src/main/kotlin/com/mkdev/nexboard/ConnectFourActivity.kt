@@ -1,12 +1,14 @@
 package com.mkdev.nexboard
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
 import android.content.Context
 import android.content.Intent
 import android.graphics.*
 import android.os.Bundle
 import android.view.*
-import android.view.animation.OvershootInterpolator
+import android.view.animation.AccelerateInterpolator
 import android.widget.LinearLayout
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -369,7 +371,10 @@ Control the centre columns, build threats in more than one direction, and block 
         private var state = engine.initialState()
         private var lastMove: Position? = null
         private var winLine: List<Int>? = null
-        private val cellScale = HashMap<Int, Float>()
+        private var fallingAnimator: ValueAnimator? = null
+        private var fallingIndex: Int? = null
+        private var fallingColor: PieceColor? = null
+        private var fallingProgress = 0f
         private val dp = resources.displayMetrics.density
         private var boardLeft = 0f; private var boardTop = 0f; private var cellSize = 0f
         private var boardColor = Color.parseColor("#24527A")
@@ -421,15 +426,37 @@ Control the centre columns, build threats in more than one direction, and block 
         fun setGameState(newState: GameState, last: Position? = null) {
             state = newState
             lastMove = last
+            fallingAnimator?.cancel()
+            fallingAnimator = null
+            fallingIndex = null
+            fallingColor = null
+            fallingProgress = 0f
             last?.let {
                 val idx = it.row * ConnectFourRuleEngine.COLUMNS + it.col
-                cellScale[idx] = 0f
-                ValueAnimator.ofFloat(0f, 1f).apply {
-                    duration = 280L
-                    interpolator = OvershootInterpolator(1.35f)
-                    addUpdateListener { cellScale[idx] = it.animatedValue as Float; invalidate() }
-                    start()
+                val piece = newState.get(it) as? ConnectFourPiece ?: return@let
+                fallingIndex = idx
+                fallingColor = piece.color
+                val animator = ValueAnimator.ofFloat(0f, 1f).apply {
+                    // A lower slot means a longer, more physical-looking drop.
+                    duration = 250L + (it.row + 1) * 55L
+                    interpolator = AccelerateInterpolator(1.25f)
+                    addUpdateListener { animation ->
+                        fallingProgress = animation.animatedValue as Float
+                        invalidate()
+                    }
+                    addListener(object : AnimatorListenerAdapter() {
+                        override fun onAnimationEnd(animation: Animator) {
+                            if (fallingIndex == idx) {
+                                fallingAnimator = null
+                                fallingIndex = null
+                                fallingColor = null
+                                invalidate()
+                            }
+                        }
+                    })
                 }
+                fallingAnimator = animator
+                animator.start()
             }
             invalidate()
         }
@@ -443,7 +470,11 @@ Control the centre columns, build threats in more than one direction, and block 
             state = newState
             lastMove = null
             winLine = null
-            cellScale.clear()
+            fallingAnimator?.cancel()
+            fallingAnimator = null
+            fallingIndex = null
+            fallingColor = null
+            fallingProgress = 0f
             isLocked = false
             invalidate()
         }
@@ -453,12 +484,38 @@ Control the centre columns, build threats in more than one direction, and block 
             if (cellSize <= 0f) return
             val right = boardLeft + ConnectFourRuleEngine.COLUMNS * cellSize
             val bottom = boardTop + ConnectFourRuleEngine.ROWS * cellSize
+            val fallingRow = fallingIndex?.div(ConnectFourRuleEngine.COLUMNS)
+            val fallingCol = fallingIndex?.rem(ConnectFourRuleEngine.COLUMNS)
+            val fallingX = fallingCol?.let { boardLeft + it * cellSize + cellSize / 2f }
+            val fallingTargetY = fallingRow?.let { boardTop + it * cellSize + cellSize / 2f }
+            val fallingStartY = boardTop - cellSize * 0.85f
+            val fallingY = fallingTargetY?.let {
+                fallingStartY + (it - fallingStartY) * fallingProgress
+            }
+            val fallingRadius = cellSize * 0.31f
+
+            // Draw the part above the board first. Once it reaches the board,
+            // the board face is drawn over it and only the circular openings
+            // reveal the disc below, so it can never paint over the frame.
+            if (fallingX != null && fallingY != null && fallingColor != null && fallingY < boardTop) {
+                drawDisc(canvas, fallingX, fallingY, fallingRadius, fallingColor!!)
+            }
+
             boardP.color = boardColor
             canvas.drawRoundRect(boardLeft, boardTop, right, bottom, cellSize * 0.14f, cellSize * 0.14f, boardP)
+            val holePath = Path()
             for (row in 0 until ConnectFourRuleEngine.ROWS) for (col in 0 until ConnectFourRuleEngine.COLUMNS) {
                 val cx = boardLeft + col * cellSize + cellSize / 2f
                 val cy = boardTop + row * cellSize + cellSize / 2f
                 canvas.drawCircle(cx, cy, cellSize * 0.36f, holeP)
+                holePath.addCircle(cx, cy, cellSize * 0.36f, Path.Direction.CW)
+            }
+
+            if (fallingX != null && fallingY != null && fallingColor != null && fallingY >= boardTop) {
+                canvas.save()
+                canvas.clipPath(holePath)
+                drawDisc(canvas, fallingX, fallingY, fallingRadius, fallingColor!!)
+                canvas.restore()
             }
             lastMove?.let {
                 val cx = boardLeft + it.col * cellSize + cellSize / 2f
@@ -468,11 +525,10 @@ Control the centre columns, build threats in more than one direction, and block 
             for (row in 0 until ConnectFourRuleEngine.ROWS) for (col in 0 until ConnectFourRuleEngine.COLUMNS) {
                 val piece = state.get(row, col) as? ConnectFourPiece ?: continue
                 val idx = row * ConnectFourRuleEngine.COLUMNS + col
+                if (idx == fallingIndex) continue
                 val cx = boardLeft + col * cellSize + cellSize / 2f
                 val cy = boardTop + row * cellSize + cellSize / 2f
-                val radius = cellSize * 0.31f * (cellScale[idx] ?: 1f)
-                canvas.drawCircle(cx, cy, radius, if (piece.color == PieceColor.WHITE) redP else yellowP)
-                canvas.drawCircle(cx - radius * 0.22f, cy - radius * 0.25f, radius * 0.15f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(70, 255, 255, 255) })
+                drawDisc(canvas, cx, cy, cellSize * 0.31f, piece.color)
             }
             winLine?.takeIf { it.size >= 2 }?.let {
                 winP.color = Color.argb(230, 255, 255, 255)
@@ -485,6 +541,16 @@ Control the centre columns, build threats in more than one direction, and block 
                     winP
                 )
             }
+        }
+
+        private fun drawDisc(canvas: Canvas, cx: Float, cy: Float, radius: Float, color: PieceColor) {
+            canvas.drawCircle(cx, cy, radius, if (color == PieceColor.WHITE) redP else yellowP)
+            canvas.drawCircle(
+                cx - radius * 0.22f,
+                cy - radius * 0.25f,
+                radius * 0.15f,
+                Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(70, 255, 255, 255) }
+            )
         }
     }
 
