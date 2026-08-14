@@ -183,9 +183,13 @@ class ReplayActivity : AppCompatActivity() {
         val allStates  = mutableListOf(engine.initialState())
         val allLabels  = mutableListOf("Start")
         for ((idx, move) in moves.withIndex()) {
-            val color = if (idx % 2 == 0) "White" else "Black"
+            val actor = if (gameType == "FOX_AND_GEESE") {
+                if (idx % 2 == 0) "Fox" else "Geese"
+            } else {
+                if (idx % 2 == 0) "White" else "Black"
+            }
             allStates += engine.applyMove(allStates.last(), move)
-            allLabels += "${idx / 2 + 1}. $color"
+            allLabels += "${idx / 2 + 1}. $actor"
         }
         states     = allStates
         moveLabels = allLabels

@@ -7,6 +7,8 @@ import com.mkdev.nexboard.engine.Piece
 import com.mkdev.nexboard.engine.PieceColor
 import com.mkdev.nexboard.games.chess.ChessPiece
 import com.mkdev.nexboard.games.checkers.CheckersPiece
+import com.mkdev.nexboard.games.foxandgeese.FoxAndGeesePiece
+import com.mkdev.nexboard.games.foxandgeese.FoxAndGeesePieceType
 
 /**
  * A horizontal strip that renders a list of captured pieces left-to-right.
@@ -89,6 +91,7 @@ class CaptureStripView(context: Context) : View(context) {
             when (p) {
                 is CheckersPiece -> drawCheckersPiece(canvas, p, x + sz * 0.5f, h / 2f, sz * 0.36f)
                 is ChessPiece    -> drawChessPiece(canvas, p, x, baseY)
+                is FoxAndGeesePiece -> drawFoxAndGeesePiece(canvas, p, x, baseY)
                 else             -> drawMorabaraPiece(canvas, p, x + sz * 0.5f, h / 2f, sz * 0.36f)
             }
             x += gap
@@ -115,6 +118,19 @@ class CaptureStripView(context: Context) : View(context) {
             fillP.color = Color.parseColor("#8A8A8A")
             canvas.drawText(piece.symbol(), x, baseY, fillP)
         }
+    }
+
+    private fun drawFoxAndGeesePiece(canvas: Canvas, piece: FoxAndGeesePiece, x: Float, baseY: Float) {
+        strokeP.color = if (piece.type == FoxAndGeesePieceType.FOX)
+            Color.parseColor("#A94F12")
+        else
+            Color.parseColor("#6A8FB8")
+        fillP.color = if (piece.type == FoxAndGeesePieceType.FOX)
+            Color.parseColor("#F28C28")
+        else
+            Color.parseColor("#DDEBFF")
+        canvas.drawText(piece.symbol(), x, baseY, strokeP)
+        canvas.drawText(piece.symbol(), x, baseY, fillP)
     }
 
     /**

@@ -187,6 +187,7 @@ class GameActivity : AppCompatActivity() {
             "OTHELLO" -> "Othello"
             "CHECKERS" -> "Draughts"
             "INTERNATIONAL_DRAUGHTS" -> "International Draughts"
+            "FOX_AND_GEESE" -> "Fox and Geese"
             else -> "Chess"
         }
         val rulesText = when (gameType) {
@@ -367,14 +368,14 @@ Checkmate your opponent's King.
 
         topCaptureView.setLabel(
             when {
-                gameType == "FOX_AND_GEESE" -> "Geese captured"
+                gameType == "FOX_AND_GEESE" -> "Fox captured"
                 !vsAI && gameType == "CHESS" -> "Black's captures"
                 else -> "Black ⚔"
             }
         )
         bottomCaptureView.setLabel(
             when {
-                gameType == "FOX_AND_GEESE" -> "Fox captured"
+                gameType == "FOX_AND_GEESE" -> "Geese captured"
                 !vsAI && gameType == "CHESS" -> "White's captures"
                 else -> "White ⚔"
             }
@@ -568,7 +569,11 @@ Checkmate your opponent's King.
     // ─── HUD helpers ─────────────────────────────────────────────────────────
 
     private fun updateHud() {
-        val turn  = if (gameState.currentTurn == PieceColor.WHITE) "White" else "Black"
+        val turn = if (gameType == "FOX_AND_GEESE") {
+            if (gameState.currentTurn == PieceColor.WHITE) "Fox" else "Geese"
+        } else {
+            if (gameState.currentTurn == PieceColor.WHITE) "White" else "Black"
+        }
         val label = if (vsAI && gameState.currentTurn == playerColor) "Your turn" else "$turn to move"
         hudView.setInfo(label, canUndo = moveHistory.isNotEmpty(), canRedo = redoGameStates.isNotEmpty())
     }
@@ -614,8 +619,8 @@ Checkmate your opponent's King.
     fun onMenuClicked() {
         val inProgress = gameState.status == GameStatus.IN_PROGRESS && moveHistory.isNotEmpty()
         val items = mutableListOf("New Game", "How to Play")
-        // Othello difficulty is fixed (always hard) — only Chess and Checkers show difficulty
-        if (vsAI && gameType != "OTHELLO") items.add("AI Difficulty")
+        // Othello and Fox and Geese use fixed AI settings.
+        if (vsAI && gameType != "OTHELLO" && gameType != "FOX_AND_GEESE") items.add("AI Difficulty")
         items.add("Main Menu")
         val arr = items.toTypedArray()
         AlertDialog.Builder(this).setTitle("Menu")
