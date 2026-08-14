@@ -310,28 +310,39 @@ class BoardView(context: Context) : View(context) {
         val top = boardTop
         val right = left + size * cellSize
         val bottom = top + size * cellSize
+        val theme = SettingsManager.currentTheme(context)
+
+        fun mix(first: Int, second: Int, secondWeight: Float): Int {
+            val weight = secondWeight.coerceIn(0f, 1f)
+            val inverse = 1f - weight
+            return Color.rgb(
+                (Color.red(first) * inverse + Color.red(second) * weight).toInt(),
+                (Color.green(first) * inverse + Color.green(second) * weight).toInt(),
+                (Color.blue(first) * inverse + Color.blue(second) * weight).toInt()
+            )
+        }
 
         val boardPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#F5E9D0")
+            color = theme.light
             style = Paint.Style.FILL
         }
         val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#B99D78")
+            color = theme.accent
             style = Paint.Style.STROKE
             strokeWidth = cellSize * 0.035f
         }
         val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#665849")
+            color = mix(theme.dark, Color.BLACK, 0.18f)
             style = Paint.Style.STROKE
             strokeWidth = cellSize * 0.045f
             strokeCap = Paint.Cap.ROUND
         }
         val pointPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#FFF9ED")
+            color = mix(theme.light, Color.WHITE, 0.55f)
             style = Paint.Style.FILL
         }
         val pointBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#665849")
+            color = mix(theme.dark, theme.accent, 0.35f)
             style = Paint.Style.STROKE
             strokeWidth = cellSize * 0.025f
         }

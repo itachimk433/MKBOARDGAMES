@@ -83,6 +83,14 @@ class GameActivity : AppCompatActivity() {
         boardView        = BoardView(this)
         bottomCaptureView = CaptureStripView(this).also { it.dividerOnTop = true }
 
+        // Render the selected game's real starting position behind the mode
+        // dialog. BoardView defaults to an empty 8x8 chess-sized state, which
+        // made Fox & Geese briefly show a chess board before startGame().
+        SettingsManager.activateGameTheme(this, gameType.lowercase())
+        gameState = engine.initialState()
+        boardView.ruleEngine = engine
+        boardView.gameState = gameState
+
         container.addView(hudView,
             android.widget.LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, hudH))
         container.addView(topCaptureView,
