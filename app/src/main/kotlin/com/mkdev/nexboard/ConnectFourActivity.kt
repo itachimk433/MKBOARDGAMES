@@ -549,7 +549,7 @@ Control the centre columns, build threats in more than one direction, and block 
                 cx - radius * 0.22f,
                 cy - radius * 0.25f,
                 radius * 0.15f,
-                Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = Color.argb(70, 255, 255, 255, 255) }
+                Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = Color.argb(70, 255, 255, 255) }
             )
         }
     }
