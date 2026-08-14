@@ -13,6 +13,7 @@ import com.mkdev.nexboard.SettingsManager
 import com.mkdev.nexboard.engine.*
 import com.mkdev.nexboard.games.checkers.CheckersPiece
 import com.mkdev.nexboard.games.chess.ChessPiece
+import com.mkdev.nexboard.games.foxandgeese.FoxAndGeeseSetup
 import com.mkdev.nexboard.games.foxandgeese.FoxAndGeesePiece
 import com.mkdev.nexboard.games.foxandgeese.FoxAndGeesePieceType
 import com.mkdev.nexboard.games.othello.OthelloPiece
@@ -240,6 +241,10 @@ class BoardView(context: Context) : View(context) {
     }
 
     private fun drawBoard(canvas: Canvas) {
+        if (isFoxAndGeeseBoard()) {
+            drawFoxAndGeeseBoard(canvas)
+            return
+        }
         for (row in 0 until gameState.boardSize) for (col in 0 until gameState.boardSize) {
             val l = boardLeft + col * cellSize; val t = boardTop + row * cellSize
             canvas.drawRect(l, t, l + cellSize, t + cellSize,
@@ -248,6 +253,7 @@ class BoardView(context: Context) : View(context) {
     }
 
     private fun drawLabels(canvas: Canvas) {
+        if (isFoxAndGeeseBoard()) return
         val size = gameState.boardSize
         for (i in 0 until size) {
             val file = ('a' + if (isFlipped) size - 1 - i else i).toString()
@@ -280,8 +286,103 @@ class BoardView(context: Context) : View(context) {
 
     private fun highlightCell(canvas: Canvas, pos: Position, paint: Paint) {
         val c = boardCol(pos.col); val r = boardRow(pos.row)
-        canvas.drawRect(boardLeft + c * cellSize, boardTop + r * cellSize,
-            boardLeft + (c+1) * cellSize, boardTop + (r+1) * cellSize, paint)
+        if (isFoxAndGeeseBoard()) {
+            canvas.drawCircle(
+                boardLeft + c * cellSize + cellSize / 2f,
+                boardTop + r * cellSize + cellSize / 2f,
+                cellSize * 0.38f,
+                paint
+            )
+        } else {
+            canvas.drawRect(boardLeft + c * cellSize, boardTop + r * cellSize,
+                boardLeft + (c+1) * cellSize, boardTop + (r+1) * cellSize, paint)
+        }
+    }
+
+    /**
+     * Draw the traditional 33-point cross board rather than a checkerboard.
+     * Every playable point is connected to its neighbouring points, matching
+     * the movement graph used by FoxAndGeeseRuleEngine.
+     */
+    private fun drawFoxAndGeeseBoard(canvas: Canvas) {
+        val size = FoxAndGeeseSetup.BOARD_SIZE
+        val left = boardLeft
+        val top = boardTop
+        val right = left + size * cellSize
+        val bottom = top + size * cellSize
+
+        val boardPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#F5E9D0")
+            style = Paint.Style.FILL
+        }
+        val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#B99D78")
+            style = Paint.Style.STROKE
+            strokeWidth = cellSize * 0.035f
+        }
+        val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#665849")
+            style = Paint.Style.STROKE
+            strokeWidth = cellSize * 0.045f
+            strokeCap = Paint.Cap.ROUND
+        }
+        val pointPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#FFF9ED")
+            style = Paint.Style.FILL
+        }
+        val pointBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#665849")
+            style = Paint.Style.STROKE
+            strokeWidth = cellSize * 0.025f
+        }
+
+        val cross = Path().apply {
+            moveTo(left + 2f * cellSize, top)
+            lineTo(left + 5f * cellSize, top)
+            lineTo(left + 5f * cellSize, top + 2f * cellSize)
+            lineTo(right, top + 2f * cellSize)
+            lineTo(right, top + 5f * cellSize)
+            lineTo(left + 5f * cellSize, top + 5f * cellSize)
+            lineTo(left + 5f * cellSize, bottom)
+            lineTo(left + 2f * cellSize, bottom)
+            lineTo(left + 2f * cellSize, top + 5f * cellSize)
+            lineTo(left, top + 5f * cellSize)
+            lineTo(left, top + 2f * cellSize)
+            lineTo(left + 2f * cellSize, top + 2f * cellSize)
+            close()
+        }
+        canvas.drawPath(cross, boardPaint)
+        canvas.drawPath(cross, borderPaint)
+
+        val dirs = listOf(
+            Position(-1, -1), Position(-1, 0), Position(-1, 1),
+            Position(0, -1),                  Position(0, 1),
+            Position(1, -1),  Position(1, 0),  Position(1, 1)
+        )
+        for (row in 0 until size) for (col in 0 until size) {
+            val from = Position(row, col)
+            if (!FoxAndGeeseSetup.isPlayable(from)) continue
+            for (dir in dirs) {
+                val to = from + dir
+                if (!FoxAndGeeseSetup.isPlayable(to)) continue
+                if (to.row < row || (to.row == row && to.col <= col)) continue
+                canvas.drawLine(
+                    boardLeft + col * cellSize + cellSize / 2f,
+                    boardTop + row * cellSize + cellSize / 2f,
+                    boardLeft + to.col * cellSize + cellSize / 2f,
+                    boardTop + to.row * cellSize + cellSize / 2f,
+                    linePaint
+                )
+            }
+        }
+
+        for (row in 0 until size) for (col in 0 until size) {
+            if (!FoxAndGeeseSetup.isPlayable(Position(row, col))) continue
+            val cx = boardLeft + col * cellSize + cellSize / 2f
+            val cy = boardTop + row * cellSize + cellSize / 2f
+            canvas.drawCircle(cx, cy, cellSize * 0.105f, pointPaint)
+            canvas.drawCircle(cx, cy, cellSize * 0.105f, pointBorderPaint)
+        }
     }
 
     private fun drawPieces(canvas: Canvas) {
@@ -363,13 +464,13 @@ class BoardView(context: Context) : View(context) {
         val radius = cellSize * 0.36f
         canvas.drawCircle(cx + 1.5f, cy + 2.5f, radius, shadowPaint)
         val fill = if (piece.type == FoxAndGeesePieceType.FOX)
-            Color.parseColor("#F28C28")
+            Color.parseColor("#4FAF9B")
         else
-            Color.parseColor("#DDEBFF")
+            Color.parseColor("#E86F2D")
         val edge = if (piece.type == FoxAndGeesePieceType.FOX)
-            Color.parseColor("#A94F12")
+            Color.parseColor("#2D7D70")
         else
-            Color.parseColor("#6A8FB8")
+            Color.parseColor("#A84618")
         Paint(Paint.ANTI_ALIAS_FLAG).also {
             it.color = fill
             canvas.drawCircle(cx, cy, radius, it)
@@ -381,10 +482,7 @@ class BoardView(context: Context) : View(context) {
             canvas.drawCircle(cx, cy, radius * 0.92f, it)
         }
         val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = if (piece.type == FoxAndGeesePieceType.FOX)
-                Color.WHITE
-            else
-                Color.parseColor("#29415F")
+            color = Color.WHITE
             textAlign = Paint.Align.CENTER
             textSize = radius * 0.95f
             isFakeBoldText = true
@@ -423,6 +521,10 @@ class BoardView(context: Context) : View(context) {
         if (isFlipped) gameState.boardSize - 1 - logicRow else logicRow
     private fun boardCol(logicCol: Int) =
         if (isFlipped) gameState.boardSize - 1 - logicCol else logicCol
+
+    private fun isFoxAndGeeseBoard(): Boolean =
+        gameState.boardSize == FoxAndGeeseSetup.BOARD_SIZE &&
+            gameState.board.any { it is FoxAndGeesePiece }
 
     private fun screenToBoard(x: Float, y: Float): Position? {
         val col = ((x - boardLeft) / cellSize).toInt()

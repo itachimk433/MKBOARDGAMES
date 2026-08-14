@@ -23,24 +23,29 @@ data class FoxAndGeesePiece(
 }
 
 object FoxAndGeeseSetup {
-    const val BOARD_SIZE = 8
+    /**
+     * The traditional board is a 7x7 lattice with a three-square-wide cross.
+     * That gives 33 playable points: 3 + 3 + 7 + 7 + 7 + 3 + 3.
+     */
+    const val BOARD_SIZE = 7
+
+    fun isPlayable(position: Position): Boolean =
+        position.row in 0 until BOARD_SIZE &&
+            position.col in 0 until BOARD_SIZE &&
+            (position.row in 2..4 || position.col in 2..4)
 
     fun initialState(): GameState {
         val board = arrayOfNulls<Piece>(BOARD_SIZE * BOARD_SIZE)
 
-        // The fox starts on a dark square at the top of the board.
-        board[indexOf(Position(0, 3))] =
+        // The fox starts at the centre point of the upper half of the cross.
+        board[indexOf(Position(2, 3))] =
             FoxAndGeesePiece(FoxAndGeesePieceType.FOX, PieceColor.WHITE)
 
-        // Thirteen geese form the opposing flock on the lower three rows,
-        // with one extra goose on the row immediately above them.
+        // Thirteen geese fill the lower arm: the full middle row plus the
+        // two three-point rows beneath it.
         val geese = buildList {
-            add(Position(4, 1))
-            for (row in 5..7) {
-                for (col in 0..7) {
-                    if ((row + col) % 2 == 1) add(Position(row, col))
-                }
-            }
+            for (col in 0 until BOARD_SIZE) add(Position(4, col))
+            for (row in 5..6) for (col in 2..4) add(Position(row, col))
         }
         for (pos in geese) {
             board[indexOf(pos)] =

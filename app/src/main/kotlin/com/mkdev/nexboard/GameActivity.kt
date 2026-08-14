@@ -278,7 +278,7 @@ The fox moves diagonally in any direction. It may jump over an adjacent goose in
 ─────────────────────────
 
 The Geese
-Geese move one square diagonally forward toward the fox. They do not capture, so their strength comes from surrounding and blocking the fox.
+Geese move one connected point forward toward the fox. They do not capture, so their strength comes from surrounding and blocking the fox.
 
 ─────────────────────────
 

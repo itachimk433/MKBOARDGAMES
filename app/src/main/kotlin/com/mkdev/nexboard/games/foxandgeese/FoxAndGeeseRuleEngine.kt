@@ -9,18 +9,19 @@ import com.mkdev.nexboard.engine.Position
 import com.mkdev.nexboard.engine.RuleEngine
 
 /**
- * Classic 8x8 Fox and Geese:
- * - the fox moves diagonally in any direction;
- * - it may jump over an adjacent goose into an empty square and capture it;
- * - the geese move diagonally forward toward the fox and never capture;
+ * Traditional 33-point Fox and Geese:
+ * - the fox moves along any connected line in any direction;
+ * - it may jump over an adjacent goose into an empty point and capture it;
+ * - the geese move one point forward toward the fox and never capture;
  * - the fox wins when the geese are gone or cannot move, while the geese win
  *   when the fox is trapped.
  */
 class FoxAndGeeseRuleEngine : RuleEngine {
 
-    private val diagonalDirs = listOf(
-        Position(-1, -1), Position(-1, 1),
-        Position(1, -1), Position(1, 1)
+    private val moveDirs = listOf(
+        Position(-1, -1), Position(-1, 0), Position(-1, 1),
+        Position(0, -1),                    Position(0, 1),
+        Position(1, -1),  Position(1, 0),  Position(1, 1)
     )
 
     override fun initialState(): GameState = FoxAndGeeseSetup.initialState()
@@ -56,9 +57,9 @@ class FoxAndGeeseRuleEngine : RuleEngine {
     }
 
     private fun foxMoves(state: GameState, from: Position): List<Move> {
-        val quiet = diagonalDirs.mapNotNull { dir ->
+        val quiet = moveDirs.mapNotNull { dir ->
             val to = from + dir
-            if (to.isValid(state.boardSize) && state.get(to) == null) Move(from, to)
+            if (isPlayable(to) && state.get(to) == null) Move(from, to)
             else null
         }
 
@@ -80,10 +81,10 @@ class FoxAndGeeseRuleEngine : RuleEngine {
         result: MutableList<Move>
     ) {
         var foundJump = false
-        for (dir in diagonalDirs) {
+        for (dir in moveDirs) {
             val over = current + dir
             val landing = current + Position(dir.row * 2, dir.col * 2)
-            if (!over.isValid(boardSize) || !landing.isValid(boardSize)) continue
+            if (!isPlayable(over) || !isPlayable(landing)) continue
             val jumped = board[indexOf(over, boardSize)] as? FoxAndGeesePiece ?: continue
             if (jumped.type != FoxAndGeesePieceType.GOOSE) continue
             if (board[indexOf(landing, boardSize)] != null) continue
@@ -110,9 +111,9 @@ class FoxAndGeeseRuleEngine : RuleEngine {
     }
 
     private fun gooseMoves(state: GameState, from: Position): List<Move> =
-        listOf(Position(-1, -1), Position(-1, 1)).mapNotNull { dir ->
+        listOf(Position(-1, -1), Position(-1, 0), Position(-1, 1)).mapNotNull { dir ->
             val to = from + dir
-            if (to.isValid(state.boardSize) && state.get(to) == null) Move(from, to)
+            if (isPlayable(to) && state.get(to) == null) Move(from, to)
             else null
         }
 
@@ -176,4 +177,6 @@ class FoxAndGeeseRuleEngine : RuleEngine {
         }
 
     private fun indexOf(pos: Position, boardSize: Int): Int = pos.row * boardSize + pos.col
+
+    private fun isPlayable(pos: Position): Boolean = FoxAndGeeseSetup.isPlayable(pos)
 }

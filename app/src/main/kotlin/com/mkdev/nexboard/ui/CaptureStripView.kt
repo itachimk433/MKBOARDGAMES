@@ -122,13 +122,13 @@ class CaptureStripView(context: Context) : View(context) {
 
     private fun drawFoxAndGeesePiece(canvas: Canvas, piece: FoxAndGeesePiece, x: Float, baseY: Float) {
         strokeP.color = if (piece.type == FoxAndGeesePieceType.FOX)
-            Color.parseColor("#A94F12")
+            Color.parseColor("#2D7D70")
         else
-            Color.parseColor("#6A8FB8")
+            Color.parseColor("#A84618")
         fillP.color = if (piece.type == FoxAndGeesePieceType.FOX)
-            Color.parseColor("#F28C28")
+            Color.parseColor("#4FAF9B")
         else
-            Color.parseColor("#DDEBFF")
+            Color.parseColor("#E86F2D")
         canvas.drawText(piece.symbol(), x, baseY, strokeP)
         canvas.drawText(piece.symbol(), x, baseY, fillP)
     }

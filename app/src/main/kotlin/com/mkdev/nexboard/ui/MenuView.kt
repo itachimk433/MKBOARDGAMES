@@ -8,6 +8,7 @@ import android.view.MotionEvent
 import android.view.View
 import com.mkdev.nexboard.R
 import com.mkdev.nexboard.SettingsManager
+import com.mkdev.nexboard.games.foxandgeese.FoxAndGeeseSetup
 
 class MenuView(context: Context) : View(context) {
 
@@ -444,28 +445,95 @@ class MenuView(context: Context) : View(context) {
     }
 
     private fun drawFoxAndGeeseMini(canvas: Canvas, left: Float, top: Float, size: Float) {
-        val cell = size / 8f
-        for (r in 0 until 8) for (c in 0 until 8) {
-            val paint = if ((r + c) % 2 == 0) miniLightPaint else miniDarkPaint
-            canvas.drawRect(
-                left + c * cell, top + r * cell,
-                left + (c + 1) * cell, top + (r + 1) * cell, paint
-            )
+        val boardSize = FoxAndGeeseSetup.BOARD_SIZE
+        val cell = size / boardSize.toFloat()
+        fun point(row: Int, col: Int): Pair<Float, Float> =
+            left + col * cell + cell / 2f to top + row * cell + cell / 2f
+        fun isPlayable(row: Int, col: Int) =
+            FoxAndGeeseSetup.isPlayable(com.mkdev.nexboard.engine.Position(row, col))
+
+        val boardPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#F5E9D0")
         }
-        val foxPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#F28C28") }
-        val goosePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#DDEBFF") }
+        val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#B99D78")
+            style = Paint.Style.STROKE
+            strokeWidth = cell * 0.04f
+        }
+        val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#665849")
+            style = Paint.Style.STROKE
+            strokeWidth = cell * 0.055f
+            strokeCap = Paint.Cap.ROUND
+        }
+        val cross = Path().apply {
+            moveTo(left + 2f * cell, top)
+            lineTo(left + 5f * cell, top)
+            lineTo(left + 5f * cell, top + 2f * cell)
+            lineTo(left + size, top + 2f * cell)
+            lineTo(left + size, top + 5f * cell)
+            lineTo(left + 5f * cell, top + 5f * cell)
+            lineTo(left + 5f * cell, top + size)
+            lineTo(left + 2f * cell, top + size)
+            lineTo(left + 2f * cell, top + 5f * cell)
+            lineTo(left, top + 5f * cell)
+            lineTo(left, top + 2f * cell)
+            lineTo(left + 2f * cell, top + 2f * cell)
+            close()
+        }
+        canvas.drawPath(cross, boardPaint)
+        canvas.drawPath(cross, borderPaint)
+
+        val dirs = listOf(
+            -1 to -1, -1 to 0, -1 to 1,
+             0 to -1,           0 to 1,
+             1 to -1,  1 to 0,  1 to 1
+        )
+        for (row in 0 until boardSize) for (col in 0 until boardSize) {
+            if (!isPlayable(row, col)) continue
+            for ((dr, dc) in dirs) {
+                val nr = row + dr
+                val nc = col + dc
+                if (!isPlayable(nr, nc)) continue
+                if (nr < row || (nr == row && nc <= col)) continue
+                val (x1, y1) = point(row, col)
+                val (x2, y2) = point(nr, nc)
+                canvas.drawLine(x1, y1, x2, y2, linePaint)
+            }
+        }
+
+        val pointPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#FFF9ED")
+        }
+        val pointBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#665849")
+            style = Paint.Style.STROKE
+            strokeWidth = cell * 0.03f
+        }
+        for (row in 0 until boardSize) for (col in 0 until boardSize) {
+            if (!isPlayable(row, col)) continue
+            val (cx, cy) = point(row, col)
+            canvas.drawCircle(cx, cy, cell * 0.10f, pointPaint)
+            canvas.drawCircle(cx, cy, cell * 0.10f, pointBorderPaint)
+        }
+
+        val foxPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#4FAF9B")
+        }
+        val goosePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#E86F2D")
+        }
+        val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(55, 0, 0, 0)
+        }
         fun piece(row: Int, col: Int, paint: Paint) {
-            canvas.drawCircle(
-                left + col * cell + cell / 2f,
-                top + row * cell + cell / 2f,
-                cell * 0.31f,
-                paint
-            )
+            val (cx, cy) = point(row, col)
+            canvas.drawCircle(cx + cell * 0.04f, cy + cell * 0.05f, cell * 0.27f, shadowPaint)
+            canvas.drawCircle(cx, cy, cell * 0.27f, paint)
         }
-        piece(0, 3, foxPaint)
-        piece(6, 1, goosePaint); piece(6, 3, goosePaint); piece(6, 5, goosePaint)
-        piece(7, 0, goosePaint); piece(7, 2, goosePaint)
-        piece(7, 4, goosePaint); piece(7, 6, goosePaint)
+        piece(2, 3, foxPaint)
+        for (col in 0 until boardSize) piece(4, col, goosePaint)
+        for (row in 5..6) for (col in 2..4) piece(row, col, goosePaint)
     }
 
     private fun drawGear(canvas: Canvas) {
