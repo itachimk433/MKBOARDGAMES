@@ -176,7 +176,7 @@ class GameActivity : AppCompatActivity() {
 
     private fun showColorPickerDialog() {
         val sides = if (gameType == "FOX_AND_GEESE")
-            arrayOf("Fox (moves first)", "Geese")
+            arrayOf("Fox (moves second)", "Geese (moves first)")
         else
             arrayOf("White (moves first)", "Black (moves second)")
         AlertDialog.Builder(this)
@@ -276,17 +276,17 @@ Capture all of your opponent's pieces, or leave them with no legal moves.
 FOX AND GEESE — Rules
 
 Overview
-An asymmetric hunt game. One player controls a fox; the other controls thirteen geese. The fox is powerful but outnumbered, while the geese work together to trap it.
+An asymmetric hunt game on a 33-point cross board. One player controls a fox; the other controls thirteen geese. The geese move first, and work together to trap the more mobile fox.
 
 ─────────────────────────
 
 The Fox
-The fox moves diagonally in any direction. It may jump over an adjacent goose into an empty square to capture it. Consecutive jumps may be combined into one move.
+The fox moves to any adjacent connected point horizontally, vertically, or diagonally. It may jump over an adjacent goose into an empty point to capture it. If another jump is available from the landing point, the fox may continue jumping in the same turn.
 
 ─────────────────────────
 
 The Geese
-Geese move one connected point forward toward the fox. They do not capture, so their strength comes from surrounding and blocking the fox.
+The geese move one adjacent connected point in any direction, including forwards, backwards, sideways, or diagonally where the board has a line. They do not capture, so their strength comes from surrounding and blocking the fox.
 
 ─────────────────────────
 

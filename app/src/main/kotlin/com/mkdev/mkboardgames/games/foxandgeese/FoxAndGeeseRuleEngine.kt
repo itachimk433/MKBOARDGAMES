@@ -9,10 +9,11 @@ import com.mkdev.mkboardgames.engine.Position
 import com.mkdev.mkboardgames.engine.RuleEngine
 
 /**
- * Traditional 33-point Fox and Geese:
- * - the fox moves along any connected line in any direction;
- * - it may jump over an adjacent goose into an empty point and capture it;
- * - the geese move one point forward toward the fox and never capture;
+ * Traditional 33-point, 13-goose Fox and Geese:
+ * - the geese move first;
+ * - both sides move to an adjacent connected point;
+ * - the fox may jump over an adjacent goose into an empty point and capture it;
+ * - geese may move in any direction but never capture;
  * - the fox wins when the geese are gone or cannot move, while the geese win
  *   when the fox is trapped.
  */
@@ -113,7 +114,7 @@ class FoxAndGeeseRuleEngine : RuleEngine {
     }
 
     private fun gooseMoves(state: GameState, from: Position): List<Move> =
-        listOf(Position(-1, -1), Position(-1, 0), Position(-1, 1)).mapNotNull { dir ->
+        moveDirs.mapNotNull { dir ->
             val to = from + dir
             if (FoxAndGeeseSetup.isConnected(from, to) && state.get(to) == null) Move(from, to)
             else null
@@ -160,7 +161,8 @@ class FoxAndGeeseRuleEngine : RuleEngine {
         val foxMobility = foxMoves(state, fox).size
         val gooseMobility = allLegalMoves(state, PieceColor.BLACK).size
         val foxRowBonus = (state.boardSize - 1 - fox.row) * 4
-        return (13 - geese) * 700 + foxMobility * 18 - gooseMobility * 7 + foxRowBonus
+        return (FoxAndGeeseSetup.GOOSE_COUNT - geese) * 700 +
+            foxMobility * 18 - gooseMobility * 7 + foxRowBonus
     }
 
     private fun findFox(state: GameState): Position? {

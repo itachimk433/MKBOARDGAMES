@@ -28,6 +28,7 @@ object FoxAndGeeseSetup {
      * That gives 33 playable points: 3 + 3 + 7 + 7 + 7 + 3 + 3.
      */
     const val BOARD_SIZE = 7
+    const val GOOSE_COUNT = 13
 
     fun isPlayable(position: Position): Boolean =
         position.row in 0 until BOARD_SIZE &&
@@ -72,7 +73,8 @@ object FoxAndGeeseSetup {
                 FoxAndGeesePiece(FoxAndGeesePieceType.GOOSE, PieceColor.BLACK)
         }
 
-        return GameState(board = board, boardSize = BOARD_SIZE, currentTurn = PieceColor.WHITE)
+        // In the 13-goose variant the geese make the opening move.
+        return GameState(board = board, boardSize = BOARD_SIZE, currentTurn = PieceColor.BLACK)
     }
 
     fun indexOf(pos: Position): Int = pos.row * BOARD_SIZE + pos.col
