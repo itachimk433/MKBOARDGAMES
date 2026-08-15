@@ -11,6 +11,7 @@ import android.opengl.GLSurfaceView
 import android.opengl.GLUtils
 import android.opengl.Matrix
 import android.util.Base64
+import android.util.Log
 import android.view.MotionEvent
 import android.view.animation.DecelerateInterpolator
 import org.json.JSONArray
@@ -57,6 +58,7 @@ class LudoDiceView(context: Context) : GLSurfaceView(context) {
         setRenderer(diceRenderer)
         renderMode = RENDERMODE_WHEN_DIRTY
         isClickable = true
+        post { requestRender() }
     }
 
     fun rollTo(nextValue: Int, onFinished: () -> Unit) {
@@ -97,6 +99,11 @@ class LudoDiceView(context: Context) : GLSurfaceView(context) {
         return true
     }
 
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        requestRender()
+    }
+
     override fun onDetachedFromWindow() {
         animator?.cancel()
         animator = null
@@ -130,6 +137,7 @@ private class DiceRenderer(
 
     override fun onSurfaceCreated(gl: javax.microedition.khronos.opengles.GL10?, config: javax.microedition.khronos.egl.EGLConfig?) {
         GLES20.glClearColor(0.063f, 0.082f, 0.102f, 1f)
+        GLES20.glPixelStorei(GLES20.GL_UNPACK_ALIGNMENT, 1)
         GLES20.glDisable(GLES20.GL_CULL_FACE)
         GLES20.glEnable(GLES20.GL_DEPTH_TEST)
         program = createProgram(VERTEX_SHADER, FRAGMENT_SHADER)
@@ -164,6 +172,7 @@ private class DiceRenderer(
         Matrix.multiplyMM(mvp, 0, projection, 0, viewModel, 0)
 
         GLES20.glUseProgram(program)
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
         GLES20.glUniformMatrix4fv(mvpHandle, 1, false, mvp, 0)
         GLES20.glUniform1i(textureHandle, 0)
 
@@ -252,7 +261,8 @@ private class DiceRenderer(
                     textureId = textures.getOrElse(raw.textureIndex) { 0 },
                 )
             }
-        } catch (_: Exception) {
+        } catch (error: Exception) {
+            Log.e(TAG, "Unable to load dice.gltf", error)
             emptyList()
         }
     }
@@ -531,6 +541,8 @@ private class DiceRenderer(
     )
 
     companion object {
+        private const val TAG = "LudoDiceView"
+
         private const val VERTEX_SHADER = """
             uniform mat4 uMvp;
             attribute vec4 aPosition;
