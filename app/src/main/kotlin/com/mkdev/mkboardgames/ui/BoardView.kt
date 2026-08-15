@@ -301,8 +301,8 @@ class BoardView(context: Context) : View(context) {
 
     /**
      * Draw the traditional 33-point cross board rather than a checkerboard.
-     * Every playable point is connected to its neighbouring points, matching
-     * the movement graph used by FoxAndGeeseRuleEngine.
+     * Every playable point is connected to its valid neighbouring points,
+     * matching the movement graph used by FoxAndGeeseRuleEngine.
      */
     private fun drawFoxAndGeeseBoard(canvas: Canvas) {
         val size = FoxAndGeeseSetup.BOARD_SIZE
@@ -375,7 +375,7 @@ class BoardView(context: Context) : View(context) {
             if (!FoxAndGeeseSetup.isPlayable(from)) continue
             for (dir in dirs) {
                 val to = from + dir
-                if (!FoxAndGeeseSetup.isPlayable(to)) continue
+                if (!FoxAndGeeseSetup.isConnected(from, to)) continue
                 if (to.row < row || (to.row == row && to.col <= col)) continue
                 canvas.drawLine(
                     boardLeft + col * cellSize + cellSize / 2f,

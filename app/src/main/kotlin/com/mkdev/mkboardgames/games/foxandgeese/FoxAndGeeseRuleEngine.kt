@@ -59,7 +59,7 @@ class FoxAndGeeseRuleEngine : RuleEngine {
     private fun foxMoves(state: GameState, from: Position): List<Move> {
         val quiet = moveDirs.mapNotNull { dir ->
             val to = from + dir
-            if (isPlayable(to) && state.get(to) == null) Move(from, to)
+            if (FoxAndGeeseSetup.isConnected(from, to) && state.get(to) == null) Move(from, to)
             else null
         }
 
@@ -84,7 +84,9 @@ class FoxAndGeeseRuleEngine : RuleEngine {
         for (dir in moveDirs) {
             val over = current + dir
             val landing = current + Position(dir.row * 2, dir.col * 2)
-            if (!isPlayable(over) || !isPlayable(landing)) continue
+            if (!FoxAndGeeseSetup.isConnected(current, over) ||
+                !FoxAndGeeseSetup.isConnected(over, landing)
+            ) continue
             val jumped = board[indexOf(over, boardSize)] as? FoxAndGeesePiece ?: continue
             if (jumped.type != FoxAndGeesePieceType.GOOSE) continue
             if (board[indexOf(landing, boardSize)] != null) continue
@@ -113,7 +115,7 @@ class FoxAndGeeseRuleEngine : RuleEngine {
     private fun gooseMoves(state: GameState, from: Position): List<Move> =
         listOf(Position(-1, -1), Position(-1, 0), Position(-1, 1)).mapNotNull { dir ->
             val to = from + dir
-            if (isPlayable(to) && state.get(to) == null) Move(from, to)
+            if (FoxAndGeeseSetup.isConnected(from, to) && state.get(to) == null) Move(from, to)
             else null
         }
 
@@ -178,5 +180,4 @@ class FoxAndGeeseRuleEngine : RuleEngine {
 
     private fun indexOf(pos: Position, boardSize: Int): Int = pos.row * boardSize + pos.col
 
-    private fun isPlayable(pos: Position): Boolean = FoxAndGeeseSetup.isPlayable(pos)
 }

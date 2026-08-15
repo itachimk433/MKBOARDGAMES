@@ -34,6 +34,26 @@ object FoxAndGeeseSetup {
             position.col in 0 until BOARD_SIZE &&
             (position.row in 2..4 || position.col in 2..4)
 
+    /**
+     * Returns whether two adjacent points share a line on the traditional
+     * cross board. Diagonals stay inside one of the three board sections;
+     * the four diagonals that cut across a cross-arm junction are not board
+     * lines and must not be drawable or playable moves.
+     */
+    fun isConnected(from: Position, to: Position): Boolean {
+        if (!isPlayable(from) || !isPlayable(to)) return false
+        val rowDistance = kotlin.math.abs(from.row - to.row)
+        val colDistance = kotlin.math.abs(from.col - to.col)
+        if (rowDistance > 1 || colDistance > 1 || (rowDistance == 0 && colDistance == 0)) {
+            return false
+        }
+        if (rowDistance == 0 || colDistance == 0) return true
+
+        val staysInVerticalArm = from.col in 2..4 && to.col in 2..4
+        val staysInHorizontalArm = from.row in 2..4 && to.row in 2..4
+        return staysInVerticalArm || staysInHorizontalArm
+    }
+
     fun initialState(): GameState {
         val board = arrayOfNulls<Piece>(BOARD_SIZE * BOARD_SIZE)
 
