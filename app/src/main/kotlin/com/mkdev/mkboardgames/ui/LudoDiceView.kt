@@ -6,6 +6,9 @@ import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
 import android.opengl.GLUtils
@@ -56,7 +59,7 @@ class LudoDiceView(context: Context) : GLSurfaceView(context) {
     init {
         setEGLContextClientVersion(2)
         setRenderer(diceRenderer)
-        renderMode = RENDERMODE_WHEN_DIRTY
+        renderMode = RENDERMODE_CONTINUOUSLY
         isClickable = true
         post { requestRender() }
     }
@@ -145,7 +148,7 @@ private class DiceRenderer(
         texCoordHandle = GLES20.glGetAttribLocation(program, "aTexCoord")
         mvpHandle = GLES20.glGetUniformLocation(program, "uMvp")
         textureHandle = GLES20.glGetUniformLocation(program, "uTexture")
-        faces = loadModel()
+        faces = loadModel().ifEmpty { buildFallbackModel() }
     }
 
     override fun onSurfaceChanged(
@@ -246,7 +249,7 @@ private class DiceRenderer(
             val scale = 2.0f / extent
             val textures = loadTextures(root)
 
-            rawFaces.map { raw ->
+            val modelFaces = rawFaces.map { raw ->
                 val normalized = FloatArray(raw.positions.size)
                 for (i in normalized.indices step 3) {
                     normalized[i] = (raw.positions[i] - center[0]) * scale
@@ -261,10 +264,71 @@ private class DiceRenderer(
                     textureId = textures.getOrElse(raw.textureIndex) { 0 },
                 )
             }
+            require(modelFaces.isNotEmpty() && modelFaces.all { it.textureId != 0 }) {
+                "Dice model did not produce valid textured faces"
+            }
+            Log.i(TAG, "Loaded dice.gltf with ${modelFaces.size} faces")
+            modelFaces
         } catch (error: Exception) {
             Log.e(TAG, "Unable to load dice.gltf", error)
             emptyList()
         }
+    }
+
+    private fun buildFallbackModel(): List<GlFace> {
+        Log.w(TAG, "Using procedural fallback die")
+        val positions = listOf(
+            // 1: left
+            floatArrayOf(-1f, -1f, -1f, -1f, 1f, -1f, -1f, 1f, 1f, -1f, -1f, 1f),
+            // 2: front
+            floatArrayOf(-1f, -1f, 1f, 1f, -1f, 1f, 1f, 1f, 1f, -1f, 1f, 1f),
+            // 3: top
+            floatArrayOf(-1f, 1f, -1f, -1f, 1f, 1f, 1f, 1f, 1f, 1f, 1f, -1f),
+            // 4: back
+            floatArrayOf(1f, -1f, -1f, -1f, -1f, -1f, -1f, 1f, -1f, 1f, 1f, -1f),
+            // 5: bottom
+            floatArrayOf(-1f, -1f, 1f, 1f, -1f, 1f, 1f, -1f, -1f, -1f, -1f, -1f),
+            // 6: right
+            floatArrayOf(1f, -1f, 1f, 1f, -1f, -1f, 1f, 1f, -1f, 1f, 1f, 1f),
+        )
+        val texCoords = floatArrayOf(
+            0f, 1f,
+            1f, 1f,
+            1f, 0f,
+            0f, 0f,
+        )
+        val indices = shortArrayOf(0, 1, 2, 2, 3, 0)
+        return positions.mapIndexed { index, vertices ->
+            GlFace(
+                vertices = directFloatBuffer(vertices),
+                texCoords = directFloatBuffer(texCoords),
+                indices = directShortBuffer(indices),
+                indexCount = indices.size,
+                textureId = uploadTexture(createPipBitmap(index + 1)),
+            )
+        }
+    }
+
+    private fun createPipBitmap(number: Int): Bitmap {
+        val size = 256
+        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        canvas.drawColor(Color.WHITE)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(24, 32, 41) }
+        val pips = when (number.coerceIn(1, 6)) {
+            1 -> listOf(1 to 1)
+            2 -> listOf(0 to 0, 2 to 2)
+            3 -> listOf(0 to 0, 1 to 1, 2 to 2)
+            4 -> listOf(0 to 0, 2 to 0, 0 to 2, 2 to 2)
+            5 -> listOf(0 to 0, 2 to 0, 1 to 1, 0 to 2, 2 to 2)
+            else -> listOf(0 to 0, 2 to 0, 0 to 1, 2 to 1, 0 to 2, 2 to 2)
+        }
+        val step = size / 4f
+        val radius = size * 0.12f
+        for ((x, y) in pips) {
+            canvas.drawCircle(step + x * step, step + y * step, radius, paint)
+        }
+        return bitmap
     }
 
     private fun visitNode(
@@ -463,6 +527,7 @@ private class DiceRenderer(
         if (bitmap == null) return 0
         val texture = IntArray(1)
         GLES20.glGenTextures(1, texture, 0)
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, texture[0])
         GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR)
         GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR)
