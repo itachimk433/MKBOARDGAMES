@@ -29,7 +29,7 @@ class MenuView(context: Context) : View(context) {
 
     enum class GameType {
         CHESS, CHECKERS, INTERNATIONAL_DRAUGHTS, OTHELLO, MORABARABA, TICTACTOE, CONNECT_FOUR,
-        FOX_AND_GEESE
+        FOX_AND_GEESE, LUDO
     }
 
     private data class Card(val type: GameType, var rect: RectF = RectF())
@@ -38,7 +38,7 @@ class MenuView(context: Context) : View(context) {
         Card(GameType.INTERNATIONAL_DRAUGHTS),
         Card(GameType.OTHELLO), Card(GameType.MORABARABA),
         Card(GameType.TICTACTOE), Card(GameType.CONNECT_FOUR),
-        Card(GameType.FOX_AND_GEESE)
+        Card(GameType.FOX_AND_GEESE), Card(GameType.LUDO)
     )
 
     private val dp = context.resources.displayMetrics.density
@@ -289,6 +289,7 @@ class MenuView(context: Context) : View(context) {
             GameType.TICTACTOE   -> "Tic-Tac-Toe"  to "vs AI  •  2 Players"
             GameType.CONNECT_FOUR -> "Connect Four" to "vs AI  •  2 Players"
             GameType.FOX_AND_GEESE -> "Fox and Geese" to "vs AI  •  2 Players"
+            GameType.LUDO         -> "Ludo"         to "vs AI  •  4 Players"
         }
 
         val titleLines = if (title == "International Draughts") {
@@ -319,6 +320,44 @@ class MenuView(context: Context) : View(context) {
             GameType.TICTACTOE  -> drawTicTacToeMini(canvas, left, top, size)
             GameType.CONNECT_FOUR -> drawConnectFourMini(canvas, left, top, size)
             GameType.FOX_AND_GEESE -> drawFoxAndGeeseMini(canvas, left, top, size)
+            GameType.LUDO -> drawLudoMini(canvas, left, top, size)
+        }
+    }
+
+    private fun drawLudoMini(canvas: Canvas, left: Float, top: Float, size: Float) {
+        val cell = size / 7f
+        val board = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#26313A") }
+        canvas.drawRoundRect(RectF(left, top, left + size, top + size), cell * 0.5f, cell * 0.5f, board)
+        val colors = intArrayOf(
+            Color.parseColor("#E4574F"), Color.parseColor("#4F8DDA"),
+            Color.parseColor("#42A778"), Color.parseColor("#E8B84A")
+        )
+        val rects = arrayOf(
+            RectF(left, top + cell * 4, left + cell * 3, top + size),
+            RectF(left, top, left + cell * 3, top + cell * 3),
+            RectF(left + cell * 4, top, left + size, top + cell * 3),
+            RectF(left + cell * 4, top + cell * 4, left + size, top + size)
+        )
+        for (i in rects.indices) {
+            board.color = colors[i]
+            board.alpha = 90
+            canvas.drawRoundRect(rects[i], cell * 0.35f, cell * 0.35f, board)
+            board.alpha = 255
+        }
+        board.color = Color.parseColor("#EEEAE0")
+        for (position in arrayOf(
+            Position(0, 3), Position(3, 6), Position(6, 3), Position(3, 0)
+        )) {
+            canvas.drawRect(left + position.col * cell, top + position.row * cell,
+                left + (position.col + 1) * cell, top + (position.row + 1) * cell, board)
+        }
+        for (i in colors.indices) {
+            board.color = colors[i]
+            canvas.drawCircle(
+                left + cell * (1.25f + (i % 2) * 4.5f),
+                top + cell * (1.25f + (i / 2) * 4.5f),
+                cell * 0.28f, board
+            )
         }
     }
 

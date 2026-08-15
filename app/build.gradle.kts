@@ -11,8 +11,8 @@ plugins {
           applicationId = "com.mkdev.mkboardgames"
           minSdk = 24
           targetSdk = 36
-          versionCode = 24
-          versionName = "2.4"
+          versionCode = 25
+          versionName = "2.5"
       }
 
       signingConfigs {

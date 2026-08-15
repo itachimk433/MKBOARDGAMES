@@ -23,10 +23,13 @@ import com.mkdev.mkboardgames.games.chess.ChessRuleEngine
 import com.mkdev.mkboardgames.games.connectfour.ConnectFourPiece
 import com.mkdev.mkboardgames.games.connectfour.ConnectFourRuleEngine
 import com.mkdev.mkboardgames.games.foxandgeese.FoxAndGeeseRuleEngine
+import com.mkdev.mkboardgames.games.ludo.LudoRuleEngine
+import com.mkdev.mkboardgames.games.ludo.LudoSetup
 import com.mkdev.mkboardgames.games.morabaraba.MorabarabaRuleEngine
 import com.mkdev.mkboardgames.games.tictactoe.TicTacToePiece
 import com.mkdev.mkboardgames.games.tictactoe.TicTacToeRuleEngine
 import com.mkdev.mkboardgames.ui.BoardView
+import com.mkdev.mkboardgames.ui.LudoBoardView
 import com.mkdev.mkboardgames.ui.MorabaraBoardView
 import org.json.JSONArray
 import org.json.JSONObject
@@ -54,6 +57,10 @@ class ReplayActivity : AppCompatActivity() {
                     obj.put("caps", caps)
                 }
                 if (m.promotionType != null) obj.put("promo", m.promotionType)
+                for (key in arrayOf("dice", "player", "token", "targetProgress")) {
+                    val value = m.metadata[key]
+                    if (value is Int) obj.put(key, value)
+                }
                 arr.put(obj)
             }
             return arr.toString()
@@ -75,7 +82,11 @@ class ReplayActivity : AppCompatActivity() {
                     }
                 }
                 val promo = if (obj.has("promo")) obj.getString("promo") else null
-                list += Move(from, to, caps, promo)
+                val metadata = mutableMapOf<String, Any>()
+                for (key in arrayOf("dice", "player", "token", "targetProgress")) {
+                    if (obj.has(key)) metadata[key] = obj.getInt(key)
+                }
+                list += Move(from, to, caps, promo, metadata)
             }
             return list
         }
@@ -94,6 +105,7 @@ class ReplayActivity : AppCompatActivity() {
     private var ticBoardView:  TicReplayBoard?     = null
     private var connectBoardView: ConnectReplayBoard? = null
     private var moraBoardView: MorabaraBoardView?  = null
+    private var ludoBoardView: LudoBoardView? = null
     private lateinit var seekBar:      SeekBar
     private lateinit var controlsView: ReplayControlsView
     private lateinit var infoView:     ReplayInfoView
@@ -167,6 +179,7 @@ class ReplayActivity : AppCompatActivity() {
         val isTicTacToe  = gameType == "TICTACTOE"
         val isConnectFour = gameType == "CONNECTFOUR"
         val isMorabaraba = gameType == "MORABARABA"
+        val isLudo = gameType == "LUDO"
 
         val engine: RuleEngine = when (gameType) {
             "TICTACTOE"  -> TicTacToeRuleEngine(ticBoardSize, ticBoardSize)
@@ -175,6 +188,7 @@ class ReplayActivity : AppCompatActivity() {
             "INTERNATIONAL_DRAUGHTS" -> InternationalDraughtsRuleEngine()
             "MORABARABA" -> MorabarabaRuleEngine()
             "FOX_AND_GEESE" -> FoxAndGeeseRuleEngine()
+            "LUDO" -> LudoRuleEngine()
             else         -> ChessRuleEngine()
         }
 
@@ -183,19 +197,23 @@ class ReplayActivity : AppCompatActivity() {
         val allStates  = mutableListOf(engine.initialState())
         val allLabels  = mutableListOf("Start")
         for ((idx, move) in moves.withIndex()) {
-            val actor = if (gameType == "FOX_AND_GEESE") {
+            val actor = if (isLudo) {
+                val player = (move.metadata["player"] as? Int ?: idx % LudoSetup.PLAYER_COUNT)
+                    .coerceIn(0, LudoSetup.PLAYER_COUNT - 1)
+                LudoSetup.PLAYER_NAMES[player]
+            } else if (gameType == "FOX_AND_GEESE") {
                 if (idx % 2 == 0) "Fox" else "Geese"
             } else {
                 if (idx % 2 == 0) "White" else "Black"
             }
             allStates += engine.applyMove(allStates.last(), move)
-            allLabels += "${idx / 2 + 1}. $actor"
+            allLabels += if (isLudo) "${idx + 1}. $actor" else "${idx / 2 + 1}. $actor"
         }
         states     = allStates
         moveLabels = allLabels
 
         // Build per-state capture snapshots (not meaningful for TicTacToe or Othello)
-        val hasCaptures = !isTicTacToe && !isConnectFour && gameType != "OTHELLO"
+        val hasCaptures = !isTicTacToe && !isConnectFour && gameType != "OTHELLO" && !isLudo
         val snaps = mutableListOf(CaptureSnapshot(emptyList(), emptyList()))
         if (hasCaptures) {
             for ((idx, move) in moves.withIndex()) {
@@ -265,6 +283,15 @@ class ReplayActivity : AppCompatActivity() {
                 moraBoardView = mbv
                 root.addView(mbv, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0).apply { weight = 1f })
             }
+            isLudo -> {
+                val lbv = LudoBoardView(this).apply {
+                    gameState = states.first()
+                    isLocked = true
+                    onGameOverTapped = { showReplayResultDialog() }
+                }
+                ludoBoardView = lbv
+                root.addView(lbv, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0).apply { weight = 1f })
+            }
             else -> {
                 val bv = BoardView(this).apply { isLocked = true; ruleEngine = engine }
                 boardView = bv
@@ -330,12 +357,21 @@ class ReplayActivity : AppCompatActivity() {
                 }
                 mbv.animateExternalMove(move)
             }
+            ludoBoardView?.let { lbv ->
+                lbv.gameState = states[cursor - 1]
+                lbv.isLocked = true
+                lbv.animateMove(move) {
+                    lbv.gameState = states[cursor]
+                    lbv.isLocked = true
+                }
+            }
         } else {
             cursor              = newCursor
             boardView?.let { it.gameState = states[cursor]; it.isLocked = true }
             ticBoardView?.showState(states[cursor])
             connectBoardView?.showState(states[cursor])
             moraBoardView?.let { it.gameState = states[cursor]; it.isLocked = true }
+            ludoBoardView?.let { it.gameState = states[cursor]; it.isLocked = true }
             seekBar.progress    = cursor
             val label = moveLabels.getOrElse(cursor) { "Move $cursor" }
             infoView.update(label, cursor, states.size - 1, resultText)
@@ -363,6 +399,14 @@ class ReplayActivity : AppCompatActivity() {
         isPlaying = false
         handler.removeCallbacks(autoPlayRunnable)
         controlsView.invalidate()
+    }
+
+    private fun showReplayResultDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("Ludo")
+            .setMessage(resultText.ifBlank { "Replay finished." })
+            .setPositiveButton("Close", null)
+            .show()
     }
 
     override fun onDestroy() { super.onDestroy(); stopAutoPlay() }
