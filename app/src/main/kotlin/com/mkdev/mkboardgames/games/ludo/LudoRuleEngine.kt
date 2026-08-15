@@ -142,5 +142,5 @@ class LudoRuleEngine : RuleEngine {
         board.filterIsInstance<LudoPiece>().firstOrNull { it.player == player && it.token == token }
 
     private fun isSafeTrackCell(position: Position): Boolean =
-        position in LudoSetup.PATH.filterIndexed { index, _ -> index % 13 == 0 }
+        LudoSetup.isSafeTrackCell(position)
 }

@@ -66,6 +66,12 @@ object LudoSetup {
         add(Position(0, 6))
     }
 
+    /**
+     * The supplied board marks both the four coloured arrow/start cells and
+     * the four star cells as safe. Tokens on these cells cannot be captured.
+     */
+    val SAFE_TRACK_INDICES: Set<Int> = setOf(0, 13, 16, 23, 26, 39, 42, 49)
+
     private val yardCells = arrayOf(
         arrayOf(Position(1, 1), Position(1, 3), Position(3, 1), Position(3, 3)),
         arrayOf(Position(1, 11), Position(1, 13), Position(3, 11), Position(3, 13)),
@@ -79,6 +85,11 @@ object LudoSetup {
 
     fun trackPosition(player: Int, progress: Int): Position =
         PATH[(startOffset(player) + progress) % PATH_LENGTH]
+
+    fun isSafeTrackCell(position: Position): Boolean =
+        PATH.withIndex().any { (index, pathPosition) ->
+            index in SAFE_TRACK_INDICES && pathPosition == position
+        }
 
     fun homeLanePosition(player: Int, progress: Int): Position {
         val lane = (progress - 52).coerceIn(0, 3)
