@@ -22,6 +22,22 @@ import java.nio.ShortBuffer
 import kotlin.math.max
 import kotlin.math.min
 
+private data class DiceOrientation(
+    val x: Float,
+    val y: Float,
+) {
+    companion object {
+        fun forValue(value: Int): DiceOrientation = when (value.coerceIn(1, 6)) {
+            1 -> DiceOrientation(0f, 90f)
+            2 -> DiceOrientation(0f, 0f)
+            3 -> DiceOrientation(90f, 0f)
+            4 -> DiceOrientation(0f, 180f)
+            5 -> DiceOrientation(-90f, 0f)
+            else -> DiceOrientation(0f, -90f)
+        }
+    }
+}
+
 /**
  * Displays the supplied dice.gltf asset using Android's built-in OpenGL ES 2.0
  * renderer. The view intentionally has no third-party 3D dependency so the
@@ -513,22 +529,6 @@ private class DiceRenderer(
         val indexCount: Int,
         val textureId: Int,
     )
-
-    private data class DiceOrientation(
-        val x: Float,
-        val y: Float,
-    ) {
-        companion object {
-            fun forValue(value: Int): DiceOrientation = when (value.coerceIn(1, 6)) {
-                1 -> DiceOrientation(0f, 90f)
-                2 -> DiceOrientation(0f, 0f)
-                3 -> DiceOrientation(90f, 0f)
-                4 -> DiceOrientation(0f, 180f)
-                5 -> DiceOrientation(-90f, 0f)
-                else -> DiceOrientation(0f, -90f)
-            }
-        }
-    }
 
     companion object {
         private const val VERTEX_SHADER = """
