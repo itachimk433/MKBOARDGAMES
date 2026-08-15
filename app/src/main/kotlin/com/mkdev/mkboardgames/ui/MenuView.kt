@@ -48,6 +48,10 @@ class MenuView(context: Context) : View(context) {
         (context.resources.getDrawable(R.drawable.ic_app_logo, null) as? BitmapDrawable)?.bitmap
     } catch (e: Exception) { null }
 
+    private val ludoBoardBitmap: Bitmap? = try {
+        context.assets.open("ludo_board_reference.png").use { BitmapFactory.decodeStream(it) }
+    } catch (e: Exception) { null }
+
     private val bgPaint        = Paint().apply { color = Color.parseColor("#121212") }
     private val cardPaint      = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#202429") }
     private val cardHiPaint    = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#2B3138") }
@@ -325,6 +329,18 @@ class MenuView(context: Context) : View(context) {
     }
 
     private fun drawLudoMini(canvas: Canvas, left: Float, top: Float, size: Float) {
+        if (ludoBoardBitmap != null) {
+            val boardRect = RectF(left, top, left + size, top + size)
+            val boardPath = Path().apply {
+                addRoundRect(boardRect, size * 0.06f, size * 0.06f, Path.Direction.CW)
+            }
+            canvas.save()
+            canvas.clipPath(boardPath)
+            canvas.drawBitmap(ludoBoardBitmap, null, boardRect, bitmapPaint)
+            canvas.restore()
+            return
+        }
+
         val cell = size / 7f
         val board = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#26313A") }
         canvas.drawRoundRect(RectF(left, top, left + size, top + size), cell * 0.5f, cell * 0.5f, board)
