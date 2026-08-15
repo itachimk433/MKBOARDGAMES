@@ -1,6 +1,5 @@
 package com.mkdev.mkboardgames
 
-import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
 import android.os.Handler
@@ -69,9 +68,11 @@ class LudoActivity : AppCompatActivity() {
         AdManager.attachBanner(root)
         setContentView(root)
 
-        boardView.onMoveSelected = ::playMove
+        boardView.onMoveSelected = { move ->
+            if (isHumanTurn()) playMove(move)
+        }
         boardView.onGameOverTapped = { showResultDialog() }
-        diceView.onRoll = { rollDice() }
+        diceView.onRoll = { if (isHumanTurn()) rollDice() }
         showModeDialog()
     }
 
@@ -176,9 +177,7 @@ class LudoActivity : AppCompatActivity() {
     }
 
     private fun rollDice() {
-        if (state.status != GameStatus.IN_PROGRESS || rolledValue != 0 ||
-            boardView.isLocked || (vsAI && !isHumanTurn())
-        ) return
+        if (state.status != GameStatus.IN_PROGRESS || rolledValue != 0 || boardView.isLocked) return
 
         val nextValue = Random.nextInt(1, 7)
         diceView.rollTo(nextValue) {
@@ -264,14 +263,7 @@ class LudoActivity : AppCompatActivity() {
         AlertDialog.Builder(this)
             .setTitle("Ludo")
             .setMessage(result)
-            .setPositiveButton("Watch Replay") { _, _ ->
-                startActivity(Intent(this, ReplayActivity::class.java).apply {
-                    putExtra(ReplayActivity.EXTRA_GAME_TYPE, "LUDO")
-                    putExtra(ReplayActivity.EXTRA_MOVES_JSON, ReplayActivity.buildMovesJson(moves))
-                    putExtra(ReplayActivity.EXTRA_RESULT, result)
-                })
-            }
-            .setNeutralButton("New Match") { _, _ -> startGame() }
+            .setPositiveButton("New Match") { _, _ -> startGame() }
             .setNegativeButton("Main Menu") { _, _ -> finish() }
             .setOnDismissListener { resultDialogVisible = false }
             .show()

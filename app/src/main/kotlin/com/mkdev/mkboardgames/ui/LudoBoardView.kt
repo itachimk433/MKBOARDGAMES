@@ -4,10 +4,11 @@ import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
-import android.graphics.Path
 import android.graphics.PointF
 import android.graphics.RectF
 import android.view.MotionEvent
@@ -47,12 +48,10 @@ class LudoBoardView(context: Context) : View(context) {
     private var animatedProgress = 0f
     private var moveAnimator: ValueAnimator? = null
 
+    private val boardBitmap: Bitmap? = runCatching {
+        context.assets.open("ludo_board_reference.png").use { BitmapFactory.decodeStream(it) }
+    }.getOrNull()
     private val boardPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val gridPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(80, 255, 255, 255)
-        style = Paint.Style.STROKE
-        strokeWidth = 1f
-    }
     private val piecePaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.CENTER
@@ -90,70 +89,14 @@ class LudoBoardView(context: Context) : View(context) {
 
     private fun drawBoard(canvas: Canvas) {
         val size = LudoSetup.BOARD_SIZE * cell
-        boardPaint.color = Color.parseColor("#182029")
-        canvas.drawRoundRect(RectF(left, top, left + size, top + size), cell, cell, boardPaint)
-
-        drawYard(canvas, 0, RectF(left, top + cell * 9, left + cell * 5, top + cell * 14))
-        drawYard(canvas, 1, RectF(left, top, left + cell * 5, top + cell * 5))
-        drawYard(canvas, 2, RectF(left + cell * 9, top, left + cell * 14, top + cell * 5))
-        drawYard(canvas, 3, RectF(left + cell * 9, top + cell * 9, left + cell * 14, top + cell * 14))
-
-        for (position in LudoSetup.PATH) drawCell(canvas, position, Color.parseColor("#E5E1D8"))
-        for (player in 0 until LudoSetup.PLAYER_COUNT) {
-            for (progress in 52 until LudoSetup.FINISH) {
-                drawCell(canvas, LudoSetup.homeLanePosition(player, progress), LudoSetup.PLAYER_SOFT_COLORS[player])
-            }
+        val boardRect = RectF(left, top, left + size, top + size)
+        val bitmap = boardBitmap
+        if (bitmap != null) {
+            canvas.drawBitmap(bitmap, null, boardRect, boardPaint)
+        } else {
+            boardPaint.color = Color.WHITE
+            canvas.drawRect(boardRect, boardPaint)
         }
-
-        val center = RectF(left + cell * 5, top + cell * 5, left + cell * 10, top + cell * 10)
-        boardPaint.color = Color.parseColor("#27313A")
-        canvas.drawRect(center, boardPaint)
-        val triangle = Path()
-        triangle.moveTo(center.centerX(), center.centerY())
-        triangle.lineTo(center.left, center.top)
-        triangle.lineTo(center.left, center.bottom)
-        triangle.close()
-        boardPaint.color = LudoSetup.PLAYER_COLORS[0]
-        canvas.drawPath(triangle, boardPaint)
-        triangle.reset()
-        triangle.moveTo(center.centerX(), center.centerY())
-        triangle.lineTo(center.left, center.top)
-        triangle.lineTo(center.right, center.top)
-        triangle.close()
-        boardPaint.color = LudoSetup.PLAYER_COLORS[1]
-        canvas.drawPath(triangle, boardPaint)
-        triangle.reset()
-        triangle.moveTo(center.centerX(), center.centerY())
-        triangle.lineTo(center.right, center.top)
-        triangle.lineTo(center.right, center.bottom)
-        triangle.close()
-        boardPaint.color = LudoSetup.PLAYER_COLORS[2]
-        canvas.drawPath(triangle, boardPaint)
-        triangle.reset()
-        triangle.moveTo(center.centerX(), center.centerY())
-        triangle.lineTo(center.right, center.bottom)
-        triangle.lineTo(center.left, center.bottom)
-        triangle.close()
-        boardPaint.color = LudoSetup.PLAYER_COLORS[3]
-        canvas.drawPath(triangle, boardPaint)
-    }
-
-    private fun drawYard(canvas: Canvas, player: Int, rect: RectF) {
-        boardPaint.color = LudoSetup.PLAYER_SOFT_COLORS[player]
-        canvas.drawRoundRect(rect, cell * 0.55f, cell * 0.55f, boardPaint)
-        boardPaint.color = Color.argb(40, 255, 255, 255)
-        canvas.drawRoundRect(
-            RectF(rect.left + cell * 0.45f, rect.top + cell * 0.45f,
-                rect.right - cell * 0.45f, rect.bottom - cell * 0.45f),
-            cell * 0.25f, cell * 0.25f, boardPaint
-        )
-    }
-
-    private fun drawCell(canvas: Canvas, position: Position, color: Int) {
-        val rect = cellRect(position)
-        boardPaint.color = color
-        canvas.drawRect(rect, boardPaint)
-        canvas.drawRect(rect, gridPaint)
     }
 
     private fun drawMoveHints(canvas: Canvas) {
@@ -222,6 +165,13 @@ class LudoBoardView(context: Context) : View(context) {
         }
         if (isLocked) return true
         val tapped = positionAt(event.x, event.y) ?: return true
+        val source = legalMoves.firstOrNull { it.from == tapped }
+        if (source != null) {
+            selectedFrom = null
+            legalMoves = emptyList()
+            onMoveSelected?.invoke(source)
+            return true
+        }
         val destination = legalMoves.firstOrNull { it.to == tapped }
         if (destination != null) {
             selectedFrom = null
@@ -229,8 +179,7 @@ class LudoBoardView(context: Context) : View(context) {
             onMoveSelected?.invoke(destination)
             return true
         }
-        val source = legalMoves.firstOrNull { it.from == tapped }?.from
-        if (source != null) selectedFrom = source else selectedFrom = null
+        selectedFrom = null
         invalidate()
         return true
     }

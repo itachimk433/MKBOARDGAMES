@@ -46,21 +46,30 @@ object LudoSetup {
     )
 
     /**
-     * The 52 playable track cells are the perimeter of the 15x15 board with
-     * the four corner cells removed. It leaves the central 5x5 home area
-     * available for the coloured approach lanes.
+     * The 52 common track cells in clockwise order, beginning at the red
+     * starting square on the supplied 15x15 board. The four player starts are
+     * exactly 13 cells apart: top, right, bottom, and left.
      */
     val PATH: List<Position> = buildList {
-        for (col in 1..13) add(Position(0, col))
-        for (row in 1..13) add(Position(row, 14))
-        for (col in 13 downTo 1) add(Position(14, col))
-        for (row in 13 downTo 1) add(Position(row, 0))
+        addAll(listOf(Position(0, 7), Position(0, 8)))
+        for (row in 1..5) add(Position(row, 8))
+        for (col in 9..14) add(Position(6, col))
+        addAll(listOf(Position(7, 14), Position(8, 14)))
+        for (col in 13 downTo 9) add(Position(8, col))
+        for (row in 9..14) add(Position(row, 8))
+        addAll(listOf(Position(14, 7), Position(14, 6)))
+        for (row in 13 downTo 9) add(Position(row, 6))
+        for (col in 5 downTo 0) add(Position(8, col))
+        addAll(listOf(Position(7, 0), Position(6, 0)))
+        for (col in 1..5) add(Position(6, col))
+        for (row in 5 downTo 1) add(Position(row, 6))
+        add(Position(0, 6))
     }
 
     private val yardCells = arrayOf(
-        arrayOf(Position(10, 1), Position(10, 3), Position(12, 1), Position(12, 3)),
         arrayOf(Position(1, 1), Position(1, 3), Position(3, 1), Position(3, 3)),
         arrayOf(Position(1, 11), Position(1, 13), Position(3, 11), Position(3, 13)),
+        arrayOf(Position(10, 1), Position(10, 3), Position(12, 1), Position(12, 3)),
         arrayOf(Position(10, 11), Position(10, 13), Position(12, 11), Position(12, 13))
     )
 
@@ -74,9 +83,9 @@ object LudoSetup {
     fun homeLanePosition(player: Int, progress: Int): Position {
         val lane = (progress - 52).coerceIn(0, 3)
         return when (player) {
-            0 -> Position(7, 1 + lane)
-            1 -> Position(1 + lane, 7)
-            2 -> Position(7, 13 - lane)
+            0 -> Position(1 + lane, 7)
+            1 -> Position(7, 13 - lane)
+            2 -> Position(7, 1 + lane)
             else -> Position(13 - lane, 7)
         }
     }
@@ -84,8 +93,8 @@ object LudoSetup {
     fun finishPosition(player: Int, token: Int): Position = when (player) {
         0 -> Position(6 + token / 2, 6 + token % 2)
         1 -> Position(6 + token / 2, 8 + token % 2)
-        2 -> Position(8 + token / 2, 8 + token % 2)
-        else -> Position(8 + token / 2, 6 + token % 2)
+        2 -> Position(8 + token / 2, 6 + token % 2)
+        else -> Position(8 + token / 2, 8 + token % 2)
     }
 
     fun positionOf(piece: LudoPiece): Position = when {
