@@ -8,6 +8,7 @@ import android.view.MotionEvent
 import android.view.View
 import com.mkdev.mkboardgames.R
 import com.mkdev.mkboardgames.SettingsManager
+import com.mkdev.mkboardgames.engine.Position
 import com.mkdev.mkboardgames.games.foxandgeese.FoxAndGeeseSetup
 
 class MenuView(context: Context) : View(context) {
@@ -450,7 +451,7 @@ class MenuView(context: Context) : View(context) {
         fun point(row: Int, col: Int): Pair<Float, Float> =
             left + col * cell + cell / 2f to top + row * cell + cell / 2f
         fun isPlayable(row: Int, col: Int) =
-            FoxAndGeeseSetup.isPlayable(com.mkdev.mkboardgames.engine.Position(row, col))
+            FoxAndGeeseSetup.isPlayable(Position(row, col))
 
         val boardPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.parseColor("#F5E9D0")
@@ -496,6 +497,7 @@ class MenuView(context: Context) : View(context) {
                 val nc = col + dc
                 if (!isPlayable(nr, nc)) continue
                 if (nr < row || (nr == row && nc <= col)) continue
+                if (!FoxAndGeeseSetup.isConnected(Position(row, col), Position(nr, nc))) continue
                 val (x1, y1) = point(row, col)
                 val (x2, y2) = point(nr, nc)
                 canvas.drawLine(x1, y1, x2, y2, linePaint)
