@@ -14,8 +14,8 @@ import com.mkdev.mkboardgames.engine.RuleEngine
  * - both sides move to an adjacent connected point;
  * - the fox may jump over an adjacent goose into an empty point and capture it;
  * - geese may move in any direction but never capture;
- * - the fox wins when the geese are gone or cannot move, while the geese win
- *   when the fox is trapped.
+ * - the fox wins when fewer than two geese remain, the geese cannot move, or
+ *   the geese are gone, while the geese win when the fox is trapped.
  */
 class FoxAndGeeseRuleEngine : RuleEngine {
 
@@ -140,7 +140,11 @@ class FoxAndGeeseRuleEngine : RuleEngine {
     override fun gameStatus(state: GameState): GameStatus {
         val fox = findFox(state)
         val geese = countGeese(state)
-        if (fox == null || geese == 0) return GameStatus.WHITE_WINS
+        // A single goose can never surround the fox, so the fox has already
+        // won as soon as the flock drops below the minimum needed to trap it.
+        if (fox == null || geese < FoxAndGeeseSetup.MIN_GEESE_TO_KEEP_PLAYING) {
+            return GameStatus.WHITE_WINS
+        }
         if (allLegalMoves(state, PieceColor.WHITE).isEmpty()) return GameStatus.BLACK_WINS
         if (allLegalMoves(state, PieceColor.BLACK).isEmpty()) return GameStatus.WHITE_WINS
         return GameStatus.IN_PROGRESS

@@ -29,6 +29,7 @@ object FoxAndGeeseSetup {
      */
     const val BOARD_SIZE = 7
     const val GOOSE_COUNT = 13
+    const val MIN_GEESE_TO_KEEP_PLAYING = 2
 
     fun isPlayable(position: Position): Boolean =
         position.row in 0 until BOARD_SIZE &&

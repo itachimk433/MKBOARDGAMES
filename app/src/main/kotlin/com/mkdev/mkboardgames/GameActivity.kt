@@ -291,7 +291,7 @@ The geese move one adjacent connected point in any direction, including forwards
 ─────────────────────────
 
 Winning
-The fox wins by capturing all the geese or by leaving the flock with no legal move. The geese win by trapping the fox so it has no legal move.
+The fox wins by capturing all but one of the geese, leaving the flock with no legal move, or capturing all the geese. A single goose can never trap the fox, so the game ends immediately when only one remains. The geese win by trapping the fox so it has no legal move.
             """.trimIndent()
 
             else -> """
