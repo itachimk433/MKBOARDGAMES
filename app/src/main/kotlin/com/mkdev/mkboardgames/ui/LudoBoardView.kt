@@ -13,12 +13,15 @@ import android.graphics.PointF
 import android.graphics.RectF
 import android.view.MotionEvent
 import android.view.View
-import android.view.animation.AccelerateDecelerateInterpolator
+import android.view.animation.LinearInterpolator
 import com.mkdev.mkboardgames.engine.GameState
 import com.mkdev.mkboardgames.engine.Move
 import com.mkdev.mkboardgames.engine.Position
 import com.mkdev.mkboardgames.games.ludo.LudoPiece
 import com.mkdev.mkboardgames.games.ludo.LudoSetup
+import kotlin.math.PI
+import kotlin.math.floor
+import kotlin.math.sin
 
 class LudoBoardView(context: Context) : View(context) {
     var gameState: GameState = LudoSetup.initialState()
@@ -45,6 +48,7 @@ class LudoBoardView(context: Context) : View(context) {
     private var top = 0f
     private var animatedMove: Move? = null
     private var animatedPiece: LudoPiece? = null
+    private var animatedPath: List<Position> = emptyList()
     private var animatedProgress = 0f
     private var moveAnimator: ValueAnimator? = null
 
@@ -101,13 +105,33 @@ class LudoBoardView(context: Context) : View(context) {
 
     private fun drawMoveHints(canvas: Canvas) {
         for (move in legalMoves) {
+            drawPathHighlight(canvas, pathFor(move))
             val point = centerOf(move.to)
             canvas.drawCircle(point.x, point.y, cell * 0.34f, highlightPaint)
             canvas.drawCircle(point.x, point.y, cell * 0.08f, highlightPaint)
         }
+        animatedMove?.let { drawPathHighlight(canvas, animatedPath) }
         selectedFrom?.let { from ->
             val point = centerOf(from)
             canvas.drawCircle(point.x, point.y, cell * 0.42f, highlightPaint)
+        }
+    }
+
+    private fun drawPathHighlight(canvas: Canvas, path: List<Position>) {
+        for ((index, position) in path.withIndex()) {
+            val rect = cellRect(position).apply { inset(cell * 0.12f, cell * 0.12f) }
+            piecePaint.color = if (index == path.lastIndex) {
+                Color.argb(120, 255, 255, 255)
+            } else {
+                Color.argb(68, 255, 255, 255)
+            }
+            piecePaint.style = Paint.Style.FILL
+            canvas.drawRoundRect(rect, cell * 0.12f, cell * 0.12f, piecePaint)
+            piecePaint.color = Color.argb(165, 255, 255, 255)
+            piecePaint.style = Paint.Style.STROKE
+            piecePaint.strokeWidth = cell * 0.035f
+            canvas.drawRoundRect(rect, cell * 0.12f, cell * 0.12f, piecePaint)
+            piecePaint.style = Paint.Style.FILL
         }
     }
 
@@ -124,13 +148,26 @@ class LudoBoardView(context: Context) : View(context) {
         val moving = animatedPiece
         val move = animatedMove
         if (moving != null && move != null) {
-            val from = centerOf(move.from)
-            val to = centerOf(move.to)
-            drawPiece(canvas, moving, PointF(
-                from.x + (to.x - from.x) * animatedProgress,
-                from.y + (to.y - from.y) * animatedProgress
-            ))
+            drawPiece(canvas, moving, animatedPiecePoint())
         }
+    }
+
+    private fun animatedPiecePoint(): PointF {
+        val path = animatedPath
+        if (path.isEmpty()) return centerOf(animatedMove?.to ?: Position(0, 0))
+
+        val lastIndex = path.lastIndex
+        val progress = animatedProgress.coerceIn(0f, lastIndex.toFloat())
+        val lowerIndex = floor(progress).toInt().coerceIn(0, lastIndex)
+        val upperIndex = (lowerIndex + 1).coerceAtMost(lastIndex)
+        val segmentProgress = progress - lowerIndex
+        val from = centerOf(path[lowerIndex])
+        val to = centerOf(path[upperIndex])
+        val jumpHeight = sin(segmentProgress * PI).toFloat() * cell * 0.18f
+        return PointF(
+            from.x + (to.x - from.x) * segmentProgress,
+            from.y + (to.y - from.y) * segmentProgress - jumpHeight
+        )
     }
 
     private fun drawPiece(canvas: Canvas, piece: LudoPiece, point: PointF) {
@@ -189,11 +226,12 @@ class LudoBoardView(context: Context) : View(context) {
         isLocked = true
         animatedMove = move
         animatedPiece = piece
+        animatedPath = pathFor(move)
         animatedProgress = 0f
         moveAnimator?.cancel()
-        moveAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
-            duration = 360L
-            interpolator = AccelerateDecelerateInterpolator()
+        moveAnimator = ValueAnimator.ofFloat(0f, animatedPath.lastIndex.toFloat()).apply {
+            duration = (animatedPath.lastIndex.coerceAtLeast(1) * 145L) + 70L
+            interpolator = LinearInterpolator()
             addUpdateListener {
                 animatedProgress = it.animatedValue as Float
                 invalidate()
@@ -202,6 +240,7 @@ class LudoBoardView(context: Context) : View(context) {
                 override fun onAnimationEnd(animation: Animator) {
                     animatedMove = null
                     animatedPiece = null
+                    animatedPath = emptyList()
                     animatedProgress = 0f
                     isLocked = false
                     invalidate()
@@ -210,6 +249,33 @@ class LudoBoardView(context: Context) : View(context) {
             })
             start()
         }
+    }
+
+    private fun pathFor(move: Move): List<Position> {
+        val piece = gameState.get(move.from) as? LudoPiece
+            ?: return listOf(move.from, move.to)
+        val targetProgress = move.metadata["targetProgress"] as? Int
+            ?: return listOf(move.from, move.to)
+        val path = mutableListOf(move.from)
+
+        if (piece.progress < 0) {
+            path += positionForProgress(piece, 0)
+            for (progress in 1..targetProgress) {
+                path += positionForProgress(piece, progress)
+            }
+        } else {
+            for (progress in (piece.progress + 1)..targetProgress) {
+                path += positionForProgress(piece, progress)
+            }
+        }
+        if (path.lastOrNull() != move.to) path += move.to
+        return path
+    }
+
+    private fun positionForProgress(piece: LudoPiece, progress: Int): Position = when {
+        progress < 52 -> LudoSetup.trackPosition(piece.player, progress)
+        progress < LudoSetup.FINISH -> LudoSetup.homeLanePosition(piece.player, progress)
+        else -> LudoSetup.finishPosition(piece.player, piece.token)
     }
 
     private fun cellRect(position: Position): RectF =

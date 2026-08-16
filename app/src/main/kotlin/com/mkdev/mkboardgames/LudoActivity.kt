@@ -189,7 +189,7 @@ class LudoActivity : AppCompatActivity() {
             boardView.legalMoves = legal
             updateHud()
             if (legal.isEmpty()) {
-                Toast.makeText(this, "No legal move", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "No move possible — turn skipped", Toast.LENGTH_SHORT).show()
                 handler.postDelayed({ finishTurnAfterNoMove() }, 520L)
             } else if (isAiTurn()) {
                 handler.postDelayed({ playMove(chooseAiMove(legal)) }, 420L)
