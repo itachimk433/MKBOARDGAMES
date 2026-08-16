@@ -269,7 +269,7 @@ class LudoActivity : AppCompatActivity() {
             lastMotionAt = now
             runOnUiThread {
                 if (matchStarted && SettingsManager.isMotionDiceEnabled(this@LudoActivity)) {
-                    rollDice(direction)
+                    rollDice(direction, false)
                 }
             }
         }
