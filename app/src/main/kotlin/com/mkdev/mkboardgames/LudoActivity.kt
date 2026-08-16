@@ -105,13 +105,13 @@ class LudoActivity : AppCompatActivity() {
             gravity = android.view.Gravity.CENTER
             setPadding(0, (4 * dp).toInt(), 0, 0)
         }
-        controls.addView(motionView, LinearLayout.LayoutParams(0, (112 * dp).toInt(), 1f).apply {
+        controls.addView(motionView, LinearLayout.LayoutParams(0, (96 * dp).toInt(), 1f).apply {
             marginEnd = (6 * dp).toInt()
         })
         controls.addView(diceView, LinearLayout.LayoutParams((112 * dp).toInt(), (112 * dp).toInt()).apply {
             marginEnd = (6 * dp).toInt()
         })
-        controls.addView(tapRollView, LinearLayout.LayoutParams(0, (112 * dp).toInt(), 1f))
+        controls.addView(tapRollView, LinearLayout.LayoutParams(0, (96 * dp).toInt(), 1f))
         root.addView(controls, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, (116 * dp).toInt()
         ))

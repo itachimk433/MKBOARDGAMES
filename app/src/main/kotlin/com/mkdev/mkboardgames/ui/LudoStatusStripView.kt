@@ -131,7 +131,7 @@ class LudoStatusStripView(context: Context) : View(context) {
             canvas.drawText(
                 "[A]",
                 left + 7f * density * scale,
-                bottom - 12f * density * scale,
+                bottom - 25f * density * scale,
                 textPaint,
             )
 
