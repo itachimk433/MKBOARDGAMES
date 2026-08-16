@@ -1055,7 +1055,7 @@ class LudoActivity : AppCompatActivity() {
             setText(economy.tokenName.take(5))
             setSelection(text.length)
             hint = "Up to 5 letters"
-            singleLine = true
+            isSingleLine = true
         }
         val padding = (22 * resources.displayMetrics.density).roundToInt()
         val container = FrameLayout(this).apply {
