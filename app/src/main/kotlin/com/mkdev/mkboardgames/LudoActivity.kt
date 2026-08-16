@@ -48,6 +48,8 @@ class LudoActivity : AppCompatActivity() {
     private var matchStarted = false
     private var rolledValue = 0
     private var resultDialogVisible = false
+    private var celebrationMessage: String? = null
+    private var celebrationGeneration = 0
     private lateinit var sensorManager: SensorManager
     private var motionSensor: Sensor? = null
     private var usingRawAccelerometer = false
@@ -287,7 +289,7 @@ class LudoActivity : AppCompatActivity() {
 
             Roll the die and move one of your four tokens around the track. A six brings a token out of your yard and gives you another roll. Land on an opponent's token to send it home. Bring all four tokens into your home area first to win.
 
-            In a four-player match, every colour takes a turn clockwise. During a match against the AI, you control one colour and the other three are automated.
+            Three sixes in a row forfeit the turn. An exact roll is required to reach the center. In a four-player match, every colour takes a turn clockwise. During a match against the AI, you control one colour and the other three are automated.
         """.trimIndent()
         AlertDialog.Builder(this)
             .setTitle("How to Play Ludo")
@@ -300,6 +302,8 @@ class LudoActivity : AppCompatActivity() {
         moves.clear()
         resultDialogVisible = false
         rolledValue = 0
+        celebrationMessage = null
+        celebrationGeneration++
         matchStarted = true
         state = engine.initialState()
         boardView.gameState = state
@@ -322,15 +326,29 @@ class LudoActivity : AppCompatActivity() {
         val nextValue = Random.nextInt(1, 7)
         diceView.rollTo(nextValue, motionDirection) {
             rolledValue = nextValue
-            state = state.copy(metadata = state.metadata + ("ludo_dice" to nextValue))
+            val previousSixStreak =
+                (state.metadata[LudoSetup.SIX_STREAK_METADATA] as? Int ?: 0).coerceAtLeast(0)
+            val sixStreak = if (nextValue == 6) previousSixStreak + 1 else 0
+            state = state.copy(
+                metadata = state.metadata + mapOf(
+                    "ludo_dice" to nextValue,
+                    LudoSetup.SIX_STREAK_METADATA to sixStreak,
+                )
+            )
             val player = LudoSetup.playerFromState(state)
             val legal = engine.legalMovesForDice(state, player, nextValue)
             boardView.gameState = state
             boardView.legalMoves = legal
             updateHud()
             if (legal.isEmpty()) {
-                Toast.makeText(this, "No move possible — turn skipped", Toast.LENGTH_SHORT).show()
-                handler.postDelayed({ finishTurnAfterNoMove() }, 520L)
+                if (nextValue == 6 && sixStreak >= 3) {
+                    showHudMessage("THREE SIXES — turn forfeited")
+                    Toast.makeText(this, "Three sixes — turn forfeited", Toast.LENGTH_SHORT).show()
+                    handler.postDelayed({ finishTurnAfterNoMove() }, 760L)
+                } else {
+                    Toast.makeText(this, "No move possible — turn skipped", Toast.LENGTH_SHORT).show()
+                    handler.postDelayed({ finishTurnAfterNoMove() }, 520L)
+                }
             } else if (isAiTurn()) {
                 handler.postDelayed({ playMove(chooseAiMove(legal)) }, 420L)
             }
@@ -351,6 +369,14 @@ class LudoActivity : AppCompatActivity() {
             rolledValue = 0
             boardView.gameState = state
             boardView.legalMoves = emptyList()
+            val targetProgress = move.metadata["targetProgress"] as? Int
+            if (targetProgress == LudoSetup.FINISH) {
+                val player = move.metadata["player"] as? Int ?: LudoSetup.playerFromState(state)
+                val token = (move.metadata["token"] as? Int ?: 0) + 1
+                val message = "TOKEN HOME! ${LudoSetup.PLAYER_NAMES[player]} token $token"
+                showHudMessage(message)
+                Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+            }
             if (state.status == GameStatus.IN_PROGRESS) {
                 updateHud()
                 if (isAiTurn()) handler.postDelayed({ rollDice() }, 420L)
@@ -364,10 +390,20 @@ class LudoActivity : AppCompatActivity() {
     private fun finishTurnAfterNoMove() {
         if (state.status != GameStatus.IN_PROGRESS || rolledValue == 0) return
         val player = LudoSetup.playerFromState(state)
-        val nextPlayer = if (rolledValue == 6) player else (player + 1) % LudoSetup.PLAYER_COUNT
+        val sixStreak = state.metadata[LudoSetup.SIX_STREAK_METADATA] as? Int ?: 0
+        val forfeitsAfterThreeSixes = rolledValue == 6 && sixStreak >= 3
+        val nextPlayer = if (rolledValue == 6 && !forfeitsAfterThreeSixes) {
+            player
+        } else {
+            (player + 1) % LudoSetup.PLAYER_COUNT
+        }
         state = state.copy(
             currentTurn = LudoSetup.colorForPlayer(nextPlayer),
-            metadata = state.metadata + mapOf("ludo_turn" to nextPlayer, "ludo_dice" to 0)
+            metadata = state.metadata + mapOf(
+                "ludo_turn" to nextPlayer,
+                "ludo_dice" to 0,
+                LudoSetup.SIX_STREAK_METADATA to if (nextPlayer == player) sixStreak else 0,
+            )
         )
         rolledValue = 0
         boardView.gameState = state
@@ -381,7 +417,7 @@ class LudoActivity : AppCompatActivity() {
 
     private fun updateHud() {
         val player = LudoSetup.playerFromState(state)
-        val text = when {
+        val text = celebrationMessage ?: when {
             state.status != GameStatus.IN_PROGRESS -> "${LudoSetup.PLAYER_NAMES[state.metadata["ludo_winner"] as? Int ?: player]} wins"
             isAiTurn() -> "${LudoSetup.PLAYER_NAMES[player]} is thinking"
             rolledValue != 0 -> "${LudoSetup.PLAYER_NAMES[player]}: choose a token • move $rolledValue spaces"
@@ -404,6 +440,19 @@ class LudoActivity : AppCompatActivity() {
         statusView.activePlayer = player
         statusView.rolledValue = rolledValue
         motionView.motionEnabled = SettingsManager.isMotionDiceEnabled(this)
+    }
+
+    private fun showHudMessage(message: String) {
+        celebrationGeneration++
+        val generation = celebrationGeneration
+        celebrationMessage = message
+        updateHud()
+        handler.postDelayed({
+            if (celebrationGeneration == generation) {
+                celebrationMessage = null
+                updateHud()
+            }
+        }, 1800L)
     }
 
     private fun showResultDialog() {

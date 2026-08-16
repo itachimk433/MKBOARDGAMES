@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.RectF
 import android.view.View
 import com.mkdev.mkboardgames.engine.GameState
@@ -35,6 +36,11 @@ class LudoStatusStripView(context: Context) : View(context) {
         typeface = android.graphics.Typeface.DEFAULT_BOLD
     }
     private val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val checkPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+    }
     private val displayOrder = intArrayOf(2, 3, 1, 0)
 
     init {
@@ -130,8 +136,24 @@ class LudoStatusStripView(context: Context) : View(context) {
             )
 
             val playerPieces = pieces.filter { it.player == player }
-            val dotStart = left + 50f * density * scale
-            val dotGap = 14f * density * scale
+            val homeCount = playerPieces.count { it.progress >= LudoSetup.FINISH }
+            val dotGap = 12f * density * scale
+            val dotStart = right - (LudoSetup.TOKENS_PER_PLAYER - 1) * dotGap - 7f * density * scale
+            val homeLabel = "$homeCount/${LudoSetup.TOKENS_PER_PLAYER} HOME"
+            textPaint.color = if (homeCount > 0) color else Color.rgb(166, 174, 184)
+            textPaint.textSize = 10f * density * scale
+            textPaint.textAlign = Paint.Align.LEFT
+            val maxLabelWidth = (dotStart - left - 6f * density * scale).coerceAtLeast(1f)
+            if (textPaint.measureText(homeLabel) > maxLabelWidth) {
+                textPaint.textSize *= maxLabelWidth / textPaint.measureText(homeLabel)
+            }
+            canvas.drawText(
+                homeLabel,
+                left + 7f * density * scale,
+                bottom - 12f * density * scale,
+                textPaint,
+            )
+
             repeat(LudoSetup.TOKENS_PER_PLAYER) { token ->
                 val piece = playerPieces.firstOrNull { it.token == token }
                 val dotColor = when {
@@ -148,16 +170,18 @@ class LudoStatusStripView(context: Context) : View(context) {
                     dotPaint,
                 )
                 if (piece?.progress == LudoSetup.FINISH) {
-                    dotPaint.color = Color.argb(190, 255, 255, 255)
-                    dotPaint.style = Paint.Style.STROKE
-                    dotPaint.strokeWidth = 1.5f * density * scale
-                    canvas.drawCircle(
-                        dotStart + token * dotGap,
-                        bottom - 16f * density * scale,
-                        5f * density * scale,
-                        dotPaint,
-                    )
-                    dotPaint.style = Paint.Style.FILL
+                    val centerX = dotStart + token * dotGap
+                    val centerY = bottom - 16f * density * scale
+                    val radius = 5f * density * scale
+                    checkPaint.color = Color.argb(235, 255, 255, 255)
+                    checkPaint.strokeWidth = 1.6f * density * scale
+                    canvas.drawCircle(centerX, centerY, radius, checkPaint)
+                    val check = Path().apply {
+                        moveTo(centerX - radius * 0.5f, centerY)
+                        lineTo(centerX - radius * 0.1f, centerY + radius * 0.38f)
+                        lineTo(centerX + radius * 0.58f, centerY - radius * 0.42f)
+                    }
+                    canvas.drawPath(check, checkPaint)
                 }
             }
 

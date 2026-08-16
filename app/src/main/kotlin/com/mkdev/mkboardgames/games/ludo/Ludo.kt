@@ -32,6 +32,7 @@ object LudoSetup {
     const val PLAYER_COUNT = 4
     const val TOKENS_PER_PLAYER = 4
     const val PIECES_METADATA = "ludo_pieces"
+    const val SIX_STREAK_METADATA = "ludo_six_streak"
 
     val PLAYER_NAMES = arrayOf("Red", "Blue", "Green", "Yellow")
     val PLAYER_COLORS = intArrayOf(
@@ -166,6 +167,7 @@ object LudoSetup {
             metadata = mapOf(
                 "ludo_turn" to 0,
                 "ludo_dice" to 0,
+                SIX_STREAK_METADATA to 0,
                 PIECES_METADATA to pieces,
             )
         )

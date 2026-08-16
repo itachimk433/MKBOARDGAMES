@@ -14,6 +14,9 @@ class LudoRuleEngine : RuleEngine {
 
     fun legalMovesForDice(state: GameState, player: Int, dice: Int): List<Move> {
         if (state.status != GameStatus.IN_PROGRESS || dice !in 1..6) return emptyList()
+        val sixStreak = state.metadata[LudoSetup.SIX_STREAK_METADATA] as? Int ?: 0
+        if (dice == 6 && sixStreak >= 3) return emptyList()
+
         val moves = mutableListOf<Move>()
         for (piece in LudoSetup.allPieces(state)) {
             if (piece.player != player || piece.progress >= LudoSetup.FINISH) continue
@@ -82,6 +85,8 @@ class LudoRuleEngine : RuleEngine {
             ?: return state
         val player = (move.metadata["player"] as? Int) ?: movingPiece.player
         val dice = (move.metadata["dice"] as? Int) ?: 0
+        val previousSixStreak =
+            (state.metadata[LudoSetup.SIX_STREAK_METADATA] as? Int ?: 0).coerceAtLeast(0)
         val targetProgress = (move.metadata["targetProgress"] as? Int)
             ?: inferTargetProgress(movingPiece, move.to)
 
@@ -106,14 +111,24 @@ class LudoRuleEngine : RuleEngine {
             GameStatus.IN_PROGRESS
         }
 
-        val nextPlayer = if (status != GameStatus.IN_PROGRESS || dice == 6) {
+        val rolledSixStreak = if (dice == 6) {
+            previousSixStreak.coerceAtLeast(1)
+        } else {
+            0
+        }
+        val forfeitsAfterThreeSixes = dice == 6 && rolledSixStreak >= 3
+        val nextPlayer = if (status != GameStatus.IN_PROGRESS) {
+            player
+        } else if (dice == 6 && !forfeitsAfterThreeSixes) {
             player
         } else {
             (player + 1) % LudoSetup.PLAYER_COUNT
         }
+        val nextSixStreak = if (nextPlayer == player) rolledSixStreak else 0
         val metadata = mutableMapOf<String, Any>(
             "ludo_turn" to nextPlayer,
             "ludo_dice" to 0,
+            LudoSetup.SIX_STREAK_METADATA to nextSixStreak,
             LudoSetup.PIECES_METADATA to nextPieces,
         )
         if (hasWon) metadata["ludo_winner"] = player
