@@ -4,6 +4,10 @@ import android.graphics.Color
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
@@ -19,6 +23,9 @@ import com.mkdev.mkboardgames.games.ludo.LudoRuleEngine
 import com.mkdev.mkboardgames.games.ludo.LudoSetup
 import com.mkdev.mkboardgames.ui.LudoBoardView
 import com.mkdev.mkboardgames.ui.LudoDiceView
+import com.mkdev.mkboardgames.ui.MotionDiceDirection
+import kotlin.math.abs
+import kotlin.math.sqrt
 import kotlin.random.Random
 
 class LudoActivity : AppCompatActivity() {
@@ -34,6 +41,11 @@ class LudoActivity : AppCompatActivity() {
     private var humanPlayer = 0
     private var rolledValue = 0
     private var resultDialogVisible = false
+    private lateinit var sensorManager: SensorManager
+    private var motionSensor: Sensor? = null
+    private var usingRawAccelerometer = false
+    private var lastMotionAt = 0L
+    private val gravity = FloatArray(3)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -73,6 +85,21 @@ class LudoActivity : AppCompatActivity() {
         }
         boardView.onGameOverTapped = { showResultDialog() }
         diceView.onRoll = { if (isHumanTurn()) rollDice() }
+        diceView.motionDiceEnabled = SettingsManager.isMotionDiceEnabled(this)
+        diceView.onMotionToggle = { enabled ->
+            SettingsManager.setMotionDiceEnabled(this, enabled)
+            syncMotionSensor()
+            Toast.makeText(
+                this,
+                if (enabled) "Motion dice enabled" else "Motion dice disabled",
+                Toast.LENGTH_SHORT,
+            ).show()
+        }
+        sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
+        motionSensor = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION)
+            ?: sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)?.also {
+                usingRawAccelerometer = true
+            }
         showModeDialog()
     }
 
@@ -80,6 +107,13 @@ class LudoActivity : AppCompatActivity() {
         super.onResume()
         makeFullscreen()
         SoundPlayer.movementSoundsEnabled = SettingsManager.isMovementSoundsEnabled(this)
+        diceView.motionDiceEnabled = SettingsManager.isMotionDiceEnabled(this)
+        syncMotionSensor()
+    }
+
+    override fun onPause() {
+        sensorManager.unregisterListener(motionListener)
+        super.onPause()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -89,7 +123,69 @@ class LudoActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         handler.removeCallbacksAndMessages(null)
+        sensorManager.unregisterListener(motionListener)
         super.onDestroy()
+    }
+
+    private val motionListener = object : SensorEventListener {
+        override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
+
+        override fun onSensorChanged(event: SensorEvent) {
+            val raw = event.values
+            val values = FloatArray(3)
+            if (usingRawAccelerometer) {
+                for (i in 0..2) {
+                    gravity[i] = 0.88f * gravity[i] + 0.12f * raw[i]
+                    values[i] = raw[i] - gravity[i]
+                }
+            } else {
+                for (i in 0..2) values[i] = raw[i]
+            }
+
+            val x = values[0]
+            val y = values[1]
+            val horizontal = abs(x)
+            val vertical = abs(y)
+            val magnitude = sqrt(x * x + y * y + values[2] * values[2])
+            if (magnitude < 3.0f || vertical < 1.8f && horizontal < 2.6f) return
+
+            val now = android.os.SystemClock.elapsedRealtime()
+            if (now - lastMotionAt < 900L) return
+            if (!isHumanTurn() || state.status != GameStatus.IN_PROGRESS ||
+                rolledValue != 0 || boardView.isLocked
+            ) return
+
+            val direction = when {
+                vertical > 2.2f && horizontal > 1.8f ->
+                    if (x < 0f) MotionDiceDirection.TOP_LEFT
+                    else MotionDiceDirection.TOP_RIGHT
+                horizontal > vertical * 1.15f ->
+                    if (x < 0f) MotionDiceDirection.LEFT
+                    else MotionDiceDirection.RIGHT
+                vertical >= horizontal -> MotionDiceDirection.UP
+                else -> null
+            } ?: return
+
+            lastMotionAt = now
+            runOnUiThread {
+                if (SettingsManager.isMotionDiceEnabled(this@LudoActivity)) {
+                    rollDice(direction)
+                }
+            }
+        }
+    }
+
+    private fun syncMotionSensor() {
+        sensorManager.unregisterListener(motionListener)
+        if (SettingsManager.isMotionDiceEnabled(this)) {
+            motionSensor?.let { sensor ->
+                sensorManager.registerListener(
+                    motionListener,
+                    sensor,
+                    SensorManager.SENSOR_DELAY_GAME,
+                )
+            }
+        }
     }
 
     @Deprecated("Deprecated in Java")
@@ -177,10 +273,14 @@ class LudoActivity : AppCompatActivity() {
     }
 
     private fun rollDice() {
+        rollDice(MotionDiceDirection.UP)
+    }
+
+    private fun rollDice(motionDirection: MotionDiceDirection) {
         if (state.status != GameStatus.IN_PROGRESS || rolledValue != 0 || boardView.isLocked) return
 
         val nextValue = Random.nextInt(1, 7)
-        diceView.rollTo(nextValue) {
+        diceView.rollTo(nextValue, motionDirection) {
             rolledValue = nextValue
             state = state.copy(metadata = state.metadata + ("ludo_dice" to nextValue))
             val player = LudoSetup.playerFromState(state)

@@ -86,7 +86,16 @@ class LudoRuleEngine : RuleEngine {
 
         val nextBoard = state.board.copyOf()
         nextBoard[LudoSetup.indexOf(move.from)] = null
+        val capturedPieces = move.captures.mapNotNull { capture ->
+            state.get(capture) as? LudoPiece
+        }
         for (capture in move.captures) nextBoard[LudoSetup.indexOf(capture)] = null
+        for (captured in capturedPieces) {
+            // A captured token is sent back to its own yard, not removed from
+            // the board. Its token-specific yard cell remains its home slot.
+            nextBoard[LudoSetup.indexOf(LudoSetup.yardPosition(captured.player, captured.token))] =
+                captured.copy(progress = -1)
+        }
 
         val movedPiece = movingPiece.copy(progress = targetProgress)
         nextBoard[LudoSetup.indexOf(move.to)] = movedPiece

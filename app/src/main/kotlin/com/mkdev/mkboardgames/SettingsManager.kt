@@ -137,6 +137,12 @@ object SettingsManager {
     fun setMovementSoundsEnabled(ctx: Context, v: Boolean) =
         prefs(ctx).edit().putBoolean(KEY_MOVEMENT_SOUNDS, v).apply()
 
+    // ── Motion dice ───────────────────────────────────────────────────────────
+    private const val KEY_MOTION_DICE = "motion_dice"
+    fun isMotionDiceEnabled(ctx: Context) = prefs(ctx).getBoolean(KEY_MOTION_DICE, false)
+    fun setMotionDiceEnabled(ctx: Context, v: Boolean) =
+        prefs(ctx).edit().putBoolean(KEY_MOTION_DICE, v).apply()
+
     // ── Light mode ───────────────────────────────────────────────────────────
     private const val KEY_LIGHT_MODE = "light_mode"
     fun isLightMode(ctx: Context) = prefs(ctx).getBoolean(KEY_LIGHT_MODE, false)

@@ -17,6 +17,8 @@ import android.util.Log
 import android.view.MotionEvent
 import android.view.View
 import android.view.animation.DecelerateInterpolator
+import android.os.Handler
+import android.os.Looper
 import org.json.JSONObject
 import kotlin.math.cos
 import kotlin.math.max
@@ -39,6 +41,10 @@ private data class DiceOrientation(
     }
 }
 
+enum class MotionDiceDirection {
+    UP, LEFT, RIGHT, TOP_LEFT, TOP_RIGHT
+}
+
 /**
  * A software-rendered perspective die using the face textures embedded in
  * dice.gltf. Drawing on a normal View keeps the die visible on devices where
@@ -49,10 +55,23 @@ class LudoDiceView(context: Context) : View(context) {
     var isRolling: Boolean = false
         private set
     var onRoll: (() -> Unit)? = null
+    var motionDiceEnabled: Boolean = false
+    var onMotionToggle: ((Boolean) -> Unit)? = null
 
     private var animator: ValueAnimator? = null
     private var rotationX = -18f
     private var rotationY = -28f
+    private var touchDown = false
+    private var longPressTriggered = false
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val longPressRunnable = Runnable {
+        if (touchDown && !isRolling) {
+            longPressTriggered = true
+            motionDiceEnabled = !motionDiceEnabled
+            onMotionToggle?.invoke(motionDiceEnabled)
+            invalidate()
+        }
+    }
     private val textures = loadDiceTextures(context)
     private val bitmapPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private val edgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -75,7 +94,11 @@ class LudoDiceView(context: Context) : View(context) {
         setBackgroundColor(Color.rgb(16, 21, 26))
     }
 
-    fun rollTo(nextValue: Int, onFinished: () -> Unit) {
+    fun rollTo(
+        nextValue: Int,
+        motionDirection: MotionDiceDirection = MotionDiceDirection.UP,
+        onFinished: () -> Unit,
+    ) {
         animator?.cancel()
         isRolling = true
         val targetValue = nextValue.coerceIn(1, 6)
@@ -83,13 +106,24 @@ class LudoDiceView(context: Context) : View(context) {
         val startX = rotationX
         val startY = rotationY
         val endY = target.y + 720f
+        val tiltX = when (motionDirection) {
+            MotionDiceDirection.TOP_LEFT, MotionDiceDirection.TOP_RIGHT -> -22f
+            MotionDiceDirection.UP -> -12f
+            else -> 0f
+        }
+        val tiltY = when (motionDirection) {
+            MotionDiceDirection.LEFT, MotionDiceDirection.TOP_LEFT -> -28f
+            MotionDiceDirection.RIGHT, MotionDiceDirection.TOP_RIGHT -> 28f
+            else -> 0f
+        }
         animator = ValueAnimator.ofFloat(0f, 1f).apply {
             duration = 720L
             interpolator = DecelerateInterpolator()
             addUpdateListener {
                 val progress = it.animatedFraction
-                rotationX = startX + (target.x - startX) * progress
-                rotationY = startY + (endY - startY) * progress
+                val gestureTilt = sin(progress * Math.PI).toFloat()
+                rotationX = startX + (target.x - startX) * progress + tiltX * gestureTilt
+                rotationY = startY + (endY - startY) * progress + tiltY * gestureTilt
                 invalidate()
             }
             addListener(object : AnimatorListenerAdapter() {
@@ -111,7 +145,11 @@ class LudoDiceView(context: Context) : View(context) {
         val density = resources.displayMetrics.density
         labelPaint.textSize = 12f * density
         canvas.drawText(
-            if (isRolling) "Rolling..." else "Tap to roll",
+            when {
+                isRolling -> "Rolling..."
+                motionDiceEnabled -> "Tap to roll · motion on · hold to toggle"
+                else -> "Tap to roll · hold to enable motion"
+            },
             width / 2f,
             22f * density,
             labelPaint,
@@ -160,8 +198,21 @@ class LudoDiceView(context: Context) : View(context) {
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        if (event.action == MotionEvent.ACTION_UP && !isRolling) {
-            onRoll?.invoke()
+        when (event.action) {
+            MotionEvent.ACTION_DOWN -> {
+                touchDown = true
+                longPressTriggered = false
+                mainHandler.postDelayed(longPressRunnable, 520L)
+            }
+            MotionEvent.ACTION_UP -> {
+                touchDown = false
+                mainHandler.removeCallbacks(longPressRunnable)
+                if (!longPressTriggered && !isRolling) onRoll?.invoke()
+            }
+            MotionEvent.ACTION_CANCEL -> {
+                touchDown = false
+                mainHandler.removeCallbacks(longPressRunnable)
+            }
         }
         return true
     }
@@ -169,6 +220,7 @@ class LudoDiceView(context: Context) : View(context) {
     override fun onDetachedFromWindow() {
         animator?.cancel()
         animator = null
+        mainHandler.removeCallbacks(longPressRunnable)
         super.onDetachedFromWindow()
     }
 

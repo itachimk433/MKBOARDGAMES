@@ -207,6 +207,15 @@ class MainActivity : AppCompatActivity() {
             movSoundVal.text = if (movementSounds) "On" else "Off"
         }
         root.addView(movSoundRow)
+        var motionDice = SettingsManager.isMotionDiceEnabled(ctx)
+        val (motionDiceRow, motionDiceVal) =
+            settingRow("◈", "Motion Dice", if (motionDice) "On" else "Off")
+        motionDiceRow.setOnClickListener {
+            motionDice = !motionDice
+            SettingsManager.setMotionDiceEnabled(ctx, motionDice)
+            motionDiceVal.text = if (motionDice) "On" else "Off"
+        }
+        root.addView(motionDiceRow)
 
         // ── Chess ──
         root.addView(sectionHeader("♟  CHESS"))
