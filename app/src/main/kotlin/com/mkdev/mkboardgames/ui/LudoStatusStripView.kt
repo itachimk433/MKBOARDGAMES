@@ -45,16 +45,23 @@ class LudoStatusStripView(context: Context) : View(context) {
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         val density = resources.displayMetrics.density
-        val padding = 5f * density
-        val gap = 7f * density
-        val cardWidth = (width - padding * 2f - gap * 3f) / 4f
-        val cardHeight = height - padding * 2f
-        val radius = 9f * density
+        val compact = resources.configuration.screenWidthDp < 600
+        val columns = if (compact) 2 else 4
+        val rows = if (compact) 2 else 1
+        val padding = (if (compact) 6f else 5f) * density
+        val horizontalGap = (if (compact) 8f else 7f) * density
+        val verticalGap = if (compact) 7f * density else 0f
+        val cardWidth = (width - padding * 2f - horizontalGap * (columns - 1)) / columns
+        val cardHeight = (height - padding * 2f - verticalGap * (rows - 1)) / rows
+        val scale = (cardWidth / (178f * density)).coerceIn(0.72f, 1f)
+        val radius = 9f * density * scale
         val pieces = LudoSetup.allPieces(gameState)
 
         displayOrder.forEachIndexed { index, player ->
-            val left = padding + index * (cardWidth + gap)
-            val top = padding
+            val column = index % columns
+            val row = index / columns
+            val left = padding + column * (cardWidth + horizontalGap)
+            val top = padding + row * (cardHeight + verticalGap)
             val right = left + cardWidth
             val bottom = top + cardHeight
             val color = LudoSetup.PLAYER_COLORS[player]
@@ -66,53 +73,69 @@ class LudoStatusStripView(context: Context) : View(context) {
 
             accentPaint.color = color
             canvas.drawRoundRect(
-                RectF(left, top, right, top + 10f * density),
+                RectF(left, top, right, top + 10f * density * scale),
                 radius,
                 radius,
                 accentPaint,
             )
-            canvas.drawRect(left, top + 5f * density, right, top + 10f * density, accentPaint)
+            canvas.drawRect(
+                left,
+                top + 5f * density * scale,
+                right,
+                top + 10f * density * scale,
+                accentPaint,
+            )
 
-            val avatarX = left + 28f * density
-            val avatarY = top + 32f * density
+            val avatarX = left + 28f * density * scale
+            val avatarY = top + 32f * density * scale
             avatarPaint.color = Color.argb(255, 233, 240, 244)
-            canvas.drawCircle(avatarX, avatarY, 21f * density, avatarPaint)
+            canvas.drawCircle(avatarX, avatarY, 21f * density * scale, avatarPaint)
             avatarPaint.color = Color.argb(
                 255,
                 Color.red(color),
                 Color.green(color),
                 Color.blue(color),
             )
-            canvas.drawCircle(avatarX, avatarY, 17f * density, avatarPaint)
+            canvas.drawCircle(avatarX, avatarY, 17f * density * scale, avatarPaint)
             avatarPaint.color = Color.argb(130, 255, 255, 255)
-            canvas.drawCircle(avatarX, avatarY - 5f * density, 6f * density, avatarPaint)
+            canvas.drawCircle(
+                avatarX,
+                avatarY - 5f * density * scale,
+                6f * density * scale,
+                avatarPaint,
+            )
             canvas.drawOval(
                 RectF(
-                    avatarX - 10f * density,
-                    avatarY + 1f * density,
-                    avatarX + 10f * density,
-                    avatarY + 13f * density,
+                    avatarX - 10f * density * scale,
+                    avatarY + 1f * density * scale,
+                    avatarX + 10f * density * scale,
+                    avatarY + 13f * density * scale,
                 ),
                 avatarPaint,
             )
 
             textPaint.color = Color.rgb(185, 192, 201)
-            textPaint.textSize = 17f * density
+            textPaint.textSize = 17f * density * scale
             textPaint.textAlign = Paint.Align.LEFT
             canvas.drawText(
                 "Tokens",
-                left + 58f * density,
-                top + 39f * density,
+                left + 58f * density * scale,
+                top + 39f * density * scale,
                 textPaint,
             )
 
             textPaint.color = color
-            textPaint.textSize = 15f * density
-            canvas.drawText("[A]", left + 9f * density, bottom - 15f * density, textPaint)
+            textPaint.textSize = 15f * density * scale
+            canvas.drawText(
+                "[A]",
+                left + 9f * density * scale,
+                bottom - 15f * density * scale,
+                textPaint,
+            )
 
             val playerPieces = pieces.filter { it.player == player }
-            val dotStart = left + 59f * density
-            val dotGap = 18f * density
+            val dotStart = left + 59f * density * scale
+            val dotGap = 18f * density * scale
             repeat(LudoSetup.TOKENS_PER_PLAYER) { token ->
                 val piece = playerPieces.firstOrNull { it.token == token }
                 val dotColor = when {
@@ -124,18 +147,18 @@ class LudoStatusStripView(context: Context) : View(context) {
                 dotPaint.color = dotColor
                 canvas.drawCircle(
                     dotStart + token * dotGap,
-                    bottom - 20f * density,
-                    7f * density,
+                    bottom - 20f * density * scale,
+                    7f * density * scale,
                     dotPaint,
                 )
                 if (piece?.progress == LudoSetup.FINISH) {
                     dotPaint.color = Color.argb(190, 255, 255, 255)
                     dotPaint.style = Paint.Style.STROKE
-                    dotPaint.strokeWidth = 1.5f * density
+                    dotPaint.strokeWidth = 1.5f * density * scale
                     canvas.drawCircle(
                         dotStart + token * dotGap,
-                        bottom - 20f * density,
-                        7f * density,
+                        bottom - 20f * density * scale,
+                        7f * density * scale,
                         dotPaint,
                     )
                     dotPaint.style = Paint.Style.FILL

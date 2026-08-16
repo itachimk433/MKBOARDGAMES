@@ -74,7 +74,7 @@ class LudoBoardView(context: Context) : View(context) {
 
     private fun updateGeometry() {
         if (width == 0 || height == 0) return
-        val boardSize = minOf(width, height) * 0.94f
+        val boardSize = minOf(width, height) * 0.98f
         cell = boardSize / LudoSetup.BOARD_SIZE
         left = (width - boardSize) / 2f
         top = (height - boardSize) / 2f
