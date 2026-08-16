@@ -24,6 +24,8 @@ data class LudoNotification(
 object LudoEconomy {
     const val METADATA = "ludo_economy"
     const val NOTIFICATION_METADATA = "ludo_notification"
+    const val PURCHASED_ABILITY_METADATA = "ludo_purchased_ability"
+    const val USED_ABILITY_METADATA = "ludo_used_ability"
     const val STARTER_COINS = 30
     const val CAPTURE_REWARD = 2
     const val HOME_REWARD = 3

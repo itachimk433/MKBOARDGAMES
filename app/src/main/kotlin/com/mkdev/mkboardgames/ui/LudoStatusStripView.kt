@@ -169,12 +169,24 @@ class LudoStatusStripView(context: Context) : View(context) {
                 textPaint,
             )
             if (profilesEnabled) {
+                val coinLabelX = left + 7f * density * scale
+                val coinBaseline = bottom - 35f * density * scale
                 textPaint.color = Color.rgb(195, 202, 210)
-                textPaint.textSize = 9f * density * scale
+                textPaint.textSize = 8f * density * scale
+                textPaint.textAlign = Paint.Align.LEFT
+                val coinLabelWidth = textPaint.measureText("COINS")
                 canvas.drawText(
-                    "COINS ${economy.coins}",
-                    left + 7f * density * scale,
-                    bottom - 35f * density * scale,
+                    "COINS",
+                    coinLabelX,
+                    coinBaseline,
+                    textPaint,
+                )
+                textPaint.color = color
+                textPaint.textSize = 12f * density * scale
+                canvas.drawText(
+                    economy.coins.toString(),
+                    coinLabelX + coinLabelWidth + 3f * density * scale,
+                    coinBaseline,
                     textPaint,
                 )
             }

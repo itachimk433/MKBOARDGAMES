@@ -504,6 +504,8 @@ class LudoActivity : AppCompatActivity() {
     private fun aiPrepareTurn(player: Int) {
         if (!economyEnabled || !isAiTurn()) return
         var economy = LudoEconomy.player(state, player)
+        val canPurchase = state.metadata[LudoEconomy.PURCHASED_ABILITY_METADATA] != true
+        val canUseAbility = state.metadata[LudoEconomy.USED_ABILITY_METADATA] != true
         val pieces = LudoSetup.allPieces(state).filter { it.player == player }
         val exposedPiece = pieces
             .filter { it.progress in 0 until 52 }
@@ -511,6 +513,7 @@ class LudoActivity : AppCompatActivity() {
         val shouldProtect = exposedPiece != null &&
             economy.protectedToken == null &&
             economy.invincibility > 0 &&
+            canUseAbility &&
             (aiDifficulty > 0 || exposedPiece.progress > 20)
 
         if (shouldProtect && exposedPiece != null) {
@@ -518,12 +521,12 @@ class LudoActivity : AppCompatActivity() {
                 invincibility = (economy.invincibility - 1).coerceAtLeast(0),
                 protectedToken = exposedPiece.token,
             )
-            setPlayerEconomy(player, economy)
+            setPlayerEconomy(player, economy, usedThisTurn = true)
             showFloatingNotification(
                 "${LudoSetup.PLAYER_NAMES[player]} used 🛡 Invincibility\nToken ${exposedPiece.token + 1} protected",
                 player,
             )
-        } else {
+        } else if (canPurchase) {
             val purchase = when {
                 economy.coins >= LudoAbility.INVINCIBILITY.cost &&
                     economy.invincibility == 0 && exposedPiece != null &&
@@ -536,7 +539,7 @@ class LudoActivity : AppCompatActivity() {
             }
             if (purchase != null) {
                 LudoEconomy.purchase(economy, purchase)?.let {
-                    setPlayerEconomy(player, it)
+                    setPlayerEconomy(player, it, purchasedThisTurn = true)
                     showFloatingNotification(
                         "${LudoSetup.PLAYER_NAMES[player]} bought ${purchase.icon} ${purchase.label}",
                         player,
@@ -548,6 +551,7 @@ class LudoActivity : AppCompatActivity() {
 
     private fun aiShouldReroll(player: Int, dice: Int, legal: List<Move>): Boolean {
         if (!economyEnabled || state.metadata["ludo_rerolled"] == true) return false
+        if (state.metadata[LudoEconomy.USED_ABILITY_METADATA] == true) return false
         if (LudoEconomy.player(state, player).reroll <= 0) return false
         return when (aiDifficulty) {
             0 -> legal.isEmpty() && Random.nextBoolean()
@@ -558,6 +562,7 @@ class LudoActivity : AppCompatActivity() {
 
     private fun aiMaybeUseExtraMove(player: Int, dice: Int, legal: List<Move>): List<Move> {
         if (!economyEnabled || LudoEconomy.player(state, player).extraMove <= 0) return legal
+        if (state.metadata[LudoEconomy.USED_ABILITY_METADATA] == true) return legal
         val sixStreak = state.metadata[LudoSetup.SIX_STREAK_METADATA] as? Int ?: 0
         if (dice == 6 && sixStreak >= 3) return legal
         val boosted = engine.legalMovesForDice(
@@ -585,14 +590,32 @@ class LudoActivity : AppCompatActivity() {
         return boosted
     }
 
-    private fun setPlayerEconomy(player: Int, economy: LudoPlayerEconomy) {
-        state = state.copy(metadata = LudoEconomy.withPlayer(state, player, economy))
+    private fun setPlayerEconomy(
+        player: Int,
+        economy: LudoPlayerEconomy,
+        purchasedThisTurn: Boolean? = null,
+        usedThisTurn: Boolean? = null,
+    ) {
+        val metadata = LudoEconomy.withPlayer(state, player, economy).toMutableMap()
+        if (purchasedThisTurn != null) {
+            metadata[LudoEconomy.PURCHASED_ABILITY_METADATA] = purchasedThisTurn
+        }
+        if (usedThisTurn != null) {
+            metadata[LudoEconomy.USED_ABILITY_METADATA] = usedThisTurn
+        }
+        state = state.copy(
+            metadata = metadata,
+        )
         boardView.gameState = state
         updateHud()
     }
 
     private fun consumeAbility(player: Int, ability: LudoAbility) {
-        setPlayerEconomy(player, LudoEconomy.consume(LudoEconomy.player(state, player), ability))
+        setPlayerEconomy(
+            player,
+            LudoEconomy.consume(LudoEconomy.player(state, player), ability),
+            usedThisTurn = true,
+        )
     }
 
     private fun showStoreDialog() {
@@ -608,6 +631,19 @@ class LudoActivity : AppCompatActivity() {
         )
         AlertDialog.Builder(this)
             .setTitle("Irregular Store · ${economy.coins} coins")
+            .setMessage(
+                "The store is available throughout your turn. Buy anytime; use Reroll and Extra Move after rolling. " +
+                    (if (state.metadata[LudoEconomy.PURCHASED_ABILITY_METADATA] == true) {
+                        "Purchase used this turn."
+                    } else {
+                        "One purchase available this turn."
+                    }) + " " +
+                    (if (state.metadata[LudoEconomy.USED_ABILITY_METADATA] == true) {
+                        "Ability use used this turn."
+                    } else {
+                        "One ability use available this turn."
+                    }),
+            )
             .setItems(options) { dialog, which ->
                 when (which) {
                     0 -> buyAbility(player, LudoAbility.INVINCIBILITY)
@@ -623,13 +659,17 @@ class LudoActivity : AppCompatActivity() {
     }
 
     private fun buyAbility(player: Int, ability: LudoAbility) {
+        if (state.metadata[LudoEconomy.PURCHASED_ABILITY_METADATA] == true) {
+            Toast.makeText(this, "Only one ability purchase per turn", Toast.LENGTH_SHORT).show()
+            return
+        }
         val economy = LudoEconomy.player(state, player)
         val purchased = LudoEconomy.purchase(economy, ability)
         if (purchased == null) {
             Toast.makeText(this, "Not enough coins", Toast.LENGTH_SHORT).show()
             return
         }
-        setPlayerEconomy(player, purchased)
+        setPlayerEconomy(player, purchased, purchasedThisTurn = true)
         showFloatingNotification(
             "YOU bought ${ability.icon} ${ability.label}",
             player,
@@ -638,6 +678,10 @@ class LudoActivity : AppCompatActivity() {
 
     private fun chooseProtectionTarget(player: Int) {
         val economy = LudoEconomy.player(state, player)
+        if (state.metadata[LudoEconomy.USED_ABILITY_METADATA] == true) {
+            Toast.makeText(this, "Only one ability use per turn", Toast.LENGTH_SHORT).show()
+            return
+        }
         if (economy.invincibility <= 0) {
             Toast.makeText(this, "Buy Invincibility first", Toast.LENGTH_SHORT).show()
             return
@@ -659,6 +703,7 @@ class LudoActivity : AppCompatActivity() {
                         invincibility = economy.invincibility - 1,
                         protectedToken = piece.token,
                     ),
+                    usedThisTurn = true,
                 )
                 showFloatingNotification(
                     "YOU used 🛡 Invincibility\nToken ${piece.token + 1} protected",
@@ -671,6 +716,10 @@ class LudoActivity : AppCompatActivity() {
     private fun useExtraMove(player: Int, dialog: android.content.DialogInterface) {
         if (rolledValue == 0) {
             Toast.makeText(this, "Roll the die first", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (state.metadata[LudoEconomy.USED_ABILITY_METADATA] == true) {
+            Toast.makeText(this, "Only one ability use per turn", Toast.LENGTH_SHORT).show()
             return
         }
         if (LudoEconomy.player(state, player).extraMove <= 0) {
@@ -697,6 +746,10 @@ class LudoActivity : AppCompatActivity() {
     private fun useReroll(player: Int, dialog: android.content.DialogInterface) {
         if (rolledValue == 0) {
             Toast.makeText(this, "Roll the die first", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (state.metadata[LudoEconomy.USED_ABILITY_METADATA] == true) {
+            Toast.makeText(this, "Only one ability use per turn", Toast.LENGTH_SHORT).show()
             return
         }
         if (state.metadata["ludo_rerolled"] == true) {
@@ -730,6 +783,8 @@ class LudoActivity : AppCompatActivity() {
         }
         val message = """
             Coins: ${economy.coins}
+            Ability purchases: ${if (state.metadata[LudoEconomy.PURCHASED_ABILITY_METADATA] == true) "1/1 used this turn" else "0/1 used this turn"}
+            Ability uses: ${if (state.metadata[LudoEconomy.USED_ABILITY_METADATA] == true) "1/1 used this turn" else "0/1 used this turn"}
 
             Abilities
             🛡 Invincibility ×${economy.invincibility}${if (economy.protectedToken != null) " · Token ${economy.protectedToken + 1} protected" else ""}
@@ -814,6 +869,9 @@ class LudoActivity : AppCompatActivity() {
                         "${LudoSetup.PLAYER_NAMES[it.player]} ${it.message}",
                         it.player,
                     )
+                    if (it.message.contains("BLOCKED")) {
+                        showHudMessage(it.message)
+                    }
                 }
                 if (move.metadata["usedExtraMove"] == true) {
                     showFloatingNotification(
@@ -849,6 +907,10 @@ class LudoActivity : AppCompatActivity() {
                 "ludo_dice" to 0,
                 LudoSetup.SIX_STREAK_METADATA to if (nextPlayer == player) sixStreak else 0,
                 "ludo_rerolled" to false,
+                LudoEconomy.PURCHASED_ABILITY_METADATA to (nextPlayer == player &&
+                    state.metadata[LudoEconomy.PURCHASED_ABILITY_METADATA] == true),
+                LudoEconomy.USED_ABILITY_METADATA to (nextPlayer == player &&
+                    state.metadata[LudoEconomy.USED_ABILITY_METADATA] == true),
             )
         )
         rolledValue = 0

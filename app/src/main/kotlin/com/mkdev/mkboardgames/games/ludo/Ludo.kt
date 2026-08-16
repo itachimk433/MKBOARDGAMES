@@ -170,6 +170,8 @@ object LudoSetup {
                 SIX_STREAK_METADATA to 0,
                 PIECES_METADATA to pieces,
                 LudoEconomy.METADATA to LudoEconomy.initialPlayers(),
+                LudoEconomy.PURCHASED_ABILITY_METADATA to false,
+                LudoEconomy.USED_ABILITY_METADATA to false,
                 "ludo_rerolled" to false,
             )
         )

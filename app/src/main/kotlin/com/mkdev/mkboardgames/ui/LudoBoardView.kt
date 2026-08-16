@@ -17,6 +17,7 @@ import android.view.animation.LinearInterpolator
 import com.mkdev.mkboardgames.engine.GameState
 import com.mkdev.mkboardgames.engine.Move
 import com.mkdev.mkboardgames.engine.Position
+import com.mkdev.mkboardgames.games.ludo.LudoEconomy
 import com.mkdev.mkboardgames.games.ludo.LudoPiece
 import com.mkdev.mkboardgames.games.ludo.LudoSetup
 import kotlin.math.PI
@@ -68,6 +69,9 @@ class LudoBoardView(context: Context) : View(context) {
         color = Color.argb(150, 255, 255, 255)
         style = Paint.Style.STROKE
         strokeWidth = 3f
+    }
+    private val protectionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
@@ -245,6 +249,17 @@ class LudoBoardView(context: Context) : View(context) {
 
     private fun drawPiece(canvas: Canvas, piece: LudoPiece, point: PointF) {
         val radius = cell * 0.34f
+        val isProtected = piece.progress in 0 until LudoSetup.FINISH &&
+            LudoEconomy.player(gameState, piece.player).protectedToken == piece.token
+        if (isProtected) {
+            protectionPaint.style = Paint.Style.FILL
+            protectionPaint.color = Color.argb(75, 255, 216, 91)
+            canvas.drawCircle(point.x, point.y, radius + cell * 0.15f, protectionPaint)
+            protectionPaint.style = Paint.Style.STROKE
+            protectionPaint.strokeWidth = cell * 0.075f
+            protectionPaint.color = Color.rgb(255, 216, 91)
+            canvas.drawCircle(point.x, point.y, radius + cell * 0.10f, protectionPaint)
+        }
         canvas.drawCircle(point.x + cell * 0.05f, point.y + cell * 0.08f, radius, shadowPaint)
         piecePaint.color = LudoSetup.PLAYER_COLORS[piece.player]
         canvas.drawCircle(point.x, point.y, radius, piecePaint)

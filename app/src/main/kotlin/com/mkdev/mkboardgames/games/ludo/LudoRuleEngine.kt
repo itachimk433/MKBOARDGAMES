@@ -50,7 +50,10 @@ class LudoRuleEngine : RuleEngine {
             }
             val protectedTarget = occupants.singleOrNull()?.let { occupant ->
                 val protection = LudoEconomy.player(state, occupant.player)
-                if (protection.protectedToken == occupant.token && occupant.player != player) {
+                if (protection.protectedToken == occupant.token &&
+                    occupant.player != player &&
+                    !isSafeTrackCell(to)
+                ) {
                     occupant
                 } else {
                     null
@@ -115,6 +118,11 @@ class LudoRuleEngine : RuleEngine {
             ?: inferTargetProgress(movingPiece, move.to)
 
         val blockedProtection = move.metadata["blockedProtection"] as? Boolean ?: false
+        val protectedPiece = if (blockedProtection) {
+            LudoSetup.piecesAt(state, move.to).singleOrNull()
+        } else {
+            null
+        }
         val nextPieces = LudoSetup.allPieces(state).map { piece ->
             when {
                 piece.player == movingPiece.player && piece.token == movingPiece.token ->
@@ -156,6 +164,18 @@ class LudoRuleEngine : RuleEngine {
         metadata[LudoSetup.SIX_STREAK_METADATA] = nextSixStreak
         metadata[LudoSetup.PIECES_METADATA] = nextPieces
         metadata["ludo_rerolled"] = false
+        metadata[LudoEconomy.PURCHASED_ABILITY_METADATA] =
+            if (nextPlayer == player) {
+                state.metadata[LudoEconomy.PURCHASED_ABILITY_METADATA] == true
+            } else {
+                false
+            }
+        metadata[LudoEconomy.USED_ABILITY_METADATA] =
+            if (nextPlayer == player) {
+                state.metadata[LudoEconomy.USED_ABILITY_METADATA] == true
+            } else {
+                false
+            }
 
         if (metadata["ludo_economy_enabled"] as? Boolean == true) {
             var economies = LudoEconomy.players(state).toMutableList()
@@ -169,7 +189,6 @@ class LudoRuleEngine : RuleEngine {
             economies[player] = playerEconomy
 
             if (blockedProtection) {
-                val protectedPiece = LudoSetup.piecesAt(state, move.to).singleOrNull()
                 if (protectedPiece != null) {
                     val protectedEconomy = economies[protectedPiece.player]
                     economies[protectedPiece.player] = protectedEconomy.copy(protectedToken = null)
@@ -179,19 +198,23 @@ class LudoRuleEngine : RuleEngine {
             val notification = when {
                 move.captures.isNotEmpty() -> LudoNotification(
                     player,
-                    "+${LudoEconomy.CAPTURE_REWARD} coins for a capture",
-                )
-                targetProgress == LudoSetup.FINISH -> LudoNotification(
-                    player,
-                    "+${LudoEconomy.HOME_REWARD} coins — token home",
+                    "sent ${
+                        capturedPlayerName(
+                            LudoSetup.piecesAt(state, move.to).singleOrNull(),
+                        )
+                    } home · +${LudoEconomy.CAPTURE_REWARD} coins",
                 )
                 hasWon -> LudoNotification(
                     player,
-                    "+${LudoEconomy.FINAL_PLACEMENT_REWARD} coins — final placement",
+                    "finished the match · +${LudoEconomy.HOME_REWARD + LudoEconomy.FINAL_PLACEMENT_REWARD} coins",
+                )
+                targetProgress == LudoSetup.FINISH -> LudoNotification(
+                    player,
+                    "Token ${(move.metadata["token"] as? Int ?: 0) + 1} reached HOME · +${LudoEconomy.HOME_REWARD} coins",
                 )
                 blockedProtection -> LudoNotification(
                     player,
-                    "Invincibility blocked a capture",
+                    "🛡 BLOCKED! Invincibility protected Token ${(protectedPiece?.token ?: 0) + 1}",
                 )
                 else -> null
             }
@@ -229,6 +252,9 @@ class LudoRuleEngine : RuleEngine {
         }
         return piece.progress
     }
+
+    private fun capturedPlayerName(piece: LudoPiece?): String =
+        piece?.let { LudoSetup.PLAYER_NAMES[it.player] } ?: "an opponent"
 
     private fun isSafeTrackCell(position: Position): Boolean =
         LudoSetup.isSafeTrackCell(position)
