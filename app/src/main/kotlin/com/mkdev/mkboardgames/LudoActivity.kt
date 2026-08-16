@@ -48,6 +48,7 @@ class LudoActivity : AppCompatActivity() {
     private lateinit var economyView: TextView
     private lateinit var storeView: TextView
     private lateinit var overlay: FrameLayout
+    private lateinit var notificationHost: LinearLayout
     private val engine = LudoRuleEngine()
     private val handler = Handler(Looper.getMainLooper())
     private val moves = mutableListOf<Move>()
@@ -89,6 +90,24 @@ class LudoActivity : AppCompatActivity() {
             ViewGroup.LayoutParams.MATCH_PARENT,
             ViewGroup.LayoutParams.MATCH_PARENT,
         ))
+        notificationHost = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.END
+            clipChildren = false
+            clipToPadding = false
+        }
+        overlay.addView(
+            notificationHost,
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.TOP or Gravity.END,
+            ).apply {
+                topMargin = (150 * dp).toInt()
+                marginStart = (10 * dp).toInt()
+                marginEnd = (10 * dp).toInt()
+            },
+        )
         turnView = TextView(this).apply {
             setTextColor(Color.WHITE)
             setTextSize(18f)
@@ -728,7 +747,7 @@ class LudoActivity : AppCompatActivity() {
     }
 
     private fun showFloatingNotification(message: String, player: Int) {
-        if (!::overlay.isInitialized) return
+        if (!::notificationHost.isInitialized) return
         val density = resources.displayMetrics.density
         val banner = TextView(this).apply {
             text = message
@@ -736,6 +755,8 @@ class LudoActivity : AppCompatActivity() {
             setTextSize(13f)
             setTypeface(typeface, Typeface.BOLD)
             setPadding((14 * density).toInt(), (9 * density).toInt(), (14 * density).toInt(), (9 * density).toInt())
+            maxWidth = (resources.displayMetrics.widthPixels * 0.78f).toInt()
+            setLineSpacing(0f, 1.05f)
             background = GradientDrawable().apply {
                 cornerRadius = 16f * density
                 setColor(Color.argb(240, 16, 23, 31))
@@ -743,15 +764,13 @@ class LudoActivity : AppCompatActivity() {
             }
             elevation = 10 * density
         }
-        val params = FrameLayout.LayoutParams(
+        val params = LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.WRAP_CONTENT,
             ViewGroup.LayoutParams.WRAP_CONTENT,
-            Gravity.TOP or Gravity.END,
         ).apply {
-            topMargin = (150 * density).toInt()
-            marginEnd = (10 * density).toInt()
+            bottomMargin = (8 * density).toInt()
         }
-        overlay.addView(banner, params)
+        notificationHost.addView(banner, params)
         banner.post {
             banner.translationX = resources.displayMetrics.widthPixels.toFloat()
             banner.animate()
@@ -762,9 +781,9 @@ class LudoActivity : AppCompatActivity() {
                         banner.animate()
                             .translationX(-resources.displayMetrics.widthPixels.toFloat())
                             .setDuration(420L)
-                            .withEndAction { overlay.removeView(banner) }
+                            .withEndAction { notificationHost.removeView(banner) }
                             .start()
-                    }, 1800L)
+                    }, 3200L)
                 }
                 .start()
         }
