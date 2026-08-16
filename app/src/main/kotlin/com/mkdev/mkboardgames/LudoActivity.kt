@@ -344,7 +344,7 @@ class LudoActivity : AppCompatActivity() {
         val text = when {
             state.status != GameStatus.IN_PROGRESS -> "${LudoSetup.PLAYER_NAMES[state.metadata["ludo_winner"] as? Int ?: player]} wins"
             isAiTurn() -> "${LudoSetup.PLAYER_NAMES[player]} is thinking"
-            rolledValue != 0 -> "${LudoSetup.PLAYER_NAMES[player]}: choose a token"
+            rolledValue != 0 -> "${LudoSetup.PLAYER_NAMES[player]}: choose a token • move $rolledValue spaces"
             else -> "${LudoSetup.PLAYER_NAMES[player]}: roll the die"
         }
         turnView.text = text

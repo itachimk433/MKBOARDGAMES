@@ -106,7 +106,11 @@ class LudoBoardView(context: Context) : View(context) {
     private fun drawMoveHints(canvas: Canvas) {
         for (move in legalMoves) {
             val accent = accentColorFor(move)
-            drawPathHighlight(canvas, pathFor(move), accent)
+            val path = pathFor(move)
+            // The source cell is the starting point, not step one. Show only
+            // the route markers between source and destination so intermediate
+            // cells cannot be mistaken for separate legal destinations.
+            drawRoutePreview(canvas, path.drop(1).dropLast(1), accent)
             val sourcePoint = centerOf(move.from)
             highlightPaint.color = Color.argb(235, Color.red(accent), Color.green(accent), Color.blue(accent))
             canvas.drawCircle(sourcePoint.x, sourcePoint.y, cell * 0.43f, highlightPaint)
@@ -123,6 +127,18 @@ class LudoBoardView(context: Context) : View(context) {
             val point = centerOf(from)
             highlightPaint.color = Color.argb(240, 255, 255, 255)
             canvas.drawCircle(point.x, point.y, cell * 0.42f, highlightPaint)
+        }
+    }
+
+    private fun drawRoutePreview(canvas: Canvas, route: List<Position>, accent: Int) {
+        if (route.isEmpty()) return
+        val red = Color.red(accent)
+        val green = Color.green(accent)
+        val blue = Color.blue(accent)
+        piecePaint.style = Paint.Style.FILL
+        for (position in route) {
+            piecePaint.color = Color.argb(150, red, green, blue)
+            canvas.drawCircle(centerOf(position).x, centerOf(position).y, cell * 0.09f, piecePaint)
         }
     }
 
