@@ -39,6 +39,7 @@ class LudoActivity : AppCompatActivity() {
     private var state: GameState = engine.initialState()
     private var vsAI = true
     private var humanPlayer = 0
+    private var matchStarted = false
     private var rolledValue = 0
     private var resultDialogVisible = false
     private lateinit var sensorManager: SensorManager
@@ -84,7 +85,7 @@ class LudoActivity : AppCompatActivity() {
             if (isHumanTurn()) playMove(move)
         }
         boardView.onGameOverTapped = { showResultDialog() }
-        diceView.onRoll = { if (isHumanTurn()) rollDice() }
+        diceView.onRoll = { if (matchStarted && isHumanTurn()) rollDice() }
         diceView.motionDiceEnabled = SettingsManager.isMotionDiceEnabled(this)
         diceView.onMotionToggle = { enabled ->
             SettingsManager.setMotionDiceEnabled(this, enabled)
@@ -151,7 +152,7 @@ class LudoActivity : AppCompatActivity() {
 
             val now = android.os.SystemClock.elapsedRealtime()
             if (now - lastMotionAt < 900L) return
-            if (!isHumanTurn() || state.status != GameStatus.IN_PROGRESS ||
+            if (!matchStarted || !isHumanTurn() || state.status != GameStatus.IN_PROGRESS ||
                 rolledValue != 0 || boardView.isLocked
             ) return
 
@@ -168,7 +169,7 @@ class LudoActivity : AppCompatActivity() {
 
             lastMotionAt = now
             runOnUiThread {
-                if (SettingsManager.isMotionDiceEnabled(this@LudoActivity)) {
+                if (matchStarted && SettingsManager.isMotionDiceEnabled(this@LudoActivity)) {
                     rollDice(direction)
                 }
             }
@@ -177,7 +178,7 @@ class LudoActivity : AppCompatActivity() {
 
     private fun syncMotionSensor() {
         sensorManager.unregisterListener(motionListener)
-        if (SettingsManager.isMotionDiceEnabled(this)) {
+        if (matchStarted && SettingsManager.isMotionDiceEnabled(this)) {
             motionSensor?.let { sensor ->
                 sensorManager.registerListener(
                     motionListener,
@@ -263,11 +264,13 @@ class LudoActivity : AppCompatActivity() {
         moves.clear()
         resultDialogVisible = false
         rolledValue = 0
+        matchStarted = true
         state = engine.initialState()
         boardView.gameState = state
         boardView.legalMoves = emptyList()
         boardView.isLocked = false
         diceView.value = 1
+        syncMotionSensor()
         updateHud()
         if (isAiTurn()) handler.postDelayed({ rollDice() }, 650L)
     }
