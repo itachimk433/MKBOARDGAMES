@@ -56,9 +56,8 @@ class LudoStatusStripView(context: Context) : View(context) {
 
         displayOrder.forEachIndexed { index, player ->
             val column = index % columns
-            val row = index / columns
             val left = padding + column * (cardWidth + horizontalGap)
-            val top = padding + row * (cardHeight + verticalGap)
+            val top = padding
             val right = left + cardWidth
             val bottom = top + cardHeight
             val color = LudoSetup.PLAYER_COLORS[player]
