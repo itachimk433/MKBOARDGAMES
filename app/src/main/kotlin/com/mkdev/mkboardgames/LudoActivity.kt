@@ -87,7 +87,7 @@ class LudoActivity : AppCompatActivity() {
             ViewGroup.LayoutParams.MATCH_PARENT, (54 * dp).toInt()
         ).apply {
             bottomMargin = (8 * dp).toInt()
-        ))
+        })
         root.addView(statusView, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, (92 * dp).toInt()
         ).apply {
