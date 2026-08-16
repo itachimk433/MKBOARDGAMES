@@ -9,6 +9,7 @@ import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.PointF
 import android.graphics.RectF
 import android.view.MotionEvent
@@ -52,6 +53,16 @@ class LudoBoardView(context: Context) : View(context) {
     private var animatedPath: List<Position> = emptyList()
     private var animatedProgress = 0f
     private var moveAnimator: ValueAnimator? = null
+    private var protectionPulse = 0f
+    private val protectionPulseAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
+        duration = 950L
+        repeatCount = ValueAnimator.INFINITE
+        repeatMode = ValueAnimator.REVERSE
+        addUpdateListener {
+            protectionPulse = it.animatedValue as Float
+            invalidate()
+        }
+    }
 
     private val boardBitmap: Bitmap? = runCatching {
         context.assets.open("ludo_board_reference.png").use { BitmapFactory.decodeStream(it) }
@@ -72,6 +83,21 @@ class LudoBoardView(context: Context) : View(context) {
     }
     private val protectionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
+    }
+
+    init {
+        setLayerType(View.LAYER_TYPE_SOFTWARE, null)
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        protectionPulseAnimator.start()
+    }
+
+    override fun onDetachedFromWindow() {
+        protectionPulseAnimator.cancel()
+        moveAnimator?.cancel()
+        super.onDetachedFromWindow()
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
@@ -270,6 +296,38 @@ class LudoBoardView(context: Context) : View(context) {
         piecePaint.style = Paint.Style.FILL
         textPaint.color = Color.WHITE
         canvas.drawText(piece.symbol(), point.x, point.y - (textPaint.ascent() + textPaint.descent()) / 2f, textPaint)
+        if (isProtected) {
+            drawProtectionShield(canvas, point.x, point.y + radius * 1.18f)
+        }
+    }
+
+    private fun drawProtectionShield(canvas: Canvas, centerX: Float, centerY: Float) {
+        val width = cell * 0.22f
+        val height = cell * 0.27f
+        val pulse = protectionPulse
+        protectionPaint.setShadowLayer(
+            cell * (0.08f + pulse * 0.08f),
+            0f,
+            cell * 0.03f,
+            Color.argb(180, 255, 206, 67),
+        )
+        protectionPaint.style = Paint.Style.FILL
+        protectionPaint.color = Color.argb(185 + (pulse * 35f).toInt(), 89, 67, 20)
+        val shield = Path().apply {
+            moveTo(centerX, centerY - height)
+            lineTo(centerX + width, centerY - height * 0.62f)
+            lineTo(centerX + width * 0.82f, centerY + height * 0.35f)
+            quadTo(centerX, centerY + height, centerX - width * 0.82f, centerY + height * 0.35f)
+            lineTo(centerX - width, centerY - height * 0.62f)
+            close()
+        }
+        canvas.drawPath(shield, protectionPaint)
+        protectionPaint.clearShadowLayer()
+        protectionPaint.style = Paint.Style.STROKE
+        protectionPaint.strokeWidth = cell * 0.045f
+        protectionPaint.color = Color.rgb(255, 224, 112)
+        canvas.drawPath(shield, protectionPaint)
+        protectionPaint.style = Paint.Style.FILL
     }
 
     private fun drawTurnMarker(canvas: Canvas) {

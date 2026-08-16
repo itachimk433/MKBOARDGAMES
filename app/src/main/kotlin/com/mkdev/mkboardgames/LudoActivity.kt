@@ -1,5 +1,6 @@
 package com.mkdev.mkboardgames
 
+import android.app.Dialog
 import android.graphics.Color
 import android.os.Bundle
 import android.os.Handler
@@ -13,9 +14,13 @@ import android.view.ViewGroup
 import android.view.WindowManager
 import android.graphics.drawable.GradientDrawable
 import android.graphics.Typeface
+import android.text.InputFilter
+import android.text.InputType
 import android.view.Gravity
 import android.widget.FrameLayout
+import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
@@ -35,6 +40,7 @@ import com.mkdev.mkboardgames.ui.LudoDiceView
 import com.mkdev.mkboardgames.ui.LudoStatusStripView
 import com.mkdev.mkboardgames.ui.MotionDiceDirection
 import kotlin.math.abs
+import kotlin.math.roundToInt
 import kotlin.math.sqrt
 import kotlin.random.Random
 
@@ -199,9 +205,9 @@ class LudoActivity : AppCompatActivity() {
         }
         boardView.onGameOverTapped = { showResultDialog() }
         statusView.onPlayerProfileTapped = { player ->
-            if (profilesEnabled()) showPlayerProfile(player)
+            if (profilesEnabled()) showPlayerProfile(player) else showRenameDialog(player)
         }
-        statusView.profilesEnabled = false
+        statusView.profilesEnabled = true
         diceView.onRoll = { if (matchStarted && isHumanTurn()) rollDice() }
         tapRollView.onTap = { if (matchStarted && isHumanTurn()) rollDice() }
         motionView.motionEnabled = SettingsManager.isMotionDiceEnabled(this)
@@ -620,43 +626,276 @@ class LudoActivity : AppCompatActivity() {
 
     private fun showStoreDialog() {
         val player = humanPlayer
-        val economy = LudoEconomy.player(state, player)
-        val options = arrayOf(
-            "Buy 🛡 Invincibility · ${LudoAbility.INVINCIBILITY.cost} coins",
-            "Buy ⚡ Extra Move · ${LudoAbility.EXTRA_MOVE.cost} coins",
-            "Buy 🎲 Reroll · ${LudoAbility.REROLL.cost} coins",
-            "Use 🛡 Invincibility · ${economy.invincibility} available",
-            "Use ⚡ Extra Move · ${economy.extraMove} available",
-            "Use 🎲 Reroll · ${economy.reroll} available",
-        )
-        AlertDialog.Builder(this)
-            .setTitle("Irregular Store · ${economy.coins} coins")
-            .setMessage(
-                "The store is available throughout your turn. Buy anytime; use Reroll and Extra Move after rolling. " +
-                    (if (state.metadata[LudoEconomy.PURCHASED_ABILITY_METADATA] == true) {
-                        "Purchase used this turn."
-                    } else {
-                        "One purchase available this turn."
-                    }) + " " +
-                    (if (state.metadata[LudoEconomy.USED_ABILITY_METADATA] == true) {
-                        "Ability use used this turn."
-                    } else {
-                        "One ability use available this turn."
-                    }),
+        val density = resources.displayMetrics.density
+        val dialog = Dialog(this)
+        val shell = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(14), dp(14), dp(14), dp(12))
+            background = GradientDrawable().apply {
+                cornerRadius = 24f * density
+                setColor(Color.rgb(9, 18, 29))
+                setStroke(dp(2), Color.rgb(72, 151, 235))
+            }
+            elevation = 18f * density
+        }
+        val scroll = ScrollView(this).apply {
+            isFillViewport = true
+            overScrollMode = View.OVER_SCROLL_NEVER
+        }
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+        scroll.addView(content)
+        shell.addView(scroll, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.MATCH_PARENT,
+        ))
+        dialog.setContentView(shell)
+        dialog.setCanceledOnTouchOutside(true)
+
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val cart = storeText("✦", 31f, Color.rgb(232, 147, 255), Gravity.CENTER).apply {
+            background = storePanel(Color.rgb(42, 20, 70), Color.rgb(170, 86, 245), 20f)
+        }
+        header.addView(cart, LinearLayout.LayoutParams(dp(58), dp(58)).apply {
+            marginEnd = dp(12)
+        })
+        val titleColumn = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+        titleColumn.addView(storeText("IRREGULAR STORE", 21f, Color.WHITE, Gravity.START))
+        titleColumn.addView(storeText("Spend your coins wisely", 13f, Color.rgb(183, 192, 207), Gravity.START))
+        header.addView(titleColumn, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        val close = storeText("×", 34f, Color.rgb(190, 219, 255), Gravity.CENTER).apply {
+            isClickable = true
+            background = storePanel(Color.TRANSPARENT, Color.rgb(56, 141, 235), 30f)
+            setOnClickListener { dialog.dismiss() }
+        }
+        header.addView(close, LinearLayout.LayoutParams(dp(54), dp(54)))
+        content.addView(header, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+        ).apply { bottomMargin = dp(12) })
+
+        val economyBar = LinearLayout(this).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(14), dp(8), dp(14), dp(8))
+            background = storePanel(Color.rgb(17, 29, 44), Color.rgb(46, 93, 139), 15f)
+        }
+        val coin = storeText("◉", 21f, Color.rgb(255, 213, 72), Gravity.CENTER)
+        economyBar.addView(coin, LinearLayout.LayoutParams(dp(30), dp(30)).apply {
+            marginEnd = dp(8)
+        })
+        val coinText = storeText("", 16f, Color.WHITE, Gravity.START)
+        economyBar.addView(coinText, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        val turnText = storeText("", 11f, Color.rgb(137, 214, 255), Gravity.END)
+        economyBar.addView(turnText)
+        content.addView(economyBar, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+        ).apply { bottomMargin = dp(12) })
+
+        val cards = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+        content.addView(storeText("BOOSTS", 13f, Color.rgb(110, 214, 255), Gravity.CENTER).apply {
+            letterSpacing = 0.18f
+        }, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+        ).apply { bottomMargin = dp(7) })
+        content.addView(cards)
+
+        val activeTitle = storeText("✦  ACTIVE BOOSTS  ✦", 13f, Color.rgb(42, 224, 226), Gravity.CENTER).apply {
+            letterSpacing = 0.12f
+        }
+        content.addView(activeTitle, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+        ).apply {
+            topMargin = dp(15)
+            bottomMargin = dp(7)
+        })
+        val active = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = storePanel(Color.rgb(11, 27, 40), Color.rgb(28, 74, 102), 16f)
+        }
+        content.addView(active)
+
+        lateinit var render: () -> Unit
+        render = {
+            val economy = LudoEconomy.player(state, player)
+            val purchaseUsed = state.metadata[LudoEconomy.PURCHASED_ABILITY_METADATA] == true
+            coinText.text = "${economy.coins} coins available"
+            turnText.text = if (purchaseUsed) "PURCHASE USED" else "1 PURCHASE LEFT"
+            cards.removeAllViews()
+            LudoAbility.values().forEachIndexed { index, ability ->
+                val card = buildStoreAbilityCard(
+                    ability = ability,
+                    economy = economy,
+                    purchaseUsed = purchaseUsed,
+                    onBuy = {
+                        buyAbility(player, ability)
+                        render()
+                    },
+                )
+                cards.addView(card, LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+                ).apply { bottomMargin = if (index == LudoAbility.values().lastIndex) 0 else dp(8) })
+                card.alpha = 0f
+                card.translationY = dp(12).toFloat()
+                card.postDelayed({
+                    card.animate().alpha(1f).translationY(0f).setDuration(260L).start()
+                }, index * 70L)
+            }
+            active.removeAllViews()
+            LudoAbility.values().forEachIndexed { index, ability ->
+                val count = LudoEconomy.abilityCount(economy, ability)
+                val row = buildActiveBoostRow(ability, count) {
+                    when (ability) {
+                        LudoAbility.INVINCIBILITY -> {
+                            dialog.dismiss()
+                            chooseProtectionTarget(player)
+                        }
+                        LudoAbility.EXTRA_MOVE -> useExtraMove(player, dialog)
+                        LudoAbility.REROLL -> useReroll(player, dialog)
+                    }
+                }
+                active.addView(row, LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, dp(52),
+                ).apply { bottomMargin = if (index == LudoAbility.values().lastIndex) 0 else dp(1) })
+            }
+        }
+        render()
+        dialog.show()
+        dialog.window?.apply {
+            setBackgroundDrawableResource(android.R.color.transparent)
+            setDimAmount(0.78f)
+            setLayout(
+                (resources.displayMetrics.widthPixels - dp(24)).coerceAtLeast(dp(280)),
+                (resources.displayMetrics.heightPixels * 0.86f).roundToInt(),
             )
-            .setItems(options) { dialog, which ->
-                when (which) {
-                    0 -> buyAbility(player, LudoAbility.INVINCIBILITY)
-                    1 -> buyAbility(player, LudoAbility.EXTRA_MOVE)
-                    2 -> buyAbility(player, LudoAbility.REROLL)
-                    3 -> chooseProtectionTarget(player)
-                    4 -> useExtraMove(player, dialog)
-                    5 -> useReroll(player, dialog)
+        }
+        shell.alpha = 0f
+        shell.scaleX = 0.92f
+        shell.scaleY = 0.92f
+        shell.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(280L).start()
+    }
+
+    private fun buildStoreAbilityCard(
+        ability: LudoAbility,
+        economy: LudoPlayerEconomy,
+        purchaseUsed: Boolean,
+        onBuy: () -> Unit,
+    ): LinearLayout {
+        val accent = when (ability) {
+            LudoAbility.INVINCIBILITY -> Color.rgb(255, 201, 71)
+            LudoAbility.EXTRA_MOVE -> Color.rgb(45, 181, 255)
+            LudoAbility.REROLL -> Color.rgb(196, 95, 255)
+        }
+        val card = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(10), dp(10), dp(10), dp(10))
+            background = storePanel(
+                Color.argb(210, Color.red(accent) / 10, Color.green(accent) / 10, Color.blue(accent) / 10),
+                Color.argb(180, Color.red(accent), Color.green(accent), Color.blue(accent)),
+                17f,
+            )
+        }
+        val icon = storeText(
+            when (ability) {
+                LudoAbility.INVINCIBILITY -> "◈"
+                LudoAbility.EXTRA_MOVE -> "ϟ"
+                LudoAbility.REROLL -> "⚄"
+            },
+            31f,
+            accent,
+            Gravity.CENTER,
+        ).apply {
+            background = storePanel(Color.argb(75, Color.red(accent), Color.green(accent), Color.blue(accent)), accent, 15f)
+        }
+        card.addView(icon, LinearLayout.LayoutParams(dp(64), dp(64)).apply { marginEnd = dp(11) })
+        val details = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        details.addView(storeText(ability.label.uppercase(), 16f, accent, Gravity.START))
+        details.addView(storeText(
+            when (ability) {
+                LudoAbility.INVINCIBILITY -> "Protect a token from one capture."
+                LudoAbility.EXTRA_MOVE -> "Move two extra spaces this turn."
+                LudoAbility.REROLL -> "Roll the die one more time."
+            },
+            12f,
+            Color.rgb(192, 204, 218),
+            Gravity.START,
+        ))
+        val owned = LudoEconomy.abilityCount(economy, ability)
+        details.addView(storeText("OWNED  $owned", 10f, Color.rgb(143, 232, 192), Gravity.START))
+        card.addView(details, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        val buy = storeText(
+            if (purchaseUsed) "USED" else if (economy.coins >= ability.cost) "BUY\n${ability.cost} ◉" else "NEED\n${ability.cost}",
+            12f,
+            if (!purchaseUsed && economy.coins >= ability.cost) Color.WHITE else Color.rgb(138, 151, 168),
+            Gravity.CENTER,
+        ).apply {
+            isClickable = !purchaseUsed && economy.coins >= ability.cost
+            background = storePanel(
+                if (isClickable) Color.argb(180, Color.red(accent), Color.green(accent), Color.blue(accent)) else Color.rgb(24, 35, 48),
+                if (isClickable) accent else Color.rgb(56, 72, 92),
+                13f,
+            )
+            if (isClickable) {
+                setOnClickListener {
+                    animate().scaleX(0.92f).scaleY(0.92f).setDuration(70L).withEndAction {
+                        animate().scaleX(1f).scaleY(1f).setDuration(100L).start()
+                        onBuy()
+                    }.start()
                 }
             }
-            .setNegativeButton("Close", null)
-            .show()
+        }
+        card.addView(buy, LinearLayout.LayoutParams(dp(82), dp(58)).apply { marginStart = dp(8) })
+        return card
     }
+
+    private fun buildActiveBoostRow(
+        ability: LudoAbility,
+        count: Int,
+        onUse: () -> Unit,
+    ): TextView {
+        val accent = when (ability) {
+            LudoAbility.INVINCIBILITY -> Color.rgb(255, 201, 71)
+            LudoAbility.EXTRA_MOVE -> Color.rgb(45, 181, 255)
+            LudoAbility.REROLL -> Color.rgb(196, 95, 255)
+        }
+        return storeText(
+            "${ability.icon}  ${ability.label.uppercase()}                              $count available",
+            12f,
+            if (count > 0) accent else Color.rgb(148, 160, 176),
+            Gravity.CENTER_VERTICAL,
+        ).apply {
+            setPadding(dp(13), 0, dp(13), 0)
+            isClickable = count > 0
+            if (count > 0) setOnClickListener { onUse() }
+        }
+    }
+
+    private fun storeText(text: String, size: Float, color: Int, gravity: Int): TextView =
+        TextView(this).apply {
+            this.text = text
+            setTextColor(color)
+            setTextSize(size)
+            this.gravity = gravity
+            setTypeface(typeface, Typeface.BOLD)
+            setLineSpacing(0f, 1.04f)
+        }
+
+    private fun storePanel(fill: Int, stroke: Int, radius: Float): GradientDrawable =
+        GradientDrawable().apply {
+            cornerRadius = radius * resources.displayMetrics.density
+            setColor(fill)
+            setStroke(dp(1), stroke)
+        }
+
+    private fun dp(value: Int): Int =
+        (value * resources.displayMetrics.density).roundToInt()
 
     private fun buyAbility(player: Int, ability: LudoAbility) {
         if (state.metadata[LudoEconomy.PURCHASED_ABILITY_METADATA] == true) {
@@ -779,10 +1018,11 @@ class LudoActivity : AppCompatActivity() {
             .filter { it.player == player }
             .sortedBy { it.token }
         val tokenLines = pieces.joinToString("\n") {
-            "Token ${it.token + 1} · ${progressLabel(it.progress)}"
+            "${economy.tokenName} ${it.token + 1} · ${progressLabel(it.progress)}"
         }
         val message = """
             Coins: ${economy.coins}
+            Name: ${economy.tokenName}
             Ability purchases: ${if (state.metadata[LudoEconomy.PURCHASED_ABILITY_METADATA] == true) "1/1 used this turn" else "0/1 used this turn"}
             Ability uses: ${if (state.metadata[LudoEconomy.USED_ABILITY_METADATA] == true) "1/1 used this turn" else "0/1 used this turn"}
 
@@ -791,13 +1031,53 @@ class LudoActivity : AppCompatActivity() {
             ⚡ Extra Move ×${economy.extraMove}
             🎲 Reroll ×${economy.reroll}
 
-            Tokens
+            ${economy.tokenName}
             $tokenLines
         """.trimIndent()
         AlertDialog.Builder(this)
             .setTitle("${LudoSetup.PLAYER_NAMES[player]} · AI profile")
             .setMessage(message)
+            .setNeutralButton("Rename") { _, _ -> showRenameDialog(player) }
             .setPositiveButton("Close", null)
+            .show()
+    }
+
+    private fun showRenameDialog(player: Int) {
+        val economy = LudoEconomy.player(state, player)
+        val input = EditText(this).apply {
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS
+            filters = arrayOf(
+                InputFilter.LengthFilter(5),
+                InputFilter { source, _, _, _, _, _ ->
+                    (source ?: "").filter { it.isLetter() }
+                },
+            )
+            setText(economy.tokenName.take(5))
+            setSelection(text.length)
+            hint = "Up to 5 letters"
+            singleLine = true
+        }
+        val padding = (22 * resources.displayMetrics.density).roundToInt()
+        val container = FrameLayout(this).apply {
+            setPadding(padding, 0, padding, 0)
+            addView(input, FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ))
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Rename ${LudoSetup.PLAYER_NAMES[player]} tokens")
+            .setMessage("Use up to 5 letters.")
+            .setView(container)
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Save") { _, _ ->
+                val renamed = LudoEconomy.rename(economy, input.text.toString())
+                setPlayerEconomy(player, renamed)
+                showFloatingNotification(
+                    "${LudoSetup.PLAYER_NAMES[player]} tokens are now ${renamed.tokenName}",
+                    player,
+                )
+            }
             .show()
     }
 
@@ -947,7 +1227,7 @@ class LudoActivity : AppCompatActivity() {
         statusView.gameState = state
         statusView.activePlayer = player
         statusView.rolledValue = rolledValue
-        statusView.profilesEnabled = profilesEnabled()
+        statusView.profilesEnabled = true
         if (economyEnabled) {
             val economy = LudoEconomy.player(state, humanPlayer)
             economyView.text = "IRREGULAR  •  COINS ${economy.coins}"

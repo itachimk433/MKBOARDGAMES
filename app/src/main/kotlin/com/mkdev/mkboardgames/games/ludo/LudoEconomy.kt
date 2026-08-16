@@ -14,6 +14,7 @@ data class LudoPlayerEconomy(
     val extraMove: Int = 0,
     val reroll: Int = 0,
     val protectedToken: Int? = null,
+    val tokenName: String = "Tokens",
 )
 
 data class LudoNotification(
@@ -83,4 +84,7 @@ object LudoEconomy {
 
     fun addCoins(economy: LudoPlayerEconomy, amount: Int): LudoPlayerEconomy =
         economy.copy(coins = (economy.coins + amount).coerceAtLeast(0))
+
+    fun rename(economy: LudoPlayerEconomy, requestedName: String): LudoPlayerEconomy =
+        economy.copy(tokenName = requestedName.filter { it.isLetter() }.take(5).ifBlank { "Tokens" })
 }

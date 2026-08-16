@@ -81,6 +81,7 @@ class LudoStatusStripView(context: Context) : View(context) {
             val right = left + cardWidth
             val bottom = top + cardHeight
             val color = LudoSetup.PLAYER_COLORS[player]
+            val economy = LudoEconomy.player(gameState, player)
 
             cardPaint.color = Color.argb(242, 17, 22, 28)
             cardPaint.setShadowLayer(5f * density, 0f, 2f * density, Color.argb(130, 0, 0, 0))
@@ -133,8 +134,13 @@ class LudoStatusStripView(context: Context) : View(context) {
             textPaint.color = Color.rgb(185, 192, 201)
             textPaint.textSize = 14f * density * scale
             textPaint.textAlign = Paint.Align.LEFT
+            val tokenName = economy.tokenName
+            val nameMaxWidth = (right - left - 49f * density * scale).coerceAtLeast(1f)
+            if (textPaint.measureText(tokenName) > nameMaxWidth) {
+                textPaint.textSize *= nameMaxWidth / textPaint.measureText(tokenName)
+            }
             canvas.drawText(
-                "Tokens",
+                tokenName,
                 left + 44f * density * scale,
                 top + 33f * density * scale,
                 textPaint,
@@ -150,7 +156,6 @@ class LudoStatusStripView(context: Context) : View(context) {
             )
 
             val playerPieces = pieces.filter { it.player == player }
-            val economy = LudoEconomy.player(gameState, player)
             val homeCount = playerPieces.count { it.progress >= LudoSetup.FINISH }
             val dotGap = 12f * density * scale
             val dotStart = right - (LudoSetup.TOKENS_PER_PLAYER - 1) * dotGap - 7f * density * scale
