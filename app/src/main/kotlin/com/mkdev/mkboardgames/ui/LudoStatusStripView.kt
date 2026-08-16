@@ -50,7 +50,7 @@ class LudoStatusStripView(context: Context) : View(context) {
         val horizontalGap = 7f * density
         val cardWidth = (width - padding * 2f - horizontalGap * (columns - 1)) / columns
         val cardHeight = height - padding * 2f
-        val scale = (cardWidth / (178f * density)).coerceIn(0.72f, 1f)
+        val scale = (cardWidth / (104f * density)).coerceIn(0.28f, 1f)
         val radius = 9f * density * scale
         val pieces = LudoSetup.allPieces(gameState)
 
@@ -82,56 +82,56 @@ class LudoStatusStripView(context: Context) : View(context) {
                 accentPaint,
             )
 
-            val avatarX = left + 28f * density * scale
-            val avatarY = top + 32f * density * scale
+            val avatarX = left + 22f * density * scale
+            val avatarY = top + 27f * density * scale
             avatarPaint.color = Color.argb(255, 233, 240, 244)
-            canvas.drawCircle(avatarX, avatarY, 21f * density * scale, avatarPaint)
+            canvas.drawCircle(avatarX, avatarY, 18f * density * scale, avatarPaint)
             avatarPaint.color = Color.argb(
                 255,
                 Color.red(color),
                 Color.green(color),
                 Color.blue(color),
             )
-            canvas.drawCircle(avatarX, avatarY, 17f * density * scale, avatarPaint)
+            canvas.drawCircle(avatarX, avatarY, 14f * density * scale, avatarPaint)
             avatarPaint.color = Color.argb(130, 255, 255, 255)
             canvas.drawCircle(
                 avatarX,
-                avatarY - 5f * density * scale,
-                6f * density * scale,
+                avatarY - 4f * density * scale,
+                5f * density * scale,
                 avatarPaint,
             )
             canvas.drawOval(
                 RectF(
-                    avatarX - 10f * density * scale,
+                    avatarX - 8f * density * scale,
                     avatarY + 1f * density * scale,
-                    avatarX + 10f * density * scale,
-                    avatarY + 13f * density * scale,
+                    avatarX + 8f * density * scale,
+                    avatarY + 11f * density * scale,
                 ),
                 avatarPaint,
             )
 
             textPaint.color = Color.rgb(185, 192, 201)
-            textPaint.textSize = 17f * density * scale
+            textPaint.textSize = 14f * density * scale
             textPaint.textAlign = Paint.Align.LEFT
             canvas.drawText(
                 "Tokens",
-                left + 58f * density * scale,
-                top + 39f * density * scale,
+                left + 44f * density * scale,
+                top + 33f * density * scale,
                 textPaint,
             )
 
             textPaint.color = color
-            textPaint.textSize = 15f * density * scale
+            textPaint.textSize = 12f * density * scale
             canvas.drawText(
                 "[A]",
-                left + 9f * density * scale,
-                bottom - 15f * density * scale,
+                left + 7f * density * scale,
+                bottom - 12f * density * scale,
                 textPaint,
             )
 
             val playerPieces = pieces.filter { it.player == player }
-            val dotStart = left + 59f * density * scale
-            val dotGap = 18f * density * scale
+            val dotStart = left + 50f * density * scale
+            val dotGap = 14f * density * scale
             repeat(LudoSetup.TOKENS_PER_PLAYER) { token ->
                 val piece = playerPieces.firstOrNull { it.token == token }
                 val dotColor = when {
@@ -143,8 +143,8 @@ class LudoStatusStripView(context: Context) : View(context) {
                 dotPaint.color = dotColor
                 canvas.drawCircle(
                     dotStart + token * dotGap,
-                    bottom - 20f * density * scale,
-                    7f * density * scale,
+                    bottom - 16f * density * scale,
+                    5f * density * scale,
                     dotPaint,
                 )
                 if (piece?.progress == LudoSetup.FINISH) {
@@ -153,8 +153,8 @@ class LudoStatusStripView(context: Context) : View(context) {
                     dotPaint.strokeWidth = 1.5f * density * scale
                     canvas.drawCircle(
                         dotStart + token * dotGap,
-                        bottom - 20f * density * scale,
-                        7f * density * scale,
+                        bottom - 16f * density * scale,
+                        5f * density * scale,
                         dotPaint,
                     )
                     dotPaint.style = Paint.Style.FILL

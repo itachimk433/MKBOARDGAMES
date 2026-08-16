@@ -30,11 +30,11 @@ private data class DiceOrientation(
     companion object {
         fun forValue(value: Int): DiceOrientation = when (value.coerceIn(1, 6)) {
             1 -> DiceOrientation(0f, 90f)
-            2 -> DiceOrientation(0f, 0f)
-            3 -> DiceOrientation(90f, 0f)
-            4 -> DiceOrientation(0f, 180f)
-            5 -> DiceOrientation(-90f, 0f)
-            else -> DiceOrientation(0f, -90f)
+            2 -> DiceOrientation(0f, -90f)
+            3 -> DiceOrientation(0f, 0f)
+            4 -> DiceOrientation(90f, 0f)
+            5 -> DiceOrientation(0f, 180f)
+            else -> DiceOrientation(-90f, 0f)
         }
     }
 }

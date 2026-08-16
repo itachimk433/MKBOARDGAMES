@@ -65,6 +65,7 @@ class LudoControlTileView(
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         val density = resources.displayMetrics.density
+        val scale = (minOf(width, height).toFloat() / (134f * density)).coerceIn(0.62f, 1f)
         val radius = 12f * density
         tilePaint.color = if (pressed) Color.rgb(44, 52, 62) else Color.rgb(25, 31, 38)
         tilePaint.style = Paint.Style.FILL
@@ -99,33 +100,63 @@ class LudoControlTileView(
 
         if (type == ControlType.MOTION) {
             iconPaint.color = if (motionEnabled) Color.rgb(220, 225, 232) else Color.rgb(123, 133, 145)
-            canvas.drawCircle(width / 2f, 28f * density, 8f * density, iconPaint)
+            canvas.drawCircle(width / 2f, 28f * density * scale, 8f * density * scale, iconPaint)
             iconPaint.color = Color.rgb(41, 48, 57)
-            canvas.drawCircle(width / 2f, 28f * density, 3f * density, iconPaint)
+            canvas.drawCircle(width / 2f, 28f * density * scale, 3f * density * scale, iconPaint)
             textPaint.color = Color.rgb(228, 232, 237)
-            textPaint.textSize = 15f * density
-            canvas.drawText(
+            drawFittedText(
+                canvas,
                 "Motion: ${if (motionEnabled) "ON" else "OFF"}",
                 width / 2f,
-                70f * density,
+                70f * density * scale,
                 textPaint,
+                15f * density * scale,
             )
-            secondaryPaint.textSize = 12f * density
-            canvas.drawText("(Hold to change)", width / 2f, 89f * density, secondaryPaint)
+            drawFittedText(
+                canvas,
+                "(Hold to change)",
+                width / 2f,
+                89f * density * scale,
+                secondaryPaint,
+                12f * density * scale,
+            )
             iconPaint.color = Color.rgb(203, 209, 217)
             repeat(3) { index ->
                 canvas.drawCircle(
-                    width / 2f - 9f * density + index * 9f * density,
-                    111f * density,
-                    2f * density,
+                    width / 2f - 9f * density * scale + index * 9f * density * scale,
+                    111f * density * scale,
+                    2f * density * scale,
                     iconPaint,
                 )
             }
         } else {
             textPaint.color = Color.rgb(228, 232, 237)
-            textPaint.textSize = 16f * density
-            canvas.drawText("TAP TO ROLL", width / 2f, 77f * density, textPaint)
+            drawFittedText(
+                canvas,
+                "TAP TO ROLL",
+                width / 2f,
+                77f * density * scale,
+                textPaint,
+                16f * density * scale,
+            )
         }
+    }
+
+    private fun drawFittedText(
+        canvas: Canvas,
+        text: String,
+        centerX: Float,
+        baseline: Float,
+        paint: Paint,
+        baseSize: Float,
+    ) {
+        paint.textSize = baseSize
+        val maxWidth = (width - 14f * resources.displayMetrics.density).coerceAtLeast(1f)
+        val measuredWidth = paint.measureText(text)
+        if (measuredWidth > maxWidth) {
+            paint.textSize = baseSize * maxWidth / measuredWidth
+        }
+        canvas.drawText(text, centerX, baseline, paint)
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {

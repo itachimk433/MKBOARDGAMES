@@ -95,22 +95,23 @@ class LudoActivity : AppCompatActivity() {
             bottomMargin = (6 * dp).toInt()
         })
         root.addView(boardView, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, 0
-        ).apply { weight = 1f })
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+        ))
         val controls = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = android.view.Gravity.CENTER
             setPadding(0, (4 * dp).toInt(), 0, 0)
         }
-        controls.addView(motionView, LinearLayout.LayoutParams(0, (134 * dp).toInt(), 1f).apply {
+        controls.addView(motionView, LinearLayout.LayoutParams(0, (112 * dp).toInt(), 1f).apply {
             marginEnd = (6 * dp).toInt()
         })
-        controls.addView(diceView, LinearLayout.LayoutParams((132 * dp).toInt(), (134 * dp).toInt()).apply {
+        controls.addView(diceView, LinearLayout.LayoutParams((112 * dp).toInt(), (112 * dp).toInt()).apply {
             marginEnd = (6 * dp).toInt()
         })
-        controls.addView(tapRollView, LinearLayout.LayoutParams(0, (134 * dp).toInt(), 1f))
+        controls.addView(tapRollView, LinearLayout.LayoutParams(0, (112 * dp).toInt(), 1f))
         root.addView(controls, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, (138 * dp).toInt()
+            ViewGroup.LayoutParams.MATCH_PARENT, (116 * dp).toInt()
         ))
         AdManager.attachBanner(root)
         setContentView(root)

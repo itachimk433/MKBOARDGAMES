@@ -70,6 +70,21 @@ class LudoBoardView(context: Context) : View(context) {
         strokeWidth = 3f
     }
 
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        val widthMode = MeasureSpec.getMode(widthMeasureSpec)
+        val heightMode = MeasureSpec.getMode(heightMeasureSpec)
+        val widthSize = MeasureSpec.getSize(widthMeasureSpec)
+        val heightSize = MeasureSpec.getSize(heightMeasureSpec)
+        val boardSize = when {
+            widthMode != MeasureSpec.UNSPECIFIED && widthSize > 0 -> widthSize
+            heightMode != MeasureSpec.UNSPECIFIED && heightSize > 0 -> heightSize
+            else -> suggestedMinimumWidth
+        }
+        val measuredWidth = resolveSize(boardSize, widthMeasureSpec)
+        val measuredHeight = resolveSize(boardSize, heightMeasureSpec)
+        setMeasuredDimension(measuredWidth, measuredHeight)
+    }
+
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) = updateGeometry()
 
     private fun updateGeometry() {
