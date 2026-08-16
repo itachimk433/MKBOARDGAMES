@@ -1,6 +1,7 @@
 package com.mkdev.mkboardgames.games.ludo
 
 import com.mkdev.mkboardgames.engine.GameState
+import com.mkdev.mkboardgames.engine.Move
 import com.mkdev.mkboardgames.engine.Piece
 import com.mkdev.mkboardgames.engine.PieceColor
 import com.mkdev.mkboardgames.engine.Position
@@ -30,6 +31,7 @@ object LudoSetup {
     const val FINISH = 56
     const val PLAYER_COUNT = 4
     const val TOKENS_PER_PLAYER = 4
+    const val PIECES_METADATA = "ludo_pieces"
 
     val PLAYER_NAMES = arrayOf("Red", "Blue", "Green", "Yellow")
     val PLAYER_COLORS = intArrayOf(
@@ -118,19 +120,54 @@ object LudoSetup {
         else -> finishPosition(piece.player, piece.token)
     }
 
-    fun initialState(): GameState {
+    /**
+     * The generic engine board can hold one Piece per cell, while Ludo allows
+     * same-colour tokens to share a track cell. Keep the complete token list
+     * in metadata and use the board array as a backwards-compatible spatial
+     * index/representative.
+     */
+    fun allPieces(state: GameState): List<LudoPiece> =
+        (state.metadata[PIECES_METADATA] as? List<*>)
+            ?.filterIsInstance<LudoPiece>()
+            ?.takeIf { it.size == PLAYER_COUNT * TOKENS_PER_PLAYER }
+            ?: state.board.filterIsInstance<LudoPiece>()
+
+    fun piecesAt(state: GameState, position: Position): List<LudoPiece> =
+        allPieces(state).filter { positionOf(it) == position }
+
+    fun pieceForMove(state: GameState, move: Move): LudoPiece? {
+        val player = move.metadata["player"] as? Int ?: return null
+        val token = move.metadata["token"] as? Int ?: return null
+        return allPieces(state).firstOrNull {
+            it.player == player && it.token == token && positionOf(it) == move.from
+        }
+    }
+
+    fun boardFor(pieces: List<LudoPiece>): Array<Piece?> {
         val board = arrayOfNulls<Piece>(BOARD_SIZE * BOARD_SIZE)
-        for (player in 0 until PLAYER_COUNT) {
-            for (token in 0 until TOKENS_PER_PLAYER) {
-                val piece = LudoPiece(player, token, -1)
-                board[indexOf(yardPosition(player, token))] = piece
+        for (piece in pieces) {
+            board[indexOf(positionOf(piece))] = piece
+        }
+        return board
+    }
+
+    fun initialState(): GameState {
+        val pieces = buildList {
+            for (player in 0 until PLAYER_COUNT) {
+                for (token in 0 until TOKENS_PER_PLAYER) {
+                    add(LudoPiece(player, token, -1))
+                }
             }
         }
         return GameState(
-            board = board,
+            board = boardFor(pieces),
             boardSize = BOARD_SIZE,
             currentTurn = PieceColor.WHITE,
-            metadata = mapOf("ludo_turn" to 0, "ludo_dice" to 0)
+            metadata = mapOf(
+                "ludo_turn" to 0,
+                "ludo_dice" to 0,
+                PIECES_METADATA to pieces,
+            )
         )
     }
 

@@ -15,49 +15,48 @@ class LudoRuleEngine : RuleEngine {
     fun legalMovesForDice(state: GameState, player: Int, dice: Int): List<Move> {
         if (state.status != GameStatus.IN_PROGRESS || dice !in 1..6) return emptyList()
         val moves = mutableListOf<Move>()
-        for (row in 0 until state.boardSize) {
-            for (col in 0 until state.boardSize) {
-                val from = Position(row, col)
-                val piece = state.get(from) as? LudoPiece ?: continue
-                if (piece.player != player || piece.progress >= LudoSetup.FINISH) continue
+        for (piece in LudoSetup.allPieces(state)) {
+            if (piece.player != player || piece.progress >= LudoSetup.FINISH) continue
+            val from = LudoSetup.positionOf(piece)
 
-                val targetProgress = when {
-                    piece.progress < 0 && dice == 6 -> 0
-                    piece.progress < 0 -> null
-                    piece.progress + dice <= LudoSetup.FINISH -> piece.progress + dice
-                    else -> null
-                } ?: continue
+            val targetProgress = when {
+                piece.progress < 0 && dice == 6 -> 0
+                piece.progress < 0 -> null
+                piece.progress + dice <= LudoSetup.FINISH -> piece.progress + dice
+                else -> null
+            } ?: continue
 
-                val to = when {
-                    targetProgress < 0 -> LudoSetup.yardPosition(player, piece.token)
-                    targetProgress < 52 -> LudoSetup.trackPosition(player, targetProgress)
-                    targetProgress < LudoSetup.FINISH ->
-                        LudoSetup.homeLanePosition(player, targetProgress)
-                    else -> LudoSetup.finishPosition(player, piece.token)
-                }
+            val to = when {
+                targetProgress < 0 -> LudoSetup.yardPosition(player, piece.token)
+                targetProgress < 52 -> LudoSetup.trackPosition(player, targetProgress)
+                targetProgress < LudoSetup.FINISH ->
+                    LudoSetup.homeLanePosition(player, targetProgress)
+                else -> LudoSetup.finishPosition(player, piece.token)
+            }
 
-                val captures = if (targetProgress in 0 until 52) {
-                    val occupant = state.get(to) as? LudoPiece
-                    if (occupant != null && occupant.player != player && !isSafeTrackCell(to)) {
-                        listOf(to)
-                    } else {
-                        emptyList()
-                    }
+            val captures = if (targetProgress in 0 until 52) {
+                val occupants = LudoSetup.piecesAt(state, to)
+                if (occupants.size == 1 && occupants.single().player != player &&
+                    !isSafeTrackCell(to)
+                ) {
+                    listOf(to)
                 } else {
                     emptyList()
                 }
-                moves += Move(
-                    from = from,
-                    to = to,
-                    captures = captures,
-                    metadata = mapOf(
-                        "dice" to dice,
-                        "player" to player,
-                        "token" to piece.token,
-                        "targetProgress" to targetProgress
-                    )
-                )
+            } else {
+                emptyList()
             }
+            moves += Move(
+                from = from,
+                to = to,
+                captures = captures,
+                metadata = mapOf(
+                    "dice" to dice,
+                    "player" to player,
+                    "token" to piece.token,
+                    "targetProgress" to targetProgress
+                )
+            )
         }
         return moves
     }
@@ -78,30 +77,28 @@ class LudoRuleEngine : RuleEngine {
     }
 
     override fun applyMove(state: GameState, move: Move): GameState {
-        val movingPiece = state.get(move.from) as? LudoPiece ?: return state
+        val movingPiece = LudoSetup.pieceForMove(state, move)
+            ?: (state.get(move.from) as? LudoPiece)
+            ?: return state
         val player = (move.metadata["player"] as? Int) ?: movingPiece.player
         val dice = (move.metadata["dice"] as? Int) ?: 0
         val targetProgress = (move.metadata["targetProgress"] as? Int)
             ?: inferTargetProgress(movingPiece, move.to)
 
-        val nextBoard = state.board.copyOf()
-        nextBoard[LudoSetup.indexOf(move.from)] = null
-        val capturedPieces = move.captures.mapNotNull { capture ->
-            state.get(capture) as? LudoPiece
+        val nextPieces = LudoSetup.allPieces(state).map { piece ->
+            when {
+                piece.player == movingPiece.player && piece.token == movingPiece.token ->
+                    movingPiece.copy(progress = targetProgress)
+                move.captures.any { capture -> LudoSetup.positionOf(piece) == capture } &&
+                    piece.player != player ->
+                    piece.copy(progress = -1)
+                else -> piece
+            }
         }
-        for (capture in move.captures) nextBoard[LudoSetup.indexOf(capture)] = null
-        for (captured in capturedPieces) {
-            // A captured token is sent back to its own yard, not removed from
-            // the board. Its token-specific yard cell remains its home slot.
-            nextBoard[LudoSetup.indexOf(LudoSetup.yardPosition(captured.player, captured.token))] =
-                captured.copy(progress = -1)
-        }
-
-        val movedPiece = movingPiece.copy(progress = targetProgress)
-        nextBoard[LudoSetup.indexOf(move.to)] = movedPiece
+        val nextBoard = LudoSetup.boardFor(nextPieces)
 
         val hasWon = (0 until LudoSetup.TOKENS_PER_PLAYER).all { token ->
-            findPiece(nextBoard, player, token)?.progress == LudoSetup.FINISH
+            nextPieces.firstOrNull { it.player == player && it.token == token }?.progress == LudoSetup.FINISH
         }
         val status = if (hasWon) {
             if (player % 2 == 0) GameStatus.WHITE_WINS else GameStatus.BLACK_WINS
@@ -116,7 +113,8 @@ class LudoRuleEngine : RuleEngine {
         }
         val metadata = mutableMapOf<String, Any>(
             "ludo_turn" to nextPlayer,
-            "ludo_dice" to 0
+            "ludo_dice" to 0,
+            LudoSetup.PIECES_METADATA to nextPieces,
         )
         if (hasWon) metadata["ludo_winner"] = player
 
@@ -146,9 +144,6 @@ class LudoRuleEngine : RuleEngine {
         }
         return piece.progress
     }
-
-    private fun findPiece(board: Array<Piece?>, player: Int, token: Int): LudoPiece? =
-        board.filterIsInstance<LudoPiece>().firstOrNull { it.player == player && it.token == token }
 
     private fun isSafeTrackCell(position: Position): Boolean =
         LudoSetup.isSafeTrackCell(position)

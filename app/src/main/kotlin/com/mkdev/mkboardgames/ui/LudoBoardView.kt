@@ -105,29 +105,41 @@ class LudoBoardView(context: Context) : View(context) {
 
     private fun drawMoveHints(canvas: Canvas) {
         for (move in legalMoves) {
-            drawPathHighlight(canvas, pathFor(move))
+            val accent = accentColorFor(move)
+            drawPathHighlight(canvas, pathFor(move), accent)
+            val sourcePoint = centerOf(move.from)
+            highlightPaint.color = Color.argb(235, Color.red(accent), Color.green(accent), Color.blue(accent))
+            canvas.drawCircle(sourcePoint.x, sourcePoint.y, cell * 0.43f, highlightPaint)
+            highlightPaint.color = Color.argb(230, 255, 255, 255)
+            canvas.drawCircle(sourcePoint.x, sourcePoint.y, cell * 0.36f, highlightPaint)
             val point = centerOf(move.to)
+            highlightPaint.color = Color.argb(245, Color.red(accent), Color.green(accent), Color.blue(accent))
             canvas.drawCircle(point.x, point.y, cell * 0.34f, highlightPaint)
+            highlightPaint.color = Color.argb(240, 255, 255, 255)
             canvas.drawCircle(point.x, point.y, cell * 0.08f, highlightPaint)
         }
-        animatedMove?.let { drawPathHighlight(canvas, animatedPath) }
+        animatedMove?.let { drawPathHighlight(canvas, animatedPath, accentColorFor(it)) }
         selectedFrom?.let { from ->
             val point = centerOf(from)
+            highlightPaint.color = Color.argb(240, 255, 255, 255)
             canvas.drawCircle(point.x, point.y, cell * 0.42f, highlightPaint)
         }
     }
 
-    private fun drawPathHighlight(canvas: Canvas, path: List<Position>) {
+    private fun drawPathHighlight(canvas: Canvas, path: List<Position>, accent: Int) {
+        val red = Color.red(accent)
+        val green = Color.green(accent)
+        val blue = Color.blue(accent)
         for ((index, position) in path.withIndex()) {
             val rect = cellRect(position).apply { inset(cell * 0.12f, cell * 0.12f) }
             piecePaint.color = if (index == path.lastIndex) {
-                Color.argb(120, 255, 255, 255)
+                Color.argb(185, red, green, blue)
             } else {
-                Color.argb(68, 255, 255, 255)
+                Color.argb(105, red, green, blue)
             }
             piecePaint.style = Paint.Style.FILL
             canvas.drawRoundRect(rect, cell * 0.12f, cell * 0.12f, piecePaint)
-            piecePaint.color = Color.argb(165, 255, 255, 255)
+            piecePaint.color = Color.argb(235, red, green, blue)
             piecePaint.style = Paint.Style.STROKE
             piecePaint.strokeWidth = cell * 0.035f
             canvas.drawRoundRect(rect, cell * 0.12f, cell * 0.12f, piecePaint)
@@ -135,21 +147,51 @@ class LudoBoardView(context: Context) : View(context) {
         }
     }
 
+    private fun accentColorFor(move: Move): Int {
+        val player = move.metadata["player"] as? Int
+            ?: (gameState.get(move.from) as? LudoPiece)?.player
+            ?: LudoSetup.playerFromState(gameState)
+        return LudoSetup.PLAYER_COLORS[player.coerceIn(0, LudoSetup.PLAYER_COUNT - 1)]
+    }
+
     private fun drawPieces(canvas: Canvas) {
-        val skipped = animatedMove?.from
-        for (row in 0 until gameState.boardSize) {
-            for (col in 0 until gameState.boardSize) {
-                val position = Position(row, col)
-                val piece = gameState.get(position) as? LudoPiece ?: continue
-                if (position == skipped) continue
-                drawPiece(canvas, piece, centerOf(position))
+        val moving = animatedPiece
+        val piecesByPosition = LudoSetup.allPieces(gameState)
+            .groupBy { LudoSetup.positionOf(it) }
+        for ((position, stack) in piecesByPosition) {
+            val center = centerOf(position)
+            stack.forEachIndexed { index, piece ->
+                if (moving != null && piece.player == moving.player && piece.token == moving.token) {
+                    return@forEachIndexed
+                }
+                val offset = stackOffset(index, stack.size)
+                drawPiece(
+                    canvas,
+                    piece,
+                    PointF(center.x + offset.x, center.y + offset.y),
+                )
             }
         }
-        val moving = animatedPiece
         val move = animatedMove
         if (moving != null && move != null) {
             drawPiece(canvas, moving, animatedPiecePoint())
         }
+    }
+
+    private fun stackOffset(index: Int, count: Int): PointF {
+        val offsets = when (count) {
+            1 -> listOf(0f to 0f)
+            2 -> listOf(-0.14f to 0f, 0.14f to 0f)
+            3 -> listOf(-0.15f to 0.10f, 0.15f to 0.10f, 0f to -0.15f)
+            else -> listOf(
+                -0.15f to -0.15f,
+                0.15f to -0.15f,
+                -0.15f to 0.15f,
+                0.15f to 0.15f,
+            )
+        }
+        val (x, y) = offsets[index.coerceIn(0, offsets.lastIndex)]
+        return PointF(x * cell, y * cell)
     }
 
     private fun animatedPiecePoint(): PointF {
@@ -202,7 +244,9 @@ class LudoBoardView(context: Context) : View(context) {
         }
         if (isLocked) return true
         val tapped = positionAt(event.x, event.y) ?: return true
-        val source = legalMoves.firstOrNull { it.from == tapped }
+        val source = legalMoves
+            .filter { it.from == tapped }
+            .minByOrNull { sourceDistance(it, event.x, event.y) }
         if (source != null) {
             selectedFrom = null
             legalMoves = emptyList()
@@ -221,8 +265,24 @@ class LudoBoardView(context: Context) : View(context) {
         return true
     }
 
+    private fun sourceDistance(move: Move, x: Float, y: Float): Float {
+        val piece = LudoSetup.pieceForMove(gameState, move)
+            ?: (gameState.get(move.from) as? LudoPiece)
+        val stack = LudoSetup.piecesAt(gameState, move.from)
+        val index = piece?.let { stack.indexOfFirst { candidate ->
+            candidate.player == it.player && candidate.token == it.token
+        } } ?: 0
+        val center = centerOf(move.from)
+        val offset = stackOffset(index.coerceAtLeast(0), stack.size.coerceAtLeast(1))
+        val dx = x - center.x - offset.x
+        val dy = y - center.y - offset.y
+        return dx * dx + dy * dy
+    }
+
     fun animateMove(move: Move, onEnd: () -> Unit) {
-        val piece = gameState.get(move.from) as? LudoPiece ?: run { onEnd(); return }
+        val piece = LudoSetup.pieceForMove(gameState, move)
+            ?: (gameState.get(move.from) as? LudoPiece)
+            ?: run { onEnd(); return }
         isLocked = true
         animatedMove = move
         animatedPiece = piece
@@ -252,7 +312,8 @@ class LudoBoardView(context: Context) : View(context) {
     }
 
     private fun pathFor(move: Move): List<Position> {
-        val piece = gameState.get(move.from) as? LudoPiece
+        val piece = LudoSetup.pieceForMove(gameState, move)
+            ?: (gameState.get(move.from) as? LudoPiece)
             ?: return listOf(move.from, move.to)
         val targetProgress = move.metadata["targetProgress"] as? Int
             ?: return listOf(move.from, move.to)

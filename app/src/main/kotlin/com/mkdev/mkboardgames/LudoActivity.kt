@@ -327,7 +327,7 @@ class LudoActivity : AppCompatActivity() {
         val nextPlayer = if (rolledValue == 6) player else (player + 1) % LudoSetup.PLAYER_COUNT
         state = state.copy(
             currentTurn = LudoSetup.colorForPlayer(nextPlayer),
-            metadata = mapOf("ludo_turn" to nextPlayer, "ludo_dice" to 0)
+            metadata = state.metadata + mapOf("ludo_turn" to nextPlayer, "ludo_dice" to 0)
         )
         rolledValue = 0
         boardView.gameState = state
