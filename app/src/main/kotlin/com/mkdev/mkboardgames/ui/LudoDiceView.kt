@@ -17,8 +17,6 @@ import android.util.Log
 import android.view.MotionEvent
 import android.view.View
 import android.view.animation.DecelerateInterpolator
-import android.os.Handler
-import android.os.Looper
 import org.json.JSONObject
 import kotlin.math.cos
 import kotlin.math.max
@@ -55,23 +53,10 @@ class LudoDiceView(context: Context) : View(context) {
     var isRolling: Boolean = false
         private set
     var onRoll: (() -> Unit)? = null
-    var motionDiceEnabled: Boolean = false
-    var onMotionToggle: ((Boolean) -> Unit)? = null
 
     private var animator: ValueAnimator? = null
     private var rotationX = -18f
     private var rotationY = -28f
-    private var touchDown = false
-    private var longPressTriggered = false
-    private val mainHandler = Handler(Looper.getMainLooper())
-    private val longPressRunnable = Runnable {
-        if (touchDown && !isRolling) {
-            longPressTriggered = true
-            motionDiceEnabled = !motionDiceEnabled
-            onMotionToggle?.invoke(motionDiceEnabled)
-            invalidate()
-        }
-    }
     private val textures = loadDiceTextures(context)
     private val bitmapPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private val edgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -82,11 +67,6 @@ class LudoDiceView(context: Context) : View(context) {
     }
     private val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(95, 0, 0, 0)
-    }
-    private val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.rgb(170, 184, 198)
-        textAlign = Paint.Align.CENTER
-        typeface = android.graphics.Typeface.DEFAULT_BOLD
     }
 
     init {
@@ -143,22 +123,28 @@ class LudoDiceView(context: Context) : View(context) {
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         val density = resources.displayMetrics.density
-        labelPaint.textSize = 12f * density
-        canvas.drawText(
-            when {
-                isRolling -> "Rolling..."
-                motionDiceEnabled -> "Tap to roll · motion on · hold to toggle"
-                else -> "Tap to roll · hold to enable motion"
-            },
-            width / 2f,
-            22f * density,
-            labelPaint,
+        val panelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.rgb(25, 31, 38)
+            style = Paint.Style.FILL
+        }
+        val panelStroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.rgb(111, 121, 133)
+            style = Paint.Style.STROKE
+            strokeWidth = 1.5f * density
+        }
+        val panel = RectF(
+            2f * density,
+            4f * density,
+            width - 2f * density,
+            height - 2f * density,
         )
+        canvas.drawRoundRect(panel, 12f * density, 12f * density, panelPaint)
+        canvas.drawRoundRect(panel, 12f * density, 12f * density, panelStroke)
 
-        val size = min(width, height).toFloat() * 0.58f
+        val size = min(width, height).toFloat() * 0.62f
         val half = size / 2f
         val centerX = width / 2f
-        val centerY = height * 0.61f
+        val centerY = height * 0.55f
         val cameraDistance = 4.2f
         val vertices = cubeVertices()
         val projected = vertices.map { vertex ->
@@ -198,29 +184,21 @@ class LudoDiceView(context: Context) : View(context) {
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        when (event.action) {
-            MotionEvent.ACTION_DOWN -> {
-                touchDown = true
-                longPressTriggered = false
-                mainHandler.postDelayed(longPressRunnable, 520L)
-            }
-            MotionEvent.ACTION_UP -> {
-                touchDown = false
-                mainHandler.removeCallbacks(longPressRunnable)
-                if (!longPressTriggered && !isRolling) onRoll?.invoke()
-            }
-            MotionEvent.ACTION_CANCEL -> {
-                touchDown = false
-                mainHandler.removeCallbacks(longPressRunnable)
-            }
+        if (event.actionMasked == MotionEvent.ACTION_UP && !isRolling) {
+            performClick()
+            onRoll?.invoke()
         }
+        return true
+    }
+
+    override fun performClick(): Boolean {
+        super.performClick()
         return true
     }
 
     override fun onDetachedFromWindow() {
         animator?.cancel()
         animator = null
-        mainHandler.removeCallbacks(longPressRunnable)
         super.onDetachedFromWindow()
     }
 

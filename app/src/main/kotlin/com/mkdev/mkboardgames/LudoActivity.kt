@@ -11,6 +11,7 @@ import android.hardware.SensorManager
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
+import android.graphics.drawable.GradientDrawable
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
@@ -22,7 +23,9 @@ import com.mkdev.mkboardgames.engine.Move
 import com.mkdev.mkboardgames.games.ludo.LudoRuleEngine
 import com.mkdev.mkboardgames.games.ludo.LudoSetup
 import com.mkdev.mkboardgames.ui.LudoBoardView
+import com.mkdev.mkboardgames.ui.LudoControlTileView
 import com.mkdev.mkboardgames.ui.LudoDiceView
+import com.mkdev.mkboardgames.ui.LudoStatusStripView
 import com.mkdev.mkboardgames.ui.MotionDiceDirection
 import kotlin.math.abs
 import kotlin.math.sqrt
@@ -31,6 +34,9 @@ import kotlin.random.Random
 class LudoActivity : AppCompatActivity() {
     private lateinit var boardView: LudoBoardView
     private lateinit var diceView: LudoDiceView
+    private lateinit var statusView: LudoStatusStripView
+    private lateinit var motionView: LudoControlTileView
+    private lateinit var tapRollView: LudoControlTileView
     private lateinit var turnView: TextView
     private val engine = LudoRuleEngine()
     private val handler = Handler(Looper.getMainLooper())
@@ -57,26 +63,53 @@ class LudoActivity : AppCompatActivity() {
         val dp = resources.displayMetrics.density
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor("#10151A"))
+            setPadding((8 * dp).toInt(), (8 * dp).toInt(), (8 * dp).toInt(), (6 * dp).toInt())
+            background = GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                intArrayOf(Color.parseColor("#2A3035"), Color.parseColor("#0C1014")),
+            )
         }
         turnView = TextView(this).apply {
             setTextColor(Color.WHITE)
-            setTextSize(16f)
+            setTextSize(18f)
             setTypeface(typeface, android.graphics.Typeface.BOLD)
             gravity = android.view.Gravity.CENTER
-            setPadding(12, (10 * dp).toInt(), 12, (10 * dp).toInt())
+            setPadding(12, (6 * dp).toInt(), 12, (6 * dp).toInt())
+            elevation = 4 * dp
         }
+        statusView = LudoStatusStripView(this)
         boardView = LudoBoardView(this)
         diceView = LudoDiceView(this)
+        motionView = LudoControlTileView(this, LudoControlTileView.ControlType.MOTION)
+        tapRollView = LudoControlTileView(this, LudoControlTileView.ControlType.TAP_TO_ROLL)
 
         root.addView(turnView, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, (52 * dp).toInt()
+            ViewGroup.LayoutParams.MATCH_PARENT, (54 * dp).toInt()
+        ).apply {
+            bottomMargin = (8 * dp).toInt()
         ))
+        root.addView(statusView, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, (92 * dp).toInt()
+        ).apply {
+            bottomMargin = (6 * dp).toInt()
+        })
         root.addView(boardView, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, 0
         ).apply { weight = 1f })
-        root.addView(diceView, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, (148 * dp).toInt()
+        val controls = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER
+            setPadding(0, (4 * dp).toInt(), 0, 0)
+        }
+        controls.addView(motionView, LinearLayout.LayoutParams(0, (134 * dp).toInt(), 1f).apply {
+            marginEnd = (6 * dp).toInt()
+        })
+        controls.addView(diceView, LinearLayout.LayoutParams((132 * dp).toInt(), (134 * dp).toInt()).apply {
+            marginEnd = (6 * dp).toInt()
+        })
+        controls.addView(tapRollView, LinearLayout.LayoutParams(0, (134 * dp).toInt(), 1f))
+        root.addView(controls, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, (138 * dp).toInt()
         ))
         AdManager.attachBanner(root)
         setContentView(root)
@@ -86,8 +119,9 @@ class LudoActivity : AppCompatActivity() {
         }
         boardView.onGameOverTapped = { showResultDialog() }
         diceView.onRoll = { if (matchStarted && isHumanTurn()) rollDice() }
-        diceView.motionDiceEnabled = SettingsManager.isMotionDiceEnabled(this)
-        diceView.onMotionToggle = { enabled ->
+        tapRollView.onTap = { if (matchStarted && isHumanTurn()) rollDice() }
+        motionView.motionEnabled = SettingsManager.isMotionDiceEnabled(this)
+        motionView.onMotionToggle = { enabled ->
             SettingsManager.setMotionDiceEnabled(this, enabled)
             syncMotionSensor()
             Toast.makeText(
@@ -108,7 +142,7 @@ class LudoActivity : AppCompatActivity() {
         super.onResume()
         makeFullscreen()
         SoundPlayer.movementSoundsEnabled = SettingsManager.isMovementSoundsEnabled(this)
-        diceView.motionDiceEnabled = SettingsManager.isMotionDiceEnabled(this)
+        motionView.motionEnabled = SettingsManager.isMotionDiceEnabled(this)
         syncMotionSensor()
     }
 
@@ -270,6 +304,7 @@ class LudoActivity : AppCompatActivity() {
         boardView.legalMoves = emptyList()
         boardView.isLocked = false
         diceView.value = 1
+        motionView.motionEnabled = SettingsManager.isMotionDiceEnabled(this)
         syncMotionSensor()
         updateHud()
         if (isAiTurn()) handler.postDelayed({ rollDice() }, 650L)
@@ -351,11 +386,22 @@ class LudoActivity : AppCompatActivity() {
             else -> "${LudoSetup.PLAYER_NAMES[player]}: roll the die"
         }
         turnView.text = text
-        turnView.setTextColor(Color.rgb(
-            Color.red(LudoSetup.PLAYER_COLORS[player]),
-            Color.green(LudoSetup.PLAYER_COLORS[player]),
-            Color.blue(LudoSetup.PLAYER_COLORS[player])
-        ))
+        val accent = LudoSetup.PLAYER_COLORS[player]
+        turnView.setTextColor(accent)
+        turnView.background = GradientDrawable().apply {
+            cornerRadius = 14f * resources.displayMetrics.density
+            setColor(Color.argb(235, 13, 18, 24))
+            setStroke((2 * resources.displayMetrics.density).toInt(), Color.argb(
+                220,
+                Color.red(accent),
+                Color.green(accent),
+                Color.blue(accent),
+            ))
+        }
+        statusView.gameState = state
+        statusView.activePlayer = player
+        statusView.rolledValue = rolledValue
+        motionView.motionEnabled = SettingsManager.isMotionDiceEnabled(this)
     }
 
     private fun showResultDialog() {
