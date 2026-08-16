@@ -13,6 +13,7 @@ object SettingsManager {
     private const val KEY_MORABARABA_DIFFICULTY = "morabaraba_ai_difficulty"
     private const val KEY_CONNECT_FOUR_DIFFICULTY = "connect_four_ai_difficulty"
     private const val KEY_FOX_AND_GEESE_DIFFICULTY = "fox_and_geese_ai_difficulty"
+    private const val KEY_LUDO_DIFFICULTY = "ludo_ai_difficulty"
 
     // ── Hints keys ───────────────────────────────────────────────────────────
     private const val KEY_CHESS_HINTS    = "chess_show_hints"
@@ -116,6 +117,11 @@ object SettingsManager {
         when (getFoxAndGeeseDifficulty(ctx)) { 0 -> 2; 2 -> 6; else -> 4 }
     fun foxAndGeeseAiTimeLimitMs(ctx: Context): Long =
         when (getFoxAndGeeseDifficulty(ctx)) { 0 -> 700L; 2 -> 2400L; else -> 1300L }
+
+    // ── Ludo ─────────────────────────────────────────────────────────────────
+    fun getLudoDifficulty(ctx: Context) = prefs(ctx).getInt(KEY_LUDO_DIFFICULTY, 0)
+    fun setLudoDifficulty(ctx: Context, v: Int) =
+        prefs(ctx).edit().putInt(KEY_LUDO_DIFFICULTY, v.coerceIn(0, 2)).apply()
 
     // ── Tic-Tac-Toe ──────────────────────────────────────────────────────────
     private const val KEY_TTT_DIFFICULTY = "ttt_ai_difficulty"

@@ -8,6 +8,7 @@ import android.graphics.Path
 import android.graphics.RectF
 import android.view.View
 import com.mkdev.mkboardgames.engine.GameState
+import com.mkdev.mkboardgames.games.ludo.LudoEconomy
 import com.mkdev.mkboardgames.games.ludo.LudoSetup
 
 class LudoStatusStripView(context: Context) : View(context) {
@@ -28,6 +29,19 @@ class LudoStatusStripView(context: Context) : View(context) {
             field = value
             invalidate()
         }
+
+    var profilesEnabled: Boolean = false
+        set(value) {
+            field = value
+            contentDescription = if (value) {
+                "Ludo player profiles. Tap a player to inspect"
+            } else {
+                "Ludo player token status"
+            }
+            invalidate()
+        }
+
+    var onPlayerProfileTapped: ((Int) -> Unit)? = null
 
     private val cardPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val accentPaint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -136,6 +150,7 @@ class LudoStatusStripView(context: Context) : View(context) {
             )
 
             val playerPieces = pieces.filter { it.player == player }
+            val economy = LudoEconomy.player(gameState, player)
             val homeCount = playerPieces.count { it.progress >= LudoSetup.FINISH }
             val dotGap = 12f * density * scale
             val dotStart = right - (LudoSetup.TOKENS_PER_PLAYER - 1) * dotGap - 7f * density * scale
@@ -153,6 +168,16 @@ class LudoStatusStripView(context: Context) : View(context) {
                 bottom - 12f * density * scale,
                 textPaint,
             )
+            if (profilesEnabled) {
+                textPaint.color = Color.rgb(195, 202, 210)
+                textPaint.textSize = 9f * density * scale
+                canvas.drawText(
+                    "COINS ${economy.coins}",
+                    left + 7f * density * scale,
+                    bottom - 35f * density * scale,
+                    textPaint,
+                )
+            }
 
             repeat(LudoSetup.TOKENS_PER_PLAYER) { token ->
                 val piece = playerPieces.firstOrNull { it.token == token }
@@ -198,5 +223,26 @@ class LudoStatusStripView(context: Context) : View(context) {
                 cardPaint.style = Paint.Style.FILL
             }
         }
+    }
+
+    override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
+        if (!profilesEnabled) return true
+        if (event.action != android.view.MotionEvent.ACTION_UP) return true
+        val density = resources.displayMetrics.density
+        val padding = 5f * density
+        val horizontalGap = 7f * density
+        val cardWidth = (width - padding * 2f - horizontalGap * 3f) / 4f
+        val column = ((event.x - padding) / (cardWidth + horizontalGap)).toInt()
+        if (column !in 0..3) return true
+        val left = padding + column * (cardWidth + horizontalGap)
+        if (event.x < left || event.x > left + cardWidth) return true
+        onPlayerProfileTapped?.invoke(displayOrder[column])
+        performClick()
+        return true
+    }
+
+    override fun performClick(): Boolean {
+        super.performClick()
+        return true
     }
 }

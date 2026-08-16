@@ -361,6 +361,24 @@ class MainActivity : AppCompatActivity() {
             { SettingsManager.getFoxAndGeeseTheme(ctx) },
             { v -> SettingsManager.setFoxAndGeeseTheme(ctx, v) }).first)
 
+        // ── Ludo ──
+        root.addView(sectionHeader("●  LUDO"))
+        var ludoDiff = SettingsManager.getLudoDifficulty(ctx)
+        val (ludoDiffRow, ludoDiffVal) =
+            settingRow("🎯", "AI Difficulty", diffs[ludoDiff])
+        ludoDiffRow.setOnClickListener {
+            AlertDialog.Builder(ctx, android.R.style.Theme_Material_Dialog_MinWidth)
+                .setTitle("Ludo · AI Difficulty")
+                .setSingleChoiceItems(diffs, ludoDiff) { d, i ->
+                    SettingsManager.setLudoDifficulty(ctx, i)
+                    ludoDiff = i
+                    ludoDiffVal.text = diffs[i]
+                    d.dismiss()
+                }.show()
+        }
+        root.addView(ludoDiffRow)
+        root.addView(divider())
+
         // ── Legal ──
         root.addView(sectionHeader("📋  LEGAL"))
         val ppUrl  = PRIVACY_POLICY_URL

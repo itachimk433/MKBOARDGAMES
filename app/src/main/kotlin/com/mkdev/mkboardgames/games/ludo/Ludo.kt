@@ -169,6 +169,8 @@ object LudoSetup {
                 "ludo_dice" to 0,
                 SIX_STREAK_METADATA to 0,
                 PIECES_METADATA to pieces,
+                LudoEconomy.METADATA to LudoEconomy.initialPlayers(),
+                "ludo_rerolled" to false,
             )
         )
     }

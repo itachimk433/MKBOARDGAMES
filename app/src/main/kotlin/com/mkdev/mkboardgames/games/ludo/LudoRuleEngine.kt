@@ -12,8 +12,14 @@ class LudoRuleEngine : RuleEngine {
 
     override fun initialState(): GameState = LudoSetup.initialState()
 
-    fun legalMovesForDice(state: GameState, player: Int, dice: Int): List<Move> {
-        if (state.status != GameStatus.IN_PROGRESS || dice !in 1..6) return emptyList()
+    fun legalMovesForDice(
+        state: GameState,
+        player: Int,
+        dice: Int,
+        baseDice: Int = dice,
+        usedExtraMove: Boolean = false,
+    ): List<Move> {
+        if (state.status != GameStatus.IN_PROGRESS || dice !in 1..8) return emptyList()
         val sixStreak = state.metadata[LudoSetup.SIX_STREAK_METADATA] as? Int ?: 0
         if (dice == 6 && sixStreak >= 3) return emptyList()
 
@@ -37,10 +43,22 @@ class LudoRuleEngine : RuleEngine {
                 else -> LudoSetup.finishPosition(player, piece.token)
             }
 
+            val occupants = if (targetProgress in 0 until 52) {
+                LudoSetup.piecesAt(state, to)
+            } else {
+                emptyList()
+            }
+            val protectedTarget = occupants.singleOrNull()?.let { occupant ->
+                val protection = LudoEconomy.player(state, occupant.player)
+                if (protection.protectedToken == occupant.token && occupant.player != player) {
+                    occupant
+                } else {
+                    null
+                }
+            }
             val captures = if (targetProgress in 0 until 52) {
-                val occupants = LudoSetup.piecesAt(state, to)
                 if (occupants.size == 1 && occupants.single().player != player &&
-                    !isSafeTrackCell(to)
+                    !isSafeTrackCell(to) && protectedTarget == null
                 ) {
                     listOf(to)
                 } else {
@@ -55,9 +73,13 @@ class LudoRuleEngine : RuleEngine {
                 captures = captures,
                 metadata = mapOf(
                     "dice" to dice,
+                    "baseDice" to baseDice,
+                    "effectiveDice" to dice,
+                    "usedExtraMove" to usedExtraMove,
                     "player" to player,
                     "token" to piece.token,
-                    "targetProgress" to targetProgress
+                    "targetProgress" to targetProgress,
+                    "blockedProtection" to (protectedTarget != null),
                 )
             )
         }
@@ -84,12 +106,15 @@ class LudoRuleEngine : RuleEngine {
             ?: (state.get(move.from) as? LudoPiece)
             ?: return state
         val player = (move.metadata["player"] as? Int) ?: movingPiece.player
-        val dice = (move.metadata["dice"] as? Int) ?: 0
+        val dice = (move.metadata["baseDice"] as? Int)
+            ?: (move.metadata["dice"] as? Int)
+            ?: 0
         val previousSixStreak =
             (state.metadata[LudoSetup.SIX_STREAK_METADATA] as? Int ?: 0).coerceAtLeast(0)
         val targetProgress = (move.metadata["targetProgress"] as? Int)
             ?: inferTargetProgress(movingPiece, move.to)
 
+        val blockedProtection = move.metadata["blockedProtection"] as? Boolean ?: false
         val nextPieces = LudoSetup.allPieces(state).map { piece ->
             when {
                 piece.player == movingPiece.player && piece.token == movingPiece.token ->
@@ -125,12 +150,57 @@ class LudoRuleEngine : RuleEngine {
             (player + 1) % LudoSetup.PLAYER_COUNT
         }
         val nextSixStreak = if (nextPlayer == player) rolledSixStreak else 0
-        val metadata = mutableMapOf<String, Any>(
-            "ludo_turn" to nextPlayer,
-            "ludo_dice" to 0,
-            LudoSetup.SIX_STREAK_METADATA to nextSixStreak,
-            LudoSetup.PIECES_METADATA to nextPieces,
-        )
+        val metadata = state.metadata.toMutableMap()
+        metadata["ludo_turn"] = nextPlayer
+        metadata["ludo_dice"] = 0
+        metadata[LudoSetup.SIX_STREAK_METADATA] = nextSixStreak
+        metadata[LudoSetup.PIECES_METADATA] = nextPieces
+        metadata["ludo_rerolled"] = false
+
+        if (metadata["ludo_economy_enabled"] as? Boolean == true) {
+            var economies = LudoEconomy.players(state).toMutableList()
+            var playerEconomy = economies[player]
+            val reward = (if (move.captures.isNotEmpty()) LudoEconomy.CAPTURE_REWARD else 0) +
+                (if (targetProgress == LudoSetup.FINISH) LudoEconomy.HOME_REWARD else 0) +
+                (if (hasWon) LudoEconomy.FINAL_PLACEMENT_REWARD else 0)
+            if (reward > 0) {
+                playerEconomy = LudoEconomy.addCoins(playerEconomy, reward)
+            }
+            economies[player] = playerEconomy
+
+            if (blockedProtection) {
+                val protectedPiece = LudoSetup.piecesAt(state, move.to).singleOrNull()
+                if (protectedPiece != null) {
+                    val protectedEconomy = economies[protectedPiece.player]
+                    economies[protectedPiece.player] = protectedEconomy.copy(protectedToken = null)
+                }
+            }
+            metadata[LudoEconomy.METADATA] = economies
+            val notification = when {
+                move.captures.isNotEmpty() -> LudoNotification(
+                    player,
+                    "+${LudoEconomy.CAPTURE_REWARD} coins for a capture",
+                )
+                targetProgress == LudoSetup.FINISH -> LudoNotification(
+                    player,
+                    "+${LudoEconomy.HOME_REWARD} coins — token home",
+                )
+                hasWon -> LudoNotification(
+                    player,
+                    "+${LudoEconomy.FINAL_PLACEMENT_REWARD} coins — final placement",
+                )
+                blockedProtection -> LudoNotification(
+                    player,
+                    "Invincibility blocked a capture",
+                )
+                else -> null
+            }
+            if (notification != null) {
+                metadata[LudoEconomy.NOTIFICATION_METADATA] = notification
+            } else {
+                metadata.remove(LudoEconomy.NOTIFICATION_METADATA)
+            }
+        }
         if (hasWon) metadata["ludo_winner"] = player
 
         return state.copy(
