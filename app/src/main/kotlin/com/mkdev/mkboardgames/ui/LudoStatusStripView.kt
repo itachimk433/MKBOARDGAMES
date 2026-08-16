@@ -45,14 +45,11 @@ class LudoStatusStripView(context: Context) : View(context) {
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         val density = resources.displayMetrics.density
-        val compact = resources.configuration.screenWidthDp < 600
-        val columns = if (compact) 2 else 4
-        val rows = if (compact) 2 else 1
-        val padding = (if (compact) 6f else 5f) * density
-        val horizontalGap = (if (compact) 8f else 7f) * density
-        val verticalGap = if (compact) 7f * density else 0f
+        val columns = 4
+        val padding = 5f * density
+        val horizontalGap = 7f * density
         val cardWidth = (width - padding * 2f - horizontalGap * (columns - 1)) / columns
-        val cardHeight = (height - padding * 2f - verticalGap * (rows - 1)) / rows
+        val cardHeight = height - padding * 2f
         val scale = (cardWidth / (178f * density)).coerceIn(0.72f, 1f)
         val radius = 9f * density * scale
         val pieces = LudoSetup.allPieces(gameState)

@@ -90,7 +90,7 @@ class LudoActivity : AppCompatActivity() {
         })
         root.addView(statusView, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
-            (if (resources.configuration.screenWidthDp < 600) 184 * dp else 92 * dp).toInt(),
+            (92 * dp).toInt(),
         ).apply {
             bottomMargin = (6 * dp).toInt()
         })
