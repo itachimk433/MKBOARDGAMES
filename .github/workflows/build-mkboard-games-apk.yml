@@ -124,24 +124,35 @@ jobs:
             ASSETS="$ASSETS app-release-signed-build${{ github.run_number }}.apk app-release-build${{ github.run_number }}.aab"
           fi
 
-          # Keep the rolling release idempotent. Deleting and recreating the
-          # release can leave the existing tag behind, which makes the next
-          # `gh release create` fail with "a release with the same tag name
-          # already exists".
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release edit "$TAG" \
-              --title "$TITLE" \
-              --notes "$NOTES" \
-              --prerelease \
-              --target "${{ github.sha }}"
+          # Keep the rolling release idempotent. Try to edit the existing
+          # release first; if it is missing, create it and upload the assets
+          # in the same command so a newly-created release is immediately
+          # available for the following operations.
+          if gh release edit "$TAG" \
+            --title "$TITLE" \
+            --notes "$NOTES" \
+            --prerelease \
+            --target "${{ github.sha }}" 2>/dev/null; then
+            uploaded=false
+            for attempt in 1 2 3; do
+              if gh release upload "$TAG" \
+                $ASSETS \
+                --clobber; then
+                uploaded=true
+                break
+              fi
+              echo "Release upload attempt $attempt failed; retrying..."
+              sleep 3
+            done
+            if [ "$uploaded" != "true" ]; then
+              echo "Release upload failed after 3 attempts"
+              exit 1
+            fi
           else
             gh release create "$TAG" \
               --title "$TITLE" \
               --notes "$NOTES" \
               --prerelease \
-              --target "${{ github.sha }}"
+              --target "${{ github.sha }}" \
+              $ASSETS
           fi
-
-          gh release upload "$TAG" \
-            $ASSETS \
-            --clobber
