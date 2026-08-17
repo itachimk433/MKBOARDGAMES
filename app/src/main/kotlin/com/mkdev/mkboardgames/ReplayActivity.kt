@@ -29,6 +29,7 @@ import com.mkdev.mkboardgames.games.ludo.LudoSetup
 import com.mkdev.mkboardgames.games.morabaraba.MorabarabaRuleEngine
 import com.mkdev.mkboardgames.games.tictactoe.TicTacToePiece
 import com.mkdev.mkboardgames.games.tictactoe.TicTacToeRuleEngine
+import com.mkdev.mkboardgames.games.xiangqi.XiangqiRuleEngine
 import com.mkdev.mkboardgames.ui.BoardView
 import com.mkdev.mkboardgames.ui.LudoBoardView
 import com.mkdev.mkboardgames.ui.MorabaraBoardView
@@ -190,6 +191,7 @@ class ReplayActivity : AppCompatActivity() {
             "MORABARABA" -> MorabarabaRuleEngine()
             "FOX_AND_GEESE" -> FoxAndGeeseRuleEngine()
             "LUDO" -> LudoRuleEngine()
+            "XIANGQI" -> XiangqiRuleEngine()
             else         -> ChessRuleEngine()
         }
 

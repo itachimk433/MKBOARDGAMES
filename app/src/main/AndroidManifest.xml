@@ -88,6 +88,8 @@
             android:screenOrientation="unspecified"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize" />
 
+        <!-- Xiangqi uses the shared game and replay activities. -->
+
     </application>
 
 </manifest>

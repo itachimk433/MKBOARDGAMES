@@ -29,7 +29,7 @@ class MenuView(context: Context) : View(context) {
 
     enum class GameType {
         CHESS, CHECKERS, INTERNATIONAL_DRAUGHTS, OTHELLO, MORABARABA, TICTACTOE, CONNECT_FOUR,
-        FOX_AND_GEESE, LUDO
+        FOX_AND_GEESE, LUDO, XIANGQI
     }
 
     private data class Card(val type: GameType, var rect: RectF = RectF())
@@ -38,7 +38,8 @@ class MenuView(context: Context) : View(context) {
         Card(GameType.INTERNATIONAL_DRAUGHTS),
         Card(GameType.OTHELLO), Card(GameType.MORABARABA),
         Card(GameType.TICTACTOE), Card(GameType.CONNECT_FOUR),
-        Card(GameType.FOX_AND_GEESE), Card(GameType.LUDO)
+        Card(GameType.FOX_AND_GEESE), Card(GameType.LUDO),
+        Card(GameType.XIANGQI)
     )
 
     private val dp = context.resources.displayMetrics.density
@@ -50,6 +51,9 @@ class MenuView(context: Context) : View(context) {
 
     private val ludoBoardBitmap: Bitmap? = try {
         context.assets.open("ludo_board_reference.png").use { BitmapFactory.decodeStream(it) }
+    } catch (e: Exception) { null }
+    private val xiangqiBoardBitmap: Bitmap? = try {
+        context.assets.open("xiangqi_board_reference.png").use { BitmapFactory.decodeStream(it) }
     } catch (e: Exception) { null }
 
     private val bgPaint        = Paint().apply { color = Color.parseColor("#121212") }
@@ -293,6 +297,7 @@ class MenuView(context: Context) : View(context) {
             GameType.CONNECT_FOUR -> "Connect Four" to "vs AI  •  2 Players"
             GameType.FOX_AND_GEESE -> "Fox and Geese" to "vs AI  •  2 Players"
             GameType.LUDO         -> "Ludo"         to "vs AI  •  4 Players"
+            GameType.XIANGQI      -> "Xiangqi 象棋"  to "vs AI  •  2 Players"
         }
 
         val titleLines = if (title == "International Draughts") {
@@ -324,6 +329,23 @@ class MenuView(context: Context) : View(context) {
             GameType.CONNECT_FOUR -> drawConnectFourMini(canvas, left, top, size)
             GameType.FOX_AND_GEESE -> drawFoxAndGeeseMini(canvas, left, top, size)
             GameType.LUDO -> drawLudoMini(canvas, left, top, size)
+            GameType.XIANGQI -> drawXiangqiMini(canvas, left, top, size)
+        }
+    }
+
+    private fun drawXiangqiMini(canvas: Canvas, left: Float, top: Float, size: Float) {
+        xiangqiBoardBitmap?.let {
+            canvas.drawBitmap(it, null, RectF(left, top, left + size, top + size), bitmapPaint)
+        } ?: run {
+            val cellW = size / 9f
+            val cellH = size / 10f
+            val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.parseColor("#D48A25")
+                style = Paint.Style.STROKE
+                strokeWidth = 1.5f * dp
+            }
+            for (r in 0..9) canvas.drawLine(left, top + r * cellH, left + size, top + r * cellH, linePaint)
+            for (c in 0..8) canvas.drawLine(left + c * cellW, top, left + c * cellW, top + size, linePaint)
         }
     }
 

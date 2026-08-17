@@ -16,6 +16,7 @@ import com.mkdev.mkboardgames.games.chess.ChessPiece
 import com.mkdev.mkboardgames.games.chess.ChessRuleEngine
 import com.mkdev.mkboardgames.games.foxandgeese.FoxAndGeeseRuleEngine
 import com.mkdev.mkboardgames.games.othello.OthelloRuleEngine
+import com.mkdev.mkboardgames.games.xiangqi.XiangqiRuleEngine
 import com.mkdev.mkboardgames.ui.BoardView
 import com.mkdev.mkboardgames.ui.CaptureStripView
 import kotlinx.coroutines.*
@@ -66,6 +67,7 @@ class GameActivity : AppCompatActivity() {
             "CHECKERS"  -> CheckersRuleEngine()
             "INTERNATIONAL_DRAUGHTS" -> InternationalDraughtsRuleEngine()
             "FOX_AND_GEESE" -> FoxAndGeeseRuleEngine()
+            "XIANGQI"   -> XiangqiRuleEngine()
             else        -> ChessRuleEngine()   // covers "CHESS" and any future alias
         }
 
@@ -177,6 +179,7 @@ class GameActivity : AppCompatActivity() {
             "CHECKERS" -> "Draughts"
             "INTERNATIONAL_DRAUGHTS" -> "International Draughts"
             "FOX_AND_GEESE" -> "Fox and Geese"
+            "XIANGQI" -> "Xiangqi 象棋"
             else       -> "Chess"
         }
         val paused = PausedMatchStore.has(this, gameType)
@@ -225,9 +228,32 @@ class GameActivity : AppCompatActivity() {
             "CHECKERS" -> "Draughts"
             "INTERNATIONAL_DRAUGHTS" -> "International Draughts"
             "FOX_AND_GEESE" -> "Fox and Geese"
+            "XIANGQI" -> "Xiangqi 象棋"
             else -> "Chess"
         }
         val rulesText = when (gameType) {
+            "XIANGQI" -> """
+XIANGQI 象棋 — Rules
+
+Overview
+Xiangqi is played on a 9×10 board. Red moves first. The pieces sit on the intersections of the lines, and the river divides the two armies.
+
+─────────────────────────
+
+Pieces
+帥 / 將 — the General moves one point inside the palace. The two Generals may not face each other along an open file.
+仕 / 士 — the Advisor moves one point diagonally inside the palace.
+相 / 象 — the Elephant moves two points diagonally and may not cross the river. Its eye must be clear.
+傌 / 馬 — the Horse moves in an L shape. Its leg must be clear.
+俥 / 車 — the Chariot moves any distance horizontally or vertically.
+炮 / 砲 — the Cannon moves like a Chariot, but captures by jumping over exactly one piece.
+兵 / 卒 — the Soldier moves forward; after crossing the river it may also move sideways.
+
+─────────────────────────
+
+Winning
+Capture the opposing General or leave it with no legal move. A move that leaves your own General in check is illegal.
+            """.trimIndent()
             "OTHELLO" -> """
 OTHELLO — Rules
 
@@ -604,6 +630,14 @@ Checkmate your opponent's King.
             val move = withContext(Dispatchers.Default) {
                 try {
                     when (gameType) {
+                        "XIANGQI" -> {
+                            AIPlayer(
+                                engine,
+                                maxDepth = 2,
+                                timeLimitMs = 1800L,
+                                quiesceDepth = 1,
+                            ).bestMove(gameState)
+                        }
                         "OTHELLO"  -> {
                             val ai = AIPlayer(engine, maxDepth = SettingsManager.othelloAiDepth(this@GameActivity), timeLimitMs = 3000L)
                             ai.bestMove(gameState)
@@ -777,6 +811,8 @@ Checkmate your opponent's King.
                 when {
                     gameType == "FOX_AND_GEESE" && vsAI && playerColor == PieceColor.WHITE -> "You win!"
                     gameType == "FOX_AND_GEESE" -> "The fox wins!"
+                    gameType == "XIANGQI" && vsAI && playerColor == PieceColor.WHITE -> "You win!"
+                    gameType == "XIANGQI" -> "Red wins!"
                     vsAI && playerColor == PieceColor.WHITE -> "You win! 🎉"
                     else -> "White wins!"
                 }
@@ -784,6 +820,8 @@ Checkmate your opponent's King.
                 when {
                     gameType == "FOX_AND_GEESE" && vsAI && playerColor == PieceColor.BLACK -> "You win!"
                     gameType == "FOX_AND_GEESE" -> "The geese win!"
+                    gameType == "XIANGQI" && vsAI && playerColor == PieceColor.BLACK -> "You win!"
+                    gameType == "XIANGQI" -> "Black wins!"
                     vsAI && playerColor == PieceColor.BLACK -> "You win! 🎉"
                     else -> "Black wins!"
                 }
@@ -791,8 +829,16 @@ Checkmate your opponent's King.
             else -> ""
         }
         val resultLabel = when (gameState.status) {
-            GameStatus.WHITE_WINS -> if (gameType == "FOX_AND_GEESE") "Fox wins" else "White wins"
-            GameStatus.BLACK_WINS -> if (gameType == "FOX_AND_GEESE") "Geese win" else "Black wins"
+            GameStatus.WHITE_WINS -> when (gameType) {
+                "FOX_AND_GEESE" -> "Fox wins"
+                "XIANGQI" -> "Red wins"
+                else -> "White wins"
+            }
+            GameStatus.BLACK_WINS -> when (gameType) {
+                "FOX_AND_GEESE" -> "Geese win"
+                "XIANGQI" -> "Black wins"
+                else -> "Black wins"
+            }
             GameStatus.DRAW       -> "Draw"
             else -> ""
         }

@@ -17,6 +17,9 @@ import com.mkdev.mkboardgames.games.foxandgeese.FoxAndGeeseSetup
 import com.mkdev.mkboardgames.games.foxandgeese.FoxAndGeesePiece
 import com.mkdev.mkboardgames.games.foxandgeese.FoxAndGeesePieceType
 import com.mkdev.mkboardgames.games.othello.OthelloPiece
+import com.mkdev.mkboardgames.games.xiangqi.XiangqiPiece
+import com.mkdev.mkboardgames.games.xiangqi.XiangqiRuleEngine
+import kotlin.math.roundToInt
 
 class BoardView(context: Context) : View(context) {
 
@@ -79,6 +82,17 @@ class BoardView(context: Context) : View(context) {
     private var cellSize  = 0f
     private var boardLeft = 0f
     private var boardTop  = 0f
+    private var xiangqiImageRect = RectF()
+    private var xiangqiGridLeft = 0f
+    private var xiangqiGridTop = 0f
+    private var xiangqiCellWidth = 0f
+    private var xiangqiCellHeight = 0f
+
+    private val xiangqiBoardBitmap: Bitmap? = try {
+        context.assets.open("xiangqi_board_empty.png").use { BitmapFactory.decodeStream(it) }
+    } catch (_: Throwable) {
+        null
+    }
 
     // ─── Paints ───────────────────────────────────────────────────────────────
     private var lightPaint  = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -123,6 +137,35 @@ class BoardView(context: Context) : View(context) {
 
     private fun updateBoardGeometry() {
         if (width <= 0 || height <= 0) return
+        if (isXiangqiBoard()) {
+            val bitmap = xiangqiBoardBitmap
+            if (bitmap != null) {
+                val scale = minOf(
+                    width.toFloat() / bitmap.width,
+                    height.toFloat() / bitmap.height,
+                )
+                val imageWidth = bitmap.width * scale
+                val imageHeight = bitmap.height * scale
+                xiangqiImageRect.set(
+                    (width - imageWidth) / 2f,
+                    (height - imageHeight) / 2f,
+                    (width + imageWidth) / 2f,
+                    (height + imageHeight) / 2f,
+                )
+                // Coordinates of the nine-by-ten intersection grid in the
+                // supplied reference image, including its printed labels.
+                xiangqiGridLeft = xiangqiImageRect.left + imageWidth * 0.052f
+                xiangqiGridRight = xiangqiImageRect.left + imageWidth * 0.951f
+                xiangqiGridTop = xiangqiImageRect.top + imageHeight * 0.113f
+                val gridBottom = xiangqiImageRect.top + imageHeight * 0.898f
+                xiangqiCellWidth = (xiangqiGridRight - xiangqiGridLeft) / 8f
+                xiangqiCellHeight = (gridBottom - xiangqiGridTop) / 9f
+                cellSize = minOf(xiangqiCellWidth, xiangqiCellHeight)
+                piecePaint.textSize = cellSize * 0.72f
+                mustCapturePaint.strokeWidth = cellSize * 0.055f
+            }
+            return
+        }
         val dp      = resources.displayMetrics.density
         val margin  = 4f * dp
         val boardSz = minOf(width.toFloat() - margin * 2, height.toFloat() - margin * 2)
@@ -228,6 +271,7 @@ class BoardView(context: Context) : View(context) {
     }
 
     private fun cellCenter(pos: Position): PointF {
+        if (isXiangqiBoard()) return xiangqiPoint(pos)
         val last = gameState.boardSize - 1
         val dr = if (isFlipped) last - pos.row else pos.row
         val dc = if (isFlipped) last - pos.col else pos.col
@@ -237,7 +281,81 @@ class BoardView(context: Context) : View(context) {
 
     // ─── Drawing ─────────────────────────────────────────────────────────────
     override fun onDraw(canvas: Canvas) {
+        if (isXiangqiBoard()) {
+            drawXiangqiBoard(canvas)
+            drawXiangqiHighlights(canvas)
+            drawXiangqiPieces(canvas)
+            return
+        }
         drawBoard(canvas); drawLabels(canvas); drawHighlights(canvas); drawPieces(canvas)
+    }
+
+    private fun drawXiangqiBoard(canvas: Canvas) {
+        canvas.drawColor(Color.rgb(20, 20, 20))
+        xiangqiBoardBitmap?.let { canvas.drawBitmap(it, null, xiangqiImageRect, Paint(Paint.ANTI_ALIAS_FLAG)) }
+    }
+
+    private fun drawXiangqiHighlights(canvas: Canvas) {
+        val radius = cellSize * 0.46f
+        gameState.lastMove?.let {
+            canvas.drawCircle(xiangqiPoint(it.from).x, xiangqiPoint(it.from).y, radius, highlightGold)
+            canvas.drawCircle(xiangqiPoint(it.to).x, xiangqiPoint(it.to).y, radius, highlightGold)
+        }
+        selectedPos?.let {
+            canvas.drawCircle(xiangqiPoint(it).x, xiangqiPoint(it).y, radius, highlightBlue)
+        }
+        val showHints = directMoveMode || SettingsManager.getShowHints(context)
+        if (showHints) {
+            legalMoves.forEach { move ->
+                val point = xiangqiPoint(move.to)
+                if (move.isCapture) canvas.drawCircle(point.x, point.y, cellSize * 0.42f, ringPaint)
+                else canvas.drawCircle(point.x, point.y, cellSize * 0.15f, dotPaint)
+            }
+        }
+    }
+
+    private fun drawXiangqiPieces(canvas: Canvas) {
+        val skipPos = animFromPos
+        for (row in 0 until 10) for (col in 0 until 9) {
+            val position = Position(row, col)
+            if (position == skipPos) continue
+            val piece = gameState.get(position) ?: continue
+            val point = xiangqiPoint(position)
+            drawXiangqiPiece(canvas, piece, point.x, point.y)
+        }
+        animPiece?.let {
+            drawXiangqiPiece(
+                canvas,
+                it,
+                lerp(animFromPx.x, animToPx.x, animProgress),
+                lerp(animFromPx.y, animToPx.y, animProgress),
+            )
+        }
+    }
+
+    private fun drawXiangqiPiece(canvas: Canvas, piece: Piece, cx: Float, cy: Float) {
+        val radius = cellSize * 0.43f
+        canvas.drawCircle(cx + radius * 0.08f, cy + radius * 0.11f, radius, shadowPaint)
+        val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#F7E8C8") }
+        canvas.drawCircle(cx, cy, radius, fill)
+        val edge = if (piece.color == PieceColor.WHITE) Color.parseColor("#C62828")
+        else Color.parseColor("#171717")
+        Paint(Paint.ANTI_ALIAS_FLAG).also {
+            it.style = Paint.Style.STROKE
+            it.strokeWidth = radius * 0.09f
+            it.color = edge
+            canvas.drawCircle(cx, cy, radius * 0.91f, it)
+            it.strokeWidth = radius * 0.035f
+            canvas.drawCircle(cx, cy, radius * 0.79f, it)
+        }
+        val text = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            textAlign = Paint.Align.CENTER
+            textSize = radius * 1.02f
+            isFakeBoldText = true
+            color = edge
+        }
+        val metrics = text.fontMetrics
+        canvas.drawText(piece.symbol(), cx, cy - (metrics.ascent + metrics.descent) / 2f, text)
     }
 
     private fun drawBoard(canvas: Canvas) {
@@ -421,6 +539,7 @@ class BoardView(context: Context) : View(context) {
             is CheckersPiece -> drawCheckersPiece(canvas, piece, cx, cy)
             is FoxAndGeesePiece -> drawFoxAndGeesePiece(canvas, piece, cx, cy)
             is OthelloPiece  -> drawOthelloPiece(canvas, piece, cx, cy, pos)
+            is XiangqiPiece  -> drawXiangqiPiece(canvas, piece, cx, cy)
         }
     }
 
@@ -537,7 +656,34 @@ class BoardView(context: Context) : View(context) {
         gameState.boardSize == FoxAndGeeseSetup.BOARD_SIZE &&
             gameState.board.any { it is FoxAndGeesePiece }
 
+    private fun isXiangqiBoard(): Boolean =
+        ruleEngine is XiangqiRuleEngine || gameState.board.any { it is XiangqiPiece }
+
+    private fun xiangqiPoint(position: Position): PointF {
+        val displayedRow = if (isFlipped) 9 - position.row else position.row
+        val displayedCol = if (isFlipped) 8 - position.col else position.col
+        return PointF(
+            xiangqiGridLeft + displayedCol * xiangqiCellWidth,
+            xiangqiGridTop + displayedRow * xiangqiCellHeight,
+        )
+    }
+
     private fun screenToBoard(x: Float, y: Float): Position? {
+        if (isXiangqiBoard()) {
+            if (xiangqiCellWidth <= 0f || xiangqiCellHeight <= 0f) return null
+            val displayedCol = ((x - xiangqiGridLeft) / xiangqiCellWidth).roundToInt()
+            val displayedRow = ((y - xiangqiGridTop) / xiangqiCellHeight).roundToInt()
+            if (displayedCol !in 0..8 || displayedRow !in 0..9) return null
+            val nearestX = xiangqiGridLeft + displayedCol * xiangqiCellWidth
+            val nearestY = xiangqiGridTop + displayedRow * xiangqiCellHeight
+            if (kotlin.math.abs(x - nearestX) > xiangqiCellWidth * 0.48f ||
+                kotlin.math.abs(y - nearestY) > xiangqiCellHeight * 0.48f
+            ) return null
+            return Position(
+                if (isFlipped) 9 - displayedRow else displayedRow,
+                if (isFlipped) 8 - displayedCol else displayedCol,
+            )
+        }
         val col = ((x - boardLeft) / cellSize).toInt()
         val row = ((y - boardTop)  / cellSize).toInt()
         val size = gameState.boardSize
