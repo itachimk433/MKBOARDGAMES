@@ -210,6 +210,8 @@ class GameActivity : AppCompatActivity() {
     private fun showColorPickerDialog() {
         val sides = if (gameType == "FOX_AND_GEESE")
             arrayOf("Fox (moves second)", "Geese (moves first)")
+        else if (gameType == "XIANGQI")
+            arrayOf("Red (moves first)", "Black (moves second)")
         else
             arrayOf("White (moves first)", "Black (moves second)")
         AlertDialog.Builder(this)
@@ -253,7 +255,7 @@ Pieces
 ─────────────────────────
 
 Winning
-Capture the opposing General or leave it with no legal move. A move that leaves your own General in check is illegal.
+Checkmate the opposing General by leaving it in check with no legal move. Stalemate is also a loss. A move that leaves your own General in check is illegal.
             """.trimIndent()
             "OTHELLO" -> """
 OTHELLO — Rules
@@ -686,6 +688,8 @@ Checkmate your opponent's King.
     private fun updateHud() {
         val turn = if (gameType == "FOX_AND_GEESE") {
             if (gameState.currentTurn == PieceColor.WHITE) "Fox" else "Geese"
+        } else if (gameType == "XIANGQI") {
+            if (gameState.currentTurn == PieceColor.WHITE) "Red" else "Black"
         } else {
             if (gameState.currentTurn == PieceColor.WHITE) "White" else "Black"
         }

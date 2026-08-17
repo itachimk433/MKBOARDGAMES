@@ -17,6 +17,11 @@ class XiangqiRuleEngine : com.mkdev.mkboardgames.engine.RuleEngine {
         val piece = pieceAt(state, position) as? XiangqiPiece ?: return emptyList()
         if (piece.color != state.currentTurn) return emptyList()
         return pseudoMovesFrom(state, position, piece)
+            // The raw move generator includes attacks on the opposing General
+            // so that check detection remains accurate. Those attacks are not
+            // legal moves: Xiangqi ends by checkmate, never by capturing a
+            // General.
+            .filter { !capturesGeneral(state, it) }
             .filter { !isInCheck(applyMoveInternal(state, it), piece.color) }
     }
 
@@ -31,6 +36,9 @@ class XiangqiRuleEngine : com.mkdev.mkboardgames.engine.RuleEngine {
         }
 
     override fun applyMove(state: GameState, move: Move): GameState {
+        require(!capturesGeneral(state, move)) {
+            "Xiangqi Generals cannot be captured"
+        }
         val next = applyMoveInternal(state, move)
         val status = gameStatus(next)
         return next.copy(status = status, moveHistory = state.moveHistory + move)
@@ -52,7 +60,8 @@ class XiangqiRuleEngine : com.mkdev.mkboardgames.engine.RuleEngine {
         var score = 0
         for (row in 0 until rows) for (col in 0 until columns) {
             val piece = pieceAt(state, Position(row, col)) as? XiangqiPiece ?: continue
-            val mobility = pseudoMovesFrom(state, Position(row, col), piece).size
+            val mobility = pseudoMovesFrom(state, Position(row, col), piece)
+                .count { !capturesGeneral(state, it) }
             score += if (piece.color == PieceColor.WHITE) {
                 piece.value() + mobility * 3
             } else {
@@ -202,6 +211,14 @@ class XiangqiRuleEngine : com.mkdev.mkboardgames.engine.RuleEngine {
             if (pseudoMovesFrom(state, from, piece).any { it.to == king }) return true
         }
         return false
+    }
+
+    private fun capturesGeneral(state: GameState, move: Move): Boolean {
+        val destinationTarget = pieceAt(state, move.to) as? XiangqiPiece
+        if (destinationTarget?.type == XiangqiPieceType.GENERAL) return true
+        return move.captures.any {
+            (pieceAt(state, it) as? XiangqiPiece)?.type == XiangqiPieceType.GENERAL
+        }
     }
 
     private fun applyMoveInternal(state: GameState, move: Move): GameState {
