@@ -70,6 +70,8 @@ object ShogiSetup {
             put(2, col, ShogiPieceType.PAWN, PieceColor.BLACK)
             put(6, col, ShogiPieceType.PAWN, PieceColor.WHITE)
         }
-        return GameState(board = board, boardSize = SIZE)
+        // In standard Shogi, Sente is traditionally represented by Black and
+        // has the first move. The app keeps that mapping consistently.
+        return GameState(board = board, boardSize = SIZE, currentTurn = PieceColor.BLACK)
     }
 }

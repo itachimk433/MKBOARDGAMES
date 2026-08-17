@@ -7,13 +7,7 @@ import com.mkdev.mkboardgames.engine.Piece
 import com.mkdev.mkboardgames.engine.PieceColor
 import com.mkdev.mkboardgames.engine.Position
 
-/**
- * Shogi's board movement and promotion rules.
- *
- * Captured pieces are shown in the shared capture strips. This first version
- * keeps the same board-only interaction model as the other games in the app;
- * captured-piece drops are intentionally not exposed as a separate touch mode.
- */
+/** Standard Shogi movement, promotion, capture, hand, and drop rules. */
 class ShogiRuleEngine : com.mkdev.mkboardgames.engine.RuleEngine {
     override fun initialState() = ShogiSetup.initialState()
 
@@ -23,10 +17,10 @@ class ShogiRuleEngine : com.mkdev.mkboardgames.engine.RuleEngine {
 
         return rawMovesFrom(state, position, piece)
             .filter { (pieceAt(state, it.to) as? ShogiPiece)?.type != ShogiPieceType.KING }
+            .flatMap { move -> promotionVariants(piece, move) }
             .filter { move ->
-                !isKingInCheck(applyMoveInternal(state, promoteMove(piece, move)), piece.color)
+                !isKingInCheck(applyMoveInternal(state, move), piece.color)
             }
-            .map { promoteMove(piece, it) }
     }
 
     override fun allLegalMoves(state: GameState, color: PieceColor): List<Move> {
@@ -37,13 +31,12 @@ class ShogiRuleEngine : com.mkdev.mkboardgames.engine.RuleEngine {
                     addAll(legalMovesFrom(turnState, Position(row, col)))
                 }
             }
+            ShogiPieceType.entries.forEach { addAll(legalDropsFrom(turnState, it)) }
         }
     }
 
     override fun applyMove(state: GameState, move: Move): GameState {
-        val mover = state.get(move.from) as? ShogiPiece
-            ?: error("No Shogi piece at ${move.from}")
-        val applied = applyMoveInternal(state, promoteMove(mover, move))
+        val applied = applyMoveInternal(state, move)
         return applied.copy(
             moveHistory = state.moveHistory + move,
             status = gameStatus(applied.copy(moveHistory = state.moveHistory + move)),
@@ -59,11 +52,9 @@ class ShogiRuleEngine : com.mkdev.mkboardgames.engine.RuleEngine {
         if (allLegalMoves(state, state.currentTurn).isNotEmpty()) {
             return GameStatus.IN_PROGRESS
         }
-        return if (isKingInCheck(state, state.currentTurn)) {
-            winnerFor(state.currentTurn.opponent())
-        } else {
-            GameStatus.DRAW
-        }
+        // Shogi has no chess-style stalemate draw. A player with no legal
+        // move loses whether or not their king is currently in check.
+        return winnerFor(state.currentTurn.opponent())
     }
 
     override fun evaluate(state: GameState): Int {
@@ -181,8 +172,8 @@ class ShogiRuleEngine : com.mkdev.mkboardgames.engine.RuleEngine {
         ).forEach { (dr, dc) -> add(Position(from.row + dr, from.col + dc)) }
     }
 
-    private fun promoteMove(piece: ShogiPiece, move: Move): Move {
-        if (piece.promoted || !canPromote(piece.type)) return move
+    private fun promotionVariants(piece: ShogiPiece, move: Move): List<Move> {
+        if (piece.promoted || !canPromote(piece.type)) return listOf(move)
         val forced = when (piece.type) {
             ShogiPieceType.PAWN, ShogiPieceType.LANCE ->
                 move.to.row == promotionLastRank(piece.color)
@@ -191,29 +182,123 @@ class ShogiRuleEngine : com.mkdev.mkboardgames.engine.RuleEngine {
                     move.to.row == promotionLastRank(piece.color) + if (piece.color == PieceColor.WHITE) 1 else -1
             else -> false
         }
-        val entersZone = inPromotionZone(move.to, piece.color)
-        if (forced || entersZone) {
-            return move.copy(
+        val mayPromote = inPromotionZone(move.from, piece.color) ||
+            inPromotionZone(move.to, piece.color)
+        if (forced) {
+            return listOf(move.copy(
                 promotionType = piece.type.name,
                 metadata = move.metadata + ("promote" to true),
-            )
+            ))
         }
-        return move
+        if (!mayPromote) return listOf(move)
+        return listOf(
+            move,
+            move.copy(
+                promotionType = piece.type.name,
+                metadata = move.metadata + ("promote" to true),
+            ),
+        )
     }
 
     private fun applyMoveInternal(state: GameState, move: Move): GameState {
         val board = state.board.copyOf()
-        move.captures.forEach { board[index(it)] = null }
-        val piece = board[index(move.from)] as? ShogiPiece ?: return state
-        val promoted = move.promotionType != null || move.metadata["promote"] == true
-        board[index(move.to)] = if (promoted) piece.copy(promoted = true) else piece
-        board[index(move.from)] = null
+        val hands = state.hands.mapValues { it.value.toMutableList() }.toMutableMap()
+        val dropType = dropType(move)
+        if (dropType != null) {
+            val hand = hands[state.currentTurn].orEmpty().toMutableList()
+            val handIndex = hand.indexOfFirst { it is ShogiPiece && it.type == dropType }
+            if (handIndex < 0 || pieceAt(state, move.to) != null) return state
+            hand.removeAt(handIndex)
+            hands[state.currentTurn] = hand
+            board[index(move.to)] = ShogiPiece(dropType, state.currentTurn)
+        } else {
+            val piece = board.getOrNull(index(move.from)) as? ShogiPiece ?: return state
+            move.captures.forEach { capture ->
+                val captured = board.getOrNull(index(capture)) as? ShogiPiece
+                board[index(capture)] = null
+                if (captured != null) {
+                    val hand = hands[state.currentTurn].orEmpty().toMutableList()
+                    hand += captured.copy(color = state.currentTurn, promoted = false)
+                    hands[state.currentTurn] = hand
+                }
+            }
+            val promoted = move.promotionType != null || move.metadata["promote"] == true
+            board[index(move.to)] = if (promoted) piece.copy(promoted = true) else piece
+            board[index(move.from)] = null
+        }
         return state.copy(
             board = board,
             currentTurn = state.currentTurn.opponent(),
             status = GameStatus.IN_PROGRESS,
+            hands = hands.mapValues { it.value.toList() },
         )
     }
+
+    /** Legal drops for a held piece type, exposed to the hand UI. */
+    fun legalDropsFrom(state: GameState, type: ShogiPieceType): List<Move> {
+        val color = state.currentTurn
+        if (state.hands[color].orEmpty().none { it is ShogiPiece && it.type == type }) {
+            return emptyList()
+        }
+        val moves = mutableListOf<Move>()
+        for (row in 0 until ShogiSetup.SIZE) {
+            for (col in 0 until ShogiSetup.SIZE) {
+                val to = Position(row, col)
+                if (pieceAt(state, to) != null) continue
+                if (type == ShogiPieceType.PAWN && row == promotionLastRank(color)) continue
+                if (type == ShogiPieceType.LANCE && row == promotionLastRank(color)) continue
+                if (type == ShogiPieceType.KNIGHT &&
+                    (row == promotionLastRank(color) ||
+                        row == promotionLastRank(color) + if (color == PieceColor.WHITE) 1 else -1)
+                ) continue
+                if (type == ShogiPieceType.PAWN && hasUnpromotedPawnOnFile(state, color, col)) continue
+
+                val move = Move(
+                    from = dropPosition(type),
+                    to = to,
+                    metadata = mapOf("drop" to type.name),
+                )
+                if (type != ShogiPieceType.PAWN || !isPawnDropMate(state, move)) {
+                    moves += move
+                }
+            }
+        }
+        return moves
+    }
+
+    private fun isPawnDropMate(state: GameState, move: Move): Boolean {
+        val next = applyMoveInternal(state, move)
+        val opponent = state.currentTurn.opponent()
+        return isKingInCheck(next, opponent) &&
+            boardLegalMoves(next, opponent).isEmpty()
+    }
+
+    private fun boardLegalMoves(state: GameState, color: PieceColor): List<Move> {
+        val turnState = state.copy(currentTurn = color)
+        return buildList {
+            for (row in 0 until ShogiSetup.SIZE) {
+                for (col in 0 until ShogiSetup.SIZE) {
+                    addAll(legalMovesFrom(turnState, Position(row, col)))
+                }
+            }
+        }
+    }
+
+    private fun hasUnpromotedPawnOnFile(state: GameState, color: PieceColor, col: Int): Boolean =
+        (0 until ShogiSetup.SIZE).any { row ->
+            val piece = pieceAt(state, Position(row, col))
+            piece is ShogiPiece &&
+                piece.color == color &&
+                piece.type == ShogiPieceType.PAWN &&
+                !piece.promoted
+        }
+
+    private fun dropPosition(type: ShogiPieceType) = Position(-1, type.ordinal)
+
+    private fun dropType(move: Move): ShogiPieceType? =
+        (move.metadata["drop"] as? String)?.let { name ->
+            runCatching { ShogiPieceType.valueOf(name) }.getOrNull()
+        }
 
     private fun isKingInCheck(state: GameState, color: PieceColor): Boolean {
         val king = findKing(state, color) ?: return true

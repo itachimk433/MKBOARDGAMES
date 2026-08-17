@@ -16,6 +16,7 @@ import com.mkdev.mkboardgames.games.chess.ChessPiece
 import com.mkdev.mkboardgames.games.chess.ChessRuleEngine
 import com.mkdev.mkboardgames.games.foxandgeese.FoxAndGeeseRuleEngine
 import com.mkdev.mkboardgames.games.othello.OthelloRuleEngine
+import com.mkdev.mkboardgames.games.shogi.ShogiPiece
 import com.mkdev.mkboardgames.games.shogi.ShogiRuleEngine
 import com.mkdev.mkboardgames.games.xiangqi.XiangqiRuleEngine
 import com.mkdev.mkboardgames.ui.BoardView
@@ -87,6 +88,8 @@ class GameActivity : AppCompatActivity() {
         topCaptureView   = CaptureStripView(this).also { it.dividerOnTop = false }
         boardView        = BoardView(this)
         bottomCaptureView = CaptureStripView(this).also { it.dividerOnTop = true }
+        topCaptureView.onPieceSelected = ::handleShogiHandTap
+        bottomCaptureView.onPieceSelected = ::handleShogiHandTap
 
         // Render the selected game's real starting position behind the mode
         // dialog. BoardView defaults to an empty 8x8 chess-sized state, which
@@ -215,12 +218,18 @@ class GameActivity : AppCompatActivity() {
             arrayOf("Fox (moves second)", "Geese (moves first)")
         else if (gameType == "XIANGQI")
             arrayOf("Red (moves first)", "Black (moves second)")
+        else if (gameType == "SHOGI")
+            arrayOf("Sente / Black (moves first)", "Gote / White (moves second)")
         else
             arrayOf("White (moves first)", "Black (moves second)")
         AlertDialog.Builder(this)
             .setTitle(if (gameType == "FOX_AND_GEESE") "Choose your side" else "Play as")
             .setItems(sides) { _, which ->
-                playerColor = if (which == 0) PieceColor.WHITE else PieceColor.BLACK
+                playerColor = if (gameType == "SHOGI") {
+                    if (which == 0) PieceColor.BLACK else PieceColor.WHITE
+                } else {
+                    if (which == 0) PieceColor.WHITE else PieceColor.BLACK
+                }
                 startGame()
             }
             .setCancelable(true)
@@ -268,7 +277,7 @@ This version uses a fixed platform ruleset. Repeating the same position, with th
 SHOGI 将棋 — Rules
 
 Overview
-Shogi is played on a 9×9 board. White is Sente and moves first; Black is Gote. Captured pieces stay with the player who captured them in traditional Shogi. This version keeps the shared board interaction used by the other games and displays captures in the capture strips.
+Shogi is played on a 9×9 board. Black is Sente and moves first; White is Gote. Captured pieces stay in the capturing player's hand and can be dropped back onto the board.
 
 ─────────────────────────
 
@@ -285,10 +294,13 @@ Pieces
 ─────────────────────────
 
 Promotion
-Pieces promote automatically when they enter the promotion zone. A promoted pawn, lance, knight, or silver moves like a Gold; a promoted bishop becomes a Horse (馬), and a promoted rook becomes a Dragon (龍).
+Pieces may promote when they move into, within, or out of the three-rank promotion zone. Promotion is optional except when a Pawn or Lance reaches the last rank, or a Knight reaches either of the last two ranks. A promoted pawn, lance, knight, or silver moves like a Gold; a promoted bishop becomes a Horse (馬), and a promoted rook becomes a Dragon (龍).
+
+Drops
+Captured pieces are reusable. A drop is always unpromoted. A Pawn or Lance may not be dropped on the last rank, and a Knight may not be dropped on either of the last two ranks. A Pawn may not be dropped on a file containing your unpromoted Pawn (二歩), and a Pawn drop may not give immediate checkmate.
 
 Winning
-Checkmate the opposing King. A player with no legal move while not in check is stalemated and the game is a draw.
+Checkmate wins the game. A player with no legal move loses, even if their King is not in check.
             """.trimIndent()
             "OTHELLO" -> """
 OTHELLO — Rules
@@ -463,6 +475,7 @@ Checkmate your opponent's King.
         boardView.isLocked             = false
         boardView.rotateBlackPieces    = (!vsAI && gameType == "CHESS")
         boardView.onMoveMade           = ::handleMove
+        boardView.onPromotionChoice   = ::showPromotionChoice
         // Tap after game ends → re-show result dialog without double-recording stats
         boardView.onGameOverTapped     = { showResultDialog() }
         boardView.refreshTheme()
@@ -470,6 +483,7 @@ Checkmate your opponent's King.
         topCaptureView.setLabel(
             when {
                 gameType == "FOX_AND_GEESE" -> "Fox captured"
+                gameType == "SHOGI" -> "Gote hand"
                 !vsAI && gameType == "CHESS" -> "Black's captures"
                 else -> "Black ⚔"
             }
@@ -477,13 +491,15 @@ Checkmate your opponent's King.
         bottomCaptureView.setLabel(
             when {
                 gameType == "FOX_AND_GEESE" -> "Geese captured"
+                gameType == "SHOGI" -> "Sente hand"
                 !vsAI && gameType == "CHESS" -> "White's captures"
                 else -> "White ⚔"
             }
         )
 
-        topCaptureView.update(emptyList())
-        bottomCaptureView.update(emptyList())
+        topCaptureView.setSelectable(false)
+        bottomCaptureView.setSelectable(false)
+        refreshCaptureViews()
         if (gameType == "CHESS" || gameType == "CHECKERS" ||
             gameType == "INTERNATIONAL_DRAUGHTS" || gameType == "OTHELLO" ||
             gameType == "FOX_AND_GEESE"
@@ -524,9 +540,53 @@ Checkmate your opponent's King.
         }
         boardView.gameState = gameState
         boardView.isLocked = false
-        topCaptureView.update(capturedByBlack)
-        bottomCaptureView.update(capturedByWhite)
+        refreshCaptureViews()
         updateHud()
+    }
+
+    private fun refreshCaptureViews() {
+        if (gameType == "SHOGI") {
+            val goteHand = gameState.hands[PieceColor.WHITE].orEmpty()
+            val senteHand = gameState.hands[PieceColor.BLACK].orEmpty()
+            topCaptureView.update(goteHand)
+            bottomCaptureView.update(senteHand)
+            topCaptureView.setSelectable(
+                !boardView.isLocked &&
+                    gameState.currentTurn == PieceColor.WHITE &&
+                    (!vsAI || playerColor == PieceColor.WHITE)
+            )
+            bottomCaptureView.setSelectable(
+                !boardView.isLocked &&
+                    gameState.currentTurn == PieceColor.BLACK &&
+                    (!vsAI || playerColor == PieceColor.BLACK)
+            )
+        } else {
+            topCaptureView.update(capturedByBlack)
+            bottomCaptureView.update(capturedByWhite)
+            topCaptureView.setSelectable(false)
+            bottomCaptureView.setSelectable(false)
+        }
+    }
+
+    private fun handleShogiHandTap(piece: Piece) {
+        val shogiPiece = piece as? ShogiPiece ?: return
+        if (gameType != "SHOGI" || boardView.isLocked ||
+            gameState.currentTurn != shogiPiece.color ||
+            (vsAI && gameState.currentTurn != playerColor)
+        ) return
+        boardView.beginShogiDrop(shogiPiece.type)
+    }
+
+    private fun showPromotionChoice(choices: List<Move>) {
+        val promoted = choices.firstOrNull { it.metadata["promote"] == true } ?: return
+        val unpromoted = choices.firstOrNull { it.metadata["promote"] != true } ?: return
+        AlertDialog.Builder(this)
+            .setTitle("Promote this piece?")
+            .setItems(arrayOf("Promote", "Keep unpromoted")) { _, which ->
+                boardView.animateExternalMove(if (which == 0) promoted else unpromoted)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun handleMove(move: Move) {
@@ -536,7 +596,7 @@ Checkmate your opponent's King.
                 ?: gameState.currentTurn
             for (cap in move.captures) {
                 val capPiece = gameState.get(cap) ?: continue
-                if (gameType == "OTHELLO") continue
+                if (gameType == "OTHELLO" || gameType == "SHOGI") continue
                 if (moverColor == PieceColor.WHITE) capturedByWhite.add(capPiece)
                 else capturedByBlack.add(capPiece)
             }
@@ -550,8 +610,7 @@ Checkmate your opponent's King.
                 val popSet = (move.captures + listOf(move.to)).toSet()
                 if (popSet.isNotEmpty()) boardView.playOthelloPopAnim(popSet)
             }
-            topCaptureView.update(capturedByBlack)
-            bottomCaptureView.update(capturedByWhite)
+            refreshCaptureViews()
             updateHud()
             if (gameType == "CHESS") playChessSound(move)
             if (gameType == "CHECKERS" || gameType == "INTERNATIONAL_DRAUGHTS")
@@ -574,8 +633,7 @@ Checkmate your opponent's King.
                 val (cw, cb) = captureSnapshots.lastOrNull() ?: (emptyList<Piece>() to emptyList<Piece>())
                 capturedByWhite = cw.toMutableList(); capturedByBlack = cb.toMutableList()
                 boardView.gameState = gameState; boardView.isLocked = false
-                topCaptureView.update(capturedByBlack)
-                bottomCaptureView.update(capturedByWhite)
+                refreshCaptureViews()
             }
         }
     }
@@ -731,6 +789,8 @@ Checkmate your opponent's King.
             if (gameState.currentTurn == PieceColor.WHITE) "Fox" else "Geese"
         } else if (gameType == "XIANGQI") {
             if (gameState.currentTurn == PieceColor.WHITE) "Red" else "Black"
+        } else if (gameType == "SHOGI") {
+            if (gameState.currentTurn == PieceColor.BLACK) "Sente" else "Gote"
         } else {
             if (gameState.currentTurn == PieceColor.WHITE) "White" else "Black"
         }
@@ -753,8 +813,7 @@ Checkmate your opponent's King.
         capturedByWhite = cw.toMutableList(); capturedByBlack = cb.toMutableList()
         redoGameStates.add(prevState); redoCaptures.add(prevCap)
         redoMoves.add(rMoves);         redoCapSnaps.add(rSnaps)
-        topCaptureView.update(capturedByBlack)
-        bottomCaptureView.update(capturedByWhite)
+        refreshCaptureViews()
         boardView.isLocked = false; boardView.gameState = gameState; updateHud()
     }
 
@@ -771,8 +830,7 @@ Checkmate your opponent's King.
         gameState = nextState
         val (cw, cb) = nextCap
         capturedByWhite = cw.toMutableList(); capturedByBlack = cb.toMutableList()
-        topCaptureView.update(capturedByBlack)
-        bottomCaptureView.update(capturedByWhite)
+        refreshCaptureViews()
         boardView.isLocked = false; boardView.gameState = gameState; updateHud()
     }
 
@@ -865,7 +923,7 @@ Checkmate your opponent's King.
                     gameType == "XIANGQI" && vsAI && playerColor == PieceColor.WHITE -> "You win!"
                     gameType == "XIANGQI" -> "Red wins!"
                     gameType == "SHOGI" && vsAI && playerColor == PieceColor.WHITE -> "You win!"
-                    gameType == "SHOGI" -> "Sente wins!"
+                    gameType == "SHOGI" -> "Gote wins!"
                     vsAI && playerColor == PieceColor.WHITE -> "You win! 🎉"
                     else -> "White wins!"
                 }
@@ -876,7 +934,7 @@ Checkmate your opponent's King.
                     gameType == "XIANGQI" && vsAI && playerColor == PieceColor.BLACK -> "You win!"
                     gameType == "XIANGQI" -> "Black wins!"
                     gameType == "SHOGI" && vsAI && playerColor == PieceColor.BLACK -> "You win!"
-                    gameType == "SHOGI" -> "Gote wins!"
+                    gameType == "SHOGI" -> "Sente wins!"
                     vsAI && playerColor == PieceColor.BLACK -> "You win! 🎉"
                     else -> "Black wins!"
                 }
@@ -887,13 +945,13 @@ Checkmate your opponent's King.
             GameStatus.WHITE_WINS -> when (gameType) {
                 "FOX_AND_GEESE" -> "Fox wins"
                 "XIANGQI" -> "Red wins"
-                "SHOGI" -> "Sente wins"
+                "SHOGI" -> "Gote wins"
                 else -> "White wins"
             }
             GameStatus.BLACK_WINS -> when (gameType) {
                 "FOX_AND_GEESE" -> "Geese win"
                 "XIANGQI" -> "Black wins"
-                "SHOGI" -> "Gote wins"
+                "SHOGI" -> "Sente wins"
                 else -> "Black wins"
             }
             GameStatus.DRAW       -> "Draw"

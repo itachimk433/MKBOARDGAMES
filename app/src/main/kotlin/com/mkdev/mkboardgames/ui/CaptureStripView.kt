@@ -9,6 +9,7 @@ import com.mkdev.mkboardgames.games.chess.ChessPiece
 import com.mkdev.mkboardgames.games.checkers.CheckersPiece
 import com.mkdev.mkboardgames.games.foxandgeese.FoxAndGeesePiece
 import com.mkdev.mkboardgames.games.foxandgeese.FoxAndGeesePieceType
+import com.mkdev.mkboardgames.games.shogi.ShogiPiece
 
 /**
  * A horizontal strip that renders a list of captured pieces left-to-right.
@@ -46,6 +47,8 @@ class CaptureStripView(context: Context) : View(context) {
 
     private var pieces: List<Piece> = emptyList()
     private var label: String = ""
+    private var selectable = false
+    var onPieceSelected: ((Piece) -> Unit)? = null
     var dividerOnTop: Boolean = false
 
     fun update(newPieces: List<Piece>) {
@@ -55,6 +58,23 @@ class CaptureStripView(context: Context) : View(context) {
     /** Optionally set a label shown at the far-right of the strip (e.g. "Black's captures"). */
     fun setLabel(text: String) {
         label = text; invalidate()
+    }
+
+    fun setSelectable(value: Boolean) {
+        selectable = value
+        isClickable = value
+        invalidate()
+    }
+
+    override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
+        if (event.action == android.view.MotionEvent.ACTION_UP && selectable && pieces.isNotEmpty()) {
+            val gap = height * 0.62f
+            if (gap > 0f) {
+                val index = ((event.x - gap * 0.2f) / gap).toInt()
+                pieces.getOrNull(index)?.let { onPieceSelected?.invoke(it) }
+            }
+        }
+        return true
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -92,6 +112,7 @@ class CaptureStripView(context: Context) : View(context) {
                 is CheckersPiece -> drawCheckersPiece(canvas, p, x + sz * 0.5f, h / 2f, sz * 0.36f)
                 is ChessPiece    -> drawChessPiece(canvas, p, x, baseY)
                 is FoxAndGeesePiece -> drawFoxAndGeesePiece(canvas, p, x, baseY)
+                is ShogiPiece   -> drawShogiPiece(canvas, p, x, baseY)
                 else             -> drawMorabaraPiece(canvas, p, x + sz * 0.5f, h / 2f, sz * 0.36f)
             }
             x += gap
@@ -129,6 +150,17 @@ class CaptureStripView(context: Context) : View(context) {
             Color.parseColor("#4FAF9B")
         else
             Color.parseColor("#E86F2D")
+        canvas.drawText(piece.symbol(), x, baseY, strokeP)
+        canvas.drawText(piece.symbol(), x, baseY, fillP)
+    }
+
+    private fun drawShogiPiece(canvas: Canvas, piece: ShogiPiece, x: Float, baseY: Float) {
+        strokeP.textSize = fillP.textSize
+        strokeP.strokeWidth = strokeP.textSize * 0.04f
+        strokeP.color = if (piece.color == PieceColor.WHITE) Color.parseColor("#555555")
+        else Color.parseColor("#CCCCCC")
+        fillP.color = if (piece.color == PieceColor.WHITE) Color.parseColor("#FFFDE7")
+        else Color.parseColor("#8A8A8A")
         canvas.drawText(piece.symbol(), x, baseY, strokeP)
         canvas.drawText(piece.symbol(), x, baseY, fillP)
     }

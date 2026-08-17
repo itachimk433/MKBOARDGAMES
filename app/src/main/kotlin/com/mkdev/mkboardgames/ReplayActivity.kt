@@ -27,6 +27,7 @@ import com.mkdev.mkboardgames.games.foxandgeese.FoxAndGeeseRuleEngine
 import com.mkdev.mkboardgames.games.ludo.LudoRuleEngine
 import com.mkdev.mkboardgames.games.ludo.LudoSetup
 import com.mkdev.mkboardgames.games.morabaraba.MorabarabaRuleEngine
+import com.mkdev.mkboardgames.games.shogi.ShogiPiece
 import com.mkdev.mkboardgames.games.shogi.ShogiRuleEngine
 import com.mkdev.mkboardgames.games.tictactoe.TicTacToePiece
 import com.mkdev.mkboardgames.games.tictactoe.TicTacToeRuleEngine
@@ -60,9 +61,9 @@ class ReplayActivity : AppCompatActivity() {
                     obj.put("caps", caps)
                 }
                 if (m.promotionType != null) obj.put("promo", m.promotionType)
-                for (key in arrayOf("dice", "player", "token", "targetProgress")) {
+                for (key in arrayOf("dice", "player", "token", "targetProgress", "drop", "promote")) {
                     val value = m.metadata[key]
-                    if (value is Int) obj.put(key, value)
+                    if (value is Int || value is String || value is Boolean) obj.put(key, value)
                 }
                 arr.put(obj)
             }
@@ -89,6 +90,8 @@ class ReplayActivity : AppCompatActivity() {
                 for (key in arrayOf("dice", "player", "token", "targetProgress")) {
                     if (obj.has(key)) metadata[key] = obj.getInt(key)
                 }
+                if (obj.has("drop")) metadata["drop"] = obj.getString("drop")
+                if (obj.has("promote")) metadata["promote"] = obj.getBoolean("promote")
                 list += Move(from, to, caps, promo, metadata)
             }
             return list
@@ -208,6 +211,8 @@ class ReplayActivity : AppCompatActivity() {
                 LudoSetup.PLAYER_NAMES[player]
             } else if (gameType == "FOX_AND_GEESE") {
                 if (idx % 2 == 0) "Fox" else "Geese"
+            } else if (gameType == "SHOGI") {
+                if (idx % 2 == 0) "Sente" else "Gote"
             } else {
                 if (idx % 2 == 0) "White" else "Black"
             }
@@ -221,25 +226,34 @@ class ReplayActivity : AppCompatActivity() {
         val hasCaptures = !isTicTacToe && !isConnectFour && gameType != "OTHELLO" && !isLudo
         val snaps = mutableListOf(CaptureSnapshot(emptyList(), emptyList()))
         if (hasCaptures) {
-            for ((idx, move) in moves.withIndex()) {
-                val prevState  = states[idx]
-                val prev       = snaps.last()
-                val moverColor = if (isMorabaraba) prevState.currentTurn
-                                 else prevState.get(move.from)?.color ?: prevState.currentTurn
-
-                val byWhite = prev.byWhite.toMutableList()
-                val byBlack = prev.byBlack.toMutableList()
-                for (pos in move.captures) {
-                    val captured = prevState.get(pos) ?: continue
-                    // White captures → black pieces go to byWhite (bottom strip)
-                    // Black captures → white pieces go to byBlack (top strip)
-                    if (moverColor == PieceColor.WHITE) byWhite += captured
-                    else                                byBlack += captured
+            if (gameType == "SHOGI") {
+                for (state in states.drop(1)) {
+                    snaps += CaptureSnapshot(
+                        state.hands[PieceColor.WHITE].orEmpty(),
+                        state.hands[PieceColor.BLACK].orEmpty(),
+                    )
                 }
-                snaps += CaptureSnapshot(
-                    byWhite.sortedByDescending { it.value() },
-                    byBlack.sortedByDescending { it.value() }
-                )
+            } else {
+                for ((idx, move) in moves.withIndex()) {
+                    val prevState  = states[idx]
+                    val prev       = snaps.last()
+                    val moverColor = if (isMorabaraba) prevState.currentTurn
+                                     else prevState.get(move.from)?.color ?: prevState.currentTurn
+
+                    val byWhite = prev.byWhite.toMutableList()
+                    val byBlack = prev.byBlack.toMutableList()
+                    for (pos in move.captures) {
+                        val captured = prevState.get(pos) ?: continue
+                        // White captures → black pieces go to byWhite (bottom strip)
+                        // Black captures → white pieces go to byBlack (top strip)
+                        if (moverColor == PieceColor.WHITE) byWhite += captured
+                        else                                byBlack += captured
+                    }
+                    snaps += CaptureSnapshot(
+                        byWhite.sortedByDescending { it.value() },
+                        byBlack.sortedByDescending { it.value() }
+                    )
+                }
             }
         } else {
             repeat(moves.size) { snaps += CaptureSnapshot(emptyList(), emptyList()) }
@@ -808,8 +822,8 @@ class ReplayActivity : AppCompatActivity() {
             val padStart = 8f * dp
             val gap      = pieceP.textSize * 0.80f
 
-            // LEFT: White's captures — pieces White took (they are Black pieces)
-            canvas.drawText("White ⚔", padStart, labelY, lblP)
+            // LEFT: White's captures, or Gote's hand in Shogi.
+            canvas.drawText(if (gameType == "SHOGI") "Gote hand" else "White ⚔", padStart, labelY, lblP)
             var x = padStart + gap / 2f
             for (piece in snapshot.byWhite) {
                 pieceP.color = pieceColor(piece)
@@ -818,9 +832,9 @@ class ReplayActivity : AppCompatActivity() {
                 if (x > half - gap / 2f) break
             }
 
-            // RIGHT: Black's captures — pieces Black took (they are White pieces)
+            // RIGHT: Black's captures, or Sente's hand in Shogi.
             lblP.textAlign = Paint.Align.RIGHT
-            canvas.drawText("Black ⚔", w - padStart, labelY, lblP)
+            canvas.drawText(if (gameType == "SHOGI") "Sente hand" else "Black ⚔", w - padStart, labelY, lblP)
             lblP.textAlign = Paint.Align.LEFT
             var rx = half + padStart + gap / 2f
             for (piece in snapshot.byBlack) {
@@ -840,6 +854,8 @@ class ReplayActivity : AppCompatActivity() {
                                 else Color.parseColor("#9E9E9E")
             is CheckersPiece -> if (piece.color == PieceColor.WHITE) Color.parseColor("#E0E0E0")
                                 else Color.parseColor("#757575")
+            is ShogiPiece    -> if (piece.color == PieceColor.WHITE) Color.parseColor("#FFFDE7")
+                                else Color.parseColor("#9E9E9E")
             else             -> Color.parseColor("#AAAAAA")
         }
     }

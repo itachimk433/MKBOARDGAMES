@@ -20,6 +20,7 @@ import com.mkdev.mkboardgames.games.othello.OthelloPiece
 import com.mkdev.mkboardgames.games.shogi.ShogiPiece
 import com.mkdev.mkboardgames.games.shogi.ShogiRuleEngine
 import com.mkdev.mkboardgames.games.shogi.ShogiSetup
+import com.mkdev.mkboardgames.games.shogi.ShogiPieceType
 import com.mkdev.mkboardgames.games.xiangqi.XiangqiPiece
 import com.mkdev.mkboardgames.games.xiangqi.XiangqiRuleEngine
 import kotlin.math.roundToInt
@@ -32,7 +33,11 @@ class BoardView(context: Context) : View(context) {
             field = value
             updateBoardGeometry()
             selectedPos = null
-            legalMoves  = emptyList()
+            legalMoves  = if (shogiDropPiece != null && ruleEngine is ShogiRuleEngine) {
+                (ruleEngine as ShogiRuleEngine).legalDropsFrom(value, shogiDropPiece!!)
+            } else {
+                emptyList()
+            }
             mustCapturePieces = if (showMustCaptureHints && ruleEngine != null)
                 computeMustCapturePieces(value) else emptySet()
             if (directMoveMode && ruleEngine != null && !isLocked)
@@ -47,10 +52,27 @@ class BoardView(context: Context) : View(context) {
     var showMustCaptureHints: Boolean = false
     var rotateBlackPieces: Boolean = false
     var directMoveMode: Boolean = false
+    var onPromotionChoice: ((List<Move>) -> Unit)? = null
 
     // ─── Selection ───────────────────────────────────────────────────────────
     private var selectedPos: Position? = null
     private var legalMoves: List<Move> = emptyList()
+    private var shogiDropPiece: ShogiPieceType? = null
+
+    fun beginShogiDrop(type: ShogiPieceType) {
+        val engine = ruleEngine as? ShogiRuleEngine ?: return
+        if (isLocked || gameState.status != GameStatus.IN_PROGRESS) return
+        shogiDropPiece = type
+        selectedPos = null
+        legalMoves = engine.legalDropsFrom(gameState, type)
+        invalidate()
+    }
+
+    fun cancelShogiDrop() {
+        shogiDropPiece = null
+        legalMoves = emptyList()
+        invalidate()
+    }
 
     // ─── Must-capture highlights ──────────────────────────────────────────────
     private var mustCapturePieces: Set<Position> = emptySet()
@@ -269,9 +291,26 @@ class BoardView(context: Context) : View(context) {
 
         val engine = ruleEngine ?: return
 
-        if (selectedPos != null) {
+        if (shogiDropPiece != null) {
             val move = legalMoves.firstOrNull { it.to == pos }
-            if (move != null) { startMoveAnimation(move); return }
+            if (move != null) {
+                startMoveAnimation(move)
+            } else {
+                cancelShogiDrop()
+            }
+            return
+        }
+
+        if (selectedPos != null) {
+            val choices = legalMoves.filter { it.to == pos }
+            if (choices.size == 1) { startMoveAnimation(choices.first()); return }
+            if (choices.size > 1) {
+                selectedPos = null
+                legalMoves = emptyList()
+                onPromotionChoice?.invoke(choices)
+                invalidate()
+                return
+            }
 
             val piece = gameState.get(pos)
             if (piece != null && piece.color == gameState.currentTurn) {
@@ -312,6 +351,20 @@ class BoardView(context: Context) : View(context) {
     }
 
     private fun startMoveAnimation(move: Move) {
+        if (move.metadata["drop"] != null) {
+            selectedPos = null
+            legalMoves = emptyList()
+            shogiDropPiece = null
+            isLocked = true
+            // Drops originate in the hand rather than from a board square, so
+            // use a short placement pause instead of a from-to animation.
+            postDelayed({
+                isLocked = false
+                invalidate()
+                onMoveMade?.invoke(move)
+            }, 160L)
+            return
+        }
         val piece = gameState.get(move.from) ?: run { isLocked = false; onMoveMade?.invoke(move); return }
 
         selectedPos = null; legalMoves = emptyList()

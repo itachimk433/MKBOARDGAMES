@@ -38,6 +38,18 @@ class AIPlayer(
             val typeOff  = (p.value() / 100).coerceIn(0, 7)
             key = key xor zobristTable[i % (64 * 8)][(colorOff + typeOff).coerceIn(0, 15)]
         }
+        // A Shogi position is not defined by the board alone: the pieces in
+        // each player's hand are also part of the position.
+        for ((color, pieces) in state.hands) {
+            var handKey = if (color == PieceColor.WHITE) 0x13579BDFL else 0x2468ACE0L
+            pieces.groupingBy { it.symbol() }
+                .eachCount()
+                .toSortedMap()
+                .forEach { (symbol, count) ->
+                    handKey = handKey * 31 + symbol.hashCode() * 17 + count
+                }
+            key = key xor handKey
+        }
         return key
     }
 

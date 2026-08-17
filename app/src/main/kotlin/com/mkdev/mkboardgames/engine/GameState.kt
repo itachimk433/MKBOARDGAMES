@@ -13,10 +13,23 @@ data class GameState(
     val currentTurn: PieceColor = PieceColor.WHITE,
     val status: GameStatus = GameStatus.IN_PROGRESS,
     val moveHistory: List<Move> = emptyList(),
-    val metadata: Map<String, Any> = emptyMap()   // en-passant target, castle rights, etc.
+    val metadata: Map<String, Any> = emptyMap(),   // en-passant target, castle rights, etc.
+    /**
+     * Pieces held off the board by each player. Shogi uses this for captured
+     * pieces that may be dropped back onto the board; other games leave it
+     * empty.
+     */
+    val hands: Map<PieceColor, List<Piece>> = emptyMap(),
 ) {
-    fun get(pos: Position): Piece? = board[pos.row * boardSize + pos.col]
-    fun get(row: Int, col: Int): Piece? = board[row * boardSize + col]
+    fun get(pos: Position): Piece? =
+        if (pos.row in 0 until boardSize && pos.col in 0 until boardSize) {
+            board[pos.row * boardSize + pos.col]
+        } else {
+            null
+        }
+
+    fun get(row: Int, col: Int): Piece? =
+        if (row in 0 until boardSize && col in 0 until boardSize) board[row * boardSize + col] else null
 
     fun set(pos: Position, piece: Piece?): Array<Piece?> {
         val copy = board.copyOf()
@@ -24,8 +37,20 @@ data class GameState(
         return copy
     }
 
-    fun withBoard(newBoard: Array<Piece?>, turn: PieceColor, move: Move, status: GameStatus = GameStatus.IN_PROGRESS, meta: Map<String, Any> = emptyMap()) =
-        copy(board = newBoard, currentTurn = turn, status = status, moveHistory = moveHistory + move, metadata = meta)
+    fun withBoard(
+        newBoard: Array<Piece?>,
+        turn: PieceColor,
+        move: Move,
+        status: GameStatus = GameStatus.IN_PROGRESS,
+        meta: Map<String, Any> = metadata,
+    ) = copy(
+        board = newBoard,
+        currentTurn = turn,
+        status = status,
+        moveHistory = moveHistory + move,
+        metadata = meta,
+        hands = hands,
+    )
 
     val lastMove: Move? get() = moveHistory.lastOrNull()
 
@@ -33,7 +58,10 @@ data class GameState(
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is GameState) return false
-        return board.contentEquals(other.board) && currentTurn == other.currentTurn
+        return board.contentEquals(other.board) &&
+            currentTurn == other.currentTurn &&
+            hands == other.hands
     }
-    override fun hashCode() = 31 * board.contentHashCode() + currentTurn.hashCode()
+    override fun hashCode() =
+        ((31 * board.contentHashCode()) + currentTurn.hashCode()) * 31 + hands.hashCode()
 }
