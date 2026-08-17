@@ -92,6 +92,18 @@ class BoardView(context: Context) : View(context) {
     private var shogiGridBottom = 0f
     private var shogiCellWidth = 0f
     private var shogiCellHeight = 0f
+    // The supplied board image is photographed with slight perspective, so
+    // its nine columns and rows are not perfectly uniform. Keep the measured
+    // grid lines in image-relative coordinates so pieces sit in the visual
+    // centre of each box instead of drifting across the board.
+    private val shogiGridX = floatArrayOf(
+        35f / 1190f, 161f / 1190f, 290f / 1190f, 414f / 1190f, 540f / 1190f,
+        668f / 1190f, 793f / 1190f, 917f / 1190f, 1041f / 1190f, 1162f / 1190f,
+    )
+    private val shogiGridY = floatArrayOf(
+        35f / 1322f, 178f / 1322f, 317f / 1322f, 456f / 1322f, 596f / 1322f,
+        735f / 1322f, 876f / 1322f, 1015f / 1322f, 1154f / 1322f, 1290f / 1322f,
+    )
     private var xiangqiImageRect = RectF()
     private var xiangqiGridLeft = 0f
     private var xiangqiGridRight = 0f
@@ -123,6 +135,10 @@ class BoardView(context: Context) : View(context) {
     private val mustCapturePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#FF8F00"); style = Paint.Style.STROKE
     }
+    private val shogiSelectionEdgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeJoin = Paint.Join.ROUND
+    }
     private val piecePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.CENTER; isFakeBoldText = true
     }
@@ -139,6 +155,8 @@ class BoardView(context: Context) : View(context) {
         darkPaint.color   = t.dark
         accentPaint.color = t.accent
         highlightBlue.color = Color.argb(160, Color.red(t.accent), Color.green(t.accent), Color.blue(t.accent))
+        shogiSelectionEdgePaint.color =
+            Color.argb(225, Color.red(t.accent), Color.green(t.accent), Color.blue(t.accent))
         dotPaint.color  = Color.argb(130, Color.red(t.accent), Color.green(t.accent), Color.blue(t.accent))
         ringPaint.color = Color.parseColor("#EF5350")
     }
@@ -169,16 +187,18 @@ class BoardView(context: Context) : View(context) {
                     (height + imageHeight) / 2f,
                 )
                 // The uploaded reference includes a narrow wooden frame around
-                // the playable 9×9 grid.
-                shogiGridLeft = shogiImageRect.left + imageWidth * 0.030f
-                shogiGridRight = shogiImageRect.left + imageWidth * 0.970f
-                shogiGridTop = shogiImageRect.top + imageHeight * 0.027f
-                shogiGridBottom = shogiImageRect.top + imageHeight * 0.991f
+                // the playable 9×9 grid. Use the measured outer lines for the
+                // legacy bounds and the per-line arrays for each box.
+                shogiGridLeft = shogiLineX(0)
+                shogiGridRight = shogiLineX(9)
+                shogiGridTop = shogiLineY(0)
+                shogiGridBottom = shogiLineY(9)
                 shogiCellWidth = (shogiGridRight - shogiGridLeft) / 9f
                 shogiCellHeight = (shogiGridBottom - shogiGridTop) / 9f
                 cellSize = minOf(shogiCellWidth, shogiCellHeight)
                 piecePaint.textSize = cellSize * 0.58f
                 mustCapturePaint.strokeWidth = cellSize * 0.055f
+                shogiSelectionEdgePaint.strokeWidth = cellSize * 0.035f
             }
             return
         }
@@ -360,7 +380,7 @@ class BoardView(context: Context) : View(context) {
             drawShogiCell(canvas, it.from, highlightGold)
             drawShogiCell(canvas, it.to, highlightGold)
         }
-        selectedPos?.let { drawShogiCell(canvas, it, highlightBlue) }
+        selectedPos?.let { drawShogiPieceHighlight(canvas, it) }
         if (showHints) {
             legalMoves.forEach { move ->
                 val point = shogiPoint(move.to)
@@ -377,12 +397,26 @@ class BoardView(context: Context) : View(context) {
         val col = if (isFlipped) 8 - position.col else position.col
         val row = if (isFlipped) 8 - position.row else position.row
         canvas.drawRect(
-            shogiGridLeft + col * shogiCellWidth,
-            shogiGridTop + row * shogiCellHeight,
-            shogiGridLeft + (col + 1) * shogiCellWidth,
-            shogiGridTop + (row + 1) * shogiCellHeight,
+            shogiLineX(col),
+            shogiLineY(row),
+            shogiLineX(col + 1),
+            shogiLineY(row + 1),
             paint,
         )
+    }
+
+    private fun drawShogiPieceHighlight(canvas: Canvas, position: Position) {
+        val piece = gameState.get(position) ?: return
+        val point = shogiPoint(position)
+        val halfW = shogiCellWidth * 0.395f
+        val halfH = shogiCellHeight * 0.415f
+        val path = shogiPiecePath(point.x, point.y, halfW, halfH)
+
+        canvas.save()
+        if (piece.color == PieceColor.BLACK) canvas.rotate(180f, point.x, point.y)
+        canvas.drawPath(path, highlightBlue)
+        canvas.drawPath(path, shogiSelectionEdgePaint)
+        canvas.restore()
     }
 
     private fun drawShogiPieces(canvas: Canvas) {
@@ -763,14 +797,7 @@ class BoardView(context: Context) : View(context) {
     private fun drawShogiPiece(canvas: Canvas, piece: ShogiPiece, cx: Float, cy: Float) {
         val halfW = shogiCellWidth * 0.34f
         val halfH = shogiCellHeight * 0.36f
-        val path = Path().apply {
-            moveTo(cx, cy - halfH)
-            lineTo(cx + halfW * 0.76f, cy - halfH * 0.60f)
-            lineTo(cx + halfW, cy + halfH)
-            lineTo(cx - halfW, cy + halfH)
-            lineTo(cx - halfW * 0.76f, cy - halfH * 0.60f)
-            close()
-        }
+        val path = shogiPiecePath(cx, cy, halfW, halfH)
         canvas.save()
         if (piece.color == PieceColor.BLACK) canvas.rotate(180f, cx, cy)
 
@@ -809,6 +836,16 @@ class BoardView(context: Context) : View(context) {
         canvas.restore()
     }
 
+    private fun shogiPiecePath(cx: Float, cy: Float, halfW: Float, halfH: Float) =
+        Path().apply {
+            moveTo(cx, cy - halfH)
+            lineTo(cx + halfW * 0.76f, cy - halfH * 0.60f)
+            lineTo(cx + halfW, cy + halfH)
+            lineTo(cx - halfW, cy + halfH)
+            lineTo(cx - halfW * 0.76f, cy - halfH * 0.60f)
+            close()
+        }
+
     // ─── Coordinate helpers ───────────────────────────────────────────────────
 
     private fun boardRow(logicRow: Int) =
@@ -830,10 +867,16 @@ class BoardView(context: Context) : View(context) {
         val displayedRow = if (isFlipped) 8 - position.row else position.row
         val displayedCol = if (isFlipped) 8 - position.col else position.col
         return PointF(
-            shogiGridLeft + displayedCol * shogiCellWidth + shogiCellWidth / 2f,
-            shogiGridTop + displayedRow * shogiCellHeight + shogiCellHeight / 2f,
+            (shogiLineX(displayedCol) + shogiLineX(displayedCol + 1)) / 2f,
+            (shogiLineY(displayedRow) + shogiLineY(displayedRow + 1)) / 2f,
         )
     }
+
+    private fun shogiLineX(index: Int): Float =
+        shogiImageRect.left + shogiImageRect.width() * shogiGridX[index]
+
+    private fun shogiLineY(index: Int): Float =
+        shogiImageRect.top + shogiImageRect.height() * shogiGridY[index]
 
     private fun xiangqiPoint(position: Position): PointF {
         val displayedRow = if (isFlipped) 9 - position.row else position.row
@@ -847,9 +890,10 @@ class BoardView(context: Context) : View(context) {
     private fun screenToBoard(x: Float, y: Float): Position? {
         if (isShogiBoard()) {
             if (shogiCellWidth <= 0f || shogiCellHeight <= 0f) return null
-            val displayedCol = ((x - shogiGridLeft) / shogiCellWidth).toInt()
-            val displayedRow = ((y - shogiGridTop) / shogiCellHeight).toInt()
-            if (displayedCol !in 0..8 || displayedRow !in 0..8) return null
+            val displayedCol = (0 until 9).firstOrNull { x >= shogiLineX(it) && x < shogiLineX(it + 1) }
+                ?: return null
+            val displayedRow = (0 until 9).firstOrNull { y >= shogiLineY(it) && y < shogiLineY(it + 1) }
+                ?: return null
             return Position(
                 if (isFlipped) 8 - displayedRow else displayedRow,
                 if (isFlipped) 8 - displayedCol else displayedCol,
