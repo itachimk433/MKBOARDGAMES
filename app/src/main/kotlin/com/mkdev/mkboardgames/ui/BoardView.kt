@@ -84,6 +84,7 @@ class BoardView(context: Context) : View(context) {
     private var boardTop  = 0f
     private var xiangqiImageRect = RectF()
     private var xiangqiGridLeft = 0f
+    private var xiangqiGridRight = 0f
     private var xiangqiGridTop = 0f
     private var xiangqiCellWidth = 0f
     private var xiangqiCellHeight = 0f
