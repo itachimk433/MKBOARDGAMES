@@ -263,6 +263,11 @@ object SettingsManager {
             .apply()
     }
 
+    fun recordLudoResult(ctx: Context, won: Boolean) {
+        setActiveGame(ctx, "ludo")
+        if (won) recordWin(ctx) else recordLoss(ctx)
+    }
+
     fun resetStats(ctx: Context) {
         val edit = prefs(ctx).edit()
         edit.putInt(KEY_STATS_WINS, 0).putInt(KEY_STATS_LOSSES, 0)
@@ -270,7 +275,7 @@ object SettingsManager {
         for (g in listOf(
             "chess", "checkers", "international_draughts",
             "othello", "morabaraba", "ttt", "connect_four", "overall",
-            "fox_and_geese"
+            "fox_and_geese", "ludo"
         )) {
             edit.putInt(winKey(g), 0).putInt(lossKey(g), 0)
                 .putInt(drawKey(g), 0).putInt(forfeitKey(g), 0)

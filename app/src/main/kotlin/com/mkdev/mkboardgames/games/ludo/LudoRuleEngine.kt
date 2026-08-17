@@ -180,11 +180,11 @@ class LudoRuleEngine : RuleEngine {
         if (metadata["ludo_economy_enabled"] as? Boolean == true) {
             var economies = LudoEconomy.players(state).toMutableList()
             var playerEconomy = economies[player]
-            val reward = (if (move.captures.isNotEmpty()) LudoEconomy.CAPTURE_REWARD else 0) +
-                (if (targetProgress == LudoSetup.FINISH) LudoEconomy.HOME_REWARD else 0) +
-                (if (hasWon) LudoEconomy.FINAL_PLACEMENT_REWARD else 0)
-            if (reward > 0) {
-                playerEconomy = LudoEconomy.addCoins(playerEconomy, reward)
+            val captureReward = if (move.captures.isNotEmpty()) LudoEconomy.CAPTURE_REWARD else 0
+            val homeReward = if (targetProgress == LudoSetup.FINISH) LudoEconomy.HOME_REWARD else 0
+            val moveReward = captureReward + homeReward
+            if (moveReward > 0) {
+                playerEconomy = LudoEconomy.addEarnedCoins(playerEconomy, moveReward)
             }
             economies[player] = playerEconomy
 
@@ -192,6 +192,21 @@ class LudoRuleEngine : RuleEngine {
                 if (protectedPiece != null) {
                     val protectedEconomy = economies[protectedPiece.player]
                     economies[protectedPiece.player] = protectedEconomy.copy(protectedToken = null)
+                }
+            }
+            if (hasWon) {
+                // The game ends as soon as the first player finishes, so award
+                // the complete 1st–4th placement table in this final state.
+                LudoEconomy.standings(state.copy(
+                    board = nextBoard,
+                    metadata = metadata + (LudoSetup.PIECES_METADATA to nextPieces),
+                )).forEach { standing ->
+                    if (standing.placementReward > 0) {
+                        economies[standing.player] = LudoEconomy.addEarnedCoins(
+                            economies[standing.player],
+                            standing.placementReward,
+                        )
+                    }
                 }
             }
             metadata[LudoEconomy.METADATA] = economies
@@ -206,7 +221,9 @@ class LudoRuleEngine : RuleEngine {
                 )
                 hasWon -> LudoNotification(
                     player,
-                    "finished the match · +${LudoEconomy.HOME_REWARD + LudoEconomy.FINAL_PLACEMENT_REWARD} coins",
+                    "finished the match · +${
+                        LudoEconomy.HOME_REWARD + LudoEconomy.placementReward(1)
+                    } coins",
                 )
                 targetProgress == LudoSetup.FINISH -> LudoNotification(
                     player,

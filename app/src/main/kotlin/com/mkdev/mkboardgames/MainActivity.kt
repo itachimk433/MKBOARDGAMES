@@ -511,6 +511,7 @@ class MainActivity : AppCompatActivity() {
             Page("Tic-Tac-Toe","✕",  "ttt"),
             Page("Connect Four", "●", "connect_four"),
             Page("Fox & Geese", "🦊", "fox_and_geese"),
+            Page("Ludo", "●", "ludo"),
         )
 
         var currentPage = 0

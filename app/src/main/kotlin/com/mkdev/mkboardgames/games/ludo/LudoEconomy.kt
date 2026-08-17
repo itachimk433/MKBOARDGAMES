@@ -15,11 +15,22 @@ data class LudoPlayerEconomy(
     val reroll: Int = 0,
     val protectedToken: Int? = null,
     val tokenName: String = "Tokens",
+    val totalEarned: Int = 0,
 )
 
 data class LudoNotification(
     val player: Int,
     val message: String,
+)
+
+data class LudoStanding(
+    val player: Int,
+    val place: Int,
+    val completedTokens: Int,
+    val totalProgress: Int,
+    val placementReward: Int,
+    val totalEarned: Int,
+    val balance: Int,
 )
 
 object LudoEconomy {
@@ -31,6 +42,7 @@ object LudoEconomy {
     const val CAPTURE_REWARD = 2
     const val HOME_REWARD = 3
     const val FINAL_PLACEMENT_REWARD = 8
+    val PLACEMENT_REWARDS = intArrayOf(8, 5, 2, 0)
 
     fun initialPlayers(): List<LudoPlayerEconomy> =
         List(LudoSetup.PLAYER_COUNT) { LudoPlayerEconomy() }
@@ -85,6 +97,47 @@ object LudoEconomy {
     fun addCoins(economy: LudoPlayerEconomy, amount: Int): LudoPlayerEconomy =
         economy.copy(coins = (economy.coins + amount).coerceAtLeast(0))
 
+    fun addEarnedCoins(economy: LudoPlayerEconomy, amount: Int): LudoPlayerEconomy =
+        economy.copy(
+            coins = (economy.coins + amount).coerceAtLeast(0),
+            totalEarned = (economy.totalEarned + amount).coerceAtLeast(0),
+        )
+
     fun rename(economy: LudoPlayerEconomy, requestedName: String): LudoPlayerEconomy =
         economy.copy(tokenName = requestedName.filter { it.isLetter() }.take(5).ifBlank { "Tokens" })
+
+    fun placementReward(place: Int): Int =
+        PLACEMENT_REWARDS.getOrElse((place - 1).coerceIn(0, PLACEMENT_REWARDS.lastIndex)) { 0 }
+
+    /**
+     * The final board is the source of truth for ordering. Completed tokens are
+     * the primary score, followed by total token progress, then player order as
+     * a stable final tie-breaker. This keeps the result deterministic even when
+     * multiple players have the same visible progress.
+     */
+    fun standings(state: GameState): List<LudoStanding> {
+        val pieces = LudoSetup.allPieces(state)
+        val economies = players(state)
+        val rewardsEnabled = state.metadata["ludo_economy_enabled"] as? Boolean == true
+        val orderedPlayers = (0 until LudoSetup.PLAYER_COUNT).sortedWith(
+            compareByDescending<Int> { player ->
+                pieces.count { it.player == player && it.progress >= LudoSetup.FINISH }
+            }.thenByDescending { player ->
+                pieces.filter { it.player == player }.sumOf { it.progress.coerceAtLeast(0) }
+            }.thenBy { it },
+        )
+        return orderedPlayers.mapIndexed { index, player ->
+            val playerPieces = pieces.filter { it.player == player }
+            val economy = economies[player]
+            LudoStanding(
+                player = player,
+                place = index + 1,
+                completedTokens = playerPieces.count { it.progress >= LudoSetup.FINISH },
+                totalProgress = playerPieces.sumOf { it.progress.coerceAtLeast(0) },
+                placementReward = if (rewardsEnabled) placementReward(index + 1) else 0,
+                totalEarned = economy.totalEarned,
+                balance = economy.coins,
+            )
+        }
+    }
 }

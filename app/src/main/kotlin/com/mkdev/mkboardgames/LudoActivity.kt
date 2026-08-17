@@ -68,6 +68,7 @@ class LudoActivity : AppCompatActivity() {
     private var economyEnabled = false
     private var aiDifficulty = 0
     private var matchStarted = false
+    private var ludoResultRecorded = false
     private var rolledValue = 0
     private var resultDialogVisible = false
     private var celebrationMessage: String? = null
@@ -404,11 +405,13 @@ class LudoActivity : AppCompatActivity() {
     private fun startGame() {
         moves.clear()
         resultDialogVisible = false
+        ludoResultRecorded = false
         rolledValue = 0
         celebrationMessage = null
         celebrationGeneration++
         matchStarted = true
         economyEnabled = irregularMode && vsAI
+        if (vsAI) SettingsManager.setActiveGame(this, "ludo")
         aiDifficulty = SettingsManager.getLudoDifficulty(this)
         val initialState = engine.initialState()
         state = initialState.copy(
@@ -1605,9 +1608,36 @@ class LudoActivity : AppCompatActivity() {
         if (state.status == GameStatus.IN_PROGRESS || resultDialogVisible) return
         resultDialogVisible = true
         val winner = state.metadata["ludo_winner"] as? Int ?: 0
-        val result = "${LudoSetup.PLAYER_NAMES[winner]} wins!"
+        if (vsAI && !ludoResultRecorded) {
+            ludoResultRecorded = true
+            SettingsManager.recordLudoResult(this, winner == humanPlayer)
+        }
+        val standings = LudoEconomy.standings(state)
+        val result = buildString {
+            append("${LudoSetup.PLAYER_NAMES[winner]} wins\n\n")
+            standings.forEachIndexed { index, standing ->
+                val economy = LudoEconomy.player(state, standing.player)
+                val ordinal = when (standing.place) {
+                    1 -> "1st"
+                    2 -> "2nd"
+                    3 -> "3rd"
+                    else -> "${standing.place}th"
+                }
+                append("$ordinal  ${LudoSetup.PLAYER_NAMES[standing.player]}")
+                if (standing.player == humanPlayer && vsAI) append(" (You)")
+                append("\n")
+                append("  ${standing.completedTokens}/4 home · ")
+                append("Placement reward +${standing.placementReward}\n")
+                if (economyEnabled) {
+                    append("  Earned +${standing.totalEarned} total · Balance ${standing.balance}")
+                } else {
+                    append("  Classic match · coins disabled")
+                }
+                if (index < standings.lastIndex) append("\n\n")
+            }
+        }
         AlertDialog.Builder(this)
-            .setTitle("Ludo")
+            .setTitle("Ludo Standings")
             .setMessage(result)
             .setPositiveButton("New Match") { _, _ -> startGame() }
             .setNegativeButton("Main Menu") { _, _ -> finish() }
