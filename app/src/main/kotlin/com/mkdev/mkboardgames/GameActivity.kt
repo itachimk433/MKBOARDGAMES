@@ -256,6 +256,9 @@ Pieces
 
 Winning
 Checkmate the opposing General by leaving it in check with no legal move. Stalemate is also a loss. A move that leaves your own General in check is illegal.
+
+Repetition and Perpetual Play
+This version uses a fixed platform ruleset. Repeating the same position, with the same side to move, three times is a draw. If one side gives check on every move in that repeated cycle, that side loses. Repeatedly attacking the same opposing piece while it moves away after each attack is treated the same way.
             """.trimIndent()
             "OTHELLO" -> """
 OTHELLO — Rules

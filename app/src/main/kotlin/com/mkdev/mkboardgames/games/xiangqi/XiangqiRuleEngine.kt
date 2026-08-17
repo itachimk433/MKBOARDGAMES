@@ -40,8 +40,12 @@ class XiangqiRuleEngine : com.mkdev.mkboardgames.engine.RuleEngine {
             "Xiangqi Generals cannot be captured"
         }
         val next = applyMoveInternal(state, move)
-        val status = gameStatus(next)
-        return next.copy(status = status, moveHistory = state.moveHistory + move)
+        val nextHistory = positionHistory(state) + positionKey(next)
+        val advanced = next.copy(
+            moveHistory = state.moveHistory + move,
+            metadata = state.metadata + (POSITION_HISTORY_KEY to nextHistory),
+        )
+        return advanced.copy(status = gameStatus(advanced))
     }
 
     override fun gameStatus(state: GameState): GameStatus {
@@ -53,6 +57,7 @@ class XiangqiRuleEngine : com.mkdev.mkboardgames.engine.RuleEngine {
             return if (state.currentTurn == PieceColor.WHITE) GameStatus.BLACK_WINS
             else GameStatus.WHITE_WINS
         }
+        repetitionOutcome(state)?.let { return it }
         return GameStatus.IN_PROGRESS
     }
 
@@ -221,6 +226,152 @@ class XiangqiRuleEngine : com.mkdev.mkboardgames.engine.RuleEngine {
         }
     }
 
+    /**
+     * This app uses a deterministic platform ruleset for repeated play:
+     *
+     * - Three occurrences of the same position (including the side to move)
+     *   are a draw.
+     * - If one side gives check on every move in that repeated cycle, that
+     *   side loses for perpetual check.
+     * - If one side repeatedly attacks the same opposing non-General piece and
+     *   that piece must move away after every attack, the attacking side loses
+     *   for perpetual chase.
+     *
+     * This deliberately adjudicates only a completed repeated cycle. It does
+     * not guess at an attacker's intent before the repetition is established.
+     */
+    private fun repetitionOutcome(state: GameState): GameStatus? {
+        val history = positionHistory(state)
+        val currentKey = positionKey(state)
+        val occurrences = history.mapIndexedNotNull { index, key ->
+            if (key == currentKey) index else null
+        }
+        if (occurrences.size < REPETITION_LIMIT) return null
+
+        val cycleStart = occurrences[occurrences.size - 2]
+        val cycleEnd = occurrences.last()
+        if (cycleStart >= cycleEnd || cycleEnd > state.moveHistory.size) {
+            return GameStatus.DRAW
+        }
+
+        val cycle = appliedMovesForCycle(state, cycleStart, cycleEnd)
+        perpetualChecker(cycle)?.let { return winnerFor(it.opponent()) }
+        perpetualChaser(cycle)?.let { return winnerFor(it.opponent()) }
+        return GameStatus.DRAW
+    }
+
+    private fun perpetualChecker(cycle: List<AppliedMove>): PieceColor? {
+        val checkingMoves = PieceColor.entries.associateWith { mutableListOf<Boolean>() }
+        for (applied in cycle) {
+            checkingMoves.getValue(applied.mover).add(
+                isInCheck(applied.after, applied.mover.opponent()),
+            )
+        }
+        val candidates = checkingMoves.filter { (_, checks) ->
+            checks.isNotEmpty() && checks.all { it }
+        }.keys
+        return candidates.singleOrNull()
+    }
+
+    private fun perpetualChaser(cycle: List<AppliedMove>): PieceColor? {
+        val candidates = PieceColor.entries.filter { attacker ->
+            val attackingMoves = cycle.withIndex().filter { it.value.mover == attacker }
+            var previousTarget: Position? = null
+            attackingMoves.isNotEmpty() && attackingMoves.all { (index, applied) ->
+                val response = cycle[(index + 1) % cycle.size]
+                if (response.mover != attacker.opponent() ||
+                    response.move.captures.isNotEmpty()
+                ) {
+                    return@all false
+                }
+                if (previousTarget != null && previousTarget != response.move.from) {
+                    return@all false
+                }
+
+                val target = pieceAt(applied.after, response.move.from) as? XiangqiPiece
+                    ?: return@all false
+                val isValidTarget = target.color == attacker.opponent() &&
+                    target.type != XiangqiPieceType.GENERAL &&
+                    isAttackedBy(applied.after, attacker, response.move.from)
+                if (!isValidTarget) return@all false
+                previousTarget = response.move.to
+                true
+            }
+        }
+        return candidates.singleOrNull()
+    }
+
+    private fun isAttackedBy(
+        state: GameState,
+        attacker: PieceColor,
+        target: Position,
+    ): Boolean {
+        for (row in 0 until rows) for (col in 0 until columns) {
+            val from = Position(row, col)
+            val piece = pieceAt(state, from) as? XiangqiPiece ?: continue
+            if (piece.color != attacker) continue
+            if (pseudoMovesFrom(state, from, piece).any { it.to == target }) return true
+        }
+        return false
+    }
+
+    private fun appliedMovesForCycle(
+        state: GameState,
+        start: Int,
+        end: Int,
+    ): List<AppliedMove> {
+        var before = stateAtMoveIndex(state, start)
+        return buildList {
+            for (index in start until end) {
+                val move = state.moveHistory[index]
+                val applied = AppliedMove(
+                    move = move,
+                    mover = before.currentTurn,
+                    after = applyMoveInternal(before, move),
+                )
+                add(applied)
+                before = applied.after
+            }
+        }
+    }
+
+    private fun stateAtMoveIndex(state: GameState, moveIndex: Int): GameState {
+        var replay = initialState()
+        for (index in 0 until moveIndex) {
+            replay = applyMoveInternal(replay, state.moveHistory[index])
+        }
+        return replay
+    }
+
+    private fun positionHistory(state: GameState): List<String> {
+        val recorded = state.metadata[POSITION_HISTORY_KEY] as? List<*>
+        val history = recorded?.filterIsInstance<String>()
+        return if (history != null && history.size == state.moveHistory.size + 1) {
+            history
+        } else {
+            listOf(positionKey(state))
+        }
+    }
+
+    private fun positionKey(state: GameState): String {
+        val key = StringBuilder(rows * columns * 2 + 2)
+        for (row in 0 until rows) for (col in 0 until columns) {
+            when (val piece = pieceAt(state, Position(row, col))) {
+                null -> key.append('.')
+                is XiangqiPiece -> key
+                    .append(if (piece.color == PieceColor.WHITE) 'R' else 'B')
+                    .append(piece.type.ordinal)
+                else -> key.append('?')
+            }
+        }
+        return key.append('|')
+            .append(if (state.currentTurn == PieceColor.WHITE) 'R' else 'B')
+            .toString()
+    }
+
+    private fun winnerFor(color: PieceColor) =
+        if (color == PieceColor.WHITE) GameStatus.WHITE_WINS else GameStatus.BLACK_WINS
+
     private fun applyMoveInternal(state: GameState, move: Move): GameState {
         val board = state.board.copyOf()
         move.captures.forEach { board[index(it)] = null }
@@ -282,4 +433,15 @@ class XiangqiRuleEngine : com.mkdev.mkboardgames.engine.RuleEngine {
         val lr: Int,
         val lc: Int,
     )
+
+    private data class AppliedMove(
+        val move: Move,
+        val mover: PieceColor,
+        val after: GameState,
+    )
+
+    private companion object {
+        const val POSITION_HISTORY_KEY = "xiangqiPositionHistory"
+        const val REPETITION_LIMIT = 3
+    }
 }
