@@ -186,6 +186,14 @@ class LudoRuleEngine : RuleEngine {
             if (moveReward > 0) {
                 playerEconomy = LudoEconomy.addEarnedCoins(playerEconomy, moveReward)
             }
+            // Invincibility belongs to the token it protects. Once that token
+            // reaches the centre home, the protection is spent and another
+            // token may be protected only after buying a new ability.
+            if (targetProgress == LudoSetup.FINISH &&
+                playerEconomy.protectedToken == movingPiece.token
+            ) {
+                playerEconomy = playerEconomy.copy(protectedToken = null)
+            }
             economies[player] = playerEconomy
 
             if (blockedProtection) {

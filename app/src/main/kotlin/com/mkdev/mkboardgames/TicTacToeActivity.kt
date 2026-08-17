@@ -90,13 +90,30 @@ class TicTacToeActivity : AppCompatActivity() {
             @Suppress("DEPRECATION") super.onBackPressed(); return
         }
         AlertDialog.Builder(this).setTitle("Leave Match?")
-            .setMessage("Leaving counts as a forfeit.")
-            .setPositiveButton("Leave") { _, _ ->
+            .setMessage("Pause to keep this match and resume it later, or leave to forfeit.")
+            .setPositiveButton("Pause & Exit") { _, _ -> pauseMatchAndExit() }
+            .setNeutralButton("Leave Match") { _, _ ->
+                clearPausedMatch()
                 if (vsAI) SettingsManager.recordForfeit(this)
                 @Suppress("DEPRECATION") super.onBackPressed()
             }
             .setNegativeButton("Keep Playing", null).show()
     }
+
+    private fun pauseMatchAndExit() {
+        PausedMatchStore.save(
+            this,
+            gameType = "TICTACTOE",
+            vsAI = vsAI,
+            playerColor = playerColor.name,
+            boardSize = boardSize,
+            winLength = winLength,
+            moves = gameState.moveHistory,
+        )
+        finish()
+    }
+
+    private fun clearPausedMatch() = PausedMatchStore.clear(this, "TICTACTOE")
 
     private fun makeFullscreen() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -111,12 +128,27 @@ class TicTacToeActivity : AppCompatActivity() {
     // ─── Dialogs ──────────────────────────────────────────────────────────────
 
     private fun showModeDialog() {
+        val paused = PausedMatchStore.has(this, "TICTACTOE")
+        val options = buildList {
+            if (paused) add("Resume Match")
+            add("vs AI")
+            add("2 Players")
+            add("How to Play")
+        }
         AlertDialog.Builder(this).setTitle("Tic-Tac-Toe")
-            .setItems(arrayOf("vs AI", "2 Players", "How to Play")) { _, which ->
-                when (which) {
-                    0 -> { vsAI = true;  showBoardSizeDialog(fromMode = true) }
-                    1 -> { vsAI = false; playerColor = PieceColor.WHITE; showBoardSizeDialog(fromMode = false) }
-                    2 -> showRules(showModeAfter = moveHistory.isEmpty())
+            .setItems(options.toTypedArray()) { _, which ->
+                if (paused && which == 0) {
+                    resumePausedMatch()
+                    return@setItems
+                }
+                when (options[which - if (paused) 1 else 0]) {
+                    "vs AI" -> { vsAI = true; showBoardSizeDialog(fromMode = true) }
+                    "2 Players" -> {
+                        vsAI = false
+                        playerColor = PieceColor.WHITE
+                        showBoardSizeDialog(fromMode = false)
+                    }
+                    "How to Play" -> showRules(showModeAfter = moveHistory.isEmpty())
                 }
             }
             .setCancelable(true)
@@ -214,11 +246,12 @@ Strategy
 
     // ─── Game flow ────────────────────────────────────────────────────────────
 
-    private fun startGame() {
+    private fun startGame(restoring: PausedMatchStore.Match? = null) {
         resultRecorded = false
         interstitialAd = null
         redoGameStates.clear(); redoRemovedMoves.clear()
         AdManager.loadInterstitial(this) { interstitialAd = it }
+        if (restoring == null) clearPausedMatch()
         SettingsManager.activateGameTheme(this, "ttt")
         if (vsAI) SettingsManager.setActiveGame(this, "ttt")
         SoundPlayer.init(this)
@@ -229,7 +262,39 @@ Strategy
         boardView.onGameOverTapped = { showResultDialog() }
         scoreView.setLabels(boardSize)
         updateHud()
-        if (vsAI && gameState.currentTurn != playerColor) triggerAI()
+        if (restoring != null) {
+            restoreMoves(restoring.moves)
+            clearPausedMatch()
+            if (vsAI && gameState.currentTurn != playerColor) triggerAI()
+        } else if (vsAI && gameState.currentTurn != playerColor) {
+            triggerAI()
+        }
+    }
+
+    private fun resumePausedMatch() {
+        val paused = PausedMatchStore.load(this, "TICTACTOE") ?: run {
+            showModeDialog()
+            return
+        }
+        boardSize = paused.boardSize ?: 3
+        winLength = paused.winLength ?: winLengthFor(boardSize)
+        engine = TicTacToeRuleEngine(boardSize, winLength)
+        vsAI = paused.vsAI
+        playerColor = runCatching { PieceColor.valueOf(paused.playerColor) }
+            .getOrDefault(PieceColor.WHITE)
+        boardView.updateBoardSize(boardSize)
+        startGame(paused)
+    }
+
+    private fun restoreMoves(moves: List<Move>) {
+        for (move in moves) {
+            moveHistory.add(gameState)
+            gameState = engine.applyMove(gameState, move)
+        }
+        boardView.setGameState(gameState, lastMove = gameState.lastMove?.to)
+        boardView.isLocked = gameState.status != GameStatus.IN_PROGRESS
+        scoreView.setLabels(boardSize)
+        updateHud()
     }
 
     internal fun handleMove(move: Move) {
@@ -377,12 +442,17 @@ Strategy
                     }
                     "Main Menu" -> if (inProgress) {
                         AlertDialog.Builder(this).setTitle("Leave Match?")
-                            .setMessage("Leaving counts as a forfeit.")
-                            .setPositiveButton("Leave") { _, _ ->
+                            .setMessage("Pause to resume later, or leave to forfeit.")
+                            .setPositiveButton("Pause & Exit") { _, _ -> pauseMatchAndExit() }
+                            .setNeutralButton("Leave Match") { _, _ ->
+                                clearPausedMatch()
                                 if (vsAI) SettingsManager.recordForfeit(this)
                                 finish()
                             }.setNegativeButton("Cancel", null).show()
-                    } else finish()
+                    } else {
+                        clearPausedMatch()
+                        finish()
+                    }
                 }
             }.show()
     }

@@ -96,23 +96,51 @@ class MorabarabaActivity : AppCompatActivity() {
         if (gameState.status != GameStatus.IN_PROGRESS) {
             @Suppress("DEPRECATION") super.onBackPressed(); return
         }
-        AlertDialog.Builder(this).setTitle("Leave Match?").setMessage("Leaving counts as a forfeit.")
-            .setPositiveButton("Leave") { _, _ ->
+        AlertDialog.Builder(this).setTitle("Leave Match?")
+            .setMessage("Pause to keep this match and resume it later, or leave to forfeit.")
+            .setPositiveButton("Pause & Exit") { _, _ -> pauseMatchAndExit() }
+            .setNeutralButton("Leave Match") { _, _ ->
+                clearPausedMatch()
                 if (vsAI) SettingsManager.recordForfeit(this)
                 @Suppress("DEPRECATION") super.onBackPressed()
             }
             .setNegativeButton("Keep Playing", null).show()
     }
 
+    private fun pauseMatchAndExit() {
+        PausedMatchStore.save(
+            this,
+            gameType = "MORABARABA",
+            vsAI = vsAI,
+            playerColor = playerColor.name,
+            pieceCount = pieceCount,
+            moves = gameState.moveHistory,
+        )
+        finish()
+    }
+
+    private fun clearPausedMatch() = PausedMatchStore.clear(this, "MORABARABA")
+
     // ─── Game flow ────────────────────────────────────────────────────────────
 
     private fun showModeDialog() {
+        val paused = PausedMatchStore.has(this, "MORABARABA")
+        val options = buildList {
+            if (paused) add("Resume Match")
+            add("vs AI")
+            add("2 Players")
+            add("How to Play")
+        }
         AlertDialog.Builder(this).setTitle("Morabaraba")
-            .setItems(arrayOf("vs AI", "2 Players", "How to Play")) { _, w ->
-                when (w) {
-                    0 -> showVariantDialog(isVsAI = true)
-                    1 -> showVariantDialog(isVsAI = false)
-                    2 -> showTutorial(showModeAfter = moveHistory.isEmpty())
+            .setItems(options.toTypedArray()) { _, w ->
+                if (paused && w == 0) {
+                    resumePausedMatch()
+                    return@setItems
+                }
+                when (options[w - if (paused) 1 else 0]) {
+                    "vs AI" -> showVariantDialog(isVsAI = true)
+                    "2 Players" -> showVariantDialog(isVsAI = false)
+                    "How to Play" -> showTutorial(showModeAfter = moveHistory.isEmpty())
                 }
             }
             .setCancelable(true)
@@ -143,7 +171,7 @@ class MorabarabaActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun startGame() {
+    private fun startGame(restoring: PausedMatchStore.Match? = null) {
         resultRecorded = false
         interstitialAd = null
         redoGameStates.clear(); redoCaptures.clear(); redoMoves.clear(); redoCapSnaps.clear()
@@ -151,6 +179,7 @@ class MorabarabaActivity : AppCompatActivity() {
         aiJob?.cancel(); aiJob = null
         moveHistory.clear()
         capturedByWhite.clear(); capturedByBlack.clear(); captureSnapshots.clear()
+        if (restoring == null) clearPausedMatch()
         SettingsManager.activateGameTheme(this, "morabaraba")
         if (vsAI) SettingsManager.setActiveGame(this, "morabaraba")
         SoundPlayer.init(this)
@@ -177,7 +206,44 @@ class MorabarabaActivity : AppCompatActivity() {
         bottomCaptureView.update(emptyList())
         SoundPlayer.play("game_start")
         updateHud()
-        if (vsAI && gameState.currentTurn != playerColor) triggerAI()
+        if (restoring != null) {
+            restoreMoves(restoring.moves)
+            clearPausedMatch()
+            if (vsAI && gameState.currentTurn != playerColor) triggerAI()
+        } else if (vsAI && gameState.currentTurn != playerColor) {
+            triggerAI()
+        }
+    }
+
+    private fun resumePausedMatch() {
+        val paused = PausedMatchStore.load(this, "MORABARABA") ?: run {
+            showModeDialog()
+            return
+        }
+        pieceCount = paused.pieceCount ?: 12
+        vsAI = paused.vsAI
+        playerColor = runCatching { PieceColor.valueOf(paused.playerColor) }
+            .getOrDefault(PieceColor.WHITE)
+        startGame(paused)
+    }
+
+    private fun restoreMoves(moves: List<Move>) {
+        for (move in moves) {
+            val previous = gameState
+            for (capture in move.captures) {
+                val captured = previous.get(capture) ?: continue
+                if (previous.currentTurn == PieceColor.WHITE) capturedByWhite.add(captured)
+                else capturedByBlack.add(captured)
+            }
+            captureSnapshots.add(capturedByWhite.toList() to capturedByBlack.toList())
+            moveHistory.add(previous)
+            gameState = engine.applyMove(gameState, move)
+        }
+        boardView.gameState = gameState
+        boardView.isLocked = false
+        topCaptureView.update(capturedByBlack)
+        bottomCaptureView.update(capturedByWhite)
+        updateHud()
     }
 
     private fun handleMove(move: Move) {
@@ -342,12 +408,17 @@ class MorabarabaActivity : AppCompatActivity() {
                     "AI Difficulty" -> showDifficultyDialog()
                     "Main Menu" -> if (inProgress) {
                         AlertDialog.Builder(this).setTitle("Leave Match?")
-                            .setMessage("Leaving counts as a forfeit.")
-                            .setPositiveButton("Leave") { _, _ ->
+                            .setMessage("Pause to resume later, or leave to forfeit.")
+                            .setPositiveButton("Pause & Exit") { _, _ -> pauseMatchAndExit() }
+                            .setNeutralButton("Leave Match") { _, _ ->
+                                clearPausedMatch()
                                 if (vsAI) SettingsManager.recordForfeit(this)
                                 finish()
                             }.setNegativeButton("Cancel", null).show()
-                    } else finish()
+                    } else {
+                        clearPausedMatch()
+                        finish()
+                    }
                 }
             }.show()
     }

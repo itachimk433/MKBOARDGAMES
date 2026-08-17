@@ -133,13 +133,31 @@ class GameActivity : AppCompatActivity() {
         if (gameState.status != GameStatus.IN_PROGRESS || moveHistory.isEmpty()) {
             @Suppress("DEPRECATION") super.onBackPressed(); return
         }
-        AlertDialog.Builder(this).setTitle("Leave Match?").setMessage("Leaving counts as a forfeit.")
-            .setPositiveButton("Leave") { _, _ ->
+        AlertDialog.Builder(this).setTitle("Leave Match?")
+            .setMessage("Pause to keep this match and resume it later, or leave to forfeit.")
+            .setPositiveButton("Pause & Exit") { _, _ ->
+                pauseMatchAndExit()
+            }
+            .setNeutralButton("Leave Match") { _, _ ->
+                clearPausedMatch()
                 if (vsAI) SettingsManager.recordForfeit(this)
                 @Suppress("DEPRECATION") super.onBackPressed()
             }
             .setNegativeButton("Keep Playing", null).show()
     }
+
+    private fun pauseMatchAndExit() {
+        PausedMatchStore.save(
+            this,
+            gameType = gameType,
+            vsAI = vsAI,
+            playerColor = playerColor.name,
+            moves = gameState.moveHistory,
+        )
+        finish()
+    }
+
+    private fun clearPausedMatch() = PausedMatchStore.clear(this, gameType)
 
     private fun makeFullscreen() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -161,12 +179,23 @@ class GameActivity : AppCompatActivity() {
             "FOX_AND_GEESE" -> "Fox and Geese"
             else       -> "Chess"
         }
+        val paused = PausedMatchStore.has(this, gameType)
+        val options = buildList {
+            if (paused) add("Resume Match")
+            add("vs AI")
+            add("2 Players")
+            add("How to Play")
+        }
         AlertDialog.Builder(this).setTitle(gameName)
-            .setItems(arrayOf("vs AI", "2 Players", "How to Play")) { _, which ->
-                when (which) {
-                    0 -> { vsAI = true; showColorPickerDialog() }
-                    1 -> { vsAI = false; playerColor = PieceColor.WHITE; startGame() }
-                    2 -> showRules(showModeAfter = moveHistory.isEmpty())
+            .setItems(options.toTypedArray()) { _, which ->
+                if (paused && which == 0) {
+                    resumePausedMatch()
+                    return@setItems
+                }
+                when (options[which - if (paused) 1 else 0]) {
+                    "vs AI" -> { vsAI = true; showColorPickerDialog() }
+                    "2 Players" -> { vsAI = false; playerColor = PieceColor.WHITE; startGame() }
+                    "How to Play" -> showRules(showModeAfter = moveHistory.isEmpty())
                 }
             }
             .setCancelable(true)
@@ -351,12 +380,13 @@ Checkmate your opponent's King.
             .window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.parseColor("#1A1A1A")))
     }
 
-    private fun startGame() {
+    private fun startGame(restoring: PausedMatchStore.Match? = null) {
         resultRecorded = false
         interstitialAd = null
         redoGameStates.clear(); redoCaptures.clear(); redoMoves.clear(); redoCapSnaps.clear()
         AdManager.loadInterstitial(this) { interstitialAd = it }
         moveHistory.clear(); capturedByWhite.clear(); capturedByBlack.clear(); captureSnapshots.clear()
+        if (restoring == null) clearPausedMatch()
         SettingsManager.activateGameTheme(this, gameType.lowercase())
         if (vsAI) SettingsManager.setActiveGame(this, gameType.lowercase())
 
@@ -396,7 +426,44 @@ Checkmate your opponent's King.
             gameType == "FOX_AND_GEESE"
         ) SoundPlayer.play("game_start")
         updateHud()
-        if (vsAI && gameState.currentTurn != playerColor) triggerAI()
+        if (restoring != null) {
+            restoreMoves(restoring.moves)
+            clearPausedMatch()
+            if (vsAI && gameState.currentTurn != playerColor) triggerAI()
+        } else if (vsAI && gameState.currentTurn != playerColor) {
+            triggerAI()
+        }
+    }
+
+    private fun resumePausedMatch() {
+        val paused = PausedMatchStore.load(this, gameType) ?: run {
+            showModeDialog()
+            return
+        }
+        vsAI = paused.vsAI
+        playerColor = runCatching { PieceColor.valueOf(paused.playerColor) }
+            .getOrDefault(PieceColor.WHITE)
+        startGame(paused)
+    }
+
+    private fun restoreMoves(moves: List<Move>) {
+        for (move in moves) {
+            val previous = gameState
+            val moverColor = previous.get(move.from)?.color ?: previous.currentTurn
+            for (capture in move.captures) {
+                val captured = previous.get(capture) ?: continue
+                if (moverColor == PieceColor.WHITE) capturedByWhite.add(captured)
+                else capturedByBlack.add(captured)
+            }
+            captureSnapshots.add(capturedByWhite.toList() to capturedByBlack.toList())
+            moveHistory.add(previous)
+            gameState = engine.applyMove(gameState, move)
+        }
+        boardView.gameState = gameState
+        boardView.isLocked = false
+        topCaptureView.update(capturedByBlack)
+        bottomCaptureView.update(capturedByWhite)
+        updateHud()
     }
 
     private fun handleMove(move: Move) {
@@ -651,12 +718,17 @@ Checkmate your opponent's King.
                     "AI Difficulty" -> showDifficultyDialog()
                     "Main Menu" -> if (inProgress) {
                         AlertDialog.Builder(this).setTitle("Leave Match?")
-                            .setMessage("Leaving counts as a forfeit.")
-                            .setPositiveButton("Leave") { _, _ ->
+                        .setMessage("Pause to resume later, or leave to forfeit.")
+                        .setPositiveButton("Pause & Exit") { _, _ -> pauseMatchAndExit() }
+                        .setNeutralButton("Leave Match") { _, _ ->
+                            clearPausedMatch()
                                 if (vsAI) SettingsManager.recordForfeit(this)
                                 finish()
                             }.setNegativeButton("Cancel", null).show()
-                    } else finish()
+                } else {
+                    clearPausedMatch()
+                    finish()
+                }
                 }
             }.show()
     }

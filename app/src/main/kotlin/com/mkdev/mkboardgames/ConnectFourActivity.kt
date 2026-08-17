@@ -84,13 +84,28 @@ class ConnectFourActivity : AppCompatActivity() {
             return
         }
         AlertDialog.Builder(this).setTitle("Leave Match?")
-            .setMessage("Leaving counts as a forfeit.")
-            .setPositiveButton("Leave") { _, _ ->
+            .setMessage("Pause to keep this match and resume it later, or leave to forfeit.")
+            .setPositiveButton("Pause & Exit") { _, _ -> pauseMatchAndExit() }
+            .setNeutralButton("Leave Match") { _, _ ->
+                clearPausedMatch()
                 if (vsAI) SettingsManager.recordForfeit(this)
                 @Suppress("DEPRECATION") super.onBackPressed()
             }
             .setNegativeButton("Keep Playing", null).show()
     }
+
+    private fun pauseMatchAndExit() {
+        PausedMatchStore.save(
+            this,
+            gameType = "CONNECT_FOUR",
+            vsAI = vsAI,
+            playerColor = playerColor.name,
+            moves = gameState.moveHistory,
+        )
+        finish()
+    }
+
+    private fun clearPausedMatch() = PausedMatchStore.clear(this, "CONNECT_FOUR")
 
     private fun makeFullscreen() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -103,12 +118,23 @@ class ConnectFourActivity : AppCompatActivity() {
     }
 
     private fun showModeDialog() {
+        val paused = PausedMatchStore.has(this, "CONNECT_FOUR")
+        val options = buildList {
+            if (paused) add("Resume Match")
+            add("vs AI")
+            add("2 Players")
+            add("How to Play")
+        }
         AlertDialog.Builder(this).setTitle("Connect Four")
-            .setItems(arrayOf("vs AI", "2 Players", "How to Play")) { _, which ->
-                when (which) {
-                    0 -> { vsAI = true; showColorPickerDialog() }
-                    1 -> { vsAI = false; playerColor = PieceColor.WHITE; startGame() }
-                    2 -> showRules(showModeAfter = moveHistory.isEmpty())
+            .setItems(options.toTypedArray()) { _, which ->
+                if (paused && which == 0) {
+                    resumePausedMatch()
+                    return@setItems
+                }
+                when (options[which - if (paused) 1 else 0]) {
+                    "vs AI" -> { vsAI = true; showColorPickerDialog() }
+                    "2 Players" -> { vsAI = false; playerColor = PieceColor.WHITE; startGame() }
+                    "How to Play" -> showRules(showModeAfter = moveHistory.isEmpty())
                 }
             }
             .setCancelable(true)
@@ -164,12 +190,13 @@ Control the centre columns, build threats in more than one direction, and block 
             .window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.parseColor("#1A1A1A")))
     }
 
-    private fun startGame() {
+    private fun startGame(restoring: PausedMatchStore.Match? = null) {
         resultRecorded = false
         interstitialAd = null
         redoGameStates.clear()
         redoRemovedMoves.clear()
         AdManager.loadInterstitial(this) { interstitialAd = it }
+        if (restoring == null) clearPausedMatch()
         SettingsManager.activateGameTheme(this, "connect_four")
         if (vsAI) SettingsManager.setActiveGame(this, "connect_four")
         SoundPlayer.init(this)
@@ -179,7 +206,35 @@ Control the centre columns, build threats in more than one direction, and block 
         boardView.onGameOverTapped = { showResultDialog() }
         scoreView.update(scoreRed, scoreDraws, scoreYellow)
         updateHud()
-        if (vsAI && gameState.currentTurn != playerColor) triggerAI()
+        if (restoring != null) {
+            restoreMoves(restoring.moves)
+            clearPausedMatch()
+            if (vsAI && gameState.currentTurn != playerColor) triggerAI()
+        } else if (vsAI && gameState.currentTurn != playerColor) {
+            triggerAI()
+        }
+    }
+
+    private fun resumePausedMatch() {
+        val paused = PausedMatchStore.load(this, "CONNECT_FOUR") ?: run {
+            showModeDialog()
+            return
+        }
+        vsAI = paused.vsAI
+        playerColor = runCatching { PieceColor.valueOf(paused.playerColor) }
+            .getOrDefault(PieceColor.WHITE)
+        startGame(paused)
+    }
+
+    private fun restoreMoves(moves: List<Move>) {
+        for (move in moves) {
+            moveHistory.add(gameState)
+            gameState = engine.applyMove(gameState, move)
+        }
+        boardView.reset(gameState)
+        boardView.isLocked = gameState.status != GameStatus.IN_PROGRESS
+        scoreView.update(scoreRed, scoreDraws, scoreYellow)
+        updateHud()
     }
 
     private fun handleMove(move: Move, fromAI: Boolean = false) {
@@ -322,12 +377,17 @@ Control the centre columns, build threats in more than one direction, and block 
                 "AI Difficulty" -> showDifficultyDialog()
                 "Main Menu" -> if (inProgress) {
                     AlertDialog.Builder(this).setTitle("Leave Match?")
-                        .setMessage("Leaving counts as a forfeit.")
-                        .setPositiveButton("Leave") { _, _ ->
+                        .setMessage("Pause to resume later, or leave to forfeit.")
+                        .setPositiveButton("Pause & Exit") { _, _ -> pauseMatchAndExit() }
+                        .setNeutralButton("Leave Match") { _, _ ->
+                            clearPausedMatch()
                             if (vsAI) SettingsManager.recordForfeit(this)
                             finish()
                         }.setNegativeButton("Cancel", null).show()
-                } else finish()
+                } else {
+                    clearPausedMatch()
+                    finish()
+                }
             }
         }.show()
     }
