@@ -95,7 +95,6 @@ class MenuView(context: Context) : View(context) {
     }
     private val miniLightPaint = Paint().apply { color = Color.parseColor("#F0D9B5") }
     private val miniDarkPaint  = Paint().apply { color = Color.parseColor("#B58863") }
-    private val miniPiecePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
     private val bitmapPaint    = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
 
     private val gridColumns = 3
@@ -378,44 +377,146 @@ class MenuView(context: Context) : View(context) {
     }
 
     private fun drawChessCheckersMini(canvas: Canvas, left: Float, top: Float, size: Float, type: GameType) {
-        val boardSize = if (type == GameType.INTERNATIONAL_DRAUGHTS) 5 else 4
+        val boardSize = if (type == GameType.INTERNATIONAL_DRAUGHTS) 10 else 8
         val cell = size / boardSize.toFloat()
         for (r in 0 until boardSize) for (c in 0 until boardSize) {
             val l = left + c * cell; val t = top + r * cell
             canvas.drawRect(l, t, l + cell, t + cell, if ((r + c) % 2 == 0) miniLightPaint else miniDarkPaint)
         }
-        miniPiecePaint.textSize = cell * 0.62f
+
         if (type == GameType.CHESS) {
-            miniPiecePaint.color = Color.parseColor("#FFFDE7")
-            canvas.drawText("♔", left + cell * 1.5f, top + cell * 3.5f + miniPiecePaint.textSize * 0.36f, miniPiecePaint)
-            miniPiecePaint.color = Color.parseColor("#212121")
-            canvas.drawText("♛", left + cell * 2.5f, top + cell * 0.5f + miniPiecePaint.textSize * 0.36f, miniPiecePaint)
+            // A recognisable mid-game position reads much better than two
+            // isolated pieces, especially on the small home-screen card.
+            val position = arrayOf(
+                "♜·♝·♚·♞♜",
+                "♟♟♟·♟♟♟♟",
+                "··♞·····",
+                "·····♟··",
+                "····♙···",
+                "··♘··♘··",
+                "♙♙♙·♕♙♙♙",
+                "♖·♗·♔♗♘♖",
+            )
+            val piecePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                textAlign = Paint.Align.CENTER
+                textSize = cell * 0.78f
+                isFakeBoldText = true
+                setShadowLayer(cell * 0.05f, 0f, cell * 0.04f, Color.argb(100, 0, 0, 0))
+            }
+            val highlightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.argb(150, 127, 200, 248)
+            }
+            canvas.drawRect(
+                left + cell * 4f,
+                top + cell * 4f,
+                left + cell * 5f,
+                top + cell * 5f,
+                highlightPaint,
+            )
+            for (r in position.indices) {
+                for (c in position[r].indices) {
+                    val piece = position[r][c]
+                    if (piece == '·') continue
+                    piecePaint.color = if (r < 4) Color.parseColor("#252A30")
+                        else Color.parseColor("#FFFDE7")
+                    val metrics = piecePaint.fontMetrics
+                    val baseline = top + r * cell + cell / 2f -
+                        (metrics.ascent + metrics.descent) / 2f
+                    canvas.drawText(
+                        piece.toString(),
+                        left + c * cell + cell / 2f,
+                        baseline,
+                        piecePaint,
+                    )
+                }
+            }
         } else {
-            val wp = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#F5F5F5") }
-            val bp = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#212121") }
-            canvas.drawCircle(left + cell * 0.5f, top + cell * 2.5f, cell * 0.33f, wp)
-            canvas.drawCircle(left + cell * 1.5f, top + cell * 3.5f, cell * 0.33f, wp)
-            canvas.drawCircle(left + cell * 1.5f, top + cell * 0.5f, cell * 0.33f, bp)
-            canvas.drawCircle(left + cell * 2.5f, top + cell * 1.5f, cell * 0.33f, bp)
+            val white = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#F5F5F5") }
+            val black = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#212121") }
+            val shadow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.argb(75, 0, 0, 0)
+            }
+            val ring = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE
+                strokeWidth = cell * 0.045f
+                color = Color.argb(150, 255, 255, 255)
+            }
+            val playableRows = if (boardSize == 10) 3 else 2
+            val topPieces = buildList {
+                for (r in 0 until playableRows) {
+                    for (c in 0 until boardSize) {
+                        if ((r + c) % 2 == 1) add(r to c)
+                    }
+                }
+            }
+            val bottomPieces = buildList {
+                for (r in (boardSize - playableRows) until boardSize) {
+                    for (c in 0 until boardSize) {
+                        if ((r + c) % 2 == 1) add(r to c)
+                    }
+                }
+            }
+            fun piece(row: Int, col: Int, paint: Paint, crowned: Boolean = false) {
+                val cx = left + col * cell + cell / 2f
+                val cy = top + row * cell + cell / 2f
+                canvas.drawCircle(cx + cell * 0.04f, cy + cell * 0.05f, cell * 0.34f, shadow)
+                canvas.drawCircle(cx, cy, cell * 0.32f, paint)
+                if (crowned) {
+                    canvas.drawCircle(cx, cy, cell * 0.18f, ring)
+                    canvas.drawCircle(cx, cy, cell * 0.07f, ring)
+                }
+            }
+            topPieces.forEachIndexed { index, (row, col) ->
+                piece(row, col, black, crowned = index == 2)
+            }
+            bottomPieces.forEachIndexed { index, (row, col) ->
+                piece(row, col, white, crowned = index == 4)
+            }
         }
     }
 
     private fun drawOthelloMini(canvas: Canvas, left: Float, top: Float, size: Float) {
-        val cell = size / 4f
-        val bgP = Paint().apply { color = Color.parseColor("#2A4A2A") }
-        val gridP = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#3A6A3A"); style = Paint.Style.STROKE; strokeWidth = 1f }
+        val boardSize = 8
+        val cell = size / boardSize.toFloat()
+        val bgP = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#2A684B") }
+        val gridP = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#8AC39B")
+            style = Paint.Style.STROKE
+            strokeWidth = cell * 0.035f
+        }
         canvas.drawRect(left, top, left + size, top + size, bgP)
-        for (i in 0..4) {
+        for (i in 0..boardSize) {
             canvas.drawLine(left + i * cell, top, left + i * cell, top + size, gridP)
             canvas.drawLine(left, top + i * cell, left + size, top + i * cell, gridP)
         }
-        val wp = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#F5F5F5") }
-        val bp = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#1A1A1A") }
-        val r = cell * 0.38f
-        canvas.drawCircle(left + cell * 1.5f, top + cell * 1.5f, r, wp)
-        canvas.drawCircle(left + cell * 2.5f, top + cell * 2.5f, r, wp)
-        canvas.drawCircle(left + cell * 2.5f, top + cell * 1.5f, r, bp)
-        canvas.drawCircle(left + cell * 1.5f, top + cell * 2.5f, r, bp)
+        val white = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#F4F0DE") }
+        val black = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#16232A") }
+        val shadow = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(70, 0, 0, 0) }
+        val pieces = listOf(
+            1 to 2, 1 to 4, 2 to 3, 2 to 5, 3 to 2, 3 to 4,
+            4 to 3, 4 to 5, 5 to 2, 5 to 4, 6 to 3, 6 to 5,
+        )
+        val whitePieces = setOf(1 to 2, 2 to 3, 3 to 4, 4 to 3, 5 to 2, 6 to 5)
+        val legalMovePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#C7E8B6")
+            style = Paint.Style.STROKE
+            strokeWidth = cell * 0.08f
+        }
+        pieces.forEach { (row, col) ->
+            val cx = left + col * cell + cell / 2f
+            val cy = top + row * cell + cell / 2f
+            val radius = cell * 0.36f
+            canvas.drawCircle(cx + cell * 0.04f, cy + cell * 0.05f, radius, shadow)
+            canvas.drawCircle(cx, cy, radius, if ((row to col) in whitePieces) white else black)
+        }
+        listOf(2 to 2, 3 to 5, 4 to 4, 5 to 3).forEach { (row, col) ->
+            canvas.drawCircle(
+                left + col * cell + cell / 2f,
+                top + row * cell + cell / 2f,
+                cell * 0.16f,
+                legalMovePaint,
+            )
+        }
     }
 
     private fun drawMorabarabaMini(canvas: Canvas, left: Float, top: Float, size: Float) {
