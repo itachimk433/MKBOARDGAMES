@@ -19,6 +19,7 @@ import android.text.InputType
 import android.view.Gravity
 import android.widget.FrameLayout
 import android.widget.EditText
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -32,6 +33,7 @@ import com.mkdev.mkboardgames.games.ludo.LudoRuleEngine
 import com.mkdev.mkboardgames.games.ludo.LudoAbility
 import com.mkdev.mkboardgames.games.ludo.LudoEconomy
 import com.mkdev.mkboardgames.games.ludo.LudoNotification
+import com.mkdev.mkboardgames.games.ludo.LudoPiece
 import com.mkdev.mkboardgames.games.ludo.LudoPlayerEconomy
 import com.mkdev.mkboardgames.games.ludo.LudoSetup
 import com.mkdev.mkboardgames.ui.LudoBoardView
@@ -203,6 +205,7 @@ class LudoActivity : AppCompatActivity() {
         boardView.onMoveSelected = { move ->
             if (isHumanTurn()) playMove(move)
         }
+        boardView.onTokenLongPressed = { piece -> showTokenAbilityDialog(piece) }
         boardView.onGameOverTapped = { showResultDialog() }
         statusView.onPlayerProfileTapped = { player ->
             if (profilesEnabled()) showPlayerProfile(player) else showRenameDialog(player)
@@ -602,6 +605,7 @@ class LudoActivity : AppCompatActivity() {
         purchasedThisTurn: Boolean? = null,
         usedThisTurn: Boolean? = null,
     ) {
+        val existingLegalMoves = boardView.legalMoves
         val metadata = LudoEconomy.withPlayer(state, player, economy).toMutableMap()
         if (purchasedThisTurn != null) {
             metadata[LudoEconomy.PURCHASED_ABILITY_METADATA] = purchasedThisTurn
@@ -613,6 +617,13 @@ class LudoActivity : AppCompatActivity() {
             metadata = metadata,
         )
         boardView.gameState = state
+        boardView.legalMoves = if (existingLegalMoves.isNotEmpty()) {
+            existingLegalMoves
+        } else if (rolledValue != 0 && isHumanTurn()) {
+            engine.legalMovesForDice(state, humanPlayer, rolledValue)
+        } else {
+            emptyList()
+        }
         updateHud()
     }
 
@@ -621,6 +632,111 @@ class LudoActivity : AppCompatActivity() {
             player,
             LudoEconomy.consume(LudoEconomy.player(state, player), ability),
             usedThisTurn = true,
+        )
+    }
+
+    private fun showTokenAbilityDialog(piece: LudoPiece) {
+        if (!economyEnabled || !matchStarted || state.status != GameStatus.IN_PROGRESS ||
+            !isHumanTurn() || piece.player != humanPlayer
+        ) {
+            return
+        }
+        val economy = LudoEconomy.player(state, humanPlayer)
+        val ownedAbilities = LudoAbility.values().filter { ability ->
+            LudoEconomy.abilityCount(economy, ability) > 0
+        }
+        if (ownedAbilities.isEmpty()) return
+
+        val labels = ownedAbilities.map { ability ->
+            "${ability.label} · ${abilityDescription(ability)}"
+        }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle("Apply to ${economy.tokenName} ${piece.token + 1}")
+            .setItems(labels) { dialog, index ->
+                when (ownedAbilities[index]) {
+                    LudoAbility.INVINCIBILITY -> applyInvincibilityToToken(piece, dialog)
+                    LudoAbility.EXTRA_MOVE -> useExtraMoveOnToken(piece, dialog)
+                    LudoAbility.REROLL -> useReroll(humanPlayer, dialog)
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun abilityDescription(ability: LudoAbility): String = when (ability) {
+        LudoAbility.INVINCIBILITY -> "protect this token"
+        LudoAbility.EXTRA_MOVE -> "move this token +2 spaces"
+        LudoAbility.REROLL -> "roll again before moving"
+    }
+
+    private fun applyInvincibilityToToken(piece: LudoPiece, dialog: android.content.DialogInterface) {
+        val player = humanPlayer
+        val economy = LudoEconomy.player(state, player)
+        if (state.metadata[LudoEconomy.USED_ABILITY_METADATA] == true) {
+            Toast.makeText(this, "Only one ability use per turn", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (economy.invincibility <= 0) {
+            Toast.makeText(this, "Buy Invincibility first", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val currentPiece = LudoSetup.allPieces(state).firstOrNull {
+            it.player == piece.player && it.token == piece.token
+        } ?: return
+        if (currentPiece.progress !in 0 until LudoSetup.FINISH) {
+            Toast.makeText(this, "Move this token onto the track first", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (economy.protectedToken != null) {
+            Toast.makeText(this, "Only one token can be protected at a time", Toast.LENGTH_SHORT).show()
+            return
+        }
+        setPlayerEconomy(
+            player,
+            economy.copy(
+                invincibility = economy.invincibility - 1,
+                protectedToken = currentPiece.token,
+            ),
+            usedThisTurn = true,
+        )
+        dialog.dismiss()
+        showFloatingNotification(
+            "YOU used 🛡 Invincibility\n${economy.tokenName} ${currentPiece.token + 1} protected",
+            player,
+        )
+    }
+
+    private fun useExtraMoveOnToken(piece: LudoPiece, dialog: android.content.DialogInterface) {
+        val player = humanPlayer
+        if (rolledValue == 0) {
+            Toast.makeText(this, "Roll the die first", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (state.metadata[LudoEconomy.USED_ABILITY_METADATA] == true) {
+            Toast.makeText(this, "Only one ability use per turn", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (LudoEconomy.player(state, player).extraMove <= 0) {
+            Toast.makeText(this, "Buy Extra Move first", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val boosted = engine.legalMovesForDice(
+            state,
+            player,
+            rolledValue + 2,
+            baseDice = rolledValue,
+            usedExtraMove = true,
+        ).filter { move -> (move.metadata["token"] as? Int) == piece.token }
+        if (boosted.isEmpty()) {
+            Toast.makeText(this, "Extra Move cannot move this token", Toast.LENGTH_SHORT).show()
+            return
+        }
+        consumeAbility(player, LudoAbility.EXTRA_MOVE)
+        boardView.legalMoves = boosted
+        dialog.dismiss()
+        showFloatingNotification(
+            "YOU used ⚡ Extra Move\n${LudoEconomy.player(state, player).tokenName} ${piece.token + 1} · +2 spaces",
+            player,
         )
     }
 
@@ -657,7 +773,10 @@ class LudoActivity : AppCompatActivity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
-        val cart = storeText("✦", 31f, Color.rgb(232, 147, 255), Gravity.CENTER).apply {
+        val cart = ImageView(this).apply {
+            setImageResource(R.drawable.ludo_store_logo)
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            setPadding(dp(4), dp(4), dp(4), dp(4))
             background = storePanel(Color.rgb(42, 20, 70), Color.rgb(170, 86, 245), 20f)
         }
         header.addView(cart, LinearLayout.LayoutParams(dp(58), dp(58)).apply {
@@ -802,16 +921,10 @@ class LudoActivity : AppCompatActivity() {
                 17f,
             )
         }
-        val icon = storeText(
-            when (ability) {
-                LudoAbility.INVINCIBILITY -> "◈"
-                LudoAbility.EXTRA_MOVE -> "ϟ"
-                LudoAbility.REROLL -> "⚄"
-            },
-            31f,
-            accent,
-            Gravity.CENTER,
-        ).apply {
+        val icon = ImageView(this).apply {
+            setImageResource(abilityIconResource(ability))
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            setPadding(dp(5), dp(5), dp(5), dp(5))
             background = storePanel(Color.argb(75, Color.red(accent), Color.green(accent), Color.blue(accent)), accent, 15f)
         }
         card.addView(icon, LinearLayout.LayoutParams(dp(64), dp(64)).apply { marginEnd = dp(11) })
@@ -859,22 +972,50 @@ class LudoActivity : AppCompatActivity() {
         ability: LudoAbility,
         count: Int,
         onUse: () -> Unit,
-    ): TextView {
+    ): LinearLayout {
         val accent = when (ability) {
             LudoAbility.INVINCIBILITY -> Color.rgb(255, 201, 71)
             LudoAbility.EXTRA_MOVE -> Color.rgb(45, 181, 255)
             LudoAbility.REROLL -> Color.rgb(196, 95, 255)
         }
-        return storeText(
-            "${ability.icon}  ${ability.label.uppercase()}                              $count available",
-            12f,
-            if (count > 0) accent else Color.rgb(148, 160, 176),
-            Gravity.CENTER_VERTICAL,
-        ).apply {
-            setPadding(dp(13), 0, dp(13), 0)
+        return LinearLayout(this).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(10), dp(5), dp(12), dp(5))
+            val icon = ImageView(this@LudoActivity).apply {
+                setImageResource(abilityIconResource(ability))
+                scaleType = ImageView.ScaleType.CENTER_CROP
+                setPadding(dp(3), dp(3), dp(3), dp(3))
+                alpha = if (count > 0) 1f else 0.5f
+                background = storePanel(
+                    Color.argb(70, Color.red(accent), Color.green(accent), Color.blue(accent)),
+                    Color.argb(if (count > 0) 200 else 90, Color.red(accent), Color.green(accent), Color.blue(accent)),
+                    10f,
+                )
+            }
+            addView(icon, LinearLayout.LayoutParams(dp(38), dp(38)).apply {
+                marginEnd = dp(10)
+            })
+            addView(storeText(
+                ability.label.uppercase(),
+                12f,
+                if (count > 0) accent else Color.rgb(148, 160, 176),
+                Gravity.CENTER_VERTICAL,
+            ), LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            addView(storeText(
+                "$count available",
+                11f,
+                if (count > 0) Color.rgb(207, 220, 235) else Color.rgb(122, 135, 151),
+                Gravity.CENTER_VERTICAL or Gravity.END,
+            ))
             isClickable = count > 0
             if (count > 0) setOnClickListener { onUse() }
         }
+    }
+
+    private fun abilityIconResource(ability: LudoAbility): Int = when (ability) {
+        LudoAbility.INVINCIBILITY -> R.drawable.invincibility_logo
+        LudoAbility.EXTRA_MOVE -> R.drawable.extra_move_logo
+        LudoAbility.REROLL -> R.drawable.reroll_logo
     }
 
     private fun storeText(text: String, size: Float, color: Int, gravity: Int): TextView =

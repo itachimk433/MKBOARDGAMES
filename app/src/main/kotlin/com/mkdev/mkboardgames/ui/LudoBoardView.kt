@@ -12,8 +12,11 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PointF
 import android.graphics.RectF
+import android.os.Handler
+import android.os.Looper
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.animation.LinearInterpolator
 import com.mkdev.mkboardgames.engine.GameState
 import com.mkdev.mkboardgames.engine.Move
@@ -42,9 +45,21 @@ class LudoBoardView(context: Context) : View(context) {
         }
     var isLocked: Boolean = false
     var onMoveSelected: ((Move) -> Unit)? = null
+    var onTokenLongPressed: ((LudoPiece) -> Unit)? = null
     var onGameOverTapped: (() -> Unit)? = null
 
     private var selectedFrom: Position? = null
+    private val touchHandler = Handler(Looper.getMainLooper())
+    private val longPressTimeout = ViewConfiguration.getLongPressTimeout().toLong()
+    private var touchDownX = 0f
+    private var touchDownY = 0f
+    private var pendingLongPressPiece: LudoPiece? = null
+    private var longPressTriggered = false
+    private val longPressAction = Runnable {
+        val piece = pendingLongPressPiece ?: return@Runnable
+        longPressTriggered = true
+        onTokenLongPressed?.invoke(piece)
+    }
     private var cell = 0f
     private var left = 0f
     private var top = 0f
@@ -95,6 +110,7 @@ class LudoBoardView(context: Context) : View(context) {
     }
 
     override fun onDetachedFromWindow() {
+        cancelPendingLongPress()
         protectionPulseAnimator.cancel()
         moveAnimator?.cancel()
         super.onDetachedFromWindow()
@@ -341,7 +357,49 @@ class LudoBoardView(context: Context) : View(context) {
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        if (event.action != MotionEvent.ACTION_UP) return true
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                touchDownX = event.x
+                touchDownY = event.y
+                longPressTriggered = false
+                pendingLongPressPiece = if (!isLocked &&
+                    gameState.status == com.mkdev.mkboardgames.engine.GameStatus.IN_PROGRESS
+                ) {
+                    positionAt(event.x, event.y)?.let { position ->
+                        pieceAt(position, event.x, event.y)
+                    }
+                } else {
+                    null
+                }
+                touchHandler.removeCallbacks(longPressAction)
+                if (pendingLongPressPiece != null) {
+                    touchHandler.postDelayed(longPressAction, longPressTimeout)
+                }
+                return true
+            }
+            MotionEvent.ACTION_MOVE -> {
+                val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
+                if (kotlin.math.abs(event.x - touchDownX) > touchSlop ||
+                    kotlin.math.abs(event.y - touchDownY) > touchSlop
+                ) {
+                    cancelPendingLongPress()
+                }
+                return true
+            }
+            MotionEvent.ACTION_CANCEL -> {
+                cancelPendingLongPress()
+                return true
+            }
+            MotionEvent.ACTION_UP -> {
+                touchHandler.removeCallbacks(longPressAction)
+                pendingLongPressPiece = null
+                if (longPressTriggered) {
+                    longPressTriggered = false
+                    return true
+                }
+            }
+            else -> return true
+        }
         if (gameState.status != com.mkdev.mkboardgames.engine.GameStatus.IN_PROGRESS) {
             onGameOverTapped?.invoke()
             return true
@@ -367,6 +425,23 @@ class LudoBoardView(context: Context) : View(context) {
         selectedFrom = null
         invalidate()
         return true
+    }
+
+    private fun cancelPendingLongPress() {
+        touchHandler.removeCallbacks(longPressAction)
+        pendingLongPressPiece = null
+        longPressTriggered = false
+    }
+
+    private fun pieceAt(position: Position, x: Float, y: Float): LudoPiece? {
+        val stack = LudoSetup.piecesAt(gameState, position)
+        return stack.minByOrNull { piece ->
+            val index = stack.indexOf(piece)
+            val offset = stackOffset(index, stack.size)
+            val dx = x - centerOf(position).x - offset.x
+            val dy = y - centerOf(position).y - offset.y
+            dx * dx + dy * dy
+        }
     }
 
     private fun sourceDistance(move: Move, x: Float, y: Float): Float {
