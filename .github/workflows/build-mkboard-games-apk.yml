@@ -124,37 +124,41 @@ jobs:
             ASSETS="$ASSETS app-release-signed-build${{ github.run_number }}.apk app-release-build${{ github.run_number }}.aab"
           fi
 
-          # Keep the rolling release idempotent. Try to edit the existing
-          # release first; if it is missing, create it and upload the assets
-          # in the same command so a newly-created release is immediately
-          # available for the following operations.
-          if gh release edit "$TAG" \
-            --title "$TITLE" \
-            --notes "$NOTES" \
-            --prerelease \
-            --draft=false \
-            --target "${{ github.sha }}" 2>/dev/null; then
-            uploaded=false
-            for attempt in 1 2 3; do
-              if gh release upload "$TAG" \
-                $ASSETS \
-                --clobber; then
-                uploaded=true
-                break
-              fi
-              echo "Release upload attempt $attempt failed; retrying..."
-              sleep 3
-            done
-            if [ "$uploaded" != "true" ]; then
-              echo "Release upload failed after 3 attempts"
-              exit 1
-            fi
+          # Keep the rolling release idempotent. A published release cannot
+          # move its tag to another commit, so update the existing release
+          # metadata without passing --target. Only new releases are created
+          # with the current commit as their target.
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Updating existing release $TAG without retargeting it"
+            gh release edit "$TAG" \
+              --title "$TITLE" \
+              --notes "$NOTES" \
+              --prerelease \
+              --draft=false
           else
+            echo "Creating release $TAG at ${{ github.sha }}"
             gh release create "$TAG" \
               --title "$TITLE" \
               --notes "$NOTES" \
               --prerelease \
               --draft=false \
-              --target "${{ github.sha }}" \
-              $ASSETS
+              --target "${{ github.sha }}"
+          fi
+
+          # Upload separately so both existing and newly-created releases
+          # receive the current run's build outputs.
+          uploaded=false
+          for attempt in 1 2 3; do
+            if gh release upload "$TAG" \
+              $ASSETS \
+              --clobber; then
+              uploaded=true
+              break
+            fi
+            echo "Release upload attempt $attempt failed; retrying..."
+            sleep 3
+          done
+          if [ "$uploaded" != "true" ]; then
+            echo "Release upload failed after 3 attempts"
+            exit 1
           fi
