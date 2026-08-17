@@ -146,15 +146,6 @@ class LudoStatusStripView(context: Context) : View(context) {
                 textPaint,
             )
 
-            textPaint.color = color
-            textPaint.textSize = 12f * density * scale
-            canvas.drawText(
-                "[A]",
-                left + 7f * density * scale,
-                bottom - 25f * density * scale,
-                textPaint,
-            )
-
             val playerPieces = pieces.filter { it.player == player }
             val homeCount = playerPieces.count { it.progress >= LudoSetup.FINISH }
             val dotGap = 12f * density * scale

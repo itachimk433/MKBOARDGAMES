@@ -136,7 +136,7 @@ class LudoDiceView(context: Context) : View(context) {
             2f * density,
             4f * density,
             width - 2f * density,
-            height - 2f * density,
+            height - 4f * density,
         )
         canvas.drawRoundRect(panel, 12f * density, 12f * density, panelPaint)
         canvas.drawRoundRect(panel, 12f * density, 12f * density, panelStroke)

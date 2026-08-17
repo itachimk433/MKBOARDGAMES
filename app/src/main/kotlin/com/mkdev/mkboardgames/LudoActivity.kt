@@ -1158,29 +1158,237 @@ class LudoActivity : AppCompatActivity() {
         val pieces = LudoSetup.allPieces(state)
             .filter { it.player == player }
             .sortedBy { it.token }
-        val tokenLines = pieces.joinToString("\n") {
-            "${economy.tokenName} ${it.token + 1} · ${progressLabel(it.progress)}"
+        val color = LudoSetup.PLAYER_COLORS[player]
+        val dialog = Dialog(this)
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(14), dp(14), dp(14), dp(12))
+            background = storePanel(Color.rgb(9, 18, 29), color, 24f)
+            elevation = 18f * resources.displayMetrics.density
         }
-        val message = """
-            Coins: ${economy.coins}
-            Name: ${economy.tokenName}
-            Ability purchases: ${if (state.metadata[LudoEconomy.PURCHASED_ABILITY_METADATA] == true) "1/1 used this turn" else "0/1 used this turn"}
-            Ability uses: ${if (state.metadata[LudoEconomy.USED_ABILITY_METADATA] == true) "1/1 used this turn" else "0/1 used this turn"}
+        val scroll = ScrollView(this).apply {
+            isFillViewport = true
+            overScrollMode = View.OVER_SCROLL_NEVER
+        }
+        val body = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+        scroll.addView(body)
+        content.addView(scroll, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.MATCH_PARENT,
+        ))
+        dialog.setContentView(content)
+        dialog.setCanceledOnTouchOutside(true)
 
-            Abilities
-            🛡 Invincibility ×${economy.invincibility}${if (economy.protectedToken != null) " · Token ${economy.protectedToken + 1} protected" else ""}
-            ⚡ Extra Move ×${economy.extraMove}
-            🎲 Reroll ×${economy.reroll}
+        val header = LinearLayout(this).apply {
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val avatar = profileText(
+            LudoSetup.PLAYER_NAMES[player].take(1),
+            24f,
+            Color.WHITE,
+            Gravity.CENTER,
+        ).apply {
+            background = storePanel(color, Color.argb(220, 255, 255, 255), 20f)
+        }
+        header.addView(avatar, LinearLayout.LayoutParams(dp(58), dp(58)).apply {
+            marginEnd = dp(12)
+        })
+        val title = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+        title.addView(profileText(
+            "${LudoSetup.PLAYER_NAMES[player]} profile",
+            21f,
+            Color.WHITE,
+        ))
+        title.addView(profileText(
+            "${economy.tokenName} · AI player",
+            13f,
+            Color.rgb(177, 194, 211),
+        ))
+        header.addView(title, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        header.addView(profileText("×", 32f, Color.rgb(204, 225, 244), Gravity.CENTER).apply {
+            isClickable = true
+            background = storePanel(Color.TRANSPARENT, Color.argb(220, 120, 178, 228), 18f)
+            setOnClickListener { dialog.dismiss() }
+        }, LinearLayout.LayoutParams(dp(48), dp(48)))
+        body.addView(header, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+        ).apply { bottomMargin = dp(12) })
 
-            ${economy.tokenName}
-            $tokenLines
-        """.trimIndent()
-        AlertDialog.Builder(this)
-            .setTitle("${LudoSetup.PLAYER_NAMES[player]} · AI profile")
-            .setMessage(message)
-            .setNeutralButton("Rename") { _, _ -> showRenameDialog(player) }
-            .setPositiveButton("Close", null)
-            .show()
+        val summary = LinearLayout(this).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(12), dp(9), dp(12), dp(9))
+            background = storePanel(Color.rgb(17, 30, 44), Color.rgb(45, 86, 125), 15f)
+        }
+        summary.addView(profileText("COINS", 11f, Color.rgb(169, 190, 211)))
+        summary.addView(profileText(
+            economy.coins.toString(),
+            20f,
+            Color.rgb(255, 213, 72),
+            Gravity.END,
+        ), LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        val protected = economy.protectedToken?.let { "Token ${it + 1} protected" } ?: "No token protected"
+        summary.addView(profileText(protected, 10f, Color.rgb(147, 221, 193), Gravity.END))
+        body.addView(summary, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+        ).apply { bottomMargin = dp(14) })
+
+        body.addView(profileText("TOKENS", 12f, color, Gravity.START).apply {
+            letterSpacing = 0.16f
+        }, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+        ).apply { bottomMargin = dp(7) })
+        pieces.forEachIndexed { index, piece ->
+            body.addView(buildProfileTokenRow(piece, color), LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply { bottomMargin = if (index == pieces.lastIndex) dp(14) else dp(6) })
+        }
+
+        body.addView(profileText("ABILITIES", 12f, color, Gravity.START).apply {
+            letterSpacing = 0.16f
+        }, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+        ).apply { bottomMargin = dp(7) })
+        val abilities = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = storePanel(Color.rgb(11, 27, 40), Color.rgb(28, 74, 102), 16f)
+        }
+        LudoAbility.values().forEachIndexed { index, ability ->
+            val row = LinearLayout(this).apply {
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(11), dp(9), dp(12), dp(9))
+            }
+            row.addView(profileText(ability.label, 13f, Color.rgb(221, 231, 242)))
+            row.addView(profileText(
+                "×${LudoEconomy.abilityCount(economy, ability)}",
+                14f,
+                color,
+                Gravity.END,
+            ), LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            if (index < LudoAbility.values().lastIndex) {
+                row.background = storePanel(Color.TRANSPARENT, Color.argb(55, 102, 151, 193), 0f)
+            }
+            abilities.addView(row, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ))
+        }
+        body.addView(abilities)
+
+        val actions = LinearLayout(this).apply {
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        actions.addView(profileText(
+            if (state.metadata[LudoEconomy.USED_ABILITY_METADATA] == true) {
+                "Ability used this turn"
+            } else {
+                "Ability available this turn"
+            },
+            11f,
+            Color.rgb(157, 181, 203),
+        ), LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        actions.addView(profileText("RENAME", 12f, Color.WHITE, Gravity.CENTER).apply {
+            isClickable = true
+            background = storePanel(Color.argb(180, Color.red(color), Color.green(color), Color.blue(color)), color, 12f)
+            setOnClickListener {
+                dialog.dismiss()
+                showRenameDialog(player)
+            }
+        }, LinearLayout.LayoutParams(dp(84), dp(42)).apply { marginStart = dp(8) })
+        body.addView(actions, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+        ).apply {
+            topMargin = dp(12)
+            bottomMargin = dp(2)
+        })
+
+        dialog.show()
+        dialog.window?.apply {
+            setBackgroundDrawableResource(android.R.color.transparent)
+            setDimAmount(0.78f)
+            setLayout(
+                (resources.displayMetrics.widthPixels - dp(24)).coerceAtLeast(dp(280)),
+                (resources.displayMetrics.heightPixels * 0.78f).roundToInt(),
+            )
+        }
+        content.alpha = 0f
+        content.scaleX = 0.94f
+        content.scaleY = 0.94f
+        content.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(240L).start()
+    }
+
+    private fun buildProfileTokenRow(piece: LudoPiece, color: Int): LinearLayout {
+        val row = LinearLayout(this).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(10), dp(8), dp(10), dp(8))
+            background = storePanel(Color.rgb(17, 29, 42), Color.rgb(43, 77, 108), 14f)
+        }
+        row.addView(profileText(
+            "${piece.token + 1}",
+            15f,
+            Color.WHITE,
+            Gravity.CENTER,
+        ).apply {
+            background = storePanel(color, Color.argb(220, 255, 255, 255), 16f)
+        }, LinearLayout.LayoutParams(dp(36), dp(36)).apply { marginEnd = dp(10) })
+        val details = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+        details.addView(profileText(
+            "Token ${piece.token + 1}",
+            13f,
+            Color.WHITE,
+        ))
+        details.addView(profileText(
+            when {
+                piece.progress < 0 -> "In yard"
+                piece.progress >= LudoSetup.FINISH -> "Finished in ${LudoSetup.PLAYER_NAMES[piece.player]} home"
+                else -> "On track · ${piece.progress} spaces"
+            },
+            11f,
+            Color.rgb(164, 186, 207),
+        ))
+        row.addView(details, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        row.addView(profileText(
+            if (piece.progress >= LudoSetup.FINISH) "HOME" else if (piece.progress < 0) "YARD" else "ACTIVE",
+            10f,
+            if (piece.progress >= LudoSetup.FINISH) color else Color.rgb(153, 170, 188),
+            Gravity.CENTER,
+        ).apply {
+            background = storePanel(
+                if (piece.progress >= LudoSetup.FINISH) {
+                    Color.argb(55, Color.red(color), Color.green(color), Color.blue(color))
+                } else {
+                    Color.rgb(25, 39, 53)
+                },
+                if (piece.progress >= LudoSetup.FINISH) color else Color.rgb(66, 91, 115),
+                10f,
+            )
+        }, LinearLayout.LayoutParams(dp(66), dp(30)))
+        return row
+    }
+
+    private fun profileText(
+        text: String,
+        size: Float,
+        color: Int,
+        gravity: Int = Gravity.START,
+    ): TextView = TextView(this).apply {
+        this.text = text
+        setTextColor(color)
+        setTextSize(size)
+        this.gravity = gravity
+        setTypeface(typeface, Typeface.BOLD)
+        setLineSpacing(0f, 1.04f)
     }
 
     private fun showRenameDialog(player: Int) {

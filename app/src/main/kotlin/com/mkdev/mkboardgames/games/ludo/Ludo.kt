@@ -107,11 +107,17 @@ object LudoSetup {
         }
     }
 
+    /**
+     * Finished tokens belong to the coloured center triangle, not to the
+     * white cells around it.  Keep all four tokens on that colour's center
+     * cell so the normal stack offset draws them together like a shared
+     * square on the track.
+     */
     fun finishPosition(player: Int, token: Int): Position = when (player) {
-        0 -> Position(8 + token / 2, 6 + token % 2)
-        1 -> Position(8 + token / 2, 8 + token % 2)
-        2 -> Position(6 + token / 2, 6 + token % 2)
-        else -> Position(6 + token / 2, 8 + token % 2)
+        0 -> Position(8, 7) // red
+        1 -> Position(7, 8) // blue
+        2 -> Position(7, 6) // green
+        else -> Position(6, 7) // yellow
     }
 
     fun positionOf(piece: LudoPiece): Position = when {
