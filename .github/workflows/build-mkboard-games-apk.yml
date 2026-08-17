@@ -132,6 +132,7 @@ jobs:
             --title "$TITLE" \
             --notes "$NOTES" \
             --prerelease \
+            --draft=false \
             --target "${{ github.sha }}" 2>/dev/null; then
             uploaded=false
             for attempt in 1 2 3; do
@@ -153,6 +154,7 @@ jobs:
               --title "$TITLE" \
               --notes "$NOTES" \
               --prerelease \
+              --draft=false \
               --target "${{ github.sha }}" \
               $ASSETS
           fi
