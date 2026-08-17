@@ -37,6 +37,7 @@ class GameActivity : AppCompatActivity() {
     private var gameState: GameState = GameState(arrayOfNulls(64))
     private var vsAI = true
     private var playerColor = PieceColor.WHITE
+    private var matchStarted = false
     private val moveHistory      = ArrayDeque<GameState>()
     private val scope            = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
@@ -132,7 +133,7 @@ class GameActivity : AppCompatActivity() {
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
-        if (gameState.status != GameStatus.IN_PROGRESS || moveHistory.isEmpty()) {
+        if (!matchStarted || gameState.status != GameStatus.IN_PROGRESS) {
             @Suppress("DEPRECATION") super.onBackPressed(); return
         }
         AlertDialog.Builder(this).setTitle("Leave Match?")
@@ -195,14 +196,14 @@ class GameActivity : AppCompatActivity() {
                     resumePausedMatch()
                     return@setItems
                 }
-                when (options[which - if (paused) 1 else 0]) {
+                when (options[which]) {
                     "vs AI" -> { vsAI = true; showColorPickerDialog() }
                     "2 Players" -> { vsAI = false; playerColor = PieceColor.WHITE; startGame() }
-                    "How to Play" -> showRules(showModeAfter = moveHistory.isEmpty())
+                    "How to Play" -> showRules(showModeAfter = !matchStarted)
                 }
             }
             .setCancelable(true)
-            .setOnCancelListener { if (moveHistory.isEmpty()) finish() }
+            .setOnCancelListener { if (!matchStarted) finish() }
             .show()
     }
 
@@ -407,6 +408,7 @@ Checkmate your opponent's King.
     }
 
     private fun startGame(restoring: PausedMatchStore.Match? = null) {
+        matchStarted = true
         resultRecorded = false
         interstitialAd = null
         redoGameStates.clear(); redoCaptures.clear(); redoMoves.clear(); redoCapSnaps.clear()

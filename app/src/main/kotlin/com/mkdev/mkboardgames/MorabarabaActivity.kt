@@ -29,6 +29,7 @@ class MorabarabaActivity : AppCompatActivity() {
     private var gameState:                  GameState = GameState(arrayOfNulls(49), boardSize = 7)
     private var vsAI                        = true
     private var playerColor                 = PieceColor.WHITE
+    private var matchStarted                = false
     private var pieceCount                  = 12
     private val scope                       = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private val moveHistory                 = ArrayDeque<GameState>()
@@ -90,7 +91,7 @@ class MorabarabaActivity : AppCompatActivity() {
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
-        if (moveHistory.isEmpty()) {
+        if (!matchStarted) {
             @Suppress("DEPRECATION") super.onBackPressed(); return
         }
         if (gameState.status != GameStatus.IN_PROGRESS) {
@@ -137,14 +138,14 @@ class MorabarabaActivity : AppCompatActivity() {
                     resumePausedMatch()
                     return@setItems
                 }
-                when (options[w - if (paused) 1 else 0]) {
+                when (options[w]) {
                     "vs AI" -> showVariantDialog(isVsAI = true)
                     "2 Players" -> showVariantDialog(isVsAI = false)
-                    "How to Play" -> showTutorial(showModeAfter = moveHistory.isEmpty())
+                    "How to Play" -> showTutorial(showModeAfter = !matchStarted)
                 }
             }
             .setCancelable(true)
-            .setOnCancelListener { if (moveHistory.isEmpty()) finish() }
+            .setOnCancelListener { if (!matchStarted) finish() }
             .show()
     }
 
@@ -172,6 +173,7 @@ class MorabarabaActivity : AppCompatActivity() {
     }
 
     private fun startGame(restoring: PausedMatchStore.Match? = null) {
+        matchStarted = true
         resultRecorded = false
         interstitialAd = null
         redoGameStates.clear(); redoCaptures.clear(); redoMoves.clear(); redoCapSnaps.clear()

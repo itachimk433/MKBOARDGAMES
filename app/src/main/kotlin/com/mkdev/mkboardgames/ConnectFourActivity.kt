@@ -22,6 +22,7 @@ class ConnectFourActivity : AppCompatActivity() {
     private var gameState = engine.initialState()
     private var vsAI = true
     private var playerColor = PieceColor.WHITE
+    private var matchStarted = false
     private val moveHistory = ArrayDeque<GameState>()
     private val redoGameStates = ArrayDeque<GameState>()
     private val redoRemovedMoves = ArrayDeque<List<GameState>>()
@@ -79,7 +80,7 @@ class ConnectFourActivity : AppCompatActivity() {
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
-        if (gameState.status != GameStatus.IN_PROGRESS || moveHistory.isEmpty()) {
+        if (!matchStarted || gameState.status != GameStatus.IN_PROGRESS) {
             @Suppress("DEPRECATION") super.onBackPressed()
             return
         }
@@ -131,14 +132,14 @@ class ConnectFourActivity : AppCompatActivity() {
                     resumePausedMatch()
                     return@setItems
                 }
-                when (options[which - if (paused) 1 else 0]) {
+                when (options[which]) {
                     "vs AI" -> { vsAI = true; showColorPickerDialog() }
                     "2 Players" -> { vsAI = false; playerColor = PieceColor.WHITE; startGame() }
-                    "How to Play" -> showRules(showModeAfter = moveHistory.isEmpty())
+                    "How to Play" -> showRules(showModeAfter = !matchStarted)
                 }
             }
             .setCancelable(true)
-            .setOnCancelListener { if (moveHistory.isEmpty()) finish() }
+            .setOnCancelListener { if (!matchStarted) finish() }
             .show()
     }
 
@@ -191,6 +192,7 @@ Control the centre columns, build threats in more than one direction, and block 
     }
 
     private fun startGame(restoring: PausedMatchStore.Match? = null) {
+        matchStarted = true
         resultRecorded = false
         interstitialAd = null
         redoGameStates.clear()
