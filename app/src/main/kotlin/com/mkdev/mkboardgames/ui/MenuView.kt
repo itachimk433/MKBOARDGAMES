@@ -29,7 +29,7 @@ class MenuView(context: Context) : View(context) {
 
     enum class GameType {
         CHESS, CHECKERS, INTERNATIONAL_DRAUGHTS, OTHELLO, MORABARABA, TICTACTOE, CONNECT_FOUR,
-        FOX_AND_GEESE, LUDO, XIANGQI
+        FOX_AND_GEESE, LUDO, XIANGQI, SHOGI
     }
 
     private data class Card(val type: GameType, var rect: RectF = RectF())
@@ -39,7 +39,7 @@ class MenuView(context: Context) : View(context) {
         Card(GameType.OTHELLO), Card(GameType.MORABARABA),
         Card(GameType.TICTACTOE), Card(GameType.CONNECT_FOUR),
         Card(GameType.FOX_AND_GEESE), Card(GameType.LUDO),
-        Card(GameType.XIANGQI)
+        Card(GameType.XIANGQI), Card(GameType.SHOGI)
     )
 
     private val dp = context.resources.displayMetrics.density
@@ -54,6 +54,9 @@ class MenuView(context: Context) : View(context) {
     } catch (e: Exception) { null }
     private val xiangqiBoardBitmap: Bitmap? = try {
         context.assets.open("xiangqi_board_reference.png").use { BitmapFactory.decodeStream(it) }
+    } catch (e: Exception) { null }
+    private val shogiBoardBitmap: Bitmap? = try {
+        context.assets.open("shogi_board_empty.png").use { BitmapFactory.decodeStream(it) }
     } catch (e: Exception) { null }
 
     private val bgPaint        = Paint().apply { color = Color.parseColor("#121212") }
@@ -298,6 +301,7 @@ class MenuView(context: Context) : View(context) {
             GameType.FOX_AND_GEESE -> "Fox and Geese" to "vs AI  •  2 Players"
             GameType.LUDO         -> "Ludo"         to "vs AI  •  4 Players"
             GameType.XIANGQI      -> "Xiangqi 象棋"  to "vs AI  •  2 Players"
+            GameType.SHOGI        -> "Shogi 将棋"    to "vs AI  •  2 Players"
         }
 
         val titleLines = if (title == "International Draughts") {
@@ -330,6 +334,48 @@ class MenuView(context: Context) : View(context) {
             GameType.FOX_AND_GEESE -> drawFoxAndGeeseMini(canvas, left, top, size)
             GameType.LUDO -> drawLudoMini(canvas, left, top, size)
             GameType.XIANGQI -> drawXiangqiMini(canvas, left, top, size)
+            GameType.SHOGI -> drawShogiMini(canvas, left, top, size)
+        }
+    }
+
+    private fun drawShogiMini(canvas: Canvas, left: Float, top: Float, size: Float) {
+        val boardRect = RectF(left, top, left + size, top + size)
+        shogiBoardBitmap?.let {
+            canvas.drawBitmap(it, null, boardRect, bitmapPaint)
+        } ?: run {
+            val cell = size / 9f
+            val board = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#C38A4C") }
+            val line = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.parseColor("#33251A")
+                style = Paint.Style.STROKE
+                strokeWidth = cell * 0.035f
+            }
+            canvas.drawRect(boardRect, board)
+            for (i in 0..9) {
+                canvas.drawLine(left + i * cell, top, left + i * cell, top + size, line)
+                canvas.drawLine(left, top + i * cell, left + size, top + i * cell, line)
+            }
+        }
+
+        val cell = size / 9f
+        val piecePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            textAlign = Paint.Align.CENTER
+            textSize = cell * 0.48f
+            isFakeBoldText = true
+        }
+        val positions = listOf(
+            Triple(0, 0, "香"), Triple(0, 4, "玉"), Triple(0, 8, "香"),
+            Triple(1, 1, "飛"), Triple(1, 7, "角"),
+            Triple(2, 0, "歩"), Triple(2, 4, "歩"), Triple(2, 8, "歩"),
+            Triple(6, 0, "歩"), Triple(6, 4, "歩"), Triple(6, 8, "歩"),
+            Triple(7, 1, "角"), Triple(7, 7, "飛"),
+            Triple(8, 0, "香"), Triple(8, 4, "玉"), Triple(8, 8, "香"),
+        )
+        positions.forEach { (row, col, symbol) ->
+            piecePaint.color = if (row < 4) Color.parseColor("#2A211B") else Color.parseColor("#FFFDF2")
+            val cx = left + col * cell + cell / 2f
+            val cy = top + row * cell + cell / 2f
+            canvas.drawText(symbol, cx, cy - (piecePaint.ascent() + piecePaint.descent()) / 2f, piecePaint)
         }
     }
 

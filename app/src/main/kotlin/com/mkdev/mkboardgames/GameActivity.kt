@@ -16,6 +16,7 @@ import com.mkdev.mkboardgames.games.chess.ChessPiece
 import com.mkdev.mkboardgames.games.chess.ChessRuleEngine
 import com.mkdev.mkboardgames.games.foxandgeese.FoxAndGeeseRuleEngine
 import com.mkdev.mkboardgames.games.othello.OthelloRuleEngine
+import com.mkdev.mkboardgames.games.shogi.ShogiRuleEngine
 import com.mkdev.mkboardgames.games.xiangqi.XiangqiRuleEngine
 import com.mkdev.mkboardgames.ui.BoardView
 import com.mkdev.mkboardgames.ui.CaptureStripView
@@ -68,6 +69,7 @@ class GameActivity : AppCompatActivity() {
             "CHECKERS"  -> CheckersRuleEngine()
             "INTERNATIONAL_DRAUGHTS" -> InternationalDraughtsRuleEngine()
             "FOX_AND_GEESE" -> FoxAndGeeseRuleEngine()
+            "SHOGI"       -> ShogiRuleEngine()
             "XIANGQI"   -> XiangqiRuleEngine()
             else        -> ChessRuleEngine()   // covers "CHESS" and any future alias
         }
@@ -180,6 +182,7 @@ class GameActivity : AppCompatActivity() {
             "CHECKERS" -> "Draughts"
             "INTERNATIONAL_DRAUGHTS" -> "International Draughts"
             "FOX_AND_GEESE" -> "Fox and Geese"
+            "SHOGI" -> "Shogi 将棋"
             "XIANGQI" -> "Xiangqi 象棋"
             else       -> "Chess"
         }
@@ -231,6 +234,7 @@ class GameActivity : AppCompatActivity() {
             "CHECKERS" -> "Draughts"
             "INTERNATIONAL_DRAUGHTS" -> "International Draughts"
             "FOX_AND_GEESE" -> "Fox and Geese"
+            "SHOGI" -> "Shogi 将棋"
             "XIANGQI" -> "Xiangqi 象棋"
             else -> "Chess"
         }
@@ -259,6 +263,32 @@ Checkmate the opposing General by leaving it in check with no legal move. Stalem
 
 Repetition and Perpetual Play
 This version uses a fixed platform ruleset. Repeating the same position, with the same side to move, three times is a draw. If one side gives check on every move in that repeated cycle, that side loses. Repeatedly attacking the same opposing piece while it moves away after each attack is treated the same way.
+            """.trimIndent()
+            "SHOGI" -> """
+SHOGI 将棋 — Rules
+
+Overview
+Shogi is played on a 9×9 board. White is Sente and moves first; Black is Gote. Captured pieces stay with the player who captured them in traditional Shogi. This version keeps the shared board interaction used by the other games and displays captures in the capture strips.
+
+─────────────────────────
+
+Pieces
+歩 Pawn — moves one point forward.
+香 Lance — moves any distance forward.
+桂 Knight — jumps two points forward and one to either side.
+銀 Silver — moves one point forward or diagonally.
+金 Gold — moves one point forward, sideways, backward, or diagonally forward.
+角 Bishop — slides diagonally. Promoted bishops also move one point orthogonally.
+飛 Rook — slides horizontally or vertically. Promoted rooks also move one point diagonally.
+玉 King — moves one point in any direction.
+
+─────────────────────────
+
+Promotion
+Pieces promote automatically when they enter the promotion zone. A promoted pawn, lance, knight, or silver moves like a Gold; a promoted bishop becomes a Horse (馬), and a promoted rook becomes a Dragon (龍).
+
+Winning
+Checkmate the opposing King. A player with no legal move while not in check is stalemated and the game is a draw.
             """.trimIndent()
             "OTHELLO" -> """
 OTHELLO — Rules
@@ -645,6 +675,14 @@ Checkmate your opponent's King.
                                 quiesceDepth = 1,
                             ).bestMove(gameState)
                         }
+                        "SHOGI" -> {
+                            AIPlayer(
+                                engine,
+                                maxDepth = SettingsManager.shogiAiDepth(this@GameActivity),
+                                timeLimitMs = SettingsManager.shogiAiTimeLimitMs(this@GameActivity),
+                                quiesceDepth = 1,
+                            ).bestMove(gameState)
+                        }
                         "OTHELLO"  -> {
                             val ai = AIPlayer(engine, maxDepth = SettingsManager.othelloAiDepth(this@GameActivity), timeLimitMs = 3000L)
                             ai.bestMove(gameState)
@@ -792,6 +830,10 @@ Checkmate your opponent's King.
                 getDiff = { SettingsManager.getFoxAndGeeseDifficulty(this) }
                 setDiff = { v -> SettingsManager.setFoxAndGeeseDifficulty(this, v) }
             }
+            "SHOGI" -> {
+                getDiff = { SettingsManager.getShogiDifficulty(this) }
+                setDiff = { v -> SettingsManager.setShogiDifficulty(this, v) }
+            }
             else       -> { getDiff = { SettingsManager.getChessDifficulty(this) };    setDiff = { v -> SettingsManager.setChessDifficulty(this, v) } }
         }
         val current = getDiff()
@@ -822,6 +864,8 @@ Checkmate your opponent's King.
                     gameType == "FOX_AND_GEESE" -> "The fox wins!"
                     gameType == "XIANGQI" && vsAI && playerColor == PieceColor.WHITE -> "You win!"
                     gameType == "XIANGQI" -> "Red wins!"
+                    gameType == "SHOGI" && vsAI && playerColor == PieceColor.WHITE -> "You win!"
+                    gameType == "SHOGI" -> "Sente wins!"
                     vsAI && playerColor == PieceColor.WHITE -> "You win! 🎉"
                     else -> "White wins!"
                 }
@@ -831,6 +875,8 @@ Checkmate your opponent's King.
                     gameType == "FOX_AND_GEESE" -> "The geese win!"
                     gameType == "XIANGQI" && vsAI && playerColor == PieceColor.BLACK -> "You win!"
                     gameType == "XIANGQI" -> "Black wins!"
+                    gameType == "SHOGI" && vsAI && playerColor == PieceColor.BLACK -> "You win!"
+                    gameType == "SHOGI" -> "Gote wins!"
                     vsAI && playerColor == PieceColor.BLACK -> "You win! 🎉"
                     else -> "Black wins!"
                 }
@@ -841,11 +887,13 @@ Checkmate your opponent's King.
             GameStatus.WHITE_WINS -> when (gameType) {
                 "FOX_AND_GEESE" -> "Fox wins"
                 "XIANGQI" -> "Red wins"
+                "SHOGI" -> "Sente wins"
                 else -> "White wins"
             }
             GameStatus.BLACK_WINS -> when (gameType) {
                 "FOX_AND_GEESE" -> "Geese win"
                 "XIANGQI" -> "Black wins"
+                "SHOGI" -> "Gote wins"
                 else -> "Black wins"
             }
             GameStatus.DRAW       -> "Draw"

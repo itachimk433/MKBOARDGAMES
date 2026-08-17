@@ -17,6 +17,9 @@ import com.mkdev.mkboardgames.games.foxandgeese.FoxAndGeeseSetup
 import com.mkdev.mkboardgames.games.foxandgeese.FoxAndGeesePiece
 import com.mkdev.mkboardgames.games.foxandgeese.FoxAndGeesePieceType
 import com.mkdev.mkboardgames.games.othello.OthelloPiece
+import com.mkdev.mkboardgames.games.shogi.ShogiPiece
+import com.mkdev.mkboardgames.games.shogi.ShogiRuleEngine
+import com.mkdev.mkboardgames.games.shogi.ShogiSetup
 import com.mkdev.mkboardgames.games.xiangqi.XiangqiPiece
 import com.mkdev.mkboardgames.games.xiangqi.XiangqiRuleEngine
 import kotlin.math.roundToInt
@@ -82,6 +85,13 @@ class BoardView(context: Context) : View(context) {
     private var cellSize  = 0f
     private var boardLeft = 0f
     private var boardTop  = 0f
+    private var shogiImageRect = RectF()
+    private var shogiGridLeft = 0f
+    private var shogiGridRight = 0f
+    private var shogiGridTop = 0f
+    private var shogiGridBottom = 0f
+    private var shogiCellWidth = 0f
+    private var shogiCellHeight = 0f
     private var xiangqiImageRect = RectF()
     private var xiangqiGridLeft = 0f
     private var xiangqiGridRight = 0f
@@ -91,6 +101,11 @@ class BoardView(context: Context) : View(context) {
 
     private val xiangqiBoardBitmap: Bitmap? = try {
         context.assets.open("xiangqi_board_empty.png").use { BitmapFactory.decodeStream(it) }
+    } catch (_: Throwable) {
+        null
+    }
+    private val shogiBoardBitmap: Bitmap? = try {
+        context.assets.open("shogi_board_empty.png").use { BitmapFactory.decodeStream(it) }
     } catch (_: Throwable) {
         null
     }
@@ -138,6 +153,35 @@ class BoardView(context: Context) : View(context) {
 
     private fun updateBoardGeometry() {
         if (width <= 0 || height <= 0) return
+        if (isShogiBoard()) {
+            val bitmap = shogiBoardBitmap
+            if (bitmap != null) {
+                val scale = minOf(
+                    width.toFloat() / bitmap.width,
+                    height.toFloat() / bitmap.height,
+                )
+                val imageWidth = bitmap.width * scale
+                val imageHeight = bitmap.height * scale
+                shogiImageRect.set(
+                    (width - imageWidth) / 2f,
+                    (height - imageHeight) / 2f,
+                    (width + imageWidth) / 2f,
+                    (height + imageHeight) / 2f,
+                )
+                // The uploaded reference includes a narrow wooden frame around
+                // the playable 9×9 grid.
+                shogiGridLeft = shogiImageRect.left + imageWidth * 0.030f
+                shogiGridRight = shogiImageRect.left + imageWidth * 0.970f
+                shogiGridTop = shogiImageRect.top + imageHeight * 0.027f
+                shogiGridBottom = shogiImageRect.top + imageHeight * 0.991f
+                shogiCellWidth = (shogiGridRight - shogiGridLeft) / 9f
+                shogiCellHeight = (shogiGridBottom - shogiGridTop) / 9f
+                cellSize = minOf(shogiCellWidth, shogiCellHeight)
+                piecePaint.textSize = cellSize * 0.58f
+                mustCapturePaint.strokeWidth = cellSize * 0.055f
+            }
+            return
+        }
         if (isXiangqiBoard()) {
             val bitmap = xiangqiBoardBitmap
             if (bitmap != null) {
@@ -272,6 +316,7 @@ class BoardView(context: Context) : View(context) {
     }
 
     private fun cellCenter(pos: Position): PointF {
+        if (isShogiBoard()) return shogiPoint(pos)
         if (isXiangqiBoard()) return xiangqiPoint(pos)
         val last = gameState.boardSize - 1
         val dr = if (isFlipped) last - pos.row else pos.row
@@ -282,6 +327,12 @@ class BoardView(context: Context) : View(context) {
 
     // ─── Drawing ─────────────────────────────────────────────────────────────
     override fun onDraw(canvas: Canvas) {
+        if (isShogiBoard()) {
+            drawShogiBoard(canvas)
+            drawShogiHighlights(canvas)
+            drawShogiPieces(canvas)
+            return
+        }
         if (isXiangqiBoard()) {
             drawXiangqiBoard(canvas)
             drawXiangqiHighlights(canvas)
@@ -294,6 +345,68 @@ class BoardView(context: Context) : View(context) {
     private fun drawXiangqiBoard(canvas: Canvas) {
         canvas.drawColor(Color.rgb(20, 20, 20))
         xiangqiBoardBitmap?.let { canvas.drawBitmap(it, null, xiangqiImageRect, Paint(Paint.ANTI_ALIAS_FLAG)) }
+    }
+
+    private fun drawShogiBoard(canvas: Canvas) {
+        canvas.drawColor(Color.rgb(20, 20, 20))
+        shogiBoardBitmap?.let {
+            canvas.drawBitmap(it, null, shogiImageRect, Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
+        }
+    }
+
+    private fun drawShogiHighlights(canvas: Canvas) {
+        val showHints = SettingsManager.getShowHints(context)
+        gameState.lastMove?.let {
+            drawShogiCell(canvas, it.from, highlightGold)
+            drawShogiCell(canvas, it.to, highlightGold)
+        }
+        selectedPos?.let { drawShogiCell(canvas, it, highlightBlue) }
+        if (showHints) {
+            legalMoves.forEach { move ->
+                val point = shogiPoint(move.to)
+                if (move.isCapture) {
+                    canvas.drawCircle(point.x, point.y, cellSize * 0.40f, ringPaint)
+                } else {
+                    canvas.drawCircle(point.x, point.y, cellSize * 0.13f, dotPaint)
+                }
+            }
+        }
+    }
+
+    private fun drawShogiCell(canvas: Canvas, position: Position, paint: Paint) {
+        val col = if (isFlipped) 8 - position.col else position.col
+        val row = if (isFlipped) 8 - position.row else position.row
+        canvas.drawRect(
+            shogiGridLeft + col * shogiCellWidth,
+            shogiGridTop + row * shogiCellHeight,
+            shogiGridLeft + (col + 1) * shogiCellWidth,
+            shogiGridTop + (row + 1) * shogiCellHeight,
+            paint,
+        )
+    }
+
+    private fun drawShogiPieces(canvas: Canvas) {
+        val skipPos = animFromPos
+        for (row in 0 until ShogiSetup.SIZE) {
+            for (col in 0 until ShogiSetup.SIZE) {
+                val position = Position(row, col)
+                if (position == skipPos) continue
+                val piece = gameState.get(position) ?: continue
+                val point = shogiPoint(position)
+                if (showMustCaptureHints && position in mustCapturePieces) {
+                    canvas.drawCircle(point.x, point.y, cellSize * 0.42f, mustCapturePaint)
+                }
+                drawPieceAt(canvas, piece, point.x, point.y, position)
+            }
+        }
+        animPiece?.let {
+            drawPieceAt(
+                canvas,
+                it,
+                lerp(animFromPx.x, animToPx.x, animProgress),
+                lerp(animFromPx.y, animToPx.y, animProgress),
+            )
+        }
     }
 
     private fun drawXiangqiHighlights(canvas: Canvas) {
@@ -540,6 +653,7 @@ class BoardView(context: Context) : View(context) {
             is CheckersPiece -> drawCheckersPiece(canvas, piece, cx, cy)
             is FoxAndGeesePiece -> drawFoxAndGeesePiece(canvas, piece, cx, cy)
             is OthelloPiece  -> drawOthelloPiece(canvas, piece, cx, cy, pos)
+            is ShogiPiece    -> drawShogiPiece(canvas, piece, cx, cy)
             is XiangqiPiece  -> drawXiangqiPiece(canvas, piece, cx, cy)
         }
     }
@@ -646,6 +760,55 @@ class BoardView(context: Context) : View(context) {
         canvas.restore()
     }
 
+    private fun drawShogiPiece(canvas: Canvas, piece: ShogiPiece, cx: Float, cy: Float) {
+        val halfW = shogiCellWidth * 0.34f
+        val halfH = shogiCellHeight * 0.36f
+        val path = Path().apply {
+            moveTo(cx, cy - halfH)
+            lineTo(cx + halfW * 0.76f, cy - halfH * 0.60f)
+            lineTo(cx + halfW, cy + halfH)
+            lineTo(cx - halfW, cy + halfH)
+            lineTo(cx - halfW * 0.76f, cy - halfH * 0.60f)
+            close()
+        }
+        canvas.save()
+        if (piece.color == PieceColor.BLACK) canvas.rotate(180f, cx, cy)
+
+        val shadow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(85, 0, 0, 0)
+            style = Paint.Style.FILL
+        }
+        canvas.save()
+        canvas.translate(cellSize * 0.035f, cellSize * 0.055f)
+        canvas.drawPath(path, shadow)
+        canvas.restore()
+
+        val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (piece.color == PieceColor.WHITE) Color.parseColor("#FFFDF2")
+            else Color.parseColor("#E7E0D1")
+        }
+        canvas.drawPath(path, fill)
+        val edge = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (piece.promoted) Color.parseColor("#B23A32")
+            else Color.parseColor("#2A211B")
+            style = Paint.Style.STROKE
+            strokeWidth = cellSize * 0.035f
+            strokeJoin = Paint.Join.ROUND
+        }
+        canvas.drawPath(path, edge)
+
+        val text = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (piece.promoted) Color.parseColor("#B23A32")
+            else Color.parseColor("#221B17")
+            textAlign = Paint.Align.CENTER
+            textSize = cellSize * 0.43f
+            isFakeBoldText = true
+        }
+        val metrics = text.fontMetrics
+        canvas.drawText(piece.symbol(), cx, cy - (metrics.ascent + metrics.descent) / 2f + cellSize * 0.025f, text)
+        canvas.restore()
+    }
+
     // ─── Coordinate helpers ───────────────────────────────────────────────────
 
     private fun boardRow(logicRow: Int) =
@@ -660,6 +823,18 @@ class BoardView(context: Context) : View(context) {
     private fun isXiangqiBoard(): Boolean =
         ruleEngine is XiangqiRuleEngine || gameState.board.any { it is XiangqiPiece }
 
+    private fun isShogiBoard(): Boolean =
+        ruleEngine is ShogiRuleEngine || gameState.board.any { it is ShogiPiece }
+
+    private fun shogiPoint(position: Position): PointF {
+        val displayedRow = if (isFlipped) 8 - position.row else position.row
+        val displayedCol = if (isFlipped) 8 - position.col else position.col
+        return PointF(
+            shogiGridLeft + displayedCol * shogiCellWidth + shogiCellWidth / 2f,
+            shogiGridTop + displayedRow * shogiCellHeight + shogiCellHeight / 2f,
+        )
+    }
+
     private fun xiangqiPoint(position: Position): PointF {
         val displayedRow = if (isFlipped) 9 - position.row else position.row
         val displayedCol = if (isFlipped) 8 - position.col else position.col
@@ -670,6 +845,16 @@ class BoardView(context: Context) : View(context) {
     }
 
     private fun screenToBoard(x: Float, y: Float): Position? {
+        if (isShogiBoard()) {
+            if (shogiCellWidth <= 0f || shogiCellHeight <= 0f) return null
+            val displayedCol = ((x - shogiGridLeft) / shogiCellWidth).toInt()
+            val displayedRow = ((y - shogiGridTop) / shogiCellHeight).toInt()
+            if (displayedCol !in 0..8 || displayedRow !in 0..8) return null
+            return Position(
+                if (isFlipped) 8 - displayedRow else displayedRow,
+                if (isFlipped) 8 - displayedCol else displayedCol,
+            )
+        }
         if (isXiangqiBoard()) {
             if (xiangqiCellWidth <= 0f || xiangqiCellHeight <= 0f) return null
             val displayedCol = ((x - xiangqiGridLeft) / xiangqiCellWidth).roundToInt()

@@ -27,6 +27,7 @@ import com.mkdev.mkboardgames.games.foxandgeese.FoxAndGeeseRuleEngine
 import com.mkdev.mkboardgames.games.ludo.LudoRuleEngine
 import com.mkdev.mkboardgames.games.ludo.LudoSetup
 import com.mkdev.mkboardgames.games.morabaraba.MorabarabaRuleEngine
+import com.mkdev.mkboardgames.games.shogi.ShogiRuleEngine
 import com.mkdev.mkboardgames.games.tictactoe.TicTacToePiece
 import com.mkdev.mkboardgames.games.tictactoe.TicTacToeRuleEngine
 import com.mkdev.mkboardgames.games.xiangqi.XiangqiRuleEngine
@@ -192,6 +193,7 @@ class ReplayActivity : AppCompatActivity() {
             "FOX_AND_GEESE" -> FoxAndGeeseRuleEngine()
             "LUDO" -> LudoRuleEngine()
             "XIANGQI" -> XiangqiRuleEngine()
+            "SHOGI" -> ShogiRuleEngine()
             else         -> ChessRuleEngine()
         }
 

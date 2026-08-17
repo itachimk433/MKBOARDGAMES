@@ -379,6 +379,25 @@ class MainActivity : AppCompatActivity() {
         root.addView(ludoDiffRow)
         root.addView(divider())
 
+        // ── Shogi ──
+        root.addView(sectionHeader("将  SHOGI"))
+        var shogiDiff = SettingsManager.getShogiDifficulty(ctx)
+        val (shogiDiffRow, shogiDiffVal) = settingRow("🎯", "AI Difficulty", diffs[shogiDiff])
+        shogiDiffRow.setOnClickListener {
+            AlertDialog.Builder(ctx, android.R.style.Theme_Material_Dialog_MinWidth)
+                .setTitle("Shogi · AI Difficulty")
+                .setSingleChoiceItems(diffs, shogiDiff) { d, i ->
+                    SettingsManager.setShogiDifficulty(ctx, i)
+                    shogiDiff = i
+                    shogiDiffVal.text = diffs[i]
+                    d.dismiss()
+                }.show()
+        }
+        root.addView(shogiDiffRow)
+        root.addView(divider())
+        root.addView(themeRow("Shogi", { SettingsManager.getShogiTheme(ctx) },
+            { v -> SettingsManager.setShogiTheme(ctx, v) }).first)
+
         // ── Legal ──
         root.addView(sectionHeader("📋  LEGAL"))
         val ppUrl  = PRIVACY_POLICY_URL
@@ -512,6 +531,7 @@ class MainActivity : AppCompatActivity() {
             Page("Connect Four", "●", "connect_four"),
             Page("Fox & Geese", "🦊", "fox_and_geese"),
             Page("Ludo", "●", "ludo"),
+            Page("Shogi", "将", "shogi"),
         )
 
         var currentPage = 0

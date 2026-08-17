@@ -14,6 +14,7 @@ object SettingsManager {
     private const val KEY_CONNECT_FOUR_DIFFICULTY = "connect_four_ai_difficulty"
     private const val KEY_FOX_AND_GEESE_DIFFICULTY = "fox_and_geese_ai_difficulty"
     private const val KEY_LUDO_DIFFICULTY = "ludo_ai_difficulty"
+    private const val KEY_SHOGI_DIFFICULTY = "shogi_ai_difficulty"
 
     // ── Hints keys ───────────────────────────────────────────────────────────
     private const val KEY_CHESS_HINTS    = "chess_show_hints"
@@ -29,6 +30,7 @@ object SettingsManager {
     private const val KEY_TTT_THEME        = "ttt_theme"
     private const val KEY_CONNECT_FOUR_THEME = "connect_four_theme"
     private const val KEY_FOX_AND_GEESE_THEME = "fox_and_geese_theme"
+    private const val KEY_SHOGI_THEME = "shogi_theme"
 
     // ── Global stats keys (legacy / overall) ─────────────────────────────────
     private const val KEY_STATS_WINS     = "stats_wins"
@@ -123,6 +125,21 @@ object SettingsManager {
     fun setLudoDifficulty(ctx: Context, v: Int) =
         prefs(ctx).edit().putInt(KEY_LUDO_DIFFICULTY, v.coerceIn(0, 2)).apply()
 
+    // ── Shogi ─────────────────────────────────────────────────────────────────
+    fun getShogiDifficulty(ctx: Context) = prefs(ctx).getInt(KEY_SHOGI_DIFFICULTY, 0)
+    fun setShogiDifficulty(ctx: Context, v: Int) =
+        prefs(ctx).edit().putInt(KEY_SHOGI_DIFFICULTY, v.coerceIn(0, 2)).apply()
+    fun shogiAiDepth(ctx: Context) = when (getShogiDifficulty(ctx)) {
+        0 -> 1
+        2 -> 3
+        else -> 2
+    }
+    fun shogiAiTimeLimitMs(ctx: Context): Long = when (getShogiDifficulty(ctx)) {
+        0 -> 700L
+        2 -> 2200L
+        else -> 1200L
+    }
+
     // ── Tic-Tac-Toe ──────────────────────────────────────────────────────────
     private const val KEY_TTT_DIFFICULTY = "ttt_ai_difficulty"
     fun getTttDifficulty(ctx: Context) = prefs(ctx).getInt(KEY_TTT_DIFFICULTY, 0)
@@ -196,6 +213,9 @@ object SettingsManager {
     fun getFoxAndGeeseTheme(ctx: Context) = prefs(ctx).getInt(KEY_FOX_AND_GEESE_THEME, 0)
     fun setFoxAndGeeseTheme(ctx: Context, v: Int) =
         prefs(ctx).edit().putInt(KEY_FOX_AND_GEESE_THEME, v).apply()
+    fun getShogiTheme(ctx: Context) = prefs(ctx).getInt(KEY_SHOGI_THEME, 0)
+    fun setShogiTheme(ctx: Context, v: Int) =
+        prefs(ctx).edit().putInt(KEY_SHOGI_THEME, v).apply()
 
     fun activateGameTheme(ctx: Context, gameKey: String) {
         val idx = when (gameKey) {
@@ -207,6 +227,7 @@ object SettingsManager {
             "ttt"        -> getTttTheme(ctx)
             "connect_four" -> getConnectFourTheme(ctx)
             "fox_and_geese" -> getFoxAndGeeseTheme(ctx)
+            "shogi"        -> getShogiTheme(ctx)
             else         -> getTheme(ctx)
         }
         setTheme(ctx, idx)
@@ -275,7 +296,7 @@ object SettingsManager {
         for (g in listOf(
             "chess", "checkers", "international_draughts",
             "othello", "morabaraba", "ttt", "connect_four", "overall",
-            "fox_and_geese", "ludo"
+            "fox_and_geese", "ludo", "shogi"
         )) {
             edit.putInt(winKey(g), 0).putInt(lossKey(g), 0)
                 .putInt(drawKey(g), 0).putInt(forfeitKey(g), 0)
