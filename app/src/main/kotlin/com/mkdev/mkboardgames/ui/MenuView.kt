@@ -10,6 +10,7 @@ import com.mkdev.mkboardgames.R
 import com.mkdev.mkboardgames.SettingsManager
 import com.mkdev.mkboardgames.engine.Position
 import com.mkdev.mkboardgames.games.foxandgeese.FoxAndGeeseSetup
+import com.mkdev.mkboardgames.games.go.GoSetup
 
 class MenuView(context: Context) : View(context) {
 
@@ -29,7 +30,7 @@ class MenuView(context: Context) : View(context) {
 
     enum class GameType {
         CHESS, CHECKERS, INTERNATIONAL_DRAUGHTS, OTHELLO, MORABARABA, TICTACTOE, CONNECT_FOUR,
-        FOX_AND_GEESE, LUDO, XIANGQI, SHOGI
+        FOX_AND_GEESE, LUDO, XIANGQI, SHOGI, GO
     }
 
     private data class Card(val type: GameType, var rect: RectF = RectF())
@@ -39,7 +40,7 @@ class MenuView(context: Context) : View(context) {
         Card(GameType.OTHELLO), Card(GameType.MORABARABA),
         Card(GameType.TICTACTOE), Card(GameType.CONNECT_FOUR),
         Card(GameType.FOX_AND_GEESE), Card(GameType.LUDO),
-        Card(GameType.XIANGQI), Card(GameType.SHOGI)
+        Card(GameType.XIANGQI), Card(GameType.SHOGI), Card(GameType.GO)
     )
 
     private val dp = context.resources.displayMetrics.density
@@ -302,6 +303,7 @@ class MenuView(context: Context) : View(context) {
             GameType.LUDO         -> "Ludo"         to "vs AI  •  4 Players"
             GameType.XIANGQI      -> "Xiangqi 象棋"  to "vs AI  •  2 Players"
             GameType.SHOGI        -> "Shogi 将棋"    to "vs AI  •  2 Players"
+            GameType.GO           -> "Go 围棋"       to "vs AI  •  2 Players"
         }
 
         val titleLines = if (title == "International Draughts") {
@@ -335,6 +337,31 @@ class MenuView(context: Context) : View(context) {
             GameType.LUDO -> drawLudoMini(canvas, left, top, size)
             GameType.XIANGQI -> drawXiangqiMini(canvas, left, top, size)
             GameType.SHOGI -> drawShogiMini(canvas, left, top, size)
+            GameType.GO -> drawGoMini(canvas, left, top, size)
+        }
+    }
+
+    private fun drawGoMini(canvas: Canvas, left: Float, top: Float, size: Float) {
+        val cell = size / (GoSetup.BOARD_SIZE - 1).toFloat()
+        val boardPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#C98525")
+        }
+        val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#2A211B")
+            style = Paint.Style.STROKE
+            strokeWidth = maxOf(1f, size * 0.018f)
+        }
+        canvas.drawRect(left, top, left + size, top + size, boardPaint)
+        for (i in 0 until GoSetup.BOARD_SIZE) {
+            val offset = i * cell
+            canvas.drawLine(left + offset, top, left + offset, top + size, linePaint)
+            canvas.drawLine(left, top + offset, left + size, top + offset, linePaint)
+        }
+        val starPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#2A211B")
+        }
+        for (row in setOf(3, 6, 9)) for (col in setOf(3, 6, 9)) {
+            canvas.drawCircle(left + col * cell, top + row * cell, size * 0.035f, starPaint)
         }
     }
 

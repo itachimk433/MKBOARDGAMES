@@ -16,6 +16,7 @@ import com.mkdev.mkboardgames.games.chess.ChessPiece
 import com.mkdev.mkboardgames.games.foxandgeese.FoxAndGeeseSetup
 import com.mkdev.mkboardgames.games.foxandgeese.FoxAndGeesePiece
 import com.mkdev.mkboardgames.games.foxandgeese.FoxAndGeesePieceType
+import com.mkdev.mkboardgames.games.go.GoRuleEngine
 import com.mkdev.mkboardgames.games.othello.OthelloPiece
 import com.mkdev.mkboardgames.games.shogi.ShogiPiece
 import com.mkdev.mkboardgames.games.shogi.ShogiRuleEngine
@@ -132,6 +133,7 @@ class BoardView(context: Context) : View(context) {
     private var xiangqiGridTop = 0f
     private var xiangqiCellWidth = 0f
     private var xiangqiCellHeight = 0f
+    private var goImageRect = RectF()
 
     private val xiangqiBoardBitmap: Bitmap? = try {
         context.assets.open("xiangqi_board_empty.png").use { BitmapFactory.decodeStream(it) }
@@ -140,6 +142,11 @@ class BoardView(context: Context) : View(context) {
     }
     private val shogiBoardBitmap: Bitmap? = try {
         context.assets.open("shogi_board_empty.png").use { BitmapFactory.decodeStream(it) }
+    } catch (_: Throwable) {
+        null
+    }
+    private val goBoardBitmap: Bitmap? = try {
+        context.assets.open("go_board_empty.png").use { BitmapFactory.decodeStream(it) }
     } catch (_: Throwable) {
         null
     }
@@ -249,6 +256,28 @@ class BoardView(context: Context) : View(context) {
                 xiangqiCellHeight = (gridBottom - xiangqiGridTop) / 9f
                 cellSize = minOf(xiangqiCellWidth, xiangqiCellHeight)
                 piecePaint.textSize = cellSize * 0.72f
+                mustCapturePaint.strokeWidth = cellSize * 0.055f
+            }
+            return
+        }
+        if (isGoBoard()) {
+            val bitmap = goBoardBitmap
+            if (bitmap != null) {
+                val scale = minOf(
+                    width.toFloat() / bitmap.width,
+                    height.toFloat() / bitmap.height,
+                )
+                val imageWidth = bitmap.width * scale
+                val imageHeight = bitmap.height * scale
+                goImageRect.set(
+                    (width - imageWidth) / 2f,
+                    (height - imageHeight) / 2f,
+                    (width + imageWidth) / 2f,
+                    (height + imageHeight) / 2f,
+                )
+                val gridSize = imageWidth * 0.832f
+                cellSize = gridSize / 12f
+                piecePaint.textSize = cellSize * 0.60f
                 mustCapturePaint.strokeWidth = cellSize * 0.055f
             }
             return
@@ -410,6 +439,13 @@ class BoardView(context: Context) : View(context) {
             drawXiangqiBoard(canvas)
             drawXiangqiHighlights(canvas)
             drawXiangqiPieces(canvas)
+            return
+        }
+        if (isGoBoard()) {
+            canvas.drawColor(Color.rgb(20, 20, 20))
+            goBoardBitmap?.let {
+                canvas.drawBitmap(it, null, goImageRect, Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
+            }
             return
         }
         drawBoard(canvas); drawLabels(canvas); drawHighlights(canvas); drawPieces(canvas)
@@ -915,6 +951,8 @@ class BoardView(context: Context) : View(context) {
 
     private fun isShogiBoard(): Boolean =
         ruleEngine is ShogiRuleEngine || gameState.board.any { it is ShogiPiece }
+
+    private fun isGoBoard(): Boolean = ruleEngine is GoRuleEngine
 
     private fun shogiPoint(position: Position): PointF {
         val displayedRow = if (isFlipped) 8 - position.row else position.row

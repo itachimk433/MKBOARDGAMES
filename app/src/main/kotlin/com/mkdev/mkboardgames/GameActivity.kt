@@ -15,6 +15,7 @@ import com.mkdev.mkboardgames.games.checkers.InternationalDraughtsRuleEngine
 import com.mkdev.mkboardgames.games.chess.ChessPiece
 import com.mkdev.mkboardgames.games.chess.ChessRuleEngine
 import com.mkdev.mkboardgames.games.foxandgeese.FoxAndGeeseRuleEngine
+import com.mkdev.mkboardgames.games.go.GoRuleEngine
 import com.mkdev.mkboardgames.games.othello.OthelloRuleEngine
 import com.mkdev.mkboardgames.games.shogi.ShogiPiece
 import com.mkdev.mkboardgames.games.shogi.ShogiRuleEngine
@@ -70,6 +71,7 @@ class GameActivity : AppCompatActivity() {
             "CHECKERS"  -> CheckersRuleEngine()
             "INTERNATIONAL_DRAUGHTS" -> InternationalDraughtsRuleEngine()
             "FOX_AND_GEESE" -> FoxAndGeeseRuleEngine()
+            "GO" -> GoRuleEngine()
             "SHOGI"       -> ShogiRuleEngine()
             "XIANGQI"   -> XiangqiRuleEngine()
             else        -> ChessRuleEngine()   // covers "CHESS" and any future alias
@@ -187,6 +189,7 @@ class GameActivity : AppCompatActivity() {
             "FOX_AND_GEESE" -> "Fox and Geese"
             "SHOGI" -> "Shogi 将棋"
             "XIANGQI" -> "Xiangqi 象棋"
+            "GO" -> "Go 围棋"
             else       -> "Chess"
         }
         val paused = PausedMatchStore.has(this, gameType)
@@ -245,6 +248,7 @@ class GameActivity : AppCompatActivity() {
             "FOX_AND_GEESE" -> "Fox and Geese"
             "SHOGI" -> "Shogi 将棋"
             "XIANGQI" -> "Xiangqi 象棋"
+            "GO" -> "Go 围棋"
             else -> "Chess"
         }
         val rulesText = when (gameType) {
