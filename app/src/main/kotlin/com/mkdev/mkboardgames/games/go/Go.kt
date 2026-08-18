@@ -80,6 +80,14 @@ class GoRuleEngine : RuleEngine {
         return moves
     }
 
+    /**
+     * Returns whether the current player has at least one legal stone placement.
+     * Passing is intentionally excluded because it is always legal by rule.
+     */
+    fun hasLegalPlacement(state: GameState): Boolean =
+        allLegalMoves(state, state.currentTurn)
+            .any { it.metadata[PASS_METADATA] != true }
+
     override fun applyMove(state: GameState, move: Move): GameState {
         if (state.status != GameStatus.IN_PROGRESS) return state
 

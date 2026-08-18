@@ -52,6 +52,7 @@ class GameActivity : AppCompatActivity() {
     private val redoCaptures   = ArrayDeque<Pair<List<Piece>, List<Piece>>>()
     private val redoMoves      = ArrayDeque<List<GameState>>()
     private val redoCapSnaps   = ArrayDeque<List<Pair<List<Piece>, List<Piece>>>>()
+    private var autoPassJob: Job? = null
 
     private var capturedByWhite = mutableListOf<Piece>()
     private var capturedByBlack = mutableListOf<Piece>()
@@ -271,7 +272,7 @@ Suicide and Ko
 You may not place a stone where your own group would have no liberties, unless the move captures an opposing group. Positional superko prevents a move from recreating any earlier board position.
 
 Passing and Winning
-Tap Pass when you have no useful placement. Two consecutive passes end the game. The winner is decided by Chinese area scoring: stones on the board plus surrounded territory, with 6.5 komi added to White's score.
+Tap Pass when you want to pass despite having a legal placement. If no legal placement remains, that turn passes automatically after a short notice. Two consecutive passes end the game. The winner is decided by Chinese area scoring: stones on the board plus surrounded territory, with 6.5 komi added to White's score.
             """.trimIndent()
             "XIANGQI" -> """
 XIANGQI 象棋 — Rules
@@ -483,6 +484,8 @@ Checkmate your opponent's King.
         matchStarted = true
         resultRecorded = false
         interstitialAd = null
+        autoPassJob?.cancel()
+        autoPassJob = null
         redoGameStates.clear(); redoCaptures.clear(); redoMoves.clear(); redoCapSnaps.clear()
         AdManager.loadInterstitial(this) { interstitialAd = it }
         moveHistory.clear(); capturedByWhite.clear(); capturedByBlack.clear(); captureSnapshots.clear()
@@ -534,8 +537,12 @@ Checkmate your opponent's King.
         if (restoring != null) {
             restoreMoves(restoring.moves)
             clearPausedMatch()
-            if (vsAI && gameState.currentTurn != playerColor) triggerAI()
-        } else if (vsAI && gameState.currentTurn != playerColor) {
+            if (!scheduleGoAutoPassIfNeeded() &&
+                vsAI && gameState.currentTurn != playerColor
+            ) triggerAI()
+        } else if (!scheduleGoAutoPassIfNeeded() &&
+            vsAI && gameState.currentTurn != playerColor
+        ) {
             triggerAI()
         }
     }
@@ -674,7 +681,9 @@ Checkmate your opponent's King.
                 showResultDialog()
                 return
             }
-            if (vsAI && gameState.currentTurn != playerColor) triggerAI()
+            if (!scheduleGoAutoPassIfNeeded() &&
+                vsAI && gameState.currentTurn != playerColor
+            ) triggerAI()
         } catch (e: Exception) {
             Toast.makeText(this, "Move error — please try again", Toast.LENGTH_SHORT).show()
             if (moveHistory.isNotEmpty()) {
@@ -693,6 +702,39 @@ Checkmate your opponent's King.
             gameState.status != GameStatus.IN_PROGRESS
         ) return
         handleMove(GoRuleEngine.passMove())
+    }
+
+    /**
+     * A Go pass is automatic only when there are no legal stone placements.
+     * Manual Pass remains available for any position where the player can move.
+     */
+    private fun scheduleGoAutoPassIfNeeded(): Boolean {
+        if (gameType != "GO" || gameState.status != GameStatus.IN_PROGRESS) return false
+        val goEngine = engine as? GoRuleEngine ?: return false
+        if (goEngine.hasLegalPlacement(gameState)) return false
+
+        autoPassJob?.cancel()
+        val passingColor = gameState.currentTurn
+        val passingPlayer = if (passingColor == PieceColor.WHITE) "White" else "Black"
+        boardView.isLocked = true
+        hudView.setInfo(
+            label = "No legal moves",
+            canUndo = moveHistory.isNotEmpty(),
+            canRedo = redoGameStates.isNotEmpty(),
+            detail = "$passingPlayer is passing automatically…",
+        )
+        autoPassJob = scope.launch {
+            delay(900L)
+            if (!isActive ||
+                gameState.status != GameStatus.IN_PROGRESS ||
+                gameState.currentTurn != passingColor ||
+                goEngine.hasLegalPlacement(gameState)
+            ) return@launch
+            autoPassJob = null
+            boardView.isLocked = false
+            handleMove(GoRuleEngine.passMove())
+        }
+        return true
     }
 
     /** Record win/loss/draw once per game. Safe to call multiple times. */
@@ -1068,6 +1110,7 @@ Checkmate your opponent's King.
         private var canRedo  = false
         private var thinking = false
         private var goMode   = false
+        private var detail   = ""
 
         private val dp = resources.displayMetrics.density
         private val sp = resources.displayMetrics.scaledDensity
@@ -1098,10 +1141,18 @@ Checkmate your opponent's King.
         private val redoRect = RectF()
         private val menuRect = RectF()
 
-        fun setInfo(label: String, canUndo: Boolean, canRedo: Boolean) {
-            title = label; this.canUndo = canUndo; this.canRedo = canRedo; invalidate()
+        fun setInfo(label: String, canUndo: Boolean, canRedo: Boolean, detail: String = "") {
+            title = label
+            this.canUndo = canUndo
+            this.canRedo = canRedo
+            this.detail = detail
+            invalidate()
         }
-        fun setThinking(t: Boolean) { thinking = t; invalidate() }
+        fun setThinking(t: Boolean) {
+            thinking = t
+            if (t) detail = ""
+            invalidate()
+        }
         fun setGoMode(enabled: Boolean) {
             goMode = enabled
             if (width > 0 && height > 0) onSizeChanged(width, height, width, height)
@@ -1155,7 +1206,7 @@ Checkmate your opponent's King.
             canvas.drawText("Menu", menuRect.centerX(), menuRect.centerY() + btnPaint.textSize * 0.36f, btnPaint)
 
             val cx = (backRect.right + if (goMode) passRect.left else undoRect.left) / 2f
-            val sub = if (thinking) "Thinking…" else ""
+            val sub = if (thinking) "Thinking…" else detail
             canvas.drawText(title, cx, h / 2f - txtPaint.textSize * 0.15f, txtPaint.also { it.textAlign = Paint.Align.CENTER })
             if (sub.isNotEmpty()) canvas.drawText(sub, cx, h / 2f + subPaint.textSize * 1.1f, subPaint.also { it.textAlign = Paint.Align.CENTER })
             txtPaint.textAlign = Paint.Align.LEFT
