@@ -161,13 +161,15 @@ class MenuView(context: Context) : View(context) {
 
     // ── Touch ─────────────────────────────────────────────────────────────────
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        // Content Y = screen Y shifted by current scroll offset
+        // Content Y = screen Y shifted by current scroll offset. The complete
+        // home surface, including the header and footer, shares this coordinate
+        // space so that everything scrolls together.
         val cy = event.y + scrollY
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
                 lastTouchY  = event.y
-                pressedGear = gearTouch.contains(event.x, event.y)
-                if (!pressedGear && logoRect.contains(event.x, event.y)) {
+                pressedGear = gearTouch.contains(event.x, cy)
+                if (!pressedGear && logoRect.contains(event.x, cy)) {
                     logoPressed = true; animateLogoScale(0.85f)
                 } else {
                     pressedCard = if (!pressedGear) cards.firstOrNull { it.rect.contains(event.x, cy) }?.type else null
@@ -179,7 +181,7 @@ class MenuView(context: Context) : View(context) {
                 val dy = lastTouchY - event.y
                 if (kotlin.math.abs(dy) > 6f) {
                     pressedCard?.let { animateCardScale(it, 1f) }
-                    pressedCard = null; logoPressed = false
+                    pressedCard = null; pressedGear = false; logoPressed = false
                 }
                 scrollY = (scrollY + dy).coerceIn(0f, maxScrollY)
                 lastTouchY = event.y
@@ -194,7 +196,7 @@ class MenuView(context: Context) : View(context) {
                     }
                     logoPressed = false; invalidate(); return true
                 }
-                if (pressedGear && gearTouch.contains(event.x, event.y)) {
+                if (pressedGear && gearTouch.contains(event.x, cy)) {
                     com.mkdev.mkboardgames.SoundPlayer.play("ui_click")
                     onSettingsClicked?.invoke(); pressedGear = false; invalidate(); return true
                 }
@@ -218,15 +220,15 @@ class MenuView(context: Context) : View(context) {
     // ── Draw ──────────────────────────────────────────────────────────────────
     override fun onDraw(canvas: Canvas) {
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
-        drawTitle(canvas)    // fixed — not affected by scroll
-        drawGear(canvas)     // fixed — top-right corner
-        // Version label — fixed top-left corner
-        canvas.drawText("v1.2", 12f * dp, 12f * dp + versionPaint.textSize, versionPaint)
-
-        // Scrollable region: cards + footer
+        // The header, game cards, and footer are one continuous scrollable
+        // surface. This keeps the home screen predictable on short displays
+        // and makes the version/settings area move with the game catalogue.
         canvas.save()
-        canvas.clipRect(0f, headerH - 10f * dp, width.toFloat(), height.toFloat())
+        canvas.clipRect(0f, 0f, width.toFloat(), height.toFloat())
         canvas.translate(0f, -scrollY)
+        drawTitle(canvas)
+        drawGear(canvas)
+        canvas.drawText("v1.2", 12f * dp, 12f * dp + versionPaint.textSize, versionPaint)
         cards.forEach { drawCard(canvas, it) }
         drawFooter(canvas)
         canvas.restore()
