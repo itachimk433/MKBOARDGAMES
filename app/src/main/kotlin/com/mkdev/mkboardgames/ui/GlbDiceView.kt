@@ -482,7 +482,7 @@ class GlbDiceView(context: Context) : GLSurfaceView(context) {
     }
 
     companion object {
-        private const val MODEL_ASSET = "perfect_little_dice_3cm_1787030625587.glb"
+        private const val MODEL_ASSET = "dice_1787032847170.glb"
 
         private const val VERTEX_SHADER = """
             attribute vec3 aPosition;
