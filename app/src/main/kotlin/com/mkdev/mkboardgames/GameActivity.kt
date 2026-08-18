@@ -223,12 +223,16 @@ class GameActivity : AppCompatActivity() {
             arrayOf("Red (moves first)", "Black (moves second)")
         else if (gameType == "SHOGI")
             arrayOf("Sente / Black (moves first)", "Gote / White (moves second)")
+        else if (gameType == "GO")
+            arrayOf("Black (moves first)", "White (moves second)")
         else
             arrayOf("White (moves first)", "Black (moves second)")
         AlertDialog.Builder(this)
             .setTitle(if (gameType == "FOX_AND_GEESE") "Choose your side" else "Play as")
             .setItems(sides) { _, which ->
                 playerColor = if (gameType == "SHOGI") {
+                    if (which == 0) PieceColor.BLACK else PieceColor.WHITE
+                } else if (gameType == "GO") {
                     if (which == 0) PieceColor.BLACK else PieceColor.WHITE
                 } else {
                     if (which == 0) PieceColor.WHITE else PieceColor.BLACK
@@ -256,7 +260,7 @@ class GameActivity : AppCompatActivity() {
 GO 围棋 — Rules
 
 Overview
-Go is played on the 13×13 intersections of the wooden board. White moves first in this app. Players place one stone at a time and surround territory while trying to capture opposing groups.
+Go is played on the 13×13 intersections of the wooden board. Black moves first. Players place one stone at a time and surround territory while trying to capture opposing groups.
 
 ─────────────────────────
 
@@ -264,10 +268,10 @@ Placing Stones
 Tap an empty intersection to place your stone. A connected group shares liberties with its orthogonally adjacent stones. When a group has no liberties, all of its stones are captured and removed.
 
 Suicide and Ko
-You may not place a stone where your own group would have no liberties, unless the move captures an opposing group. The ko rule prevents immediately recapturing a single stone in the same position.
+You may not place a stone where your own group would have no liberties, unless the move captures an opposing group. Positional superko prevents a move from recreating any earlier board position.
 
 Passing and Winning
-Tap Pass when you have no useful placement. Two consecutive passes end the game. The winner is decided by stones and surrounded territory, with a small komi added for Black.
+Tap Pass when you have no useful placement. Two consecutive passes end the game. The winner is decided by Chinese area scoring: stones on the board plus surrounded territory, with 6.5 komi added to White's score.
             """.trimIndent()
             "XIANGQI" -> """
 XIANGQI 象棋 — Rules

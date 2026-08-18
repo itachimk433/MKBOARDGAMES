@@ -14,7 +14,7 @@ object GoSetup {
     fun initialState(): GameState = GameState(
         board = arrayOfNulls(BOARD_SIZE * BOARD_SIZE),
         boardSize = BOARD_SIZE,
-        currentTurn = PieceColor.WHITE,
+        currentTurn = PieceColor.BLACK,
     )
 }
 
@@ -28,10 +28,10 @@ class GoRuleEngine : RuleEngine {
     companion object {
         const val PASS_METADATA = "pass"
         private const val PASS_COUNT = "passCount"
-        private const val KO_INDEX = "koIndex"
+        private const val POSITION_HISTORY = "positionHistory"
         private const val WHITE_CAPTURES = "whiteCaptures"
         private const val BLACK_CAPTURES = "blackCaptures"
-        private const val KOMI = 7
+        private const val KOMI = 6.5
 
         fun passMove(): Move = Move(
             from = Position(-1, -1),
@@ -48,7 +48,7 @@ class GoRuleEngine : RuleEngine {
     override fun initialState(): GameState = GoSetup.initialState()
 
     override fun legalMovesFrom(state: GameState, position: Position): List<Move> {
-        if (state.status != GameStatus.IN_PROGRESS || !position.isValid(GoSetup.BOARD_SIZE)) {
+        if (state.status != GameStatus.IN_PROGRESS || !position.isValid(state.boardSize)) {
             return emptyList()
         }
         return placementMove(state, position)?.let { listOf(it) }.orEmpty()
@@ -74,7 +74,7 @@ class GoRuleEngine : RuleEngine {
             val passCount = (state.metadata[PASS_COUNT] as? Int ?: 0) + 1
             val nextMetadata = state.metadata + mapOf(
                 PASS_COUNT to passCount,
-                KO_INDEX to -1,
+                POSITION_HISTORY to positionHistory(state),
             )
             val nextStatus = if (passCount >= 2) scoreStatus(state.board, state.boardSize)
             else GameStatus.IN_PROGRESS
@@ -97,24 +97,13 @@ class GoRuleEngine : RuleEngine {
             }
         }
 
-        val capturesForKo = move.captures
-        val koIndex = if (capturesForKo.size == 1) {
-            val group = groupAt(board, state.boardSize, position)
-            if (group.size == 1 && liberties(board, state.boardSize, group).size == 1) {
-                capturesForKo.first().row * state.boardSize + capturesForKo.first().col
-            } else {
-                -1
-            }
-        } else {
-            -1
-        }
         val whiteCaptures = (state.metadata[WHITE_CAPTURES] as? Int ?: 0) +
             if (state.currentTurn == PieceColor.WHITE) move.captures.size else 0
         val blackCaptures = (state.metadata[BLACK_CAPTURES] as? Int ?: 0) +
             if (state.currentTurn == PieceColor.BLACK) move.captures.size else 0
         val nextMetadata = state.metadata + mapOf(
             PASS_COUNT to 0,
-            KO_INDEX to koIndex,
+            POSITION_HISTORY to positionHistory(state) + boardKey(board),
             WHITE_CAPTURES to whiteCaptures,
             BLACK_CAPTURES to blackCaptures,
         )
@@ -147,8 +136,6 @@ class GoRuleEngine : RuleEngine {
 
     private fun placementMove(state: GameState, position: Position): Move? {
         if (state.get(position) != null) return null
-        val koIndex = state.metadata[KO_INDEX] as? Int ?: -1
-        if (position.row * state.boardSize + position.col == koIndex) return null
 
         val board = state.board.copyOf()
         board[position.row * state.boardSize + position.col] = GoPiece(state.currentTurn)
@@ -166,6 +153,9 @@ class GoRuleEngine : RuleEngine {
 
         val ownGroup = groupAt(board, state.boardSize, position)
         if (liberties(board, state.boardSize, ownGroup).isEmpty()) return null
+        // Positional superko: a legal move may not recreate any earlier board
+        // position, not only the immediately previous one.
+        if (boardKey(board) in positionHistory(state)) return null
         return Move(from = position, to = position, captures = captures)
     }
 
@@ -205,9 +195,28 @@ class GoRuleEngine : RuleEngine {
         return result
     }
 
+    private fun boardKey(board: Array<Piece?>): String =
+        buildString(board.size) {
+            board.forEach { piece ->
+                append(
+                    when (piece?.color) {
+                        PieceColor.WHITE -> 'w'
+                        PieceColor.BLACK -> 'b'
+                        null -> '.'
+                    },
+                )
+            }
+        }
+
+    private fun positionHistory(state: GameState): List<String> =
+        (state.metadata[POSITION_HISTORY] as? List<*>)
+            ?.filterIsInstance<String>()
+            ?.takeIf { it.isNotEmpty() }
+            ?: listOf(boardKey(state.board))
+
     private fun scoreStatus(board: Array<Piece?>, size: Int): GameStatus {
-        var whiteScore = board.count { it?.color == PieceColor.WHITE }
-        var blackScore = board.count { it?.color == PieceColor.BLACK } + KOMI
+        var whiteScore = board.count { it?.color == PieceColor.WHITE }.toDouble() + KOMI
+        var blackScore = board.count { it?.color == PieceColor.BLACK }.toDouble()
         val visited = mutableSetOf<Position>()
         for (row in 0 until size) {
             for (col in 0 until size) {
