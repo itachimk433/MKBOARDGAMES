@@ -53,11 +53,8 @@ class MenuView(context: Context) : View(context) {
     private val ludoBoardBitmap: Bitmap? = try {
         context.assets.open("ludo_board_reference.png").use { BitmapFactory.decodeStream(it) }
     } catch (e: Exception) { null }
-    private val xiangqiBoardBitmap: Bitmap? = try {
-        context.assets.open("xiangqi_board_reference.png").use { BitmapFactory.decodeStream(it) }
-    } catch (e: Exception) { null }
     private val shogiBoardBitmap: Bitmap? = try {
-        context.assets.open("shogi_board_empty.png").use { BitmapFactory.decodeStream(it) }
+        context.assets.open("shogi_board_empty.webp").use { BitmapFactory.decodeStream(it) }
     } catch (e: Exception) { null }
 
     private val bgPaint        = Paint().apply { color = Color.parseColor("#121212") }
@@ -418,19 +415,15 @@ class MenuView(context: Context) : View(context) {
     }
 
     private fun drawXiangqiMini(canvas: Canvas, left: Float, top: Float, size: Float) {
-        xiangqiBoardBitmap?.let {
-            canvas.drawBitmap(it, null, RectF(left, top, left + size, top + size), bitmapPaint)
-        } ?: run {
-            val cellW = size / 9f
-            val cellH = size / 10f
-            val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.parseColor("#D48A25")
-                style = Paint.Style.STROKE
-                strokeWidth = 1.5f * dp
-            }
-            for (r in 0..9) canvas.drawLine(left, top + r * cellH, left + size, top + r * cellH, linePaint)
-            for (c in 0..8) canvas.drawLine(left + c * cellW, top, left + c * cellW, top + size, linePaint)
+        val cellW = size / 9f
+        val cellH = size / 10f
+        val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#D48A25")
+            style = Paint.Style.STROKE
+            strokeWidth = 1.5f * dp
         }
+        for (r in 0..9) canvas.drawLine(left, top + r * cellH, left + size, top + r * cellH, linePaint)
+        for (c in 0..8) canvas.drawLine(left + c * cellW, top, left + c * cellW, top + size, linePaint)
     }
 
     private fun drawLudoMini(canvas: Canvas, left: Float, top: Float, size: Float) {

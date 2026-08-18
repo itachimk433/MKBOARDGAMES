@@ -5,19 +5,15 @@ import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
-import android.util.Base64
-import android.util.Log
 import android.view.MotionEvent
 import android.view.View
 import android.view.animation.AccelerateDecelerateInterpolator
-import org.json.JSONObject
 import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.min
@@ -46,9 +42,8 @@ enum class MotionDiceDirection {
 }
 
 /**
- * A software-rendered perspective die using the face textures embedded in
- * dice.gltf. Drawing on a normal View keeps the die visible on devices where
- * an OpenGL surface is unavailable or unreliable.
+ * A software-rendered perspective die. Drawing on a normal View keeps the die
+ * visible on devices where an OpenGL surface is unavailable or unreliable.
  */
 class LudoDiceView(context: Context) : View(context) {
     var value: Int = 1
@@ -60,7 +55,9 @@ class LudoDiceView(context: Context) : View(context) {
     private var rotationX = -18f
     private var rotationY = -28f
     private var rotationZ = 0f
-    private val textures = loadDiceTextures(context)
+    // Keep the software fallback self-contained so the app does not need to
+    // bundle a multi-megabyte GLTF file containing six simple die textures.
+    private val textures = List(6) { createFallbackTexture(it + 1) }
     private val bitmapPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private val edgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(190, 30, 38, 48)
@@ -314,23 +311,6 @@ class LudoDiceView(context: Context) : View(context) {
         }
     }
 
-    private fun loadDiceTextures(context: Context): List<Bitmap> {
-        return try {
-            val json = context.assets.open("dice.gltf").bufferedReader(Charsets.UTF_8).use { it.readText() }
-            val images = JSONObject(json).getJSONArray("images")
-            List(6) { index ->
-                val uri = images.getJSONObject(index).getString("uri")
-                val encoded = uri.substringAfter(',', "")
-                val bytes = Base64.decode(encoded, Base64.DEFAULT)
-                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                    ?: createFallbackTexture(index + 1)
-            }
-        } catch (error: Exception) {
-            Log.e(TAG, "Unable to load die textures", error)
-            List(6) { createFallbackTexture(it + 1) }
-        }
-    }
-
     private fun createFallbackTexture(number: Int): Bitmap {
         val size = 256
         val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
@@ -374,7 +354,4 @@ class LudoDiceView(context: Context) : View(context) {
         val indices: IntArray,
     )
 
-    companion object {
-        private const val TAG = "LudoDiceView"
-    }
 }

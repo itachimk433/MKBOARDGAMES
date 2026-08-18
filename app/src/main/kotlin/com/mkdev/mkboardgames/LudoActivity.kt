@@ -19,7 +19,6 @@ import android.text.InputType
 import android.view.Gravity
 import android.widget.FrameLayout
 import android.widget.EditText
-import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -776,10 +775,9 @@ class LudoActivity : AppCompatActivity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
-        val cart = ImageView(this).apply {
-            setImageResource(R.drawable.ludo_store_logo)
-            scaleType = ImageView.ScaleType.CENTER_CROP
+        val cart = storeText("🛒", 28f, Color.WHITE, Gravity.CENTER).apply {
             setPadding(dp(4), dp(4), dp(4), dp(4))
+            contentDescription = "Store"
             background = storePanel(Color.rgb(42, 20, 70), Color.rgb(170, 86, 245), 20f)
         }
         header.addView(cart, LinearLayout.LayoutParams(dp(58), dp(58)).apply {
@@ -924,10 +922,9 @@ class LudoActivity : AppCompatActivity() {
                 17f,
             )
         }
-        val icon = ImageView(this).apply {
-            setImageResource(abilityIconResource(ability))
-            scaleType = ImageView.ScaleType.CENTER_CROP
+        val icon = storeText(abilityIcon(ability), 30f, accent, Gravity.CENTER).apply {
             setPadding(dp(5), dp(5), dp(5), dp(5))
+            contentDescription = "${ability.label} icon"
             background = storePanel(Color.argb(75, Color.red(accent), Color.green(accent), Color.blue(accent)), accent, 15f)
         }
         card.addView(icon, LinearLayout.LayoutParams(dp(64), dp(64)).apply { marginEnd = dp(11) })
@@ -984,10 +981,9 @@ class LudoActivity : AppCompatActivity() {
         return LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(10), dp(5), dp(12), dp(5))
-            val icon = ImageView(this@LudoActivity).apply {
-                setImageResource(abilityIconResource(ability))
-                scaleType = ImageView.ScaleType.CENTER_CROP
+            val icon = storeText(abilityIcon(ability), 21f, accent, Gravity.CENTER).apply {
                 setPadding(dp(3), dp(3), dp(3), dp(3))
+                contentDescription = "${ability.label} icon"
                 alpha = if (count > 0) 1f else 0.5f
                 background = storePanel(
                     Color.argb(70, Color.red(accent), Color.green(accent), Color.blue(accent)),
@@ -1015,10 +1011,10 @@ class LudoActivity : AppCompatActivity() {
         }
     }
 
-    private fun abilityIconResource(ability: LudoAbility): Int = when (ability) {
-        LudoAbility.INVINCIBILITY -> R.drawable.invincibility_logo
-        LudoAbility.EXTRA_MOVE -> R.drawable.extra_move_logo
-        LudoAbility.REROLL -> R.drawable.reroll_logo
+    private fun abilityIcon(ability: LudoAbility): String = when (ability) {
+        LudoAbility.INVINCIBILITY -> "🛡"
+        LudoAbility.EXTRA_MOVE -> "⚡"
+        LudoAbility.REROLL -> "↻"
     }
 
     private fun storeText(text: String, size: Float, color: Int, gravity: Int): TextView =
