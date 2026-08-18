@@ -148,11 +148,9 @@ class GoRuleEngine : RuleEngine {
     }
 
     override fun evaluate(state: GameState): Int {
-        val white = state.board.count { it?.color == PieceColor.WHITE }
-        val black = state.board.count { it?.color == PieceColor.BLACK }
-        val whiteCaptures = state.metadata[WHITE_CAPTURES] as? Int ?: 0
-        val blackCaptures = state.metadata[BLACK_CAPTURES] as? Int ?: 0
-        return (white - black) * 10 + (whiteCaptures - blackCaptures) * 25
+        val summary = scoreSummary(state)
+        return ((summary.white.total - summary.black.total) * 100.0).toInt() +
+            (summary.white.captures - summary.black.captures) * 8
     }
 
     fun scoreSummary(state: GameState): GoScoreSummary {

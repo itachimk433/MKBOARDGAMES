@@ -16,6 +16,7 @@ import com.mkdev.mkboardgames.games.chess.ChessPiece
 import com.mkdev.mkboardgames.games.chess.ChessRuleEngine
 import com.mkdev.mkboardgames.games.foxandgeese.FoxAndGeeseRuleEngine
 import com.mkdev.mkboardgames.games.go.GoRuleEngine
+import com.mkdev.mkboardgames.games.go.GoAIPlayer
 import com.mkdev.mkboardgames.games.othello.OthelloRuleEngine
 import com.mkdev.mkboardgames.games.shogi.ShogiPiece
 import com.mkdev.mkboardgames.games.shogi.ShogiRuleEngine
@@ -33,6 +34,7 @@ class GameActivity : AppCompatActivity() {
     private lateinit var boardView:        BoardView
     private lateinit var hudView:          HudView
     private lateinit var topCaptureView:   CaptureStripView
+    private lateinit var goNoticeView:    android.widget.TextView
     private lateinit var bottomCaptureView: CaptureStripView
     private lateinit var engine:           RuleEngine
     private lateinit var gameType:         String
@@ -89,6 +91,15 @@ class GameActivity : AppCompatActivity() {
 
         hudView          = HudView(this)
         topCaptureView   = CaptureStripView(this).also { it.dividerOnTop = false }
+        goNoticeView     = android.widget.TextView(this).apply {
+            setTextColor(Color.parseColor("#FFE0A3"))
+            textSize = 12f
+            gravity = Gravity.CENTER
+            setPadding((14 * dp).toInt(), (7 * dp).toInt(), (14 * dp).toInt(), (7 * dp).toInt())
+            setLineSpacing(1f, 1.05f)
+            setBackgroundColor(Color.parseColor("#1A1A1A"))
+            visibility = View.GONE
+        }
         boardView        = BoardView(this)
         bottomCaptureView = CaptureStripView(this).also { it.dividerOnTop = true }
         topCaptureView.onPieceSelected = ::handleShogiHandTap
@@ -106,6 +117,11 @@ class GameActivity : AppCompatActivity() {
             android.widget.LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, hudH))
         container.addView(topCaptureView,
             android.widget.LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, capH))
+        container.addView(goNoticeView,
+            android.widget.LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                (58 * dp).toInt(),
+            ))
         container.addView(boardView,
             android.widget.LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0)
                 .apply { weight = 1f })
@@ -508,6 +524,7 @@ Checkmate your opponent's King.
         boardView.onGameOverTapped     = { showResultDialog() }
         boardView.refreshTheme()
         hudView.setGoMode(gameType == "GO")
+        hideGoNotice()
 
         topCaptureView.setLabel(
             when {
@@ -645,11 +662,12 @@ Checkmate your opponent's King.
             .show()
     }
 
-    private fun handleMove(move: Move) {
+    private fun handleMove(move: Move, automaticPass: Boolean = false) {
         if (boardView.isLocked) return
         try {
             val moverColor = gameState.get(move.from)?.color
                 ?: gameState.currentTurn
+            if (gameType == "GO" && !automaticPass) hideGoNotice()
             for (cap in move.captures) {
                 val capPiece = gameState.get(cap) ?: continue
                 if (gameType == "OTHELLO" || gameType == "SHOGI") continue
@@ -680,6 +698,16 @@ Checkmate your opponent's King.
                 AdManager.loadInterstitial(this) { interstitialAd = it }
                 showResultDialog()
                 return
+            }
+            if (gameType == "GO" && automaticPass) {
+                if (moverColor != playerColor) {
+                    showGoNotice(
+                        "Your opponent no longer has available moves, " +
+                            "click on Pass to end the game, or continue taking more territory.",
+                    )
+                } else {
+                    showGoNotice("You no longer have available moves. Passing automatically…")
+                }
             }
             if (!scheduleGoAutoPassIfNeeded() &&
                 vsAI && gameState.currentTurn != playerColor
@@ -717,12 +745,8 @@ Checkmate your opponent's King.
         val passingColor = gameState.currentTurn
         val passingPlayer = if (passingColor == PieceColor.WHITE) "White" else "Black"
         boardView.isLocked = true
-        hudView.setInfo(
-            label = "No legal moves",
-            canUndo = moveHistory.isNotEmpty(),
-            canRedo = redoGameStates.isNotEmpty(),
-            detail = "$passingPlayer is passing automatically…",
-        )
+        showGoNotice("$passingPlayer has no legal placements.\nPassing automatically…")
+        updateHud()
         autoPassJob = scope.launch {
             delay(900L)
             if (!isActive ||
@@ -732,7 +756,7 @@ Checkmate your opponent's King.
             ) return@launch
             autoPassJob = null
             boardView.isLocked = false
-            handleMove(GoRuleEngine.passMove())
+            handleMove(GoRuleEngine.passMove(), automaticPass = true)
         }
         return true
     }
@@ -821,6 +845,15 @@ Checkmate your opponent's King.
     private fun triggerAI() {
         boardView.isLocked = true; hudView.setThinking(true)
         scope.launch {
+            if (gameType == "GO") {
+                delay(SettingsManager.goAiThinkingDelayMs(this@GameActivity))
+            }
+            if (!isActive || gameState.status != GameStatus.IN_PROGRESS) {
+                boardView.isLocked = false
+                hudView.setThinking(false)
+                return@launch
+            }
+            val thinkingState = gameState
             val move = withContext(Dispatchers.Default) {
                 try {
                     when (gameType) {
@@ -830,7 +863,7 @@ Checkmate your opponent's King.
                                 maxDepth = 2,
                                 timeLimitMs = 1800L,
                                 quiesceDepth = 1,
-                            ).bestMove(gameState)
+                            ).bestMove(thinkingState)
                         }
                         "SHOGI" -> {
                             AIPlayer(
@@ -838,27 +871,31 @@ Checkmate your opponent's King.
                                 maxDepth = SettingsManager.shogiAiDepth(this@GameActivity),
                                 timeLimitMs = SettingsManager.shogiAiTimeLimitMs(this@GameActivity),
                                 quiesceDepth = 1,
-                            ).bestMove(gameState)
+                            ).bestMove(thinkingState)
                         }
                         "OTHELLO"  -> {
                             val ai = AIPlayer(engine, maxDepth = SettingsManager.othelloAiDepth(this@GameActivity), timeLimitMs = 3000L)
-                            ai.bestMove(gameState)
-                                ?: engine.allLegalMoves(gameState, gameState.currentTurn).randomOrNull()
+                            ai.bestMove(thinkingState)
+                                ?: engine.allLegalMoves(thinkingState, thinkingState.currentTurn).randomOrNull()
                         }
                         "GO" -> {
-                            AIPlayer(engine, maxDepth = 1, timeLimitMs = 1200L)
-                                .bestMove(gameState)
+                            GoAIPlayer(
+                                engine = engine as GoRuleEngine,
+                                maxIterations = SettingsManager.goAiIterations(this@GameActivity),
+                                timeLimitMs = SettingsManager.goAiTimeLimitMs(this@GameActivity),
+                                deterministic = SettingsManager.getGoDifficulty(this@GameActivity) == 2,
+                            ).bestMove(thinkingState)
                         }
                         "CHECKERS" -> {
                             val ai = AIPlayer(engine, maxDepth = SettingsManager.checkersAiDepth(this@GameActivity))
-                            ai.bestMove(gameState)
+                            ai.bestMove(thinkingState)
                         }
                         "INTERNATIONAL_DRAUGHTS" -> {
                             val ai = AIPlayer(
                                 engine,
                                 maxDepth = SettingsManager.internationalDraughtsAiDepth(this@GameActivity)
                             )
-                            ai.bestMove(gameState)
+                            ai.bestMove(thinkingState)
                         }
                         "FOX_AND_GEESE" -> {
                             val ai = AIPlayer(
@@ -866,7 +903,7 @@ Checkmate your opponent's King.
                                 maxDepth = SettingsManager.foxAndGeeseAiDepth(this@GameActivity),
                                 timeLimitMs = SettingsManager.foxAndGeeseAiTimeLimitMs(this@GameActivity)
                             )
-                            ai.bestMove(gameState)
+                            ai.bestMove(thinkingState)
                         }
                         else -> {
                             // Chess — deeper search with quiescence and time limit
@@ -874,13 +911,17 @@ Checkmate your opponent's King.
                             val timeMs   = SettingsManager.chessAiTimeLimitMs(this@GameActivity)
                             val quiesce  = SettingsManager.chessAiQuiesceDepth(this@GameActivity)
                             val ai = AIPlayer(engine, maxDepth = depth, timeLimitMs = timeMs, quiesceDepth = quiesce)
-                            ai.bestMove(gameState)
+                            ai.bestMove(thinkingState)
                         }
                     }
                 } catch (e: Throwable) { null }
             }
             hudView.setThinking(false)
-            if (move != null) boardView.animateExternalMove(move)
+            val stateIsStillCurrent =
+                gameState.currentTurn == thinkingState.currentTurn &&
+                    gameState.moveHistory.size == thinkingState.moveHistory.size &&
+                    gameState.status == thinkingState.status
+            if (move != null && isActive && stateIsStillCurrent) boardView.animateExternalMove(move)
             else boardView.isLocked = false
         }
     }
@@ -901,8 +942,22 @@ Checkmate your opponent's King.
         hudView.setInfo(label, canUndo = moveHistory.isNotEmpty(), canRedo = redoGameStates.isNotEmpty())
     }
 
+    private fun showGoNotice(message: String) {
+        if (gameType != "GO") return
+        goNoticeView.text = message
+        goNoticeView.visibility = View.VISIBLE
+    }
+
+    private fun hideGoNotice() {
+        if (::goNoticeView.isInitialized) {
+            goNoticeView.text = ""
+            goNoticeView.visibility = View.GONE
+        }
+    }
+
     fun onUndoClicked() {
         if (moveHistory.isEmpty() || boardView.isLocked) return
+        if (gameType == "GO") hideGoNotice()
         val prevState = gameState
         val prevCap   = capturedByWhite.toList() to capturedByBlack.toList()
         val rMoves    = mutableListOf<GameState>()
@@ -922,6 +977,7 @@ Checkmate your opponent's King.
 
     fun onRedoClicked() {
         if (redoGameStates.isEmpty() || boardView.isLocked) return
+        if (gameType == "GO") hideGoNotice()
         val nextState = redoGameStates.removeLast()
         val nextCap   = redoCaptures.removeLast()
         val rMoves    = redoMoves.removeLast()
@@ -979,6 +1035,10 @@ Checkmate your opponent's King.
         val getDiff: () -> Int
         val setDiff: (Int) -> Unit
         when (gameType) {
+            "GO" -> {
+                getDiff = { SettingsManager.getGoDifficulty(this) }
+                setDiff = { v -> SettingsManager.setGoDifficulty(this, v) }
+            }
             "CHECKERS" -> {
                 getDiff = { SettingsManager.getCheckersDifficulty(this) }
                 setDiff = { v -> SettingsManager.setCheckersDifficulty(this, v) }

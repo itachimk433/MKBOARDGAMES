@@ -15,6 +15,7 @@ object SettingsManager {
     private const val KEY_FOX_AND_GEESE_DIFFICULTY = "fox_and_geese_ai_difficulty"
     private const val KEY_LUDO_DIFFICULTY = "ludo_ai_difficulty"
     private const val KEY_SHOGI_DIFFICULTY = "shogi_ai_difficulty"
+    private const val KEY_GO_DIFFICULTY = "go_ai_difficulty"
 
     // ── Hints keys ───────────────────────────────────────────────────────────
     private const val KEY_CHESS_HINTS    = "chess_show_hints"
@@ -138,6 +139,29 @@ object SettingsManager {
         0 -> 700L
         2 -> 2200L
         else -> 1200L
+    }
+
+    // ── Go ────────────────────────────────────────────────────────────────────
+    fun getGoDifficulty(ctx: Context) = prefs(ctx).getInt(KEY_GO_DIFFICULTY, 0)
+    fun setGoDifficulty(ctx: Context, v: Int) =
+        prefs(ctx).edit().putInt(KEY_GO_DIFFICULTY, v.coerceIn(0, 2)).apply()
+
+    fun goAiIterations(ctx: Context) = when (getGoDifficulty(ctx)) {
+        0 -> 260
+        2 -> 1500
+        else -> 720
+    }
+
+    fun goAiTimeLimitMs(ctx: Context): Long = when (getGoDifficulty(ctx)) {
+        0 -> 550L
+        2 -> 2600L
+        else -> 1300L
+    }
+
+    fun goAiThinkingDelayMs(ctx: Context): Long = when (getGoDifficulty(ctx)) {
+        0 -> 650L
+        2 -> 1350L
+        else -> 950L
     }
 
     // ── Tic-Tac-Toe ──────────────────────────────────────────────────────────
