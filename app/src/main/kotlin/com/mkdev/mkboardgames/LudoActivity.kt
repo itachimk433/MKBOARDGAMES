@@ -751,7 +751,7 @@ class LudoActivity : AppCompatActivity() {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(14), dp(14), dp(14), dp(12))
             background = GradientDrawable().apply {
-                cornerRadius = 24f * density
+                cornerRadius = 0f
                 setColor(Color.rgb(9, 18, 29))
                 setStroke(dp(2), Color.rgb(72, 151, 235))
             }
@@ -828,7 +828,7 @@ class LudoActivity : AppCompatActivity() {
         ).apply { bottomMargin = dp(7) })
         content.addView(cards)
 
-        val activeTitle = storeText("✦  ACTIVE BOOSTS  ✦", 13f, Color.rgb(42, 224, 226), Gravity.CENTER).apply {
+        val activeTitle = storeText("ACTIVE BOOSTS", 13f, Color.rgb(42, 224, 226), Gravity.CENTER).apply {
             letterSpacing = 0.12f
         }
         content.addView(activeTitle, LinearLayout.LayoutParams(
