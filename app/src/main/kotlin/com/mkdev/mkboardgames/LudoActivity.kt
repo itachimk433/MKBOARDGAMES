@@ -38,7 +38,7 @@ import com.mkdev.mkboardgames.games.ludo.LudoPlayerEconomy
 import com.mkdev.mkboardgames.games.ludo.LudoSetup
 import com.mkdev.mkboardgames.ui.LudoBoardView
 import com.mkdev.mkboardgames.ui.LudoControlTileView
-import com.mkdev.mkboardgames.ui.LudoDiceView
+import com.mkdev.mkboardgames.ui.GlbDiceView
 import com.mkdev.mkboardgames.ui.LudoStatusStripView
 import com.mkdev.mkboardgames.ui.MotionDiceDirection
 import kotlin.math.abs
@@ -48,7 +48,7 @@ import kotlin.random.Random
 
 class LudoActivity : AppCompatActivity() {
     private lateinit var boardView: LudoBoardView
-    private lateinit var diceView: LudoDiceView
+    private lateinit var diceView: GlbDiceView
     private lateinit var statusView: LudoStatusStripView
     private lateinit var motionView: LudoControlTileView
     private lateinit var tapRollView: LudoControlTileView
@@ -160,7 +160,7 @@ class LudoActivity : AppCompatActivity() {
         ))
         statusView = LudoStatusStripView(this)
         boardView = LudoBoardView(this)
-        diceView = LudoDiceView(this)
+        diceView = GlbDiceView(this)
         motionView = LudoControlTileView(this, LudoControlTileView.ControlType.MOTION)
         tapRollView = LudoControlTileView(this, LudoControlTileView.ControlType.TAP_TO_ROLL)
 
