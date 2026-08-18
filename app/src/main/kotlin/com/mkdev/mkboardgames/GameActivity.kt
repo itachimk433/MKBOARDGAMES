@@ -252,6 +252,23 @@ class GameActivity : AppCompatActivity() {
             else -> "Chess"
         }
         val rulesText = when (gameType) {
+            "GO" -> """
+GO 围棋 — Rules
+
+Overview
+Go is played on the 13×13 intersections of the wooden board. White moves first in this app. Players place one stone at a time and surround territory while trying to capture opposing groups.
+
+─────────────────────────
+
+Placing Stones
+Tap an empty intersection to place your stone. A connected group shares liberties with its orthogonally adjacent stones. When a group has no liberties, all of its stones are captured and removed.
+
+Suicide and Ko
+You may not place a stone where your own group would have no liberties, unless the move captures an opposing group. The ko rule prevents immediately recapturing a single stone in the same position.
+
+Passing and Winning
+Tap Pass when you have no useful placement. Two consecutive passes end the game. The winner is decided by stones and surrounded territory, with a small komi added for Black.
+            """.trimIndent()
             "XIANGQI" -> """
 XIANGQI 象棋 — Rules
 
@@ -473,7 +490,7 @@ Checkmate your opponent's King.
         boardView.ruleEngine           = engine
         boardView.showMustCaptureHints =
             gameType == "CHECKERS" || gameType == "INTERNATIONAL_DRAUGHTS"
-        boardView.directMoveMode       = (gameType == "OTHELLO")
+        boardView.directMoveMode       = (gameType == "OTHELLO" || gameType == "GO")
         boardView.gameState            = gameState
         boardView.isFlipped            = false
         boardView.isLocked             = false
@@ -483,6 +500,7 @@ Checkmate your opponent's King.
         // Tap after game ends → re-show result dialog without double-recording stats
         boardView.onGameOverTapped     = { showResultDialog() }
         boardView.refreshTheme()
+        hudView.setGoMode(gameType == "GO")
 
         topCaptureView.setLabel(
             when {
@@ -642,6 +660,14 @@ Checkmate your opponent's King.
         }
     }
 
+    private fun onPassClicked() {
+        if (gameType != "GO" ||
+            boardView.isLocked ||
+            gameState.status != GameStatus.IN_PROGRESS
+        ) return
+        handleMove(GoRuleEngine.passMove())
+    }
+
     /** Record win/loss/draw once per game. Safe to call multiple times. */
     private fun recordResult() {
         if (resultRecorded || !vsAI) return
@@ -749,6 +775,10 @@ Checkmate your opponent's King.
                             val ai = AIPlayer(engine, maxDepth = SettingsManager.othelloAiDepth(this@GameActivity), timeLimitMs = 3000L)
                             ai.bestMove(gameState)
                                 ?: engine.allLegalMoves(gameState, gameState.currentTurn).randomOrNull()
+                        }
+                        "GO" -> {
+                            AIPlayer(engine, maxDepth = 1, timeLimitMs = 1200L)
+                                .bestMove(gameState)
                         }
                         "CHECKERS" -> {
                             val ai = AIPlayer(engine, maxDepth = SettingsManager.checkersAiDepth(this@GameActivity))
@@ -988,6 +1018,7 @@ Checkmate your opponent's King.
         private var canUndo  = false
         private var canRedo  = false
         private var thinking = false
+        private var goMode   = false
 
         private val dp = resources.displayMetrics.density
         private val sp = resources.displayMetrics.scaledDensity
@@ -1013,6 +1044,7 @@ Checkmate your opponent's King.
         }
 
         private val backRect = RectF()
+        private val passRect = RectF()
         private val undoRect = RectF()
         private val redoRect = RectF()
         private val menuRect = RectF()
@@ -1021,10 +1053,20 @@ Checkmate your opponent's King.
             title = label; this.canUndo = canUndo; this.canRedo = canRedo; invalidate()
         }
         fun setThinking(t: Boolean) { thinking = t; invalidate() }
+        fun setGoMode(enabled: Boolean) {
+            goMode = enabled
+            if (width > 0 && height > 0) onSizeChanged(width, height, width, height)
+            invalidate()
+        }
 
         override fun onSizeChanged(w: Int, h: Int, ow: Int, oh: Int) {
             val bw = 44f * dp; val bh = 28f * dp; val by = (h - bh) / 2f
             backRect.set(6f * dp,        by, 6f * dp + bw,   by + bh)
+            if (goMode) {
+                passRect.set(w - bw * 4.4f, by, w - bw * 3.35f, by + bh)
+            } else {
+                passRect.set(0f, 0f, 0f, 0f)
+            }
             undoRect.set(w - bw * 3.3f,  by, w - bw * 2.2f,  by + bh)
             redoRect.set(w - bw * 2.15f, by, w - bw * 1.1f,  by + bh)
             menuRect.set(w - bw * 1.05f, by, w - 4f * dp,    by + bh)
@@ -1035,6 +1077,7 @@ Checkmate your opponent's King.
             if (e.action == MotionEvent.ACTION_UP) {
                 when {
                     backRect.contains(e.x, e.y) -> { SoundPlayer.play("ui_click"); this@GameActivity.onBackPressed() }
+                    goMode && passRect.contains(e.x, e.y) -> { SoundPlayer.play("ui_click"); onPassClicked() }
                     undoRect.contains(e.x, e.y) -> { SoundPlayer.play("ui_click"); onUndoClicked() }
                     redoRect.contains(e.x, e.y) -> { SoundPlayer.play("ui_click"); onRedoClicked() }
                     menuRect.contains(e.x, e.y) -> { SoundPlayer.play("ui_click"); onMenuClicked() }
@@ -1050,17 +1093,19 @@ Checkmate your opponent's King.
 
             val rr = 5f * dp
             canvas.drawRoundRect(backRect, rr, rr, btnBgPaint)
+            if (goMode) canvas.drawRoundRect(passRect, rr, rr, btnBgPaint)
             canvas.drawRoundRect(undoRect, rr, rr, btnBgPaint)
             canvas.drawRoundRect(redoRect, rr, rr, btnBgPaint)
             canvas.drawRoundRect(menuRect, rr, rr, btnBgPaint)
             canvas.drawText("← Back", backRect.centerX(), backRect.centerY() + btnPaint.textSize * 0.36f, btnPaint)
+            if (goMode) canvas.drawText("Pass", passRect.centerX(), passRect.centerY() + btnPaint.textSize * 0.36f, btnPaint)
             canvas.drawText("Undo", undoRect.centerX(), undoRect.centerY() + btnPaint.textSize * 0.36f,
                 if (canUndo) btnPaint else dimPaint)
             canvas.drawText("Redo", redoRect.centerX(), redoRect.centerY() + btnPaint.textSize * 0.36f,
                 if (canRedo) btnPaint else dimPaint)
             canvas.drawText("Menu", menuRect.centerX(), menuRect.centerY() + btnPaint.textSize * 0.36f, btnPaint)
 
-            val cx = (backRect.right + undoRect.left) / 2f
+            val cx = (backRect.right + if (goMode) passRect.left else undoRect.left) / 2f
             val sub = if (thinking) "Thinking…" else ""
             canvas.drawText(title, cx, h / 2f - txtPaint.textSize * 0.15f, txtPaint.also { it.textAlign = Paint.Align.CENTER })
             if (sub.isNotEmpty()) canvas.drawText(sub, cx, h / 2f + subPaint.textSize * 1.1f, subPaint.also { it.textAlign = Paint.Align.CENTER })

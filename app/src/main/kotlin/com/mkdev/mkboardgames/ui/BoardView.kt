@@ -318,6 +318,13 @@ class BoardView(context: Context) : View(context) {
     }
 
     private fun handleTap(pos: Position) {
+        if (isGoBoard()) {
+            val engine = ruleEngine ?: return
+            val move = engine.allLegalMoves(gameState, gameState.currentTurn)
+                .firstOrNull { it.to == pos && it.metadata["pass"] != true }
+            if (move != null) startMoveAnimation(move)
+            return
+        }
         if (directMoveMode) {
             val engine = ruleEngine ?: return
             if (legalMoves.isEmpty())
@@ -389,6 +396,17 @@ class BoardView(context: Context) : View(context) {
     }
 
     private fun startMoveAnimation(move: Move) {
+        if (isGoBoard()) {
+            selectedPos = null
+            legalMoves = emptyList()
+            isLocked = true
+            postDelayed({
+                isLocked = false
+                invalidate()
+                onMoveMade?.invoke(move)
+            }, 140L)
+            return
+        }
         if (move.metadata["drop"] != null) {
             selectedPos = null
             legalMoves = emptyList()
@@ -429,6 +447,7 @@ class BoardView(context: Context) : View(context) {
     private fun cellCenter(pos: Position): PointF {
         if (isShogiBoard()) return shogiPoint(pos)
         if (isXiangqiBoard()) return xiangqiPoint(pos)
+        if (isGoBoard()) return goPoint(pos)
         val last = gameState.boardSize - 1
         val dr = if (isFlipped) last - pos.row else pos.row
         val dc = if (isFlipped) last - pos.col else pos.col
@@ -455,6 +474,7 @@ class BoardView(context: Context) : View(context) {
             goBoardBitmap?.let {
                 canvas.drawBitmap(it, null, goImageRect, Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
             }
+            drawGoHighlights(canvas)
             drawGoPieces(canvas)
             return
         }
@@ -788,6 +808,14 @@ class BoardView(context: Context) : View(context) {
         }
     }
 
+    private fun drawGoHighlights(canvas: Canvas) {
+        val lastMove = gameState.lastMove
+        if (lastMove != null && lastMove.metadata["pass"] != true) {
+            val point = goPoint(lastMove.to)
+            canvas.drawCircle(point.x, point.y, cellSize * 0.16f, highlightGold)
+        }
+    }
+
     private fun drawGoPiece(canvas: Canvas, piece: GoPiece, cx: Float, cy: Float) {
         val radius = cellSize * 0.43f
         val shadow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -1082,6 +1110,28 @@ class BoardView(context: Context) : View(context) {
             return Position(
                 if (isFlipped) 9 - displayedRow else displayedRow,
                 if (isFlipped) 8 - displayedCol else displayedCol,
+            )
+        }
+        if (isGoBoard()) {
+            if (goImageRect.width() <= 0f || goImageRect.height() <= 0f) return null
+            val displayedCol = goGridX.indices.minByOrNull { index ->
+                kotlin.math.abs(x - (goImageRect.left + goImageRect.width() * goGridX[index]))
+            } ?: return null
+            val displayedRow = goGridY.indices.minByOrNull { index ->
+                kotlin.math.abs(y - (goImageRect.top + goImageRect.height() * goGridY[index]))
+            } ?: return null
+            val nearest = goPoint(
+                Position(
+                    if (isFlipped) 12 - displayedRow else displayedRow,
+                    if (isFlipped) 12 - displayedCol else displayedCol,
+                ),
+            )
+            if (kotlin.math.abs(x - nearest.x) > cellSize * 0.52f ||
+                kotlin.math.abs(y - nearest.y) > cellSize * 0.52f
+            ) return null
+            return Position(
+                if (isFlipped) 12 - displayedRow else displayedRow,
+                if (isFlipped) 12 - displayedCol else displayedCol,
             )
         }
         val col = ((x - boardLeft) / cellSize).toInt()

@@ -24,6 +24,7 @@ import com.mkdev.mkboardgames.games.chess.ChessRuleEngine
 import com.mkdev.mkboardgames.games.connectfour.ConnectFourPiece
 import com.mkdev.mkboardgames.games.connectfour.ConnectFourRuleEngine
 import com.mkdev.mkboardgames.games.foxandgeese.FoxAndGeeseRuleEngine
+import com.mkdev.mkboardgames.games.go.GoRuleEngine
 import com.mkdev.mkboardgames.games.ludo.LudoRuleEngine
 import com.mkdev.mkboardgames.games.ludo.LudoSetup
 import com.mkdev.mkboardgames.games.morabaraba.MorabarabaRuleEngine
@@ -61,7 +62,7 @@ class ReplayActivity : AppCompatActivity() {
                     obj.put("caps", caps)
                 }
                 if (m.promotionType != null) obj.put("promo", m.promotionType)
-                for (key in arrayOf("dice", "player", "token", "targetProgress", "drop", "promote")) {
+                for (key in arrayOf("dice", "player", "token", "targetProgress", "drop", "promote", "pass")) {
                     val value = m.metadata[key]
                     if (value is Int || value is String || value is Boolean) obj.put(key, value)
                 }
@@ -92,6 +93,7 @@ class ReplayActivity : AppCompatActivity() {
                 }
                 if (obj.has("drop")) metadata["drop"] = obj.getString("drop")
                 if (obj.has("promote")) metadata["promote"] = obj.getBoolean("promote")
+                if (obj.has("pass")) metadata["pass"] = obj.getBoolean("pass")
                 list += Move(from, to, caps, promo, metadata)
             }
             return list
@@ -197,6 +199,7 @@ class ReplayActivity : AppCompatActivity() {
             "LUDO" -> LudoRuleEngine()
             "XIANGQI" -> XiangqiRuleEngine()
             "SHOGI" -> ShogiRuleEngine()
+            "GO" -> GoRuleEngine()
             else         -> ChessRuleEngine()
         }
 
