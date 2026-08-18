@@ -82,6 +82,7 @@ class GlbDiceView(context: Context) : GLSurfaceView(context) {
                 val gestureTilt = sin(progress * Math.PI).toFloat()
                 rotationX = startX + (target.x - startX) * progress + tiltX * gestureTilt
                 rotationY = startY + (endY - startY) * progress + tiltY * gestureTilt
+                glRenderer.setRotation(rotationX, rotationY)
             }
             addListener(object : AnimatorListenerAdapter() {
                 override fun onAnimationEnd(animation: Animator) {
@@ -89,6 +90,7 @@ class GlbDiceView(context: Context) : GLSurfaceView(context) {
                     isRolling = false
                     rotationX = target.x
                     rotationY = target.y
+                    glRenderer.setRotation(rotationX, rotationY)
                     onFinished()
                 }
             })
@@ -130,6 +132,13 @@ class GlbDiceView(context: Context) : GLSurfaceView(context) {
         private var view = FloatArray(16)
         private var width = 1
         private var height = 1
+        @Volatile private var rotationX = -18f
+        @Volatile private var rotationY = -28f
+
+        fun setRotation(x: Float, y: Float) {
+            rotationX = x
+            rotationY = y
+        }
 
         override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
             GLES20.glClearColor(16f / 255f, 21f / 255f, 26f / 255f, 1f)
