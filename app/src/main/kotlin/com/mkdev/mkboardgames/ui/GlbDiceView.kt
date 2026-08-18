@@ -62,6 +62,11 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
             ),
         )
 
+        glRenderer.onFrameRendered = {
+            post {
+                fallbackView.visibility = GONE
+            }
+        }
         glSurfaceView.setEGLContextClientVersion(2)
         glSurfaceView.setEGLConfigChooser(8, 8, 8, 8, 16, 0)
         glSurfaceView.holder.setFormat(PixelFormat.TRANSLUCENT)
@@ -165,6 +170,8 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         private var modelHandle = 0
         private var textureHandle = 0
         private var textureIsAlphaHandle = 0
+        private var hasReportedFirstFrame = false
+        var onFrameRendered: (() -> Unit)? = null
         private var projection = FloatArray(16)
         private var view = FloatArray(16)
         private var width = 1
@@ -299,6 +306,10 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
                 GLES20.GL_UNSIGNED_SHORT,
                 currentModel.indices,
             )
+            if (!hasReportedFirstFrame && GLES20.glGetError() == GLES20.GL_NO_ERROR) {
+                hasReportedFirstFrame = true
+                onFrameRendered?.invoke()
+            }
 
             GLES20.glDisableVertexAttribArray(positionHandle)
             GLES20.glDisableVertexAttribArray(normalHandle)
