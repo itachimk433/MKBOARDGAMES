@@ -16,6 +16,7 @@ import com.mkdev.mkboardgames.games.chess.ChessPiece
 import com.mkdev.mkboardgames.games.foxandgeese.FoxAndGeeseSetup
 import com.mkdev.mkboardgames.games.foxandgeese.FoxAndGeesePiece
 import com.mkdev.mkboardgames.games.foxandgeese.FoxAndGeesePieceType
+import com.mkdev.mkboardgames.games.go.GoPiece
 import com.mkdev.mkboardgames.games.go.GoRuleEngine
 import com.mkdev.mkboardgames.games.othello.OthelloPiece
 import com.mkdev.mkboardgames.games.shogi.ShogiPiece
@@ -134,6 +135,14 @@ class BoardView(context: Context) : View(context) {
     private var xiangqiCellWidth = 0f
     private var xiangqiCellHeight = 0f
     private var goImageRect = RectF()
+    private val goGridX = floatArrayOf(
+        0.084f, 0.154f, 0.224f, 0.294f, 0.364f, 0.434f, 0.503f,
+        0.572f, 0.641f, 0.711f, 0.781f, 0.851f, 0.919f,
+    )
+    private val goGridY = floatArrayOf(
+        0.079f, 0.145f, 0.211f, 0.275f, 0.341f, 0.406f, 0.472f,
+        0.537f, 0.603f, 0.667f, 0.733f, 0.798f, 0.866f,
+    )
 
     private val xiangqiBoardBitmap: Bitmap? = try {
         context.assets.open("xiangqi_board_empty.png").use { BitmapFactory.decodeStream(it) }
@@ -446,6 +455,7 @@ class BoardView(context: Context) : View(context) {
             goBoardBitmap?.let {
                 canvas.drawBitmap(it, null, goImageRect, Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
             }
+            drawGoPieces(canvas)
             return
         }
         drawBoard(canvas); drawLabels(canvas); drawHighlights(canvas); drawPieces(canvas)
@@ -770,6 +780,66 @@ class BoardView(context: Context) : View(context) {
         }
     }
 
+    private fun drawGoPieces(canvas: Canvas) {
+        for (row in 0 until gameState.boardSize) for (col in 0 until gameState.boardSize) {
+            val piece = gameState.get(row, col) as? GoPiece ?: continue
+            val point = goPoint(Position(row, col))
+            drawGoPiece(canvas, piece, point.x, point.y)
+        }
+    }
+
+    private fun drawGoPiece(canvas: Canvas, piece: GoPiece, cx: Float, cy: Float) {
+        val radius = cellSize * 0.43f
+        val shadow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(105, 0, 0, 0)
+            maskFilter = BlurMaskFilter(radius * 0.18f, BlurMaskFilter.Blur.NORMAL)
+        }
+        canvas.drawCircle(cx + radius * 0.10f, cy + radius * 0.15f, radius, shadow)
+
+        val colors = if (piece.color == PieceColor.BLACK) {
+            intArrayOf(Color.rgb(92, 92, 92), Color.rgb(28, 28, 28), Color.rgb(3, 3, 3))
+        } else {
+            intArrayOf(Color.WHITE, Color.rgb(235, 235, 235), Color.rgb(164, 164, 164))
+        }
+        val stone = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = RadialGradient(
+                cx - radius * 0.33f,
+                cy - radius * 0.38f,
+                radius * 1.35f,
+                colors,
+                floatArrayOf(0f, 0.50f, 1f),
+                Shader.TileMode.CLAMP,
+            )
+        }
+        canvas.drawCircle(cx, cy, radius, stone)
+
+        val edge = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = maxOf(1f, radius * 0.045f)
+            color = if (piece.color == PieceColor.BLACK)
+                Color.argb(190, 0, 0, 0)
+            else
+                Color.argb(150, 118, 118, 118)
+        }
+        canvas.drawCircle(cx, cy, radius, edge)
+
+        val glint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (piece.color == PieceColor.BLACK)
+                Color.argb(110, 255, 255, 255)
+            else
+                Color.argb(145, 255, 255, 255)
+        }
+        canvas.drawOval(
+            RectF(
+                cx - radius * 0.52f,
+                cy - radius * 0.62f,
+                cx - radius * 0.03f,
+                cy - radius * 0.34f,
+            ),
+            glint,
+        )
+    }
+
     private fun drawPieceAt(canvas: Canvas, piece: Piece, cx: Float, cy: Float, pos: Position? = null) {
         when (piece) {
             is ChessPiece    -> drawChessPiece(canvas, piece, cx, cy)
@@ -953,6 +1023,15 @@ class BoardView(context: Context) : View(context) {
         ruleEngine is ShogiRuleEngine || gameState.board.any { it is ShogiPiece }
 
     private fun isGoBoard(): Boolean = ruleEngine is GoRuleEngine
+
+    private fun goPoint(position: Position): PointF {
+        val displayedRow = if (isFlipped) 12 - position.row else position.row
+        val displayedCol = if (isFlipped) 12 - position.col else position.col
+        return PointF(
+            goImageRect.left + goImageRect.width() * goGridX[displayedCol],
+            goImageRect.top + goImageRect.height() * goGridY[displayedRow],
+        )
+    }
 
     private fun shogiPoint(position: Position): PointF {
         val displayedRow = if (isFlipped) 8 - position.row else position.row

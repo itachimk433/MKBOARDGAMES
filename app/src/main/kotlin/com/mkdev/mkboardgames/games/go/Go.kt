@@ -3,6 +3,7 @@ package com.mkdev.mkboardgames.games.go
 import com.mkdev.mkboardgames.engine.GameState
 import com.mkdev.mkboardgames.engine.GameStatus
 import com.mkdev.mkboardgames.engine.Move
+import com.mkdev.mkboardgames.engine.Piece
 import com.mkdev.mkboardgames.engine.PieceColor
 import com.mkdev.mkboardgames.engine.Position
 import com.mkdev.mkboardgames.engine.RuleEngine
@@ -19,6 +20,11 @@ object GoSetup {
         boardSize = BOARD_SIZE,
         currentTurn = PieceColor.WHITE,
     )
+}
+
+data class GoPiece(override val color: PieceColor) : Piece(color) {
+    override fun symbol(): String = "●"
+    override fun value(): Int = 1
 }
 
 class GoRuleEngine : RuleEngine {

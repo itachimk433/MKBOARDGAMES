@@ -363,6 +363,15 @@ class MenuView(context: Context) : View(context) {
         for (row in setOf(3, 6, 9)) for (col in setOf(3, 6, 9)) {
             canvas.drawCircle(left + col * cell, top + row * cell, size * 0.035f, starPaint)
         }
+        val black = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(22, 22, 22) }
+        val white = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(244, 241, 232) }
+        val stoneRadius = size * 0.036f
+        listOf(2 to 2, 3 to 3, 9 to 10, 10 to 9).forEach { (row, col) ->
+            canvas.drawCircle(left + col * cell, top + row * cell, stoneRadius, black)
+        }
+        listOf(2 to 3, 3 to 2, 9 to 9, 10 to 10).forEach { (row, col) ->
+            canvas.drawCircle(left + col * cell, top + row * cell, stoneRadius, white)
+        }
     }
 
     private fun drawShogiMini(canvas: Canvas, left: Float, top: Float, size: Float) {
