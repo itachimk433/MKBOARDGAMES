@@ -3,6 +3,7 @@ package com.mkdev.mkboardgames
 import android.content.Context
 import android.content.Intent
 import android.graphics.*
+import android.os.Build
 import android.os.Bundle
 import android.view.*
 import android.widget.Toast
@@ -43,6 +44,7 @@ class GameActivity : AppCompatActivity() {
     private lateinit var bottomCaptureView: CaptureStripView
     private lateinit var engine:           RuleEngine
     private lateinit var gameType:         String
+    private lateinit var gameContainer:    View
 
     private var gameState: GameState = GameState(arrayOfNulls(64))
     private var vsAI = true
@@ -139,7 +141,8 @@ class GameActivity : AppCompatActivity() {
         bottomCaptureView.visibility = if (showCaptures) View.VISIBLE else View.GONE
 
         AdManager.attachBanner(container)
-        setContentView(container)
+        gameContainer = container
+        setContentView(gameContainer)
 
         @Suppress("DEPRECATION")
         window.decorView.setOnSystemUiVisibilityChangeListener { vis ->
@@ -166,6 +169,10 @@ class GameActivity : AppCompatActivity() {
         if (!matchStarted || gameState.status != GameStatus.IN_PROGRESS) {
             @Suppress("DEPRECATION") super.onBackPressed(); return
         }
+        if (gameType == "CHESS") {
+            showChessLeaveMatchDialog()
+            return
+        }
         AlertDialog.Builder(this).setTitle("Leave Match?")
             .setMessage("Pause to keep this match and resume it later, or leave to forfeit.")
             .setPositiveButton("Pause & Exit") { _, _ ->
@@ -177,6 +184,57 @@ class GameActivity : AppCompatActivity() {
                 @Suppress("DEPRECATION") super.onBackPressed()
             }
             .setNegativeButton("Keep Playing", null).show()
+    }
+
+    private fun showChessLeaveMatchDialog() {
+        val view = ChessChoiceView(
+            this,
+            title = "Leave Match?",
+            subtitle = "Pause to resume later, or leave to forfeit this game.",
+            choices = listOf(
+                ChessChoiceView.Choice(
+                    "Pause & Exit",
+                    "Save and resume later",
+                    "Ⅱ",
+                    Color.parseColor("#E3B86A"),
+                ),
+                ChessChoiceView.Choice(
+                    "Leave Match",
+                    "Forfeit this game",
+                    "⚑",
+                    Color.parseColor("#E58A7A"),
+                ),
+                ChessChoiceView.Choice(
+                    "Keep Playing",
+                    "Return to the board",
+                    "↩",
+                    Color.parseColor("#A9B6E8"),
+                ),
+            ),
+        )
+        val dialog = Dialog(this)
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
+        dialog.setContentView(view)
+        dialog.setCanceledOnTouchOutside(true)
+        dialog.setOnDismissListener { clearChessDialogBlur() }
+        dialog.setOnCancelListener { clearChessDialogBlur() }
+        view.onChoiceSelected = { which ->
+            when (which) {
+                0 -> {
+                    dialog.dismiss()
+                    pauseMatchAndExit()
+                }
+                1 -> {
+                    dialog.dismiss()
+                    clearPausedMatch()
+                    if (vsAI) SettingsManager.recordForfeit(this)
+                    @Suppress("DEPRECATION") super.onBackPressed()
+                }
+                else -> dialog.dismiss()
+            }
+        }
+        dialog.show()
+        styleChessDialog(dialog, 520f)
     }
 
     private fun pauseMatchAndExit() {
@@ -254,9 +312,11 @@ class GameActivity : AppCompatActivity() {
         dialog.setCanceledOnTouchOutside(true)
         dialog.setOnCancelListener {
             chessMenuDialog = null
+            clearChessDialogBlur()
             if (!matchStarted) finish()
         }
         dialog.setOnDismissListener {
+            clearChessDialogBlur()
             if (chessMenuDialog === dialog) chessMenuDialog = null
         }
 
@@ -339,7 +399,11 @@ class GameActivity : AppCompatActivity() {
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
         dialog.setContentView(view)
         dialog.setCanceledOnTouchOutside(true)
-        dialog.setOnCancelListener { showModeDialog() }
+        dialog.setOnCancelListener {
+            clearChessDialogBlur()
+            showModeDialog()
+        }
+        dialog.setOnDismissListener { clearChessDialogBlur() }
         view.onChoiceSelected = { which ->
             playerColor = if (which == 0) PieceColor.WHITE else PieceColor.BLACK
             dialog.dismiss()
@@ -596,8 +660,10 @@ Checkmate your opponent's King.
         dialog.setContentView(view)
         dialog.setCanceledOnTouchOutside(true)
         dialog.setOnCancelListener {
+            clearChessDialogBlur()
             if (showModeAfter) showModeDialog()
         }
+        dialog.setOnDismissListener { clearChessDialogBlur() }
         view.onDone = {
             dialog.dismiss()
             if (showModeAfter) showModeDialog()
@@ -618,6 +684,21 @@ Checkmate your opponent's King.
             window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
             window.attributes = window.attributes.apply { dimAmount = 0.72f }
             window.setLayout(width, height)
+        }
+        applyChessDialogBlur()
+    }
+
+    private fun applyChessDialogBlur() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            gameContainer.setRenderEffect(
+                RenderEffect.createBlurEffect(14f, 14f, Shader.TileMode.CLAMP),
+            )
+        }
+    }
+
+    private fun clearChessDialogBlur() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            gameContainer.setRenderEffect(null)
         }
     }
 
@@ -1140,14 +1221,18 @@ Checkmate your opponent's King.
                     "How to Play"   -> showRules(showModeAfter = false)
                     "AI Difficulty" -> showDifficultyDialog()
                     "Main Menu" -> if (inProgress) {
-                        AlertDialog.Builder(this).setTitle("Leave Match?")
-                        .setMessage("Pause to resume later, or leave to forfeit.")
-                        .setPositiveButton("Pause & Exit") { _, _ -> pauseMatchAndExit() }
-                        .setNeutralButton("Leave Match") { _, _ ->
-                            clearPausedMatch()
-                                if (vsAI) SettingsManager.recordForfeit(this)
-                                finish()
-                            }.setNegativeButton("Cancel", null).show()
+                        if (gameType == "CHESS") {
+                            showChessLeaveMatchDialog()
+                        } else {
+                            AlertDialog.Builder(this).setTitle("Leave Match?")
+                                .setMessage("Pause to resume later, or leave to forfeit.")
+                                .setPositiveButton("Pause & Exit") { _, _ -> pauseMatchAndExit() }
+                                .setNeutralButton("Leave Match") { _, _ ->
+                                    clearPausedMatch()
+                                    if (vsAI) SettingsManager.recordForfeit(this)
+                                    finish()
+                                }.setNegativeButton("Cancel", null).show()
+                        }
                 } else {
                     clearPausedMatch()
                     finish()
