@@ -145,17 +145,17 @@ class BoardView(context: Context) : View(context) {
     )
 
     private val xiangqiBoardBitmap: Bitmap? = try {
-        context.assets.open("xiangqi_board_empty.webp").use { BitmapFactory.decodeStream(it) }
+        context.assets.open("xiangqi_board_empty.png").use { BitmapFactory.decodeStream(it) }
     } catch (_: Throwable) {
         null
     }
     private val shogiBoardBitmap: Bitmap? = try {
-        context.assets.open("shogi_board_empty.webp").use { BitmapFactory.decodeStream(it) }
+        context.assets.open("shogi_board_empty.png").use { BitmapFactory.decodeStream(it) }
     } catch (_: Throwable) {
         null
     }
     private val goBoardBitmap: Bitmap? = try {
-        context.assets.open("go_board_empty.webp").use { BitmapFactory.decodeStream(it) }
+        context.assets.open("go_board_empty.png").use { BitmapFactory.decodeStream(it) }
     } catch (_: Throwable) {
         null
     }

@@ -54,7 +54,7 @@ class MenuView(context: Context) : View(context) {
         context.assets.open("ludo_board_reference.png").use { BitmapFactory.decodeStream(it) }
     } catch (e: Exception) { null }
     private val shogiBoardBitmap: Bitmap? = try {
-        context.assets.open("shogi_board_empty.webp").use { BitmapFactory.decodeStream(it) }
+        context.assets.open("shogi_board_empty.png").use { BitmapFactory.decodeStream(it) }
     } catch (e: Exception) { null }
 
     private val bgPaint        = Paint().apply { color = Color.parseColor("#121212") }
