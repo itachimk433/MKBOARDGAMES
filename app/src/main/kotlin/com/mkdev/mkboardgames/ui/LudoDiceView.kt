@@ -16,16 +16,18 @@ import android.util.Base64
 import android.util.Log
 import android.view.MotionEvent
 import android.view.View
-import android.view.animation.DecelerateInterpolator
+import android.view.animation.AccelerateDecelerateInterpolator
 import org.json.JSONObject
 import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sin
+import kotlin.random.Random
 
 private data class DiceOrientation(
     val x: Float,
     val y: Float,
+    val z: Float = 0f,
 ) {
     companion object {
         fun forValue(value: Int): DiceOrientation = when (value.coerceIn(1, 6)) {
@@ -57,6 +59,7 @@ class LudoDiceView(context: Context) : View(context) {
     private var animator: ValueAnimator? = null
     private var rotationX = -18f
     private var rotationY = -28f
+    private var rotationZ = 0f
     private val textures = loadDiceTextures(context)
     private val bitmapPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private val edgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -85,7 +88,8 @@ class LudoDiceView(context: Context) : View(context) {
         val target = DiceOrientation.forValue(targetValue)
         val startX = rotationX
         val startY = rotationY
-        val endY = target.y + 720f
+        val startZ = rotationZ
+        val spin = RollSpin.random(motionDirection)
         val tiltX = when (motionDirection) {
             MotionDiceDirection.TOP_LEFT, MotionDiceDirection.TOP_RIGHT -> -22f
             MotionDiceDirection.UP -> -12f
@@ -97,13 +101,20 @@ class LudoDiceView(context: Context) : View(context) {
             else -> 0f
         }
         animator = ValueAnimator.ofFloat(0f, 1f).apply {
-            duration = 720L
-            interpolator = DecelerateInterpolator()
+            duration = 980L
+            interpolator = AccelerateDecelerateInterpolator()
             addUpdateListener {
                 val progress = it.animatedFraction
-                val gestureTilt = sin(progress * Math.PI).toFloat()
-                rotationX = startX + (target.x - startX) * progress + tiltX * gestureTilt
-                rotationY = startY + (endY - startY) * progress + tiltY * gestureTilt
+                val tumble = sin(progress * Math.PI).toFloat()
+                rotationX = startX +
+                    (target.x - startX + spin.x) * progress +
+                    (tiltX + spin.wobbleX) * tumble
+                rotationY = startY +
+                    (target.y - startY + spin.y) * progress +
+                    (tiltY + spin.wobbleY) * tumble
+                rotationZ = startZ +
+                    (target.z - startZ + spin.z) * progress +
+                    spin.wobbleZ * tumble
                 invalidate()
             }
             addListener(object : AnimatorListenerAdapter() {
@@ -112,6 +123,7 @@ class LudoDiceView(context: Context) : View(context) {
                     isRolling = false
                     rotationX = target.x
                     rotationY = target.y
+                    rotationZ = target.z
                     invalidate()
                     onFinished()
                 }
@@ -251,17 +263,55 @@ class LudoDiceView(context: Context) : View(context) {
     private fun rotate(point: CubePoint): CubePoint {
         val y = Math.toRadians(rotationY.toDouble())
         val x = Math.toRadians(rotationX.toDouble())
+        val z = Math.toRadians(rotationZ.toDouble())
         val cosY = cos(y).toFloat()
         val sinY = sin(y).toFloat()
         val xAfterY = point.x * cosY + point.z * sinY
         val zAfterY = -point.x * sinY + point.z * cosY
         val cosX = cos(x).toFloat()
         val sinX = sin(x).toFloat()
+        val xAfterX = xAfterY
+        val yAfterX = point.y * cosX - zAfterY * sinX
+        val zAfterX = point.y * sinX + zAfterY * cosX
+        val cosZ = cos(z).toFloat()
+        val sinZ = sin(z).toFloat()
         return CubePoint(
-            x = xAfterY,
-            y = point.y * cosX - zAfterY * sinX,
-            z = point.y * sinX + zAfterY * cosX,
+            x = xAfterX * cosZ - yAfterX * sinZ,
+            y = xAfterX * sinZ + yAfterX * cosZ,
+            z = zAfterX,
         )
+    }
+
+    private data class RollSpin(
+        val x: Float,
+        val y: Float,
+        val z: Float,
+        val wobbleX: Float,
+        val wobbleY: Float,
+        val wobbleZ: Float,
+    ) {
+        companion object {
+            fun random(direction: MotionDiceDirection): RollSpin {
+                val sign = { if (Random.nextBoolean()) 1f else -1f }
+                val xSign = sign()
+                val ySign = sign()
+                val zSign = sign()
+                val directionBoost = when (direction) {
+                    MotionDiceDirection.LEFT, MotionDiceDirection.TOP_LEFT -> -1f
+                    MotionDiceDirection.RIGHT, MotionDiceDirection.TOP_RIGHT -> 1f
+                    MotionDiceDirection.UP -> 0f
+                }
+                return RollSpin(
+                    x = Random.nextInt(2, 5) * 360f * xSign,
+                    y = Random.nextInt(2, 5) * 360f * ySign,
+                    z = Random.nextInt(2, 4) * 360f * zSign,
+                    wobbleX = (8f + Random.nextFloat() * 12f) * xSign,
+                    wobbleY = (8f + Random.nextFloat() * 12f) * ySign +
+                        directionBoost * 8f,
+                    wobbleZ = (10f + Random.nextFloat() * 16f) * zSign,
+                )
+            }
+        }
     }
 
     private fun loadDiceTextures(context: Context): List<Bitmap> {

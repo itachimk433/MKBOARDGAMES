@@ -13,7 +13,7 @@ import android.opengl.Matrix
 import android.util.Log
 import android.view.MotionEvent
 import android.view.ViewGroup
-import android.view.animation.DecelerateInterpolator
+import android.view.animation.AccelerateDecelerateInterpolator
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
@@ -25,6 +25,7 @@ import java.nio.ByteOrder
 import java.nio.FloatBuffer
 import java.nio.ShortBuffer
 import kotlin.math.sin
+import kotlin.random.Random
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
@@ -51,6 +52,7 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
     private var animator: ValueAnimator? = null
     private var rotationX = -18f
     private var rotationY = -28f
+    private var rotationZ = 0f
     private val glRenderer = DiceRenderer(context.applicationContext)
 
     init {
@@ -104,7 +106,8 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         val target = DiceOrientation.forValue(targetValue)
         val startX = rotationX
         val startY = rotationY
-        val endY = target.y + 720f
+        val startZ = rotationZ
+        val spin = RollSpin.random(motionDirection)
         val tiltX = when (motionDirection) {
             MotionDiceDirection.TOP_LEFT, MotionDiceDirection.TOP_RIGHT -> -22f
             MotionDiceDirection.UP -> -12f
@@ -117,14 +120,21 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         }
 
         animator = ValueAnimator.ofFloat(0f, 1f).apply {
-            duration = 720L
-            interpolator = DecelerateInterpolator()
+            duration = 980L
+            interpolator = AccelerateDecelerateInterpolator()
             addUpdateListener {
                 val progress = it.animatedFraction
-                val gestureTilt = sin(progress * Math.PI).toFloat()
-                rotationX = startX + (target.x - startX) * progress + tiltX * gestureTilt
-                rotationY = startY + (endY - startY) * progress + tiltY * gestureTilt
-                glRenderer.setRotation(rotationX, rotationY)
+                val tumble = sin(progress * Math.PI).toFloat()
+                rotationX = startX +
+                    (target.x - startX + spin.x) * progress +
+                    (tiltX + spin.wobbleX) * tumble
+                rotationY = startY +
+                    (target.y - startY + spin.y) * progress +
+                    (tiltY + spin.wobbleY) * tumble
+                rotationZ = startZ +
+                    (target.z - startZ + spin.z) * progress +
+                    spin.wobbleZ * tumble
+                glRenderer.setRotation(rotationX, rotationY, rotationZ)
             }
             addListener(object : AnimatorListenerAdapter() {
                 override fun onAnimationEnd(animation: Animator) {
@@ -132,7 +142,8 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
                     isRolling = false
                     rotationX = target.x
                     rotationY = target.y
-                    glRenderer.setRotation(rotationX, rotationY)
+                    rotationZ = target.z
+                    glRenderer.setRotation(rotationX, rotationY, rotationZ)
                     onFinished()
                 }
             })
@@ -180,10 +191,12 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         private var height = 1
         @Volatile private var rotationX = -18f
         @Volatile private var rotationY = -28f
+        @Volatile private var rotationZ = 0f
 
-        fun setRotation(x: Float, y: Float) {
+        fun setRotation(x: Float, y: Float, z: Float) {
             rotationX = x
             rotationY = y
+            rotationZ = z
         }
 
         override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
@@ -239,6 +252,7 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
             Matrix.setIdentityM(modelMatrix, 0)
             Matrix.rotateM(modelMatrix, 0, rotationX, 1f, 0f, 0f)
             Matrix.rotateM(modelMatrix, 0, rotationY, 0f, 1f, 0f)
+            Matrix.rotateM(modelMatrix, 0, rotationZ, 0f, 0f, 1f)
             Matrix.scaleM(
                 modelMatrix,
                 0,
@@ -839,6 +853,7 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
     private data class DiceOrientation(
         val x: Float,
         val y: Float,
+        val z: Float = 0f,
     ) {
         companion object {
             fun forValue(value: Int): DiceOrientation = when (value.coerceIn(1, 6)) {
@@ -848,6 +863,38 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
                 4 -> DiceOrientation(90f, 0f)
                 5 -> DiceOrientation(0f, 180f)
                 else -> DiceOrientation(-90f, 0f)
+            }
+        }
+    }
+
+    private data class RollSpin(
+        val x: Float,
+        val y: Float,
+        val z: Float,
+        val wobbleX: Float,
+        val wobbleY: Float,
+        val wobbleZ: Float,
+    ) {
+        companion object {
+            fun random(direction: MotionDiceDirection): RollSpin {
+                val sign = { if (Random.nextBoolean()) 1f else -1f }
+                val xSign = sign()
+                val ySign = sign()
+                val zSign = sign()
+                val directionBoost = when (direction) {
+                    MotionDiceDirection.LEFT, MotionDiceDirection.TOP_LEFT -> -1f
+                    MotionDiceDirection.RIGHT, MotionDiceDirection.TOP_RIGHT -> 1f
+                    MotionDiceDirection.UP -> 0f
+                }
+                return RollSpin(
+                    x = Random.nextInt(2, 5) * 360f * xSign,
+                    y = Random.nextInt(2, 5) * 360f * ySign,
+                    z = Random.nextInt(2, 4) * 360f * zSign,
+                    wobbleX = (8f + Random.nextFloat() * 12f) * xSign,
+                    wobbleY = (8f + Random.nextFloat() * 12f) * ySign +
+                        directionBoost * 8f,
+                    wobbleZ = (10f + Random.nextFloat() * 16f) * zSign,
+                )
             }
         }
     }
