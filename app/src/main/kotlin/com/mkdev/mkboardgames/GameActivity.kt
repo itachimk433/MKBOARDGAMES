@@ -273,11 +273,6 @@ class GameActivity : AppCompatActivity() {
             dialog.dismiss()
             showRules(showModeAfter = !matchStarted)
         }
-        menuView.onPlayAs = {
-            dialog.dismiss()
-            vsAI = true
-            showColorPickerDialog()
-        }
         menuView.onResumeMatch = {
             dialog.dismiss()
             resumePausedMatch()
@@ -289,11 +284,10 @@ class GameActivity : AppCompatActivity() {
             val horizontalMargin = (24f * metrics.density).toInt()
             val maxWidth = (420f * metrics.density).toInt()
             val width = minOf(metrics.widthPixels - horizontalMargin * 2, maxWidth)
-            val maxHeight = (metrics.heightPixels * 0.84f).toInt()
             window.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
             window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
             window.attributes = window.attributes.apply { dimAmount = 0.72f }
-            window.setLayout(width, maxHeight)
+            window.setLayout(width, WindowManager.LayoutParams.WRAP_CONTENT)
         }
     }
 

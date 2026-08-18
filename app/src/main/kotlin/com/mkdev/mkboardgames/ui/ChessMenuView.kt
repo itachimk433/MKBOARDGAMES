@@ -24,7 +24,6 @@ class ChessMenuView(
     var onVsAi: (() -> Unit)? = null
     var onTwoPlayers: (() -> Unit)? = null
     var onHowToPlay: (() -> Unit)? = null
-    var onPlayAs: (() -> Unit)? = null
     var onResumeMatch: (() -> Unit)? = null
 
     private data class MenuAction(
@@ -46,25 +45,6 @@ class ChessMenuView(
     private val panelBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeWidth = 1f * unit
-    }
-    private val boardLightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#E5C99A")
-    }
-    private val boardDarkPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#916447")
-    }
-    private val boardFramePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#D9A85B")
-        style = Paint.Style.STROKE
-        strokeWidth = 2f * unit
-    }
-    private val boardHighlightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(150, 245, 194, 96)
-    }
-    private val piecePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        textAlign = Paint.Align.CENTER
-        isFakeBoldText = true
-        setShadowLayer(3f * unit, 0f, 2f * unit, Color.argb(130, 0, 0, 0))
     }
     private val eyebrowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#E3B86A")
@@ -98,6 +78,11 @@ class ChessMenuView(
         isFakeBoldText = true
         textSize = 23f * textScale
     }
+    private val chevronPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#C8D7D8")
+        textAlign = Paint.Align.CENTER
+        textSize = 25f * textScale
+    }
     private val resumePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#E3B86A")
         textAlign = Paint.Align.CENTER
@@ -124,12 +109,19 @@ class ChessMenuView(
         setLayerType(View.LAYER_TYPE_SOFTWARE, null)
     }
 
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        val desiredHeight = if (hasResumeMatch) 462f * unit else 414f * unit
+        val measuredWidth = MeasureSpec.getSize(widthMeasureSpec)
+        val measuredHeight = resolveSize(desiredHeight.toInt(), heightMeasureSpec)
+        setMeasuredDimension(measuredWidth, measuredHeight)
+    }
+
     override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
         val sidePadding = 18f * unit
         val gap = 10f * unit
         val actionWidth = (width - sidePadding * 2f - gap) / 2f
-        val actionTop = minOf(height * 0.53f, 300f * unit)
-        val actionHeight = 78f * unit
+        val actionTop = 164f * unit
+        val actionHeight = 82f * unit
 
         actions = listOf(
             MenuAction(
@@ -147,27 +139,22 @@ class ChessMenuView(
                 action = { onTwoPlayers?.invoke() },
             ),
             MenuAction(
-                label = "How To Player",
+                label = "How To Play",
                 detail = "Learn the essentials",
                 symbol = "?",
                 accent = Color.parseColor("#A9B6E8"),
                 action = { onHowToPlay?.invoke() },
             ),
-            MenuAction(
-                label = "Play As",
-                detail = "Choose your colour",
-                symbol = "↔",
-                accent = Color.parseColor("#D9958F"),
-                action = { onPlayAs?.invoke() },
-            ),
         )
 
         actions.forEachIndexed { index, action ->
-            val column = index % 2
-            val row = index / 2
-            val left = sidePadding + column * (actionWidth + gap)
-            val top = actionTop + row * (actionHeight + gap)
-            action.rect = RectF(left, top, left + actionWidth, top + actionHeight)
+            if (index < 2) {
+                val left = sidePadding + index * (actionWidth + gap)
+                action.rect = RectF(left, actionTop, left + actionWidth, actionTop + actionHeight)
+            } else {
+                val top = actionTop + actionHeight + gap
+                action.rect = RectF(sidePadding, top, width - sidePadding, top + actionHeight)
+            }
             actionScale[action.label] = 1f
         }
         resumeRect.set(
@@ -196,7 +183,7 @@ class ChessMenuView(
         canvas.drawRoundRect(0f, 0f, width, height, corner, corner, surfacePaint)
         surfacePaint.shader = null
 
-        drawHeader(canvas, width, height)
+        drawHeader(canvas, width)
         actions.forEach { drawAction(canvas, it) }
         if (hasResumeMatch) {
             drawResumeAction(canvas, width)
@@ -210,74 +197,21 @@ class ChessMenuView(
         }
     }
 
-    private fun drawHeader(canvas: Canvas, width: Float, height: Float) {
-        canvas.drawText("CHESS", width / 2f, 32f * unit, eyebrowPaint)
-        canvas.drawText("Choose your match", width / 2f, 62f * unit, titlePaint)
-        canvas.drawText("A good game starts with the right opponent.", width / 2f, 84f * unit, subtitlePaint)
-
-        val boardSize = minOf(width * 0.43f, 132f * unit)
-        val left = width / 2f - boardSize / 2f
-        val top = 102f * unit
-        val cell = boardSize / 8f
-
-        panelPaint.color = Color.argb(95, 0, 0, 0)
-        canvas.drawRoundRect(
-            left - 8f * unit,
-            top - 8f * unit,
-            left + boardSize + 8f * unit,
-            top + boardSize + 8f * unit,
-            12f * unit,
-            12f * unit,
-            panelPaint,
-        )
-        for (row in 0 until 8) {
-            for (column in 0 until 8) {
-                val square = if ((row + column) % 2 == 0) boardLightPaint else boardDarkPaint
-                canvas.drawRect(
-                    left + column * cell,
-                    top + row * cell,
-                    left + (column + 1) * cell,
-                    top + (row + 1) * cell,
-                    square,
-                )
-            }
+    private fun drawHeader(canvas: Canvas, width: Float) {
+        val center = width / 2f
+        val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#D7A94D")
+            strokeWidth = 1.5f * unit
         }
-        canvas.drawRect(left, top, left + boardSize, top + boardSize, boardFramePaint)
-        canvas.drawRect(
-            left + cell * 4f,
-            top + cell * 4f,
-            left + cell * 5f,
-            top + cell * 5f,
-            boardHighlightPaint,
-        )
-
-        val position = arrayOf(
-            "♜·♝·♚·♞♜",
-            "♟♟♟·♟♟♟♟",
-            "··♞·····",
-            "·····♟··",
-            "····♙···",
-            "··♘··♘··",
-            "♙♙♙·♕♙♙♙",
-            "♖·♗·♔♗♘♖",
-        )
-        piecePaint.textSize = cell * 0.77f
-        for (row in position.indices) {
-            for (column in position[row].indices) {
-                val piece = position[row][column]
-                if (piece == '·') continue
-                piecePaint.color = if (row < 4) Color.parseColor("#233039") else Color.parseColor("#FFF4D8")
-                val metrics = piecePaint.fontMetrics
-                val baseline = top + row * cell + cell / 2f -
-                    (metrics.ascent + metrics.descent) / 2f
-                canvas.drawText(
-                    piece.toString(),
-                    left + column * cell + cell / 2f,
-                    baseline,
-                    piecePaint,
-                )
-            }
-        }
+        canvas.drawLine(center - 118f * unit, 36f * unit, center - 42f * unit, 36f * unit, linePaint)
+        canvas.drawLine(center + 42f * unit, 36f * unit, center + 118f * unit, 36f * unit, linePaint)
+        canvas.drawText("♛", center, 43f * unit, actionSymbolPaint.apply {
+            color = Color.parseColor("#E3B86A")
+            textSize = 21f * textScale
+        })
+        canvas.drawText("C H E S S", center, 58f * unit, eyebrowPaint)
+        canvas.drawText("Choose your match", center, 99f * unit, titlePaint)
+        canvas.drawText("A good game starts with the right opponent.", center, 125f * unit, subtitlePaint)
     }
 
     private fun drawAction(canvas: Canvas, action: MenuAction) {
@@ -313,6 +247,7 @@ class ChessMenuView(
         actionLabelPaint.color = Color.WHITE
         canvas.drawText(action.label, rect.left + 54f * unit, rect.top + 31f * unit, actionLabelPaint)
         canvas.drawText(action.detail, rect.left + 54f * unit, rect.top + 51f * unit, actionDetailPaint)
+        canvas.drawText("›", rect.right - 22f * unit, rect.top + 42f * unit, chevronPaint)
         canvas.restore()
     }
 
