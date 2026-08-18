@@ -4,16 +4,19 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
+import android.graphics.PixelFormat
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
 import android.opengl.GLUtils
 import android.opengl.Matrix
 import android.util.Log
 import android.view.MotionEvent
+import android.view.ViewGroup
 import android.view.animation.DecelerateInterpolator
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
+import android.widget.FrameLayout
 import org.json.JSONObject
 import java.io.InputStream
 import java.nio.ByteBuffer
@@ -27,13 +30,18 @@ import javax.microedition.khronos.opengles.GL10
 /**
  * OpenGL ES renderer for the supplied embedded glTF dice model.
  *
- * The GLB contains its own geometry and base-color texture, so the Ludo die
- * is no longer approximated by a software-rendered cube.
+ * The GLB is the primary renderer. A software-rendered die remains underneath
+ * it so devices that cannot composite the transparent GL surface still show a
+ * usable dice control instead of a blank area.
  */
-class GlbDiceView(context: Context) : GLSurfaceView(context) {
+class GlbDiceView(context: Context) : FrameLayout(context) {
+    private val fallbackView = LudoDiceView(context)
+    private val glSurfaceView = GLSurfaceView(context)
+
     var value: Int = 1
         set(newValue) {
             field = newValue.coerceIn(1, 6)
+            fallbackView.value = field
         }
     var isRolling: Boolean = false
         private set
@@ -45,11 +53,37 @@ class GlbDiceView(context: Context) : GLSurfaceView(context) {
     private val glRenderer = DiceRenderer(context.applicationContext)
 
     init {
-        setEGLContextClientVersion(2)
-        setRenderer(glRenderer)
-        renderMode = RENDERMODE_CONTINUOUSLY
-        isClickable = true
         setBackgroundColor(Color.rgb(16, 21, 26))
+        addView(
+            fallbackView,
+            LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+            ),
+        )
+
+        glSurfaceView.setEGLContextClientVersion(2)
+        glSurfaceView.setEGLConfigChooser(8, 8, 8, 8, 16, 0)
+        glSurfaceView.holder.setFormat(PixelFormat.TRANSLUCENT)
+        glSurfaceView.setZOrderOnTop(true)
+        glSurfaceView.setRenderer(glRenderer)
+        glSurfaceView.renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+        glSurfaceView.isClickable = true
+        glSurfaceView.setOnTouchListener { view, event ->
+            if (event.actionMasked == MotionEvent.ACTION_UP && !isRolling) {
+                view.performClick()
+                onRoll?.invoke()
+            }
+            true
+        }
+        addView(
+            glSurfaceView,
+            LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+            ),
+        )
+        fallbackView.onRoll = { if (!isRolling) onRoll?.invoke() }
     }
 
     fun rollTo(
@@ -60,6 +94,7 @@ class GlbDiceView(context: Context) : GLSurfaceView(context) {
         animator?.cancel()
         isRolling = true
         val targetValue = nextValue.coerceIn(1, 6)
+        fallbackView.rollTo(targetValue, motionDirection) {}
         val target = DiceOrientation.forValue(targetValue)
         val startX = rotationX
         val startY = rotationY
@@ -143,7 +178,7 @@ class GlbDiceView(context: Context) : GLSurfaceView(context) {
         }
 
         override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
-            GLES20.glClearColor(16f / 255f, 21f / 255f, 26f / 255f, 1f)
+            GLES20.glClearColor(0f, 0f, 0f, 0f)
             GLES20.glEnable(GLES20.GL_DEPTH_TEST)
             GLES20.glDisable(GLES20.GL_CULL_FACE)
 
