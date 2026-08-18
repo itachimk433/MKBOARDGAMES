@@ -71,6 +71,14 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         glSurfaceView.setEGLConfigChooser(8, 8, 8, 8, 16, 0)
         glSurfaceView.holder.setFormat(PixelFormat.TRANSLUCENT)
         glSurfaceView.setZOrderOnTop(true)
+        /*
+         * The imported GLB contains a baked texture atlas whose UV layout does
+         * not match the model consistently. On affected devices it produces
+         * stretched pips and triangular texture streaks. The software view
+         * below uses the clean, individual face textures from dice.gltf and
+         * keeps the die readable on every renderer.
+         */
+        glSurfaceView.visibility = GONE
         glSurfaceView.setRenderer(glRenderer)
         glSurfaceView.renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
         glSurfaceView.isClickable = true
