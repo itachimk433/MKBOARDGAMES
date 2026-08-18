@@ -6,6 +6,8 @@ import android.graphics.*
 import android.os.Bundle
 import android.view.*
 import android.widget.Toast
+import android.app.Dialog
+import android.graphics.drawable.ColorDrawable
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.mkdev.mkboardgames.engine.*
@@ -23,6 +25,7 @@ import com.mkdev.mkboardgames.games.shogi.ShogiRuleEngine
 import com.mkdev.mkboardgames.games.xiangqi.XiangqiRuleEngine
 import com.mkdev.mkboardgames.ui.BoardView
 import com.mkdev.mkboardgames.ui.CaptureStripView
+import com.mkdev.mkboardgames.ui.ChessMenuView
 import kotlinx.coroutines.*
 
 class GameActivity : AppCompatActivity() {
@@ -49,6 +52,7 @@ class GameActivity : AppCompatActivity() {
     // Result guard: stats recorded exactly once per game
     private var resultRecorded = false
     private var interstitialAd: Any? = null
+    private var chessMenuDialog: Dialog? = null
 
     private val redoGameStates = ArrayDeque<GameState>()
     private val redoCaptures   = ArrayDeque<Pair<List<Piece>, List<Piece>>>()
@@ -199,6 +203,10 @@ class GameActivity : AppCompatActivity() {
     // ─── Game flow ────────────────────────────────────────────────────────────
 
     private fun showModeDialog() {
+        if (gameType == "CHESS") {
+            showChessMenu()
+            return
+        }
         val gameName = when (gameType) {
             "OTHELLO"  -> "Othello"
             "CHECKERS" -> "Draughts"
@@ -231,6 +239,62 @@ class GameActivity : AppCompatActivity() {
             .setCancelable(true)
             .setOnCancelListener { if (!matchStarted) finish() }
             .show()
+    }
+
+    private fun showChessMenu() {
+        chessMenuDialog?.dismiss()
+
+        val menuView = ChessMenuView(this, PausedMatchStore.has(this, gameType))
+        val dialog = Dialog(this)
+        chessMenuDialog = dialog
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
+        dialog.setContentView(menuView)
+        dialog.setCanceledOnTouchOutside(true)
+        dialog.setOnCancelListener {
+            chessMenuDialog = null
+            if (!matchStarted) finish()
+        }
+        dialog.setOnDismissListener {
+            if (chessMenuDialog === dialog) chessMenuDialog = null
+        }
+
+        menuView.onVsAi = {
+            dialog.dismiss()
+            vsAI = true
+            showColorPickerDialog()
+        }
+        menuView.onTwoPlayers = {
+            dialog.dismiss()
+            vsAI = false
+            playerColor = PieceColor.WHITE
+            startGame()
+        }
+        menuView.onHowToPlay = {
+            dialog.dismiss()
+            showRules(showModeAfter = !matchStarted)
+        }
+        menuView.onPlayAs = {
+            dialog.dismiss()
+            vsAI = true
+            showColorPickerDialog()
+        }
+        menuView.onResumeMatch = {
+            dialog.dismiss()
+            resumePausedMatch()
+        }
+
+        dialog.show()
+        dialog.window?.let { window ->
+            val metrics = resources.displayMetrics
+            val horizontalMargin = (24f * metrics.density).toInt()
+            val maxWidth = (420f * metrics.density).toInt()
+            val width = minOf(metrics.widthPixels - horizontalMargin * 2, maxWidth)
+            val maxHeight = (metrics.heightPixels * 0.84f).toInt()
+            window.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+            window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+            window.attributes = window.attributes.apply { dimAmount = 0.72f }
+            window.setLayout(width, maxHeight)
+        }
     }
 
     private fun showColorPickerDialog() {
