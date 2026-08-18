@@ -1,0 +1,11 @@
+Model Information:
+* title:	Low Poly Dice
+* source:	https://sketchfab.com/3d-models/low-poly-dice-98cf3cda5e904604b4be8bf633cf967f
+* author:	Designed By Jonathan (https://sketchfab.com/designedbyjonathan)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Low Poly Dice" (https://sketchfab.com/3d-models/low-poly-dice-98cf3cda5e904604b4be8bf633cf967f) by Designed By Jonathan (https://sketchfab.com/designedbyjonathan) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
