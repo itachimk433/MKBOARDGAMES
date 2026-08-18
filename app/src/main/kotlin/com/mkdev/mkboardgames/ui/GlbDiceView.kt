@@ -8,6 +8,7 @@ import android.opengl.GLES20
 import android.opengl.GLSurfaceView
 import android.opengl.GLUtils
 import android.opengl.Matrix
+import android.util.Log
 import android.view.MotionEvent
 import android.view.animation.DecelerateInterpolator
 import android.animation.Animator
@@ -128,6 +129,7 @@ class GlbDiceView(context: Context) : GLSurfaceView(context) {
         private var mvpHandle = 0
         private var modelHandle = 0
         private var textureHandle = 0
+        private var textureIsAlphaHandle = 0
         private var projection = FloatArray(16)
         private var view = FloatArray(16)
         private var width = 1
@@ -152,10 +154,14 @@ class GlbDiceView(context: Context) : GLSurfaceView(context) {
             mvpHandle = GLES20.glGetUniformLocation(program, "uMvp")
             modelHandle = GLES20.glGetUniformLocation(program, "uModel")
             textureHandle = GLES20.glGetUniformLocation(program, "uTexture")
+            textureIsAlphaHandle = GLES20.glGetUniformLocation(program, "uTextureIsAlpha")
 
-            model = runCatching {
+            model = try {
                 GlbModel.load(context.assets.open(MODEL_ASSET))
-            }.getOrNull()
+            } catch (error: Exception) {
+                Log.e(TAG, "Unable to load Ludo dice model", error)
+                null
+            }
             model?.uploadTexture()
         }
 
@@ -186,9 +192,22 @@ class GlbDiceView(context: Context) : GLSurfaceView(context) {
 
             val modelMatrix = FloatArray(16)
             Matrix.setIdentityM(modelMatrix, 0)
-            Matrix.scaleM(modelMatrix, 0, 50f, 50f, 50f)
             Matrix.rotateM(modelMatrix, 0, rotationX, 1f, 0f, 0f)
             Matrix.rotateM(modelMatrix, 0, rotationY, 0f, 1f, 0f)
+            Matrix.scaleM(
+                modelMatrix,
+                0,
+                currentModel.renderScale,
+                currentModel.renderScale,
+                currentModel.renderScale,
+            )
+            Matrix.translateM(
+                modelMatrix,
+                0,
+                -currentModel.centerX,
+                -currentModel.centerY,
+                -currentModel.centerZ,
+            )
 
             val viewModel = FloatArray(16)
             val mvp = FloatArray(16)
@@ -198,6 +217,10 @@ class GlbDiceView(context: Context) : GLSurfaceView(context) {
             GLES20.glUseProgram(program)
             GLES20.glUniformMatrix4fv(mvpHandle, 1, false, mvp, 0)
             GLES20.glUniformMatrix4fv(modelHandle, 1, false, modelMatrix, 0)
+            GLES20.glUniform1f(
+                textureIsAlphaHandle,
+                if (currentModel.baseColorUsesAlpha) 1f else 0f,
+            )
 
             currentModel.positions.position(0)
             GLES20.glEnableVertexAttribArray(positionHandle)
@@ -284,6 +307,11 @@ class GlbDiceView(context: Context) : GLSurfaceView(context) {
         val indices: ShortBuffer,
         val indexCount: Int,
         val baseColor: Bitmap,
+        val baseColorUsesAlpha: Boolean,
+        val centerX: Float,
+        val centerY: Float,
+        val centerZ: Float,
+        val renderScale: Float,
     ) {
         var textureId: Int = 0
 
@@ -332,11 +360,43 @@ class GlbDiceView(context: Context) : GLSurfaceView(context) {
                 val texCoords = parsed.readFloats(attributes.getInt("TEXCOORD_0"), 2)
                 val indexValues = parsed.readIndices(primitive.getInt("indices"))
                 val textureBytes = parsed.readBaseColorImage(json)
-                val bitmap = BitmapFactory.decodeByteArray(
+                val decodedBitmap = BitmapFactory.decodeByteArray(
                     textureBytes,
                     0,
                     textureBytes.size,
+                    BitmapFactory.Options().apply {
+                        inPreferredConfig = Bitmap.Config.ARGB_8888
+                        inScaled = false
+                    },
                 ) ?: error("The GLB base-color texture could not be decoded")
+                val baseColorUsesAlpha = decodedBitmap.config == Bitmap.Config.ALPHA_8
+                val bitmap = decodedBitmap.let { decoded ->
+                    if (baseColorUsesAlpha) {
+                        decoded
+                    } else if (decoded.config == Bitmap.Config.ARGB_8888) {
+                        decoded
+                    } else {
+                        decoded.copy(Bitmap.Config.ARGB_8888, false)
+                            ?: error("The GLB base-color texture could not be converted")
+                    }
+                }
+
+                var minX = Float.POSITIVE_INFINITY
+                var minY = Float.POSITIVE_INFINITY
+                var minZ = Float.POSITIVE_INFINITY
+                var maxX = Float.NEGATIVE_INFINITY
+                var maxY = Float.NEGATIVE_INFINITY
+                var maxZ = Float.NEGATIVE_INFINITY
+                for (index in positions.indices step 3) {
+                    minX = minOf(minX, positions[index])
+                    minY = minOf(minY, positions[index + 1])
+                    minZ = minOf(minZ, positions[index + 2])
+                    maxX = maxOf(maxX, positions[index])
+                    maxY = maxOf(maxY, positions[index + 1])
+                    maxZ = maxOf(maxZ, positions[index + 2])
+                }
+                val maxDimension = maxOf(maxX - minX, maxY - minY, maxZ - minZ)
+                    .coerceAtLeast(0.0001f)
 
                 return GlbModel(
                     positions = floatBuffer(positions),
@@ -345,6 +405,11 @@ class GlbDiceView(context: Context) : GLSurfaceView(context) {
                     indices = shortBuffer(indexValues.map { it.toShort() }.toShortArray()),
                     indexCount = indexValues.size,
                     baseColor = bitmap,
+                    baseColorUsesAlpha = baseColorUsesAlpha,
+                    centerX = (minX + maxX) / 2f,
+                    centerY = (minY + maxY) / 2f,
+                    centerZ = (minZ + maxZ) / 2f,
+                    renderScale = 1.2f / maxDimension,
                 )
             }
 
@@ -482,6 +547,7 @@ class GlbDiceView(context: Context) : GLSurfaceView(context) {
     }
 
     companion object {
+        private const val TAG = "GlbDiceView"
         private const val MODEL_ASSET = "dice_1787032847170.glb"
 
         private const val VERTEX_SHADER = """
@@ -502,6 +568,7 @@ class GlbDiceView(context: Context) : GLSurfaceView(context) {
         private const val FRAGMENT_SHADER = """
             precision mediump float;
             uniform sampler2D uTexture;
+            uniform float uTextureIsAlpha;
             varying vec3 vNormal;
             varying vec2 vTexCoord;
             void main() {
@@ -509,7 +576,8 @@ class GlbDiceView(context: Context) : GLSurfaceView(context) {
                 vec3 normal = normalize(vNormal);
                 vec3 lightDirection = normalize(vec3(-0.45, 0.8, 1.0));
                 float diffuse = 0.48 + 0.52 * max(dot(normal, lightDirection), 0.0);
-                gl_FragColor = vec4(base.rgb * diffuse, base.a);
+                vec3 color = mix(base.rgb, vec3(base.a), uTextureIsAlpha);
+                gl_FragColor = vec4(color * diffuse, 1.0);
             }
         """
     }
