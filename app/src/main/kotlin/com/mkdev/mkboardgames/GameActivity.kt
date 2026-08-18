@@ -25,7 +25,9 @@ import com.mkdev.mkboardgames.games.shogi.ShogiRuleEngine
 import com.mkdev.mkboardgames.games.xiangqi.XiangqiRuleEngine
 import com.mkdev.mkboardgames.ui.BoardView
 import com.mkdev.mkboardgames.ui.CaptureStripView
+import com.mkdev.mkboardgames.ui.ChessChoiceView
 import com.mkdev.mkboardgames.ui.ChessMenuView
+import com.mkdev.mkboardgames.ui.ChessRulesView
 import kotlinx.coroutines.*
 
 class GameActivity : AppCompatActivity() {
@@ -292,6 +294,10 @@ class GameActivity : AppCompatActivity() {
     }
 
     private fun showColorPickerDialog() {
+        if (gameType == "CHESS") {
+            showChessSidePicker()
+            return
+        }
         val sides = if (gameType == "FOX_AND_GEESE")
             arrayOf("Fox (moves second)", "Geese (moves first)")
         else if (gameType == "XIANGQI")
@@ -317,6 +323,30 @@ class GameActivity : AppCompatActivity() {
             .setCancelable(true)
             .setOnCancelListener { showModeDialog() }
             .show()
+    }
+
+    private fun showChessSidePicker() {
+        val view = ChessChoiceView(
+            this,
+            title = "Play As",
+            subtitle = "Choose your colour before the first move.",
+            choices = listOf(
+                ChessChoiceView.Choice("White", "Moves first", "♔", Color.parseColor("#E3B86A")),
+                ChessChoiceView.Choice("Black", "Moves second", "♚", Color.parseColor("#A9B6E8")),
+            ),
+        )
+        val dialog = Dialog(this)
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
+        dialog.setContentView(view)
+        dialog.setCanceledOnTouchOutside(true)
+        dialog.setOnCancelListener { showModeDialog() }
+        view.onChoiceSelected = { which ->
+            playerColor = if (which == 0) PieceColor.WHITE else PieceColor.BLACK
+            dialog.dismiss()
+            startGame()
+        }
+        dialog.show()
+        styleChessDialog(dialog, 420f)
     }
 
     private fun showRules(showModeAfter: Boolean = false) {
@@ -535,6 +565,11 @@ Checkmate your opponent's King.
             """.trimIndent()
         }
 
+        if (gameType == "CHESS") {
+            showChessRulesDialog(rulesText = rulesText, showModeAfter = showModeAfter)
+            return
+        }
+
         val dp = resources.displayMetrics.density
         val tv = android.widget.TextView(this).apply {
             setTextColor(Color.parseColor("#E0E0E0"))
@@ -552,6 +587,38 @@ Checkmate your opponent's King.
             .setPositiveButton("Got it!") { _, _ -> if (showModeAfter) showModeDialog() }
             .show()
             .window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.parseColor("#1A1A1A")))
+    }
+
+    private fun showChessRulesDialog(rulesText: String, showModeAfter: Boolean) {
+        val view = ChessRulesView(this, "Chess", rulesText)
+        val dialog = Dialog(this)
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
+        dialog.setContentView(view)
+        dialog.setCanceledOnTouchOutside(true)
+        dialog.setOnCancelListener {
+            if (showModeAfter) showModeDialog()
+        }
+        view.onDone = {
+            dialog.dismiss()
+            if (showModeAfter) showModeDialog()
+        }
+        dialog.show()
+        styleChessDialog(dialog, 620f)
+    }
+
+    private fun styleChessDialog(dialog: Dialog, heightDp: Float) {
+        val metrics = resources.displayMetrics
+        val horizontalMargin = (24f * metrics.density).toInt()
+        val maxWidth = (420f * metrics.density).toInt()
+        val width = minOf(metrics.widthPixels - horizontalMargin * 2, maxWidth)
+        val maxHeight = (metrics.heightPixels * 0.84f).toInt()
+        val height = minOf((heightDp * metrics.density).toInt(), maxHeight)
+        dialog.window?.let { window ->
+            window.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+            window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+            window.attributes = window.attributes.apply { dimAmount = 0.72f }
+            window.setLayout(width, height)
+        }
     }
 
     private fun startGame(restoring: PausedMatchStore.Match? = null) {

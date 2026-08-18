@@ -66,22 +66,19 @@ class ChessMenuView(
     }
     private val actionLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
+        textAlign = Paint.Align.CENTER
         isFakeBoldText = true
         textSize = 14f * textScale
     }
     private val actionDetailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#9FB5B8")
+        textAlign = Paint.Align.CENTER
         textSize = 10f * textScale
     }
     private val actionSymbolPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.CENTER
         isFakeBoldText = true
         textSize = 23f * textScale
-    }
-    private val chevronPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#C8D7D8")
-        textAlign = Paint.Align.CENTER
-        textSize = 25f * textScale
     }
     private val resumePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#E3B86A")
@@ -232,22 +229,12 @@ class ChessMenuView(
             panelBorderPaint,
         )
 
-        panelPaint.color = action.accent
-        canvas.drawRoundRect(
-            rect.left,
-            rect.top,
-            rect.left + 4f * unit,
-            rect.bottom,
-            15f * unit,
-            15f * unit,
-            panelPaint,
-        )
         actionSymbolPaint.color = action.accent
-        canvas.drawText(action.symbol, rect.left + 29f * unit, rect.top + 34f * unit, actionSymbolPaint)
+        actionSymbolPaint.textSize = 20f * textScale
+        canvas.drawText(action.symbol, rect.centerX(), rect.top + 25f * unit, actionSymbolPaint)
         actionLabelPaint.color = Color.WHITE
-        canvas.drawText(action.label, rect.left + 54f * unit, rect.top + 31f * unit, actionLabelPaint)
-        canvas.drawText(action.detail, rect.left + 54f * unit, rect.top + 51f * unit, actionDetailPaint)
-        canvas.drawText("›", rect.right - 22f * unit, rect.top + 42f * unit, chevronPaint)
+        canvas.drawText(action.label, rect.centerX(), rect.top + 52f * unit, actionLabelPaint)
+        canvas.drawText(action.detail, rect.centerX(), rect.top + 69f * unit, actionDetailPaint)
         canvas.restore()
     }
 
