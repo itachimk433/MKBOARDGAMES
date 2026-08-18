@@ -24,6 +24,19 @@ data class GoPiece(override val color: PieceColor) : Piece(color) {
     override fun value(): Int = 100
 }
 
+data class GoScoreBreakdown(
+    val stones: Int,
+    val territory: Int,
+    val captures: Int,
+    val komi: Double,
+    val total: Double,
+)
+
+data class GoScoreSummary(
+    val black: GoScoreBreakdown,
+    val white: GoScoreBreakdown,
+)
+
 class GoRuleEngine : RuleEngine {
     companion object {
         const val PASS_METADATA = "pass"
@@ -134,6 +147,37 @@ class GoRuleEngine : RuleEngine {
         return (white - black) * 10 + (whiteCaptures - blackCaptures) * 25
     }
 
+    fun scoreSummary(state: GameState): GoScoreSummary {
+        val blackStones = state.board.count { it?.color == PieceColor.BLACK }
+        val whiteStones = state.board.count { it?.color == PieceColor.WHITE }
+        val (blackTerritory, whiteTerritory) = territoryTotals(state.board, state.boardSize)
+        val blackCaptures = capturesFor(state, PieceColor.BLACK)
+        val whiteCaptures = capturesFor(state, PieceColor.WHITE)
+        val blackTotal = (blackStones + blackTerritory).toDouble()
+        val whiteTotal = (whiteStones + whiteTerritory).toDouble() + KOMI
+        return GoScoreSummary(
+            black = GoScoreBreakdown(
+                stones = blackStones,
+                territory = blackTerritory,
+                captures = blackCaptures,
+                komi = 0.0,
+                total = blackTotal,
+            ),
+            white = GoScoreBreakdown(
+                stones = whiteStones,
+                territory = whiteTerritory,
+                captures = whiteCaptures,
+                komi = KOMI,
+                total = whiteTotal,
+            ),
+        )
+    }
+
+    fun capturesFor(state: GameState, color: PieceColor): Int {
+        val key = if (color == PieceColor.WHITE) WHITE_CAPTURES else BLACK_CAPTURES
+        return state.metadata[key] as? Int ?: 0
+    }
+
     private fun placementMove(state: GameState, position: Position): Move? {
         if (state.get(position) != null) return null
 
@@ -215,8 +259,21 @@ class GoRuleEngine : RuleEngine {
             ?: listOf(boardKey(state.board))
 
     private fun scoreStatus(board: Array<Piece?>, size: Int): GameStatus {
-        var whiteScore = board.count { it?.color == PieceColor.WHITE }.toDouble() + KOMI
-        var blackScore = board.count { it?.color == PieceColor.BLACK }.toDouble()
+        val (blackTerritory, whiteTerritory) = territoryTotals(board, size)
+        val whiteScore = board.count { it?.color == PieceColor.WHITE }.toDouble() +
+            whiteTerritory + KOMI
+        val blackScore = board.count { it?.color == PieceColor.BLACK }.toDouble() +
+            blackTerritory
+        return when {
+            whiteScore > blackScore -> GameStatus.WHITE_WINS
+            blackScore > whiteScore -> GameStatus.BLACK_WINS
+            else -> GameStatus.DRAW
+        }
+    }
+
+    private fun territoryTotals(board: Array<Piece?>, size: Int): Pair<Int, Int> {
+        var blackTerritory = 0
+        var whiteTerritory = 0
         val visited = mutableSetOf<Position>()
         for (row in 0 until size) {
             for (col in 0 until size) {
@@ -237,15 +294,11 @@ class GoRuleEngine : RuleEngine {
                     }
                 }
                 if (borderingColors.size == 1) {
-                    if (borderingColors.single() == PieceColor.WHITE) whiteScore += region.size
-                    else blackScore += region.size
+                    if (borderingColors.single() == PieceColor.WHITE) whiteTerritory += region.size
+                    else blackTerritory += region.size
                 }
             }
         }
-        return when {
-            whiteScore > blackScore -> GameStatus.WHITE_WINS
-            blackScore > whiteScore -> GameStatus.BLACK_WINS
-            else -> GameStatus.DRAW
-        }
+        return blackTerritory to whiteTerritory
     }
 }

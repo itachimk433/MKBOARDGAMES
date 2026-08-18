@@ -79,7 +79,7 @@ class GameActivity : AppCompatActivity() {
 
         val dp    = resources.displayMetrics.density
         val hudH  = (56 * dp).toInt()
-        val capH  = (36 * dp).toInt()
+        val capH  = if (gameType == "GO") (58 * dp).toInt() else (36 * dp).toInt()
 
         val container = android.widget.LinearLayout(this).apply {
             orientation = android.widget.LinearLayout.VERTICAL
@@ -571,6 +571,29 @@ Checkmate your opponent's King.
     }
 
     private fun refreshCaptureViews() {
+        if (gameType == "GO") {
+            val goEngine = engine as? GoRuleEngine ?: return
+            val scores = goEngine.scoreSummary(gameState)
+            topCaptureView.setSummary(
+                player = "Black",
+                playerColor = PieceColor.BLACK,
+                score = scores.black.total,
+                captures = scores.black.captures,
+                active = gameState.status == GameStatus.IN_PROGRESS &&
+                    gameState.currentTurn == PieceColor.BLACK,
+            )
+            bottomCaptureView.setSummary(
+                player = "White",
+                playerColor = PieceColor.WHITE,
+                score = scores.white.total,
+                captures = scores.white.captures,
+                active = gameState.status == GameStatus.IN_PROGRESS &&
+                    gameState.currentTurn == PieceColor.WHITE,
+            )
+            topCaptureView.setSelectable(false)
+            bottomCaptureView.setSelectable(false)
+            return
+        }
         if (gameType == "SHOGI") {
             val goteHand = gameState.hands[PieceColor.WHITE].orEmpty()
             val senteHand = gameState.hands[PieceColor.BLACK].orEmpty()
@@ -953,7 +976,7 @@ Checkmate your opponent's King.
 
     private fun showResultDialog() {
         if (gameState.status == GameStatus.IN_PROGRESS) return
-        val msg = when (gameState.status) {
+        val outcome = when (gameState.status) {
             GameStatus.WHITE_WINS ->
                 when {
                     gameType == "FOX_AND_GEESE" && vsAI && playerColor == PieceColor.WHITE -> "You win!"
@@ -978,6 +1001,11 @@ Checkmate your opponent's King.
                 }
             GameStatus.DRAW -> "Draw! Well played."
             else -> ""
+        }
+        val msg = if (gameType == "GO") {
+            buildGoResultMessage(outcome)
+        } else {
+            outcome
         }
         val resultLabel = when (gameState.status) {
             GameStatus.WHITE_WINS -> when (gameType) {
@@ -1004,6 +1032,23 @@ Checkmate your opponent's King.
             builder.setNeutralButton("Watch Replay") { _, _ -> launchReplay(resultLabel) }
         }
         builder.show()
+    }
+
+    private fun buildGoResultMessage(outcome: String): String {
+        val scores = (engine as? GoRuleEngine)?.scoreSummary(gameState) ?: return outcome
+        fun formatScore(score: Double): String =
+            if (score == score.toInt().toDouble()) score.toInt().toString()
+            else String.format(java.util.Locale.US, "%.1f", score)
+
+        fun playerDetails(name: String, score: com.mkdev.mkboardgames.games.go.GoScoreBreakdown): String =
+            "$name\n" +
+                "Territory  ${score.territory}\n" +
+                "Stones     ${score.stones}\n" +
+                "Captures   ${score.captures}\n" +
+                "Komi       ${formatScore(score.komi)}\n" +
+                "Final score ${formatScore(score.total)}"
+
+        return "$outcome\n\n${playerDetails("Black", scores.black)}\n\n${playerDetails("White", scores.white)}"
     }
 
     private fun launchReplay(resultLabel: String) {

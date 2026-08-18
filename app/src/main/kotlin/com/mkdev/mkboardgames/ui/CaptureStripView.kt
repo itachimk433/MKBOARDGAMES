@@ -10,9 +10,11 @@ import com.mkdev.mkboardgames.games.checkers.CheckersPiece
 import com.mkdev.mkboardgames.games.foxandgeese.FoxAndGeesePiece
 import com.mkdev.mkboardgames.games.foxandgeese.FoxAndGeesePieceType
 import com.mkdev.mkboardgames.games.shogi.ShogiPiece
+import java.util.Locale
 
 /**
- * A horizontal strip that renders a list of captured pieces left-to-right.
+ * A horizontal strip that renders a list of captured pieces left-to-right,
+ * or a compact player score summary for games such as Go.
  *
  * Top strip    → WHITE pieces captured BY Black  (placed near Black's side of the board)
  * Bottom strip → BLACK pieces captured BY White  (placed near White's side of the board)
@@ -34,6 +36,24 @@ class CaptureStripView(context: Context) : View(context) {
         color = Color.parseColor("#555555"); textAlign = Paint.Align.LEFT
         textSize = 9f * sp.coerceAtMost(3f); isFakeBoldText = true; letterSpacing = 0.08f
     }
+    private val summaryNameP = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE; textAlign = Paint.Align.LEFT; isFakeBoldText = true
+        textSize = 13f * sp.coerceAtMost(3f)
+    }
+    private val summaryMetaP = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#8B8B8B"); textAlign = Paint.Align.CENTER
+        textSize = 8f * sp.coerceAtMost(3f); isFakeBoldText = true; letterSpacing = 0.08f
+    }
+    private val summaryValueP = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE; textAlign = Paint.Align.CENTER; isFakeBoldText = true
+        textSize = 15f * sp.coerceAtMost(3f)
+    }
+    private val summaryDividerP = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#303030")
+    }
+    private val summaryAccentP = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#7FC8F8")
+    }
 
     // Two-pass text paints — reused for every piece
     private val strokeP = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -48,6 +68,12 @@ class CaptureStripView(context: Context) : View(context) {
     private var pieces: List<Piece> = emptyList()
     private var label: String = ""
     private var selectable = false
+    private var summaryMode = false
+    private var summaryPlayer = ""
+    private var summaryColor = PieceColor.BLACK
+    private var summaryScore = 0.0
+    private var summaryCaptures = 0
+    private var summaryActive = false
     var onPieceSelected: ((Piece) -> Unit)? = null
     var dividerOnTop: Boolean = false
 
@@ -58,6 +84,29 @@ class CaptureStripView(context: Context) : View(context) {
     /** Optionally set a label shown at the far-right of the strip (e.g. "Black's captures"). */
     fun setLabel(text: String) {
         label = text; invalidate()
+    }
+
+    fun setSummary(
+        player: String,
+        playerColor: PieceColor,
+        score: Double,
+        captures: Int,
+        active: Boolean,
+    ) {
+        summaryMode = true
+        summaryPlayer = player
+        summaryColor = playerColor
+        summaryScore = score
+        summaryCaptures = captures
+        summaryActive = active
+        selectable = false
+        isClickable = false
+        invalidate()
+    }
+
+    fun clearSummary() {
+        summaryMode = false
+        invalidate()
     }
 
     fun setSelectable(value: Boolean) {
@@ -82,6 +131,11 @@ class CaptureStripView(context: Context) : View(context) {
         canvas.drawRect(0f, 0f, w, h, bgP)
         if (dividerOnTop) canvas.drawRect(0f, 0f, w, dp, divP)
         else              canvas.drawRect(0f, h - dp, w, h, divP)
+
+        if (summaryMode) {
+            drawSummary(canvas)
+            return
+        }
 
         // Draw optional label on the right
         if (label.isNotEmpty()) {
@@ -118,6 +172,54 @@ class CaptureStripView(context: Context) : View(context) {
             x += gap
         }
     }
+
+    private fun drawSummary(canvas: Canvas) {
+        val w = width.toFloat()
+        val h = height.toFloat()
+        val accent = if (summaryColor == PieceColor.WHITE) Color.parseColor("#E8E8E8")
+        else Color.parseColor("#8B9AA8")
+
+        // Keep the active player visible without competing with the board.
+        summaryAccentP.color = if (summaryActive) Color.parseColor("#7FC8F8") else accent
+        canvas.drawRect(0f, 0f, if (summaryActive) 3f * dp else 1f * dp, h, summaryAccentP)
+
+        canvas.drawLine(w * 0.38f, 9f * dp, w * 0.38f, h - 9f * dp, summaryDividerP)
+        canvas.drawLine(w * 0.68f, 9f * dp, w * 0.68f, h - 9f * dp, summaryDividerP)
+
+        circleP.style = Paint.Style.FILL
+        circleP.color = if (summaryColor == PieceColor.WHITE) Color.parseColor("#F5F5F5")
+        else Color.parseColor("#252B30")
+        val indicatorX = 16f * dp
+        val indicatorY = h / 2f
+        canvas.drawCircle(indicatorX, indicatorY, 6f * dp, circleP)
+        circleP.style = Paint.Style.STROKE
+        circleP.strokeWidth = 1.2f * dp
+        circleP.color = if (summaryColor == PieceColor.WHITE) Color.parseColor("#AAAAAA")
+        else Color.parseColor("#66727D")
+        canvas.drawCircle(indicatorX, indicatorY, 6f * dp, circleP)
+        circleP.style = Paint.Style.FILL
+
+        summaryNameP.color = if (summaryActive) Color.WHITE else Color.parseColor("#D0D0D0")
+        canvas.drawText(
+            summaryPlayer,
+            29f * dp,
+            indicatorY + summaryNameP.textSize * 0.35f,
+            summaryNameP,
+        )
+
+        drawMetric(canvas, "SCORE", formatScore(summaryScore), w * 0.52f)
+        drawMetric(canvas, "CAPTURED", summaryCaptures.toString(), w * 0.83f)
+    }
+
+    private fun drawMetric(canvas: Canvas, label: String, value: String, centerX: Float) {
+        val h = height.toFloat()
+        canvas.drawText(label, centerX, h / 2f - 3f * dp, summaryMetaP)
+        canvas.drawText(value, centerX, h / 2f + 15f * dp, summaryValueP)
+    }
+
+    private fun formatScore(score: Double): String =
+        if (score == score.toInt().toDouble()) score.toInt().toString()
+        else String.format(Locale.US, "%.1f", score)
 
     /**
      * Draws a chess piece symbol using two-pass (stroke + fill) rendering.
