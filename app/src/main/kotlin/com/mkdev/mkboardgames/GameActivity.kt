@@ -351,6 +351,7 @@ class GameActivity : AppCompatActivity() {
             window.attributes = window.attributes.apply { dimAmount = 0.72f }
             window.setLayout(width, WindowManager.LayoutParams.WRAP_CONTENT)
         }
+        applyChessDialogBlur()
     }
 
     private fun showColorPickerDialog() {
