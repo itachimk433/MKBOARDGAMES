@@ -8,11 +8,11 @@ import android.os.Bundle
 import android.view.*
 import android.view.animation.OvershootInterpolator
 import android.widget.LinearLayout
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.mkdev.mkboardgames.engine.*
 import com.mkdev.mkboardgames.games.tictactoe.TicTacToePiece
 import com.mkdev.mkboardgames.games.tictactoe.TicTacToeRuleEngine
+import com.mkdev.mkboardgames.ui.StyledDialogs
 import kotlinx.coroutines.*
 
 class TicTacToeActivity : AppCompatActivity() {
@@ -90,15 +90,23 @@ class TicTacToeActivity : AppCompatActivity() {
         if (!matchStarted || gameState.status != GameStatus.IN_PROGRESS) {
             @Suppress("DEPRECATION") super.onBackPressed(); return
         }
-        AlertDialog.Builder(this).setTitle("Leave Match?")
-            .setMessage("Pause to keep this match and resume it later, or leave to forfeit.")
-            .setPositiveButton("Pause & Exit") { _, _ -> pauseMatchAndExit() }
-            .setNeutralButton("Leave Match") { _, _ ->
-                clearPausedMatch()
-                if (vsAI) SettingsManager.recordForfeit(this)
-                @Suppress("DEPRECATION") super.onBackPressed()
+        StyledDialogs.showChoices(this, "Leave Match?",
+            "Pause to resume later, or leave to forfeit this game.",
+            listOf(
+                StyledDialogs.choice("Pause & Exit", "Save and resume later", "Ⅱ", "#E3B86A"),
+                StyledDialogs.choice("Leave Match", "Forfeit this game", "⚑", "#E58A7A"),
+                StyledDialogs.choice("Keep Playing", "Return to the board", "↩", "#A9B6E8"),
+            ), 520f, "T I C · T A C · T O E") { which, dialog ->
+            dialog.dismiss()
+            when (which) {
+                0 -> pauseMatchAndExit()
+                1 -> {
+                    clearPausedMatch()
+                    if (vsAI) SettingsManager.recordForfeit(this)
+                    @Suppress("DEPRECATION") super.onBackPressed()
+                }
             }
-            .setNegativeButton("Keep Playing", null).show()
+        }
     }
 
     private fun pauseMatchAndExit() {
@@ -136,25 +144,23 @@ class TicTacToeActivity : AppCompatActivity() {
             add("2 Players")
             add("How to Play")
         }
-        AlertDialog.Builder(this).setTitle("Tic-Tac-Toe")
-            .setItems(options.toTypedArray()) { _, which ->
-                if (paused && which == 0) {
-                    resumePausedMatch()
-                    return@setItems
+        StyledDialogs.showChoices(this, "Tic-Tac-Toe", "Choose how to begin.",
+            options.map { item ->
+                when (item) {
+                    "Resume Match" -> StyledDialogs.choice(item, "Continue where you left off", "Ⅱ", "#E3B86A")
+                    "vs AI" -> StyledDialogs.choice(item, "Play against the computer", "♞", "#8EC7B9")
+                    "2 Players" -> StyledDialogs.choice(item, "Share the board locally", "♙", "#A9B6E8")
+                    else -> StyledDialogs.choice(item, "Review the essentials", "?", "#E58A7A")
                 }
-                when (options[which]) {
-                    "vs AI" -> { vsAI = true; showBoardSizeDialog(fromMode = true) }
-                    "2 Players" -> {
-                        vsAI = false
-                        playerColor = PieceColor.WHITE
-                        showBoardSizeDialog(fromMode = false)
-                    }
-                    "How to Play" -> showRules(showModeAfter = !matchStarted)
-                }
+            }, 520f, "T I C · T A C · T O E", onCancel = { if (!matchStarted) finish() }) { which, dialog ->
+            dialog.dismiss()
+            when (options[which]) {
+                "Resume Match" -> resumePausedMatch()
+                "vs AI" -> { vsAI = true; showBoardSizeDialog(fromMode = true) }
+                "2 Players" -> { vsAI = false; playerColor = PieceColor.WHITE; showBoardSizeDialog(fromMode = false) }
+                "How to Play" -> showRules(showModeAfter = !matchStarted)
             }
-            .setCancelable(true)
-            .setOnCancelListener { if (!matchStarted) finish() }
-            .show()
+        }
     }
 
     private fun showBoardSizeDialog(fromMode: Boolean) {
@@ -163,17 +169,17 @@ class TicTacToeActivity : AppCompatActivity() {
             "4×4 — Medium   (4 in a row)",
             "5×5 — Large    (4 in a row)"
         )
-        AlertDialog.Builder(this).setTitle("Board Size")
-            .setItems(sizeLabels) { _, which ->
+        StyledDialogs.showChoices(this, "Board Size", "Choose the board that suits your match.",
+            sizeLabels.mapIndexed { index, label ->
+                StyledDialogs.choice(label, if (index == 0) "Classic game" else "More room to play", listOf("III", "IV", "V")[index], listOf("#E3B86A", "#8EC7B9", "#A9B6E8")[index])
+            }, 520f, "T I C · T A C · T O E", onCancel = { showModeDialog() }) { which, dialog ->
+                dialog.dismiss()
                 boardSize = which + 3
                 winLength = winLengthFor(boardSize)
                 engine    = TicTacToeRuleEngine(boardSize, winLength)
                 boardView.updateBoardSize(boardSize)
                 if (fromMode && vsAI) showColorPickerDialog() else startGame()
             }
-            .setCancelable(true)
-            .setOnCancelListener { showModeDialog() }
-            .show()
     }
 
     /** Returns the appropriate win-line length for the given board size. */
@@ -184,14 +190,15 @@ class TicTacToeActivity : AppCompatActivity() {
     }
 
     private fun showColorPickerDialog() {
-        AlertDialog.Builder(this).setTitle("Play as")
-            .setItems(arrayOf("X  (goes first)", "O  (goes second)")) { _, which ->
+        StyledDialogs.showChoices(this, "Play As", "Choose your side before the first move.",
+            listOf(
+                StyledDialogs.choice("X", "Goes first", "X", "#E3B86A"),
+                StyledDialogs.choice("O", "Goes second", "O", "#A9B6E8"),
+            ), 420f, "T I C · T A C · T O E", onCancel = { showBoardSizeDialog(fromMode = true) }) { which, dialog ->
+                dialog.dismiss()
                 playerColor = if (which == 0) PieceColor.WHITE else PieceColor.BLACK
                 startGame()
             }
-            .setCancelable(true)
-            .setOnCancelListener { showBoardSizeDialog(fromMode = true) }
-            .show()
     }
 
     private fun showRules(showModeAfter: Boolean = false) {
@@ -235,14 +242,13 @@ Strategy
 • On larger boards, control the centre region and connect threats.
             """.trimIndent()
         }
-        val sv = android.widget.ScrollView(this).apply {
-            setBackgroundColor(Color.parseColor("#1A1A1A")); addView(tv)
-        }
-        AlertDialog.Builder(this).setTitle("How to Play Tic-Tac-Toe")
-            .setView(sv)
-            .setPositiveButton("Got it!") { _, _ -> if (showModeAfter) showModeDialog() }
-            .show()
-            .window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.parseColor("#1A1A1A")))
+        StyledDialogs.showRules(
+            this,
+            "How to Play Tic-Tac-Toe",
+            tv.text.toString(),
+            "T I C · T A C · T O E",
+            onDone = { if (showModeAfter) showModeDialog() },
+        )
     }
 
     // ─── Game flow ────────────────────────────────────────────────────────────
@@ -420,43 +426,58 @@ Strategy
         val items = mutableListOf("New Game", "How to Play")
         if (vsAI) items.add("AI Difficulty")
         items.add("Main Menu")
-        val arr = items.toTypedArray()
-        AlertDialog.Builder(this).setTitle("Menu")
-            .setItems(arr) { _, which ->
-                when (arr[which]) {
+        StyledDialogs.showChoices(this, "Menu", "Choose what to do next.",
+            items.map { item ->
+                when (item) {
+                    "New Game" -> StyledDialogs.choice(item, if (inProgress) "Start over and forfeit" else "Begin a fresh match", "↻", "#E3B86A")
+                    "How to Play" -> StyledDialogs.choice(item, "Review the essentials", "?", "#A9B6E8")
+                    "AI Difficulty" -> StyledDialogs.choice(item, "Adjust the challenge", "♞", "#8EC7B9")
+                    else -> StyledDialogs.choice(item, if (inProgress) "Leave this match" else "Choose another game", "⌂", "#E58A7A")
+                }
+            }, 520f, "T I C · T A C · T O E") { which, dialog ->
+                dialog.dismiss()
+                when (items[which]) {
                     "New Game" -> if (inProgress) {
-                        AlertDialog.Builder(this).setTitle("Forfeit Match?")
-                            .setMessage("Starting a new game counts as a forfeit.")
-                            .setPositiveButton("Forfeit & New Game") { _, _ ->
-                                if (vsAI) SettingsManager.recordForfeit(this)
-                                showModeDialog()
-                            }.setNegativeButton("Cancel", null).show()
+                        StyledDialogs.showChoices(this, "Forfeit Match?", "Starting a new game counts as a forfeit.",
+                            listOf(
+                                StyledDialogs.choice("Forfeit & New Game", "Start over now", "↻", "#E58A7A"),
+                                StyledDialogs.choice("Cancel", "Keep the current match", "↩", "#A9B6E8"),
+                            ), 420f, "T I C · T A C · T O E") { selected, confirm ->
+                                confirm.dismiss()
+                                if (selected == 0) {
+                                    if (vsAI) SettingsManager.recordForfeit(this)
+                                    showModeDialog()
+                                }
+                            }
                     } else showModeDialog()
                     "How to Play" -> showRules(showModeAfter = false)
                     "AI Difficulty" -> {
                         val diffs = arrayOf("Easy", "Medium", "Hard")
-                        var diff = SettingsManager.getTttDifficulty(this)
-                        AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_MinWidth)
-                            .setTitle("AI Difficulty")
-                            .setSingleChoiceItems(diffs, diff) { d, i ->
-                                SettingsManager.setTttDifficulty(this, i); diff = i; d.dismiss()
-                            }.show()
+                        val current = SettingsManager.getTttDifficulty(this)
+                        StyledDialogs.showChoices(this, "AI Difficulty", "Adjust the challenge.",
+                            diffs.mapIndexed { index, label ->
+                                StyledDialogs.choice(label, if (index == current) "Current setting" else "Computer strength", listOf("I", "II", "III")[index], listOf("#8EC7B9", "#E3B86A", "#E58A7A")[index])
+                            }, 520f, "T I C · T A C · T O E") { selected, difficulty ->
+                                difficulty.dismiss()
+                                SettingsManager.setTttDifficulty(this, selected)
+                            }
                     }
                     "Main Menu" -> if (inProgress) {
-                        AlertDialog.Builder(this).setTitle("Leave Match?")
-                            .setMessage("Pause to resume later, or leave to forfeit.")
-                            .setPositiveButton("Pause & Exit") { _, _ -> pauseMatchAndExit() }
-                            .setNeutralButton("Leave Match") { _, _ ->
-                                clearPausedMatch()
-                                if (vsAI) SettingsManager.recordForfeit(this)
-                                finish()
-                            }.setNegativeButton("Cancel", null).show()
-                    } else {
-                        clearPausedMatch()
-                        finish()
-                    }
+                        StyledDialogs.showChoices(this, "Leave Match?", "Pause to resume later, or leave to forfeit.",
+                            listOf(
+                                StyledDialogs.choice("Pause & Exit", "Save and resume later", "Ⅱ", "#E3B86A"),
+                                StyledDialogs.choice("Leave Match", "Forfeit this game", "⚑", "#E58A7A"),
+                                StyledDialogs.choice("Keep Playing", "Return to the board", "↩", "#A9B6E8"),
+                            ), 520f, "T I C · T A C · T O E") { selected, leave ->
+                                leave.dismiss()
+                                when (selected) {
+                                    0 -> pauseMatchAndExit()
+                                    1 -> { clearPausedMatch(); if (vsAI) SettingsManager.recordForfeit(this); finish() }
+                                }
+                            }
+                    } else { clearPausedMatch(); finish() }
                 }
-            }.show()
+            }
     }
 
     private fun showResultDialog() {
@@ -475,11 +496,19 @@ Strategy
             GameStatus.DRAW       -> "Draw"
             else -> ""
         }
-        AlertDialog.Builder(this).setTitle("Game Over").setMessage(msg)
-            .setPositiveButton("Play Again") { _, _ -> startGame() }
-            .setNegativeButton("Main Menu")  { _, _ -> finish() }
-            .setNeutralButton("Watch Replay") { _, _ -> launchReplay(resultLabel) }
-            .setCancelable(true).show()
+        StyledDialogs.showChoices(this, "Game Over", msg,
+            listOf(
+                StyledDialogs.choice("Play Again", "Start a fresh game", "↻", "#E3B86A"),
+                StyledDialogs.choice("Main Menu", "Choose another match", "⌂", "#E58A7A"),
+                StyledDialogs.choice("Watch Replay", "Review the moves", "▶", "#A9B6E8"),
+            ), 520f, "T I C · T A C · T O E") { which, dialog ->
+                dialog.dismiss()
+                when (which) {
+                    0 -> startGame()
+                    1 -> finish()
+                    2 -> launchReplay(resultLabel)
+                }
+            }
     }
 
     private fun launchReplay(resultLabel: String) {

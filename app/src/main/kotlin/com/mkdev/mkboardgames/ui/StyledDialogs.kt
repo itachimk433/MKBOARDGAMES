@@ -21,8 +21,8 @@ object StyledDialogs {
         choices: List<ChessChoiceView.Choice>,
         heightDp: Float = 520f,
         gameLabel: String,
-        onChoice: (Int, Dialog) -> Unit,
         onCancel: (() -> Unit)? = null,
+        onChoice: (Int, Dialog) -> Unit,
     ): Dialog {
         val view = ChessChoiceView(context, title, subtitle, choices, gameLabel)
         val dialog = Dialog(context)

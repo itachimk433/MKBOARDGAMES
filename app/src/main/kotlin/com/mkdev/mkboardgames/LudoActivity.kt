@@ -40,6 +40,7 @@ import com.mkdev.mkboardgames.ui.LudoControlTileView
 import com.mkdev.mkboardgames.ui.GlbDiceView
 import com.mkdev.mkboardgames.ui.LudoStatusStripView
 import com.mkdev.mkboardgames.ui.MotionDiceDirection
+import com.mkdev.mkboardgames.ui.StyledDialogs
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
@@ -319,12 +320,14 @@ class LudoActivity : AppCompatActivity() {
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         if (state.status == GameStatus.IN_PROGRESS && moves.isNotEmpty()) {
-            AlertDialog.Builder(this)
-                .setTitle("Leave Match?")
-                .setMessage("Leaving counts as a forfeit.")
-                .setPositiveButton("Leave") { _, _ -> super.onBackPressed() }
-                .setNegativeButton("Keep Playing", null)
-                .show()
+            StyledDialogs.showChoices(this, "Leave Match?", "Leaving counts as a forfeit.",
+                listOf(
+                    StyledDialogs.choice("Leave Match", "Forfeit this game", "⚑", "#E58A7A"),
+                    StyledDialogs.choice("Keep Playing", "Return to the board", "↩", "#A9B6E8"),
+                ), 420f, "L U D O") { which, dialog ->
+                    dialog.dismiss()
+                    if (which == 0) super.onBackPressed()
+                }
         } else {
             super.onBackPressed()
         }
@@ -341,14 +344,15 @@ class LudoActivity : AppCompatActivity() {
     }
 
     private fun showModeDialog() {
-        AlertDialog.Builder(this)
-            .setTitle("Ludo")
-            .setItems(arrayOf(
-                "vs AI · Normal",
-                "vs AI · Irregular",
-                "4 Players",
-                "How to Play",
-            )) { _, which ->
+        val options = listOf("vs AI · Normal", "vs AI · Irregular", "4 Players", "How to Play")
+        StyledDialogs.showChoices(this, "Ludo", "Choose how to begin.",
+            listOf(
+                StyledDialogs.choice(options[0], "Classic computer match", "♞", "#8EC7B9"),
+                StyledDialogs.choice(options[1], "Match with abilities and coins", "✦", "#E3B86A"),
+                StyledDialogs.choice(options[2], "Play locally with four colours", "♙", "#A9B6E8"),
+                StyledDialogs.choice(options[3], "Review the essentials", "?", "#E58A7A"),
+            ), 520f, "L U D O", onCancel = { if (moves.isEmpty()) finish() }) { which, dialog ->
+                dialog.dismiss()
                 when (which) {
                     0 -> {
                         vsAI = true
@@ -368,20 +372,17 @@ class LudoActivity : AppCompatActivity() {
                     3 -> showRules(true)
                 }
             }
-            .setCancelable(true)
-            .setOnCancelListener { if (moves.isEmpty()) finish() }
-            .show()
     }
 
     private fun showPlayerPicker() {
-        AlertDialog.Builder(this)
-            .setTitle("Choose your colour")
-            .setItems(LudoSetup.PLAYER_NAMES) { _, which ->
+        StyledDialogs.showChoices(this, "Play As", "Choose your colour before the first roll.",
+            LudoSetup.PLAYER_NAMES.mapIndexed { index, name ->
+                StyledDialogs.choice(name, if (index == 0) "Moves first" else "Joins the match", listOf("●", "●", "●", "●")[index], listOf("#E3B86A", "#E58A7A", "#8EC7B9", "#A9B6E8")[index])
+            }, 520f, "L U D O", onCancel = { showModeDialog() }) { which, dialog ->
+                dialog.dismiss()
                 humanPlayer = which
                 startGame()
             }
-            .setOnCancelListener { showModeDialog() }
-            .show()
     }
 
     private fun showRules(showModeAfter: Boolean) {
@@ -394,11 +395,8 @@ class LudoActivity : AppCompatActivity() {
 
             Normal mode is classic Ludo. Irregular mode gives every colour ${LudoEconomy.STARTER_COINS} match-only coins. Captures, tokens reaching home, and final placement reward coins. STORE abilities last for the match: Invincibility blocks one capture, Extra Move adds two spaces, and Reroll replaces the current die. AI behaviour and profiles are visible only in Irregular mode.
         """.trimIndent()
-        AlertDialog.Builder(this)
-            .setTitle("How to Play Ludo")
-            .setMessage(message)
-            .setPositiveButton("Got it") { _, _ -> if (showModeAfter) showModeDialog() }
-            .show()
+        StyledDialogs.showRules(this, "How to Play Ludo", message, "L U D O",
+            onDone = { if (showModeAfter) showModeDialog() })
     }
 
     private fun startGame() {
@@ -1632,12 +1630,14 @@ class LudoActivity : AppCompatActivity() {
                 if (index < standings.lastIndex) append("\n\n")
             }
         }
-        AlertDialog.Builder(this)
-            .setTitle("Ludo Standings")
-            .setMessage(result)
-            .setPositiveButton("New Match") { _, _ -> startGame() }
-            .setNegativeButton("Main Menu") { _, _ -> finish() }
-            .setOnDismissListener { resultDialogVisible = false }
-            .show()
+        StyledDialogs.showChoices(this, "Ludo Standings", result,
+            listOf(
+                StyledDialogs.choice("New Match", "Roll into another game", "↻", "#E3B86A"),
+                StyledDialogs.choice("Main Menu", "Choose another game", "⌂", "#E58A7A"),
+            ), 620f, "L U D O") { which, dialog ->
+                dialog.dismiss()
+                resultDialogVisible = false
+                if (which == 0) startGame() else finish()
+            }.setOnDismissListener { resultDialogVisible = false }
     }
 }
