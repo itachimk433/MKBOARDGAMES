@@ -313,7 +313,7 @@ class GameActivity : AppCompatActivity() {
         val menuView = ChessMenuView(
             this,
             PausedMatchStore.has(this, gameType),
-            gameLabel = difficultyGameLabel(),
+            gameLabel = styledGameLabel(),
         )
         val dialog = Dialog(this)
         chessMenuDialog = dialog
@@ -406,7 +406,7 @@ class GameActivity : AppCompatActivity() {
                 ChessChoiceView.Choice("White", "Moves first", "♔", Color.parseColor("#E3B86A")),
                 ChessChoiceView.Choice("Black", "Moves second", "♚", Color.parseColor("#A9B6E8")),
             ),
-            gameLabel = difficultyGameLabel(),
+            gameLabel = styledGameLabel(),
         )
         val dialog = Dialog(this)
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
@@ -1329,7 +1329,7 @@ Checkmate your opponent's King.
             title = "Menu",
             subtitle = "Choose what to do next.",
             choices = choices,
-            gameLabel = difficultyGameLabel(),
+            gameLabel = styledGameLabel(),
         )
         val dialog = Dialog(this)
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
@@ -1438,7 +1438,7 @@ Checkmate your opponent's King.
             title = "AI Difficulty",
             subtitle = "Choose the challenge for your next move.",
             choices = levels,
-            gameLabel = difficultyGameLabel(),
+            gameLabel = styledGameLabel(),
         )
         val dialog = Dialog(this)
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
@@ -1458,9 +1458,9 @@ Checkmate your opponent's King.
         styleChessDialog(dialog, 520f)
     }
 
-    private fun difficultyGameLabel(): String = when (gameType) {
+    private fun styledGameLabel(): String = when (gameType) {
         "CHECKERS" -> "D R A U G H T S"
-        "INTERNATIONAL_DRAUGHTS" -> "D R A U G H T S"
+        "INTERNATIONAL_DRAUGHTS" -> "I N T L  D R A U G H T S"
         "FOX_AND_GEESE" -> "F O X  &  G E E S E"
         "GO" -> "G O"
         "SHOGI" -> "S H O G I"
