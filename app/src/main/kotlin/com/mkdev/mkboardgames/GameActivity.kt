@@ -1405,27 +1405,10 @@ Checkmate your opponent's King.
             else       -> { getDiff = { SettingsManager.getChessDifficulty(this) };    setDiff = { v -> SettingsManager.setChessDifficulty(this, v) } }
         }
         val current = getDiff()
-        val labels  = arrayOf("Easy", "Medium", "Hard")
-        if (gameType == "CHESS") {
-            showChessDifficultyDialog(current, setDiff)
-            return
-        }
-        AlertDialog.Builder(this).setTitle("AI Difficulty")
-            .setSingleChoiceItems(labels, current) { dlg, which ->
-                val changed = which != current
-                setDiff(which); dlg.dismiss()
-                if (changed && gameState.status == GameStatus.IN_PROGRESS && moveHistory.isNotEmpty()) {
-                    AlertDialog.Builder(this).setTitle("Restart Match?")
-                        .setMessage("Difficulty changed. Restart now?")
-                        .setPositiveButton("Restart") { _, _ -> startGame() }
-                        .setNegativeButton("Keep Playing", null).show()
-                }
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
+        showStyledDifficultyDialog(current, setDiff)
     }
 
-    private fun showChessDifficultyDialog(current: Int, setDiff: (Int) -> Unit) {
+    private fun showStyledDifficultyDialog(current: Int, setDiff: (Int) -> Unit) {
         val levels = listOf(
             ChessChoiceView.Choice(
                 "Easy",
@@ -1451,6 +1434,7 @@ Checkmate your opponent's King.
             title = "AI Difficulty",
             subtitle = "Choose the challenge for your next move.",
             choices = levels,
+            gameLabel = difficultyGameLabel(),
         )
         val dialog = Dialog(this)
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
@@ -1468,6 +1452,16 @@ Checkmate your opponent's King.
         }
         dialog.show()
         styleChessDialog(dialog, 520f)
+    }
+
+    private fun difficultyGameLabel(): String = when (gameType) {
+        "CHECKERS" -> "D R A U G H T S"
+        "INTERNATIONAL_DRAUGHTS" -> "D R A U G H T S"
+        "FOX_AND_GEESE" -> "F O X  &  G E E S E"
+        "GO" -> "G O"
+        "SHOGI" -> "S H O G I"
+        "XIANGQI" -> "X I A N G Q I"
+        else -> "C H E S S"
     }
 
     private fun showChessRestartDialog() {
