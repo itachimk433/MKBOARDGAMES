@@ -350,6 +350,7 @@ class GameActivity : AppCompatActivity() {
             window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
             window.attributes = window.attributes.apply { dimAmount = 0.72f }
             window.setLayout(width, WindowManager.LayoutParams.WRAP_CONTENT)
+            enableChessWindowBlur(window)
         }
         applyChessDialogBlur()
     }
@@ -685,8 +686,18 @@ Checkmate your opponent's King.
             window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
             window.attributes = window.attributes.apply { dimAmount = 0.72f }
             window.setLayout(width, height)
+            enableChessWindowBlur(window)
         }
         applyChessDialogBlur()
+    }
+
+    private fun enableChessWindowBlur(window: Window) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+            window.attributes = window.attributes.apply {
+                blurBehindRadius = (28f * resources.displayMetrics.density).toInt()
+            }
+        }
     }
 
     private fun applyChessDialogBlur() {
@@ -1336,6 +1347,11 @@ Checkmate your opponent's King.
             GameStatus.DRAW       -> "Draw"
             else -> ""
         }
+        if (gameType == "CHESS") {
+            showChessResultDialog(msg, resultLabel)
+            return
+        }
+
         val builder = AlertDialog.Builder(this).setTitle("Game Over").setMessage(msg)
             .setPositiveButton("Play Again") { _, _ -> startGame() }
             .setNegativeButton("Main Menu")  { _, _ -> finish() }
@@ -1345,6 +1361,50 @@ Checkmate your opponent's King.
             builder.setNeutralButton("Watch Replay") { _, _ -> launchReplay(resultLabel) }
         }
         builder.show()
+    }
+
+    private fun showChessResultDialog(message: String, resultLabel: String) {
+        val view = ChessChoiceView(
+            this,
+            title = "Game Over",
+            subtitle = message,
+            choices = listOf(
+                ChessChoiceView.Choice(
+                    "Play Again",
+                    "Start a fresh game",
+                    "↻",
+                    Color.parseColor("#E3B86A"),
+                ),
+                ChessChoiceView.Choice(
+                    "Main Menu",
+                    "Choose another match",
+                    "⌂",
+                    Color.parseColor("#E58A7A"),
+                ),
+                ChessChoiceView.Choice(
+                    "Watch Replay",
+                    "Review the moves",
+                    "▶",
+                    Color.parseColor("#A9B6E8"),
+                ),
+            ),
+        )
+        val dialog = Dialog(this)
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
+        dialog.setContentView(view)
+        dialog.setCanceledOnTouchOutside(true)
+        dialog.setOnDismissListener { clearChessDialogBlur() }
+        dialog.setOnCancelListener { clearChessDialogBlur() }
+        view.onChoiceSelected = { which ->
+            dialog.dismiss()
+            when (which) {
+                0 -> startGame()
+                1 -> finish()
+                else -> launchReplay(resultLabel)
+            }
+        }
+        dialog.show()
+        styleChessDialog(dialog, 520f)
     }
 
     private fun buildGoResultMessage(outcome: String): String {
