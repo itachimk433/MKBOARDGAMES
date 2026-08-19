@@ -169,7 +169,7 @@ class GameActivity : AppCompatActivity() {
         if (!matchStarted || gameState.status != GameStatus.IN_PROGRESS) {
             @Suppress("DEPRECATION") super.onBackPressed(); return
         }
-        if (gameType == "CHESS") {
+        if (isStyledBoardGame()) {
             showChessLeaveMatchDialog()
             return
         }
@@ -262,11 +262,13 @@ class GameActivity : AppCompatActivity() {
 
     // ─── Game flow ────────────────────────────────────────────────────────────
 
-    private fun showModeDialog() {
-        if (gameType == "CHESS" ||
+    private fun isStyledBoardGame(): Boolean =
+        gameType == "CHESS" ||
             gameType == "CHECKERS" ||
             gameType == "INTERNATIONAL_DRAUGHTS"
-        ) {
+
+    private fun showModeDialog() {
+        if (isStyledBoardGame()) {
             showChessMenu()
             return
         }
@@ -311,7 +313,7 @@ class GameActivity : AppCompatActivity() {
         val menuView = ChessMenuView(
             this,
             PausedMatchStore.has(this, gameType),
-            gameLabel = if (isDraughts) "D R A U G H T S" else "C H E S S",
+            gameLabel = difficultyGameLabel(),
         )
         val dialog = Dialog(this)
         chessMenuDialog = dialog
@@ -364,10 +366,7 @@ class GameActivity : AppCompatActivity() {
     }
 
     private fun showColorPickerDialog() {
-        if (gameType == "CHESS" ||
-            gameType == "CHECKERS" ||
-            gameType == "INTERNATIONAL_DRAUGHTS"
-        ) {
+        if (isStyledBoardGame()) {
             showChessSidePicker()
             return
         }
@@ -407,7 +406,7 @@ class GameActivity : AppCompatActivity() {
                 ChessChoiceView.Choice("White", "Moves first", "♔", Color.parseColor("#E3B86A")),
                 ChessChoiceView.Choice("Black", "Moves second", "♚", Color.parseColor("#A9B6E8")),
             ),
-            gameLabel = if (gameType == "CHESS") "C H E S S" else "D R A U G H T S",
+            gameLabel = difficultyGameLabel(),
         )
         val dialog = Dialog(this)
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
@@ -643,8 +642,12 @@ Checkmate your opponent's King.
             """.trimIndent()
         }
 
-        if (gameType == "CHESS") {
-            showChessRulesDialog(rulesText = rulesText, showModeAfter = showModeAfter)
+        if (isStyledBoardGame()) {
+            showChessRulesDialog(
+                gameName = gameName,
+                rulesText = rulesText,
+                showModeAfter = showModeAfter,
+            )
             return
         }
 
@@ -667,8 +670,8 @@ Checkmate your opponent's King.
             .window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.parseColor("#1A1A1A")))
     }
 
-    private fun showChessRulesDialog(rulesText: String, showModeAfter: Boolean) {
-        val view = ChessRulesView(this, "Chess", rulesText)
+    private fun showChessRulesDialog(gameName: String, rulesText: String, showModeAfter: Boolean) {
+        val view = ChessRulesView(this, gameName, rulesText)
         val dialog = Dialog(this)
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
         dialog.setContentView(view)
@@ -1234,7 +1237,7 @@ Checkmate your opponent's King.
 
     fun onMenuClicked() {
         val inProgress = gameState.status == GameStatus.IN_PROGRESS && moveHistory.isNotEmpty()
-        if (gameType == "CHESS") {
+        if (isStyledBoardGame()) {
             showChessGameplayMenu(inProgress)
             return
         }
@@ -1258,7 +1261,7 @@ Checkmate your opponent's King.
                     "How to Play"   -> showRules(showModeAfter = false)
                     "AI Difficulty" -> showDifficultyDialog()
                     "Main Menu" -> if (inProgress) {
-                        if (gameType == "CHESS") {
+                        if (isStyledBoardGame()) {
                             showChessLeaveMatchDialog()
                         } else {
                             AlertDialog.Builder(this).setTitle("Leave Match?")
@@ -1326,6 +1329,7 @@ Checkmate your opponent's King.
             title = "Menu",
             subtitle = "Choose what to do next.",
             choices = choices,
+            gameLabel = difficultyGameLabel(),
         )
         val dialog = Dialog(this)
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
@@ -1549,7 +1553,7 @@ Checkmate your opponent's King.
             GameStatus.DRAW       -> "Draw"
             else -> ""
         }
-        if (gameType == "CHESS") {
+        if (isStyledBoardGame()) {
             showChessResultDialog(msg, resultLabel)
             return
         }
@@ -1590,6 +1594,7 @@ Checkmate your opponent's King.
                     Color.parseColor("#A9B6E8"),
                 ),
             ),
+            gameLabel = difficultyGameLabel(),
         )
         val dialog = Dialog(this)
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
