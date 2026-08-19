@@ -702,15 +702,24 @@ Checkmate your opponent's King.
 
     private fun applyChessDialogBlur() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            gameContainer.setRenderEffect(
-                RenderEffect.createBlurEffect(14f, 14f, Shader.TileMode.CLAMP),
-            )
+            val blur = RenderEffect.createBlurEffect(22f, 22f, Shader.TileMode.CLAMP)
+            gameContainer.setRenderEffect(blur)
+            (gameContainer as? ViewGroup)?.let { container ->
+                for (index in 0 until container.childCount) {
+                    container.getChildAt(index).setRenderEffect(blur)
+                }
+            }
         }
     }
 
     private fun clearChessDialogBlur() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             gameContainer.setRenderEffect(null)
+            (gameContainer as? ViewGroup)?.let { container ->
+                for (index in 0 until container.childCount) {
+                    container.getChildAt(index).setRenderEffect(null)
+                }
+            }
         }
     }
 

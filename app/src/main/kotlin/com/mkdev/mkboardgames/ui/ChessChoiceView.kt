@@ -140,7 +140,6 @@ class ChessChoiceView(
 
         drawHeader(canvas, width)
         hits.forEach { drawChoice(canvas, it) }
-        canvas.drawText("Tap a card to continue.", width / 2f, height - 17f * unit, footerPaint)
     }
 
     private fun drawHeader(canvas: Canvas, width: Float) {
