@@ -15,6 +15,7 @@ class ChessRulesView(
     context: Context,
     private val gameName: String,
     rulesText: String,
+    private val gameLabel: String = "C H E S S",
 ) : LinearLayout(context) {
 
     var onDone: (() -> Unit)? = null
@@ -41,7 +42,7 @@ class ChessRulesView(
         }, LayoutParams(LayoutParams.MATCH_PARENT, (32f * density).toInt()))
 
         addView(TextView(context).apply {
-            text = "C H E S S"
+            text = gameLabel
             gravity = Gravity.CENTER
             setTextColor(Color.parseColor("#E3B86A"))
             setTypeface(typeface, android.graphics.Typeface.BOLD)

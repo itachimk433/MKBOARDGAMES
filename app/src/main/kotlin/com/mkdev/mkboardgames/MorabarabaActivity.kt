@@ -3,15 +3,18 @@ package com.mkdev.mkboardgames
 import android.content.Context
 import android.content.Intent
 import android.graphics.*
+import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
 import android.view.*
 import android.widget.*
-import androidx.appcompat.app.AlertDialog
+import android.app.Dialog
 import androidx.appcompat.app.AppCompatActivity
 import com.mkdev.mkboardgames.engine.*
 import com.mkdev.mkboardgames.games.morabaraba.MorabarabaBoard
 import com.mkdev.mkboardgames.games.morabaraba.MorabarabaRuleEngine
 import com.mkdev.mkboardgames.ui.CaptureStripView
+import com.mkdev.mkboardgames.ui.ChessChoiceView
+import com.mkdev.mkboardgames.ui.ChessRulesView
 import com.mkdev.mkboardgames.ui.MorabaraBoardView
 import kotlinx.coroutines.*
 
@@ -97,15 +100,7 @@ class MorabarabaActivity : AppCompatActivity() {
         if (gameState.status != GameStatus.IN_PROGRESS) {
             @Suppress("DEPRECATION") super.onBackPressed(); return
         }
-        AlertDialog.Builder(this).setTitle("Leave Match?")
-            .setMessage("Pause to keep this match and resume it later, or leave to forfeit.")
-            .setPositiveButton("Pause & Exit") { _, _ -> pauseMatchAndExit() }
-            .setNeutralButton("Leave Match") { _, _ ->
-                clearPausedMatch()
-                if (vsAI) SettingsManager.recordForfeit(this)
-                @Suppress("DEPRECATION") super.onBackPressed()
-            }
-            .setNegativeButton("Keep Playing", null).show()
+        showLeaveMatchDialog()
     }
 
     private fun pauseMatchAndExit() {
@@ -126,50 +121,117 @@ class MorabarabaActivity : AppCompatActivity() {
 
     private fun showModeDialog() {
         val paused = PausedMatchStore.has(this, "MORABARABA")
-        val options = buildList {
-            if (paused) add("Resume Match")
-            add("vs AI")
-            add("2 Players")
-            add("How to Play")
+        val choices = mutableListOf<ChessChoiceView.Choice>()
+        val actions = mutableListOf<() -> Unit>()
+        if (paused) {
+            choices += ChessChoiceView.Choice("Resume Match", "Continue where you left off", "Ⅱ", Color.parseColor("#E3B86A"))
+            actions += { resumePausedMatch() }
         }
-        AlertDialog.Builder(this).setTitle("Morabaraba")
-            .setItems(options.toTypedArray()) { _, w ->
-                if (paused && w == 0) {
-                    resumePausedMatch()
-                    return@setItems
-                }
-                when (options[w]) {
-                    "vs AI" -> showVariantDialog(isVsAI = true)
-                    "2 Players" -> showVariantDialog(isVsAI = false)
-                    "How to Play" -> showTutorial(showModeAfter = !matchStarted)
-                }
-            }
-            .setCancelable(true)
-            .setOnCancelListener { if (!matchStarted) finish() }
-            .show()
+        choices += ChessChoiceView.Choice("vs AI", "Play against the computer", "♞", Color.parseColor("#8EC7B9"))
+        actions += { showVariantDialog(isVsAI = true) }
+        choices += ChessChoiceView.Choice("2 Players", "Share the board locally", "♙", Color.parseColor("#A9B6E8"))
+        actions += { showVariantDialog(isVsAI = false) }
+        choices += ChessChoiceView.Choice("How to Play", "Review the essentials", "?", Color.parseColor("#E58A7A"))
+        actions += { showTutorial(showModeAfter = !matchStarted) }
+        showChoiceDialog("Morabaraba", "Choose how to begin.", choices, actions, 570f) {
+            if (!matchStarted) finish()
+        }
     }
 
     private fun showVariantDialog(isVsAI: Boolean) {
-        AlertDialog.Builder(this).setTitle("Choose Variant")
-            .setItems(arrayOf("6 Cows — Simple", "9 Cows — Classic", "12 Cows — Morabaraba")) { _, w ->
-                pieceCount = when (w) { 0 -> 6; 1 -> 9; else -> 12 }
+        val choices = listOf(
+            ChessChoiceView.Choice("6 Cows", "Simple variant", "VI", Color.parseColor("#8EC7B9")),
+            ChessChoiceView.Choice("9 Cows", "Classic variant", "IX", Color.parseColor("#E3B86A")),
+            ChessChoiceView.Choice("12 Cows", "Full Morabaraba", "XII", Color.parseColor("#E58A7A")),
+        )
+        showChoiceDialog("Choose Variant", "Select the number of cows in play.", choices, choices.mapIndexed { index, _ ->
+            {
+                pieceCount = when (index) { 0 -> 6; 1 -> 9; else -> 12 }
                 vsAI = isVsAI
-                if (isVsAI) showColorPickerDialog() else { playerColor = PieceColor.WHITE; startGame() }
+                if (isVsAI) showColorPickerDialog() else {
+                    playerColor = PieceColor.WHITE
+                    startGame()
+                }
             }
-            .setCancelable(true)
-            .setOnCancelListener { showModeDialog() }
-            .show()
+        }, 520f) { showModeDialog() }
     }
 
     private fun showColorPickerDialog() {
-        AlertDialog.Builder(this).setTitle("Play as")
-            .setItems(arrayOf("White ● (moves first)", "Black ● (moves second)")) { _, which ->
-                playerColor = if (which == 0) PieceColor.WHITE else PieceColor.BLACK
-                startGame()
-            }
-            .setCancelable(true)
-            .setOnCancelListener { showVariantDialog(isVsAI = true) }
-            .show()
+        val choices = listOf(
+            ChessChoiceView.Choice("White", "Moves first", "●", Color.parseColor("#E3B86A")),
+            ChessChoiceView.Choice("Black", "Moves second", "●", Color.parseColor("#A9B6E8")),
+        )
+        showChoiceDialog("Play As", "Choose your side on the board.", choices, listOf(
+            { playerColor = PieceColor.WHITE; startGame() },
+            { playerColor = PieceColor.BLACK; startGame() },
+        ), 420f) { showVariantDialog(isVsAI = true) }
+    }
+
+    private fun showChoiceDialog(
+        title: String,
+        subtitle: String,
+        choices: List<ChessChoiceView.Choice>,
+        actions: List<() -> Unit>,
+        heightDp: Float,
+        onCancel: (() -> Unit)? = null,
+    ) {
+        val view = ChessChoiceView(
+            this,
+            title = title,
+            subtitle = subtitle,
+            choices = choices,
+            gameLabel = "M O R A B A R A B A",
+        )
+        val dialog = Dialog(this)
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
+        dialog.setContentView(view)
+        dialog.setCanceledOnTouchOutside(true)
+        dialog.setOnCancelListener {
+            onCancel?.invoke()
+        }
+        view.onChoiceSelected = { which ->
+            dialog.dismiss()
+            actions.getOrNull(which)?.invoke()
+        }
+        dialog.show()
+        styleMorabarabaDialog(dialog, heightDp)
+    }
+
+    private fun styleMorabarabaDialog(dialog: Dialog, heightDp: Float) {
+        val metrics = resources.displayMetrics
+        val horizontalMargin = (24f * metrics.density).toInt()
+        val maxWidth = (420f * metrics.density).toInt()
+        val width = minOf(metrics.widthPixels - horizontalMargin * 2, maxWidth)
+        val maxHeight = (metrics.heightPixels * 0.84f).toInt()
+        val height = minOf((heightDp * metrics.density).toInt(), maxHeight)
+        dialog.window?.let { window ->
+            window.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+            window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+            window.attributes = window.attributes.apply { dimAmount = 0.72f }
+            window.setLayout(width, height)
+        }
+    }
+
+    private fun showLeaveMatchDialog() {
+        showChoiceDialog(
+            "Leave Match?",
+            "Pause to resume later, or leave to forfeit this game.",
+            listOf(
+                ChessChoiceView.Choice("Pause & Exit", "Save and resume later", "Ⅱ", Color.parseColor("#E3B86A")),
+                ChessChoiceView.Choice("Leave Match", "Forfeit this game", "⚑", Color.parseColor("#E58A7A")),
+                ChessChoiceView.Choice("Keep Playing", "Return to the board", "↩", Color.parseColor("#A9B6E8")),
+            ),
+            listOf(
+                { pauseMatchAndExit() },
+                {
+                    clearPausedMatch()
+                    if (vsAI) SettingsManager.recordForfeit(this)
+                    @Suppress("DEPRECATION") super.onBackPressed()
+                },
+                {},
+            ),
+            520f,
+        )
     }
 
     private fun startGame(restoring: PausedMatchStore.Match? = null) {
@@ -391,55 +453,77 @@ class MorabarabaActivity : AppCompatActivity() {
 
     private fun showMenuDialog() {
         val inProgress = gameState.status == GameStatus.IN_PROGRESS && moveHistory.isNotEmpty()
-        val items = mutableListOf("New Game", "How to Play")
-        if (vsAI) items.add("AI Difficulty")
-        items.add("Main Menu")
-        val arr = items.toTypedArray()
-        AlertDialog.Builder(this).setTitle("Menu")
-            .setItems(arr) { _, which ->
-                when (arr[which]) {
-                    "New Game" -> if (inProgress) {
-                        AlertDialog.Builder(this).setTitle("Forfeit Match?")
-                            .setMessage("Starting a new game counts as a forfeit.")
-                            .setPositiveButton("Forfeit & New Game") { _, _ ->
-                                if (vsAI) SettingsManager.recordForfeit(this)
-                                showModeDialog()
-                            }.setNegativeButton("Cancel", null).show()
-                    } else showModeDialog()
-                    "How to Play"   -> showTutorial(showModeAfter = false)
-                    "AI Difficulty" -> showDifficultyDialog()
-                    "Main Menu" -> if (inProgress) {
-                        AlertDialog.Builder(this).setTitle("Leave Match?")
-                            .setMessage("Pause to resume later, or leave to forfeit.")
-                            .setPositiveButton("Pause & Exit") { _, _ -> pauseMatchAndExit() }
-                            .setNeutralButton("Leave Match") { _, _ ->
-                                clearPausedMatch()
-                                if (vsAI) SettingsManager.recordForfeit(this)
-                                finish()
-                            }.setNegativeButton("Cancel", null).show()
-                    } else {
-                        clearPausedMatch()
-                        finish()
-                    }
-                }
-            }.show()
+        val choices = mutableListOf(
+            ChessChoiceView.Choice("New Game", if (inProgress) "Start over and forfeit" else "Begin a fresh match", "↻", Color.parseColor("#E3B86A")),
+            ChessChoiceView.Choice("How to Play", "Review the essentials", "?", Color.parseColor("#A9B6E8")),
+        )
+        val actions = mutableListOf<() -> Unit>(
+            { if (inProgress) showForfeitDialog() else showModeDialog() },
+            { showTutorial(showModeAfter = false) },
+        )
+        if (vsAI) {
+            choices += ChessChoiceView.Choice("AI Difficulty", "Adjust the challenge", "♞", Color.parseColor("#8EC7B9"))
+            actions += { showDifficultyDialog() }
+        }
+        choices += ChessChoiceView.Choice("Main Menu", if (inProgress) "Leave this match" else "Choose another game", "⌂", Color.parseColor("#E58A7A"))
+        actions += {
+            if (inProgress) showLeaveMatchDialog()
+            else {
+                clearPausedMatch()
+                finish()
+            }
+        }
+        showChoiceDialog("Menu", "Choose what to do next.", choices, actions, 620f)
+    }
+
+    private fun showForfeitDialog() {
+        showChoiceDialog(
+            "Forfeit Match?",
+            "Starting a new game counts as a forfeit.",
+            listOf(
+                ChessChoiceView.Choice("Cancel", "Keep playing this match", "↩", Color.parseColor("#A9B6E8")),
+                ChessChoiceView.Choice("Forfeit & New Game", "Start a fresh match", "↻", Color.parseColor("#E58A7A")),
+            ),
+            listOf(
+                {},
+                {
+                    if (vsAI) SettingsManager.recordForfeit(this)
+                    showModeDialog()
+                },
+            ),
+            470f,
+        )
     }
 
     private fun showDifficultyDialog() {
         val current = SettingsManager.getMorabarabaDifficulty(this)
-        AlertDialog.Builder(this).setTitle("AI Difficulty")
-            .setSingleChoiceItems(arrayOf("Easy", "Medium", "Hard"), current) { dlg, which ->
+        val choices = listOf(
+            ChessChoiceView.Choice("Easy", if (current == 0) "Current setting" else "A relaxed challenge", "I", Color.parseColor("#8EC7B9")),
+            ChessChoiceView.Choice("Medium", if (current == 1) "Current setting" else "A balanced challenge", "II", Color.parseColor("#E3B86A")),
+            ChessChoiceView.Choice("Hard", if (current == 2) "Current setting" else "A serious challenge", "III", Color.parseColor("#E58A7A")),
+        )
+        showChoiceDialog("AI Difficulty", "Choose the challenge for your next move.", choices, choices.indices.map { which ->
+            {
                 val changed = which != current
-                SettingsManager.setMorabarabaDifficulty(this, which); dlg.dismiss()
+                SettingsManager.setMorabarabaDifficulty(this, which)
                 if (changed && gameState.status == GameStatus.IN_PROGRESS && moveHistory.isNotEmpty()) {
-                    AlertDialog.Builder(this).setTitle("Restart Match?")
-                        .setMessage("Difficulty changed. Restart now?")
-                        .setPositiveButton("Restart") { _, _ -> showModeDialog() }
-                        .setNegativeButton("Keep Playing", null).show()
+                    showRestartDialog()
                 }
             }
-            .setNegativeButton("Cancel", null)
-            .show()
+        }, 520f)
+    }
+
+    private fun showRestartDialog() {
+        showChoiceDialog(
+            "Restart Match?",
+            "Difficulty changed. Restart now?",
+            listOf(
+                ChessChoiceView.Choice("Keep Playing", "Continue this match", "↩", Color.parseColor("#A9B6E8")),
+                ChessChoiceView.Choice("Restart", "Start with the new difficulty", "↻", Color.parseColor("#E3B86A")),
+            ),
+            listOf({}, { showModeDialog() }),
+            470f,
+        )
     }
 
     private fun doUndo() {
@@ -502,12 +586,21 @@ class MorabarabaActivity : AppCompatActivity() {
             GameStatus.BLACK_WINS -> "Black wins"
             else -> "Draw"
         }
-        AlertDialog.Builder(this).setTitle("Game Over").setMessage(msg)
-            .setPositiveButton("Play Again")   { _, _ -> showModeDialog() }
-            .setNeutralButton("Watch Replay")  { _, _ -> launchReplay(resultLabel) }
-            .setNegativeButton("Main Menu")    { _, _ -> finish() }
-            .setCancelable(true)
-            .show()
+        showChoiceDialog(
+            "Game Over",
+            msg,
+            listOf(
+                ChessChoiceView.Choice("Play Again", "Start a fresh game", "↻", Color.parseColor("#E3B86A")),
+                ChessChoiceView.Choice("Main Menu", "Choose another match", "⌂", Color.parseColor("#E58A7A")),
+                ChessChoiceView.Choice("Watch Replay", "Review the moves", "▶", Color.parseColor("#A9B6E8")),
+            ),
+            listOf(
+                { showModeDialog() },
+                { finish() },
+                { launchReplay(resultLabel) },
+            ),
+            520f,
+        )
     }
 
     // ─── Replay ───────────────────────────────────────────────────────────────
@@ -524,13 +617,7 @@ class MorabarabaActivity : AppCompatActivity() {
     // ─── Tutorial ────────────────────────────────────────────────────────────
 
     private fun showTutorial(showModeAfter: Boolean = false) {
-        val dp   = resources.displayMetrics.density
-        val tv   = TextView(this).apply {
-            setTextColor(Color.parseColor("#E0E0E0"))
-            textSize = 14f
-            setPadding((16 * dp).toInt(), (12 * dp).toInt(), (16 * dp).toInt(), (12 * dp).toInt())
-            setLineSpacing(4f * dp, 1f)
-            text = """
+        val rulesText = """
 MORABARABA — Rules
 
 Overview
@@ -565,15 +652,18 @@ You win by either:
 • Reducing your opponent to fewer than 3 cows, OR
 • Leaving your opponent with no legal moves.
             """.trimIndent()
+        val dialog = Dialog(this)
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
+        val view = ChessRulesView(this, "Morabaraba", rulesText, "M O R A B A R A B A")
+        dialog.setContentView(view)
+        dialog.setCanceledOnTouchOutside(true)
+        dialog.setOnCancelListener { if (showModeAfter) showModeDialog() }
+        view.onDone = {
+            dialog.dismiss()
+            if (showModeAfter) showModeDialog()
         }
-        val sv = ScrollView(this).apply {
-            setBackgroundColor(Color.parseColor("#1A1A1A")); addView(tv)
-        }
-        AlertDialog.Builder(this).setTitle("How to Play Morabaraba")
-            .setView(sv)
-            .setPositiveButton("Got it!") { _, _ -> if (showModeAfter) showModeDialog() }
-            .show()
-            .window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.parseColor("#1A1A1A")))
+        dialog.show()
+        styleMorabarabaDialog(dialog, 620f)
     }
 
     private fun makeFullscreen() {

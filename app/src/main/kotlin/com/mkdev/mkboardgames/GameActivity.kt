@@ -265,7 +265,8 @@ class GameActivity : AppCompatActivity() {
     private fun isStyledBoardGame(): Boolean =
         gameType == "CHESS" ||
             gameType == "CHECKERS" ||
-            gameType == "INTERNATIONAL_DRAUGHTS"
+            gameType == "INTERNATIONAL_DRAUGHTS" ||
+            gameType == "OTHELLO"
 
     private fun showModeDialog() {
         if (isStyledBoardGame()) {
@@ -309,7 +310,6 @@ class GameActivity : AppCompatActivity() {
     private fun showChessMenu() {
         chessMenuDialog?.dismiss()
 
-        val isDraughts = gameType == "CHECKERS" || gameType == "INTERNATIONAL_DRAUGHTS"
         val menuView = ChessMenuView(
             this,
             PausedMatchStore.has(this, gameType),
@@ -671,7 +671,7 @@ Checkmate your opponent's King.
     }
 
     private fun showChessRulesDialog(gameName: String, rulesText: String, showModeAfter: Boolean) {
-        val view = ChessRulesView(this, gameName, rulesText)
+        val view = ChessRulesView(this, gameName, rulesText, styledGameLabel())
         val dialog = Dialog(this)
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
         dialog.setContentView(view)
@@ -1300,7 +1300,7 @@ Checkmate your opponent's King.
             { if (inProgress) showChessForfeitDialog() else showModeDialog() },
             { showRules(showModeAfter = false) },
         )
-        if (vsAI) {
+        if (vsAI && gameType != "OTHELLO") {
             choices += ChessChoiceView.Choice(
                 "AI Difficulty",
                 "Adjust the challenge",
@@ -1461,6 +1461,7 @@ Checkmate your opponent's King.
     private fun styledGameLabel(): String = when (gameType) {
         "CHECKERS" -> "D R A U G H T S"
         "INTERNATIONAL_DRAUGHTS" -> "I N T L  D R A U G H T S"
+        "OTHELLO" -> "O T H E L L O"
         "FOX_AND_GEESE" -> "F O X  &  G E E S E"
         "GO" -> "G O"
         "SHOGI" -> "S H O G I"
@@ -1570,30 +1571,33 @@ Checkmate your opponent's King.
     }
 
     private fun showChessResultDialog(message: String, resultLabel: String) {
+        val choices = mutableListOf(
+            ChessChoiceView.Choice(
+                "Play Again",
+                "Start a fresh game",
+                "↻",
+                Color.parseColor("#E3B86A"),
+            ),
+            ChessChoiceView.Choice(
+                "Main Menu",
+                "Choose another match",
+                "⌂",
+                Color.parseColor("#E58A7A"),
+            ),
+        )
+        if (gameType != "OTHELLO") {
+            choices += ChessChoiceView.Choice(
+                "Watch Replay",
+                "Review the moves",
+                "▶",
+                Color.parseColor("#A9B6E8"),
+            )
+        }
         val view = ChessChoiceView(
             this,
             title = "Game Over",
             subtitle = message,
-            choices = listOf(
-                ChessChoiceView.Choice(
-                    "Play Again",
-                    "Start a fresh game",
-                    "↻",
-                    Color.parseColor("#E3B86A"),
-                ),
-                ChessChoiceView.Choice(
-                    "Main Menu",
-                    "Choose another match",
-                    "⌂",
-                    Color.parseColor("#E58A7A"),
-                ),
-                ChessChoiceView.Choice(
-                    "Watch Replay",
-                    "Review the moves",
-                    "▶",
-                    Color.parseColor("#A9B6E8"),
-                ),
-            ),
+            choices = choices,
             gameLabel = difficultyGameLabel(),
         )
         val dialog = Dialog(this)
@@ -1607,7 +1611,7 @@ Checkmate your opponent's King.
             when (which) {
                 0 -> startGame()
                 1 -> finish()
-                else -> launchReplay(resultLabel)
+                2 -> launchReplay(resultLabel)
             }
         }
         dialog.show()
