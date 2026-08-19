@@ -166,7 +166,7 @@ class ChessMenuView(
         super.onDraw(canvas)
         val width = width.toFloat()
         val height = height.toFloat()
-        val corner = 26f * unit
+        val corner = 12f * unit
 
         surfacePaint.shader = LinearGradient(
             0f,
@@ -220,12 +220,12 @@ class ChessMenuView(
         canvas.scale(scale, scale, rect.centerX(), rect.centerY())
 
         panelPaint.color = if (pressed) Color.parseColor("#21454A") else Color.parseColor("#16353B")
-        canvas.drawRoundRect(rect, 15f * unit, 15f * unit, panelPaint)
+        canvas.drawRoundRect(rect, 8f * unit, 8f * unit, panelPaint)
         panelBorderPaint.color = if (pressed) action.accent else Color.parseColor("#2C5960")
         canvas.drawRoundRect(
             RectF(rect.left + 0.5f * unit, rect.top + 0.5f * unit, rect.right - 0.5f * unit, rect.bottom - 0.5f * unit),
-            15f * unit,
-            15f * unit,
+            8f * unit,
+            8f * unit,
             panelBorderPaint,
         )
 
@@ -240,9 +240,9 @@ class ChessMenuView(
 
     private fun drawResumeAction(canvas: Canvas, width: Float) {
         panelPaint.color = if (resumePressed) Color.parseColor("#21454A") else Color.parseColor("#16353B")
-        canvas.drawRoundRect(resumeRect, 14f * unit, 14f * unit, panelPaint)
+        canvas.drawRoundRect(resumeRect, 8f * unit, 8f * unit, panelPaint)
         panelBorderPaint.color = Color.parseColor("#2C5960")
-        canvas.drawRoundRect(resumeRect, 14f * unit, 14f * unit, panelBorderPaint)
+        canvas.drawRoundRect(resumeRect, 8f * unit, 8f * unit, panelBorderPaint)
         canvas.drawText("RESUME SAVED MATCH", width / 2f, resumeRect.top + 20f * unit, resumePaint)
         canvas.drawText("Tap here to continue your last game", width / 2f, resumeRect.top + 38f * unit, footerPaint)
     }

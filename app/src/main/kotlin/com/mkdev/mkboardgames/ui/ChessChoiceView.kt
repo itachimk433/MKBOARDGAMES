@@ -135,7 +135,7 @@ class ChessChoiceView(
             Color.parseColor("#0B1D25"),
             Shader.TileMode.CLAMP,
         )
-        canvas.drawRoundRect(0f, 0f, width, height, 26f * unit, 26f * unit, surfacePaint)
+        canvas.drawRoundRect(0f, 0f, width, height, 12f * unit, 12f * unit, surfacePaint)
         surfacePaint.shader = null
 
         drawHeader(canvas, width)
@@ -165,12 +165,12 @@ class ChessChoiceView(
         canvas.save()
         canvas.scale(scale, scale, rect.centerX(), rect.centerY())
         cardPaint.color = if (pressed) Color.parseColor("#21454A") else Color.parseColor("#16353B")
-        canvas.drawRoundRect(rect, 15f * unit, 15f * unit, cardPaint)
+        canvas.drawRoundRect(rect, 8f * unit, 8f * unit, cardPaint)
         borderPaint.color = hit.choice.accent
         canvas.drawRoundRect(
             RectF(rect.left + 0.5f * unit, rect.top + 0.5f * unit, rect.right - 0.5f * unit, rect.bottom - 0.5f * unit),
-            15f * unit,
-            15f * unit,
+            8f * unit,
+            8f * unit,
             borderPaint,
         )
         iconPaint.color = hit.choice.accent

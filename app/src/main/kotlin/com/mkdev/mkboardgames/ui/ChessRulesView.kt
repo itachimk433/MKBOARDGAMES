@@ -28,7 +28,7 @@ class ChessRulesView(
             GradientDrawable.Orientation.TL_BR,
             intArrayOf(Color.parseColor("#102C32"), Color.parseColor("#0B1D25")),
         ).apply {
-            cornerRadius = 26f * density
+            cornerRadius = 12f * density
             setStroke((1f * density).toInt(), Color.parseColor("#2C5960"))
         }
 
@@ -67,7 +67,7 @@ class ChessRulesView(
         val scroll = ScrollView(context).apply {
             isFillViewport = true
             overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
-            background = roundedBackground(Color.parseColor("#0D252B"), 16f)
+            background = roundedBackground(Color.parseColor("#0D252B"), 8f)
         }
         scroll.addView(TextView(context).apply {
             text = rulesText
@@ -87,7 +87,7 @@ class ChessRulesView(
             setTextColor(Color.parseColor("#102C32"))
             setTypeface(typeface, android.graphics.Typeface.BOLD)
             setTextSize(14f)
-            background = roundedBackground(Color.parseColor("#E3B86A"), 14f)
+            background = roundedBackground(Color.parseColor("#E3B86A"), 8f)
             setOnClickListener {
                 performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
                 onDone?.invoke()
