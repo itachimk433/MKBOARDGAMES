@@ -1602,7 +1602,7 @@ Checkmate your opponent's King.
             title = "Game Over",
             subtitle = message,
             choices = choices,
-            gameLabel = difficultyGameLabel(),
+            gameLabel = styledGameLabel(),
         )
         val dialog = Dialog(this)
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
