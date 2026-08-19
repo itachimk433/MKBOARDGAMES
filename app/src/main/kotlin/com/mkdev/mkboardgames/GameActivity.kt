@@ -266,7 +266,11 @@ class GameActivity : AppCompatActivity() {
         gameType == "CHESS" ||
             gameType == "CHECKERS" ||
             gameType == "INTERNATIONAL_DRAUGHTS" ||
-            gameType == "OTHELLO"
+            gameType == "OTHELLO" ||
+            gameType == "FOX_AND_GEESE" ||
+            gameType == "GO" ||
+            gameType == "SHOGI" ||
+            gameType == "XIANGQI"
 
     private fun showModeDialog() {
         if (isStyledBoardGame()) {
