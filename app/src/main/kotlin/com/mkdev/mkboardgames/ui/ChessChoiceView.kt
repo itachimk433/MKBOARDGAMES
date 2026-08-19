@@ -19,6 +19,7 @@ class ChessChoiceView(
     private val title: String,
     private val subtitle: String,
     choices: List<Choice>,
+    private val gameLabel: String = "C H E S S",
 ) : View(context) {
 
     data class Choice(
@@ -151,7 +152,7 @@ class ChessChoiceView(
         canvas.drawLine(center - 118f * unit, 36f * unit, center - 42f * unit, 36f * unit, linePaint)
         canvas.drawLine(center + 42f * unit, 36f * unit, center + 118f * unit, 36f * unit, linePaint)
         canvas.drawText("♛", center, 43f * unit, crownPaint)
-        canvas.drawText("C H E S S", center, 58f * unit, eyebrowPaint)
+        canvas.drawText(gameLabel, center, 58f * unit, eyebrowPaint)
         canvas.drawText(title, center, 99f * unit, titlePaint)
         canvas.drawText(subtitle, center, 125f * unit, subtitlePaint)
     }

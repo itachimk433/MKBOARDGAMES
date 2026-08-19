@@ -263,7 +263,10 @@ class GameActivity : AppCompatActivity() {
     // ─── Game flow ────────────────────────────────────────────────────────────
 
     private fun showModeDialog() {
-        if (gameType == "CHESS") {
+        if (gameType == "CHESS" ||
+            gameType == "CHECKERS" ||
+            gameType == "INTERNATIONAL_DRAUGHTS"
+        ) {
             showChessMenu()
             return
         }
@@ -304,7 +307,12 @@ class GameActivity : AppCompatActivity() {
     private fun showChessMenu() {
         chessMenuDialog?.dismiss()
 
-        val menuView = ChessMenuView(this, PausedMatchStore.has(this, gameType))
+        val isDraughts = gameType == "CHECKERS" || gameType == "INTERNATIONAL_DRAUGHTS"
+        val menuView = ChessMenuView(
+            this,
+            PausedMatchStore.has(this, gameType),
+            gameLabel = if (isDraughts) "D R A U G H T S" else "C H E S S",
+        )
         val dialog = Dialog(this)
         chessMenuDialog = dialog
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
@@ -356,7 +364,10 @@ class GameActivity : AppCompatActivity() {
     }
 
     private fun showColorPickerDialog() {
-        if (gameType == "CHESS") {
+        if (gameType == "CHESS" ||
+            gameType == "CHECKERS" ||
+            gameType == "INTERNATIONAL_DRAUGHTS"
+        ) {
             showChessSidePicker()
             return
         }
@@ -396,6 +407,7 @@ class GameActivity : AppCompatActivity() {
                 ChessChoiceView.Choice("White", "Moves first", "♔", Color.parseColor("#E3B86A")),
                 ChessChoiceView.Choice("Black", "Moves second", "♚", Color.parseColor("#A9B6E8")),
             ),
+            gameLabel = if (gameType == "CHESS") "C H E S S" else "D R A U G H T S",
         )
         val dialog = Dialog(this)
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)

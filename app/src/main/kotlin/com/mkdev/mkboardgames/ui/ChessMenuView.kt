@@ -19,6 +19,7 @@ import com.mkdev.mkboardgames.SoundPlayer
 class ChessMenuView(
     context: Context,
     private val hasResumeMatch: Boolean,
+    private val gameLabel: String = "C H E S S",
 ) : View(context) {
 
     var onVsAi: (() -> Unit)? = null
@@ -206,7 +207,7 @@ class ChessMenuView(
             color = Color.parseColor("#E3B86A")
             textSize = 21f * textScale
         })
-        canvas.drawText("C H E S S", center, 58f * unit, eyebrowPaint)
+        canvas.drawText(gameLabel, center, 58f * unit, eyebrowPaint)
         canvas.drawText("Choose your match", center, 99f * unit, titlePaint)
         canvas.drawText("A good game starts with the right opponent.", center, 125f * unit, subtitlePaint)
     }
