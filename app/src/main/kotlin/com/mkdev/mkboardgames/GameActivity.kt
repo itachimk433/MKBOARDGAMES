@@ -1234,6 +1234,10 @@ Checkmate your opponent's King.
 
     fun onMenuClicked() {
         val inProgress = gameState.status == GameStatus.IN_PROGRESS && moveHistory.isNotEmpty()
+        if (gameType == "CHESS") {
+            showChessGameplayMenu(inProgress)
+            return
+        }
         val items = mutableListOf("New Game", "How to Play")
         // Othello uses a fixed AI setting; the other games expose their
         // difficulty because their search depth can be tuned safely.
@@ -1272,6 +1276,106 @@ Checkmate your opponent's King.
                 }
                 }
             }.show()
+    }
+
+    private fun showChessGameplayMenu(inProgress: Boolean) {
+        val choices = mutableListOf(
+            ChessChoiceView.Choice(
+                "New Game",
+                if (inProgress) "Start over and forfeit" else "Begin a fresh match",
+                "↻",
+                Color.parseColor("#E3B86A"),
+            ),
+            ChessChoiceView.Choice(
+                "How to Play",
+                "Review the essentials",
+                "?",
+                Color.parseColor("#A9B6E8"),
+            ),
+        )
+        val actions = mutableListOf<() -> Unit>(
+            { if (inProgress) showChessForfeitDialog() else showModeDialog() },
+            { showRules(showModeAfter = false) },
+        )
+        if (vsAI) {
+            choices += ChessChoiceView.Choice(
+                "AI Difficulty",
+                "Adjust the challenge",
+                "♞",
+                Color.parseColor("#8EC7B9"),
+            )
+            actions += { showDifficultyDialog() }
+        }
+        choices += ChessChoiceView.Choice(
+            "Main Menu",
+            if (inProgress) "Leave this match" else "Choose another game",
+            "⌂",
+            Color.parseColor("#E58A7A"),
+        )
+        actions += {
+            if (inProgress) {
+                showChessLeaveMatchDialog()
+            } else {
+                clearPausedMatch()
+                finish()
+            }
+        }
+
+        val view = ChessChoiceView(
+            this,
+            title = "Menu",
+            subtitle = "Choose what to do next.",
+            choices = choices,
+        )
+        val dialog = Dialog(this)
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
+        dialog.setContentView(view)
+        dialog.setCanceledOnTouchOutside(true)
+        dialog.setOnDismissListener { clearChessDialogBlur() }
+        dialog.setOnCancelListener { clearChessDialogBlur() }
+        view.onChoiceSelected = { which ->
+            dialog.dismiss()
+            actions.getOrNull(which)?.invoke()
+        }
+        dialog.show()
+        styleChessDialog(dialog, 620f)
+    }
+
+    private fun showChessForfeitDialog() {
+        val view = ChessChoiceView(
+            this,
+            title = "Forfeit Match?",
+            subtitle = "Starting a new game counts as a forfeit.",
+            choices = listOf(
+                ChessChoiceView.Choice(
+                    "Cancel",
+                    "Keep playing this match",
+                    "↩",
+                    Color.parseColor("#A9B6E8"),
+                ),
+                ChessChoiceView.Choice(
+                    "Forfeit & New Game",
+                    "Start a fresh match",
+                    "↻",
+                    Color.parseColor("#E58A7A"),
+                ),
+            ),
+        )
+        val dialog = Dialog(this)
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
+        dialog.setContentView(view)
+        dialog.setCanceledOnTouchOutside(true)
+        dialog.setOnDismissListener { clearChessDialogBlur() }
+        dialog.setOnCancelListener { clearChessDialogBlur() }
+        view.onChoiceSelected = { which ->
+            dialog.dismiss()
+            if (which == 1) {
+                if (vsAI) SettingsManager.recordForfeit(this)
+                showModeDialog()
+            }
+        }
+        dialog.show()
+        styleChessDialog(dialog, 470f)
     }
 
     private fun showDifficultyDialog() {
