@@ -1406,6 +1406,10 @@ Checkmate your opponent's King.
         }
         val current = getDiff()
         val labels  = arrayOf("Easy", "Medium", "Hard")
+        if (gameType == "CHESS") {
+            showChessDifficultyDialog(current, setDiff)
+            return
+        }
         AlertDialog.Builder(this).setTitle("AI Difficulty")
             .setSingleChoiceItems(labels, current) { dlg, which ->
                 val changed = which != current
@@ -1419,6 +1423,85 @@ Checkmate your opponent's King.
             }
             .setNegativeButton("Cancel", null)
             .show()
+    }
+
+    private fun showChessDifficultyDialog(current: Int, setDiff: (Int) -> Unit) {
+        val levels = listOf(
+            ChessChoiceView.Choice(
+                "Easy",
+                if (current == 0) "Current setting" else "A relaxed challenge",
+                "I",
+                Color.parseColor("#8EC7B9"),
+            ),
+            ChessChoiceView.Choice(
+                "Medium",
+                if (current == 1) "Current setting" else "A balanced challenge",
+                "II",
+                Color.parseColor("#E3B86A"),
+            ),
+            ChessChoiceView.Choice(
+                "Hard",
+                if (current == 2) "Current setting" else "A serious challenge",
+                "III",
+                Color.parseColor("#E58A7A"),
+            ),
+        )
+        val view = ChessChoiceView(
+            this,
+            title = "AI Difficulty",
+            subtitle = "Choose the challenge for your next move.",
+            choices = levels,
+        )
+        val dialog = Dialog(this)
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
+        dialog.setContentView(view)
+        dialog.setCanceledOnTouchOutside(true)
+        dialog.setOnDismissListener { clearChessDialogBlur() }
+        dialog.setOnCancelListener { clearChessDialogBlur() }
+        view.onChoiceSelected = { which ->
+            val changed = which != current
+            setDiff(which)
+            dialog.dismiss()
+            if (changed && gameState.status == GameStatus.IN_PROGRESS && moveHistory.isNotEmpty()) {
+                showChessRestartDialog()
+            }
+        }
+        dialog.show()
+        styleChessDialog(dialog, 520f)
+    }
+
+    private fun showChessRestartDialog() {
+        val view = ChessChoiceView(
+            this,
+            title = "Restart Match?",
+            subtitle = "Difficulty changed. Restart now?",
+            choices = listOf(
+                ChessChoiceView.Choice(
+                    "Keep Playing",
+                    "Continue this match",
+                    "↩",
+                    Color.parseColor("#A9B6E8"),
+                ),
+                ChessChoiceView.Choice(
+                    "Restart",
+                    "Start with the new difficulty",
+                    "↻",
+                    Color.parseColor("#E3B86A"),
+                ),
+            ),
+        )
+        val dialog = Dialog(this)
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
+        dialog.setContentView(view)
+        dialog.setCanceledOnTouchOutside(true)
+        dialog.setOnDismissListener { clearChessDialogBlur() }
+        dialog.setOnCancelListener { clearChessDialogBlur() }
+        view.onChoiceSelected = { which ->
+            dialog.dismiss()
+            if (which == 1) startGame()
+        }
+        dialog.show()
+        styleChessDialog(dialog, 470f)
     }
 
     // ─── Result dialog ────────────────────────────────────────────────────────
