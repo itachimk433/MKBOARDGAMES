@@ -21,10 +21,11 @@ object StyledDialogs {
         choices: List<ChessChoiceView.Choice>,
         heightDp: Float = 520f,
         gameLabel: String,
+        headerSymbol: String = "♛",
         onCancel: (() -> Unit)? = null,
         onChoice: (Int, Dialog) -> Unit,
     ): Dialog {
-        val view = ChessChoiceView(context, title, subtitle, choices, gameLabel)
+        val view = ChessChoiceView(context, title, subtitle, choices, gameLabel, headerSymbol)
         val dialog = Dialog(context)
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
         dialog.setContentView(view)
@@ -61,17 +62,18 @@ object StyledDialogs {
         gameLabel: String,
         onDone: (() -> Unit)? = null,
     ): Dialog {
-        val view = ChessRulesView(context, gameName, rules, gameLabel)
+        val view = ChessRulesView(context, gameName, rules, gameLabel, if (gameLabel == "L U D O") "⚄" else "♛")
         val dialog = Dialog(context)
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
         dialog.setContentView(view)
-        dialog.setCanceledOnTouchOutside(true)
+        dialog.setCanceledOnTouchOutside(false)
         dialog.setOnShowListener {
             val window = dialog.window ?: return@setOnShowListener
             val density = context.resources.displayMetrics.density
             val margin = (24f * density).toInt()
             window.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
             window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+            window.setWindowAnimations(0)
             window.attributes = window.attributes.apply { dimAmount = 0.72f }
             window.setLayout(
                 minOf(context.resources.displayMetrics.widthPixels - margin * 2, (420f * density).toInt()),
@@ -79,8 +81,8 @@ object StyledDialogs {
             )
         }
         view.onDone = {
-            dialog.dismiss()
             onDone?.invoke()
+            dialog.dismiss()
         }
         dialog.show()
         return dialog

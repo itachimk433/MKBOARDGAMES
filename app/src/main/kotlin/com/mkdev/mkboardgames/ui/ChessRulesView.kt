@@ -16,6 +16,7 @@ class ChessRulesView(
     private val gameName: String,
     rulesText: String,
     private val gameLabel: String = "C H E S S",
+    private val headerSymbol: String = "♛",
 ) : LinearLayout(context) {
 
     var onDone: (() -> Unit)? = null
@@ -34,7 +35,7 @@ class ChessRulesView(
         }
 
         addView(TextView(context).apply {
-            text = "♛"
+            text = headerSymbol
             gravity = Gravity.CENTER
             setTextColor(Color.parseColor("#E3B86A"))
             setTextSize(22f)

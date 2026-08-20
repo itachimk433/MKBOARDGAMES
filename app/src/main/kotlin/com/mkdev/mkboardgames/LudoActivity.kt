@@ -347,29 +347,34 @@ class LudoActivity : AppCompatActivity() {
         val options = listOf("vs AI · Normal", "vs AI · Irregular", "4 Players", "How to Play")
         StyledDialogs.showChoices(this, "Ludo", "Choose how to begin.",
             listOf(
-                StyledDialogs.choice(options[0], "Classic computer match", "♞", "#8EC7B9"),
-                StyledDialogs.choice(options[1], "Match with abilities and coins", "◉", "#E3B86A"),
-                StyledDialogs.choice(options[2], "Play locally with four colours", "♙", "#A9B6E8"),
-                StyledDialogs.choice(options[3], "Review the essentials", "?", "#E58A7A"),
-            ), 520f, "L U D O", onCancel = { if (moves.isEmpty()) finish() }) { which, dialog ->
-                dialog.dismiss()
+                StyledDialogs.choice(options[0], "Classic computer match", "⚄", "#8EC7B9"),
+                StyledDialogs.choice(options[1], "Match with abilities and coins", "⚄", "#E3B86A"),
+                StyledDialogs.choice(options[2], "Play locally with four colours", "⚄", "#A9B6E8"),
+                StyledDialogs.choice(options[3], "Review the essentials", "⚄", "#E58A7A"),
+            ), 520f, "L U D O", headerSymbol = "⚄", onCancel = { if (moves.isEmpty()) finish() }) { which, dialog ->
                 when (which) {
                     0 -> {
                         vsAI = true
                         irregularMode = false
                         showPlayerPicker()
+                        dialog.dismiss()
                     }
                     1 -> {
                         vsAI = true
                         irregularMode = true
                         showPlayerPicker()
+                        dialog.dismiss()
                     }
                     2 -> {
                         vsAI = false
                         irregularMode = false
                         startGame()
+                        dialog.dismiss()
                     }
-                    3 -> showRules(true)
+                    3 -> {
+                        showRules(true)
+                        dialog.dismiss()
+                    }
                 }
             }
     }
@@ -378,10 +383,10 @@ class LudoActivity : AppCompatActivity() {
         StyledDialogs.showChoices(this, "Play As", "Choose your colour before the first roll.",
             LudoSetup.PLAYER_NAMES.mapIndexed { index, name ->
                 StyledDialogs.choice(name, if (index == 0) "Moves first" else "Joins the match", listOf("●", "●", "●", "●")[index], listOf("#E3B86A", "#E58A7A", "#8EC7B9", "#A9B6E8")[index])
-            }, 520f, "L U D O", onCancel = { showModeDialog() }) { which, dialog ->
-                dialog.dismiss()
+            }, 520f, "L U D O", headerSymbol = "⚄", onCancel = { showModeDialog() }) { which, dialog ->
                 humanPlayer = which
                 startGame()
+                dialog.dismiss()
             }
     }
 
@@ -395,7 +400,7 @@ class LudoActivity : AppCompatActivity() {
 
             Normal mode is classic Ludo. Irregular mode gives every colour ${LudoEconomy.STARTER_COINS} match-only coins. Captures, tokens reaching home, and final placement reward coins. STORE abilities last for the match: Invincibility blocks one capture, Extra Move adds two spaces, and Reroll replaces the current die. AI behaviour and profiles are visible only in Irregular mode.
         """.trimIndent()
-        StyledDialogs.showRules(this, "How to Play Ludo", message, "L U D O",
+        StyledDialogs.showRules(this, "Ludo", message, "L U D O",
             onDone = { if (showModeAfter) showModeDialog() })
     }
 
