@@ -8,8 +8,14 @@ class OthelloRuleEngine : RuleEngine {
 
     // ─── Move generation ──────────────────────────────────────────────────────
 
-    /** Not used by the UI (Othello clicks on destinations, not pieces). */
-    override fun legalMovesFrom(state: GameState, position: Position): List<Move> = emptyList()
+    /**
+     * Othello selects destinations rather than source pieces, so a query for
+     * an empty square returns the placement move for the active player.
+     */
+    override fun legalMovesFrom(state: GameState, position: Position): List<Move> {
+        if (!position.isValid() || state.get(position) != null) return emptyList()
+        return allLegalMoves(state, state.currentTurn).filter { it.to == position }
+    }
 
     /**
      * Every empty square that would flip at least one opponent disc.
@@ -45,15 +51,18 @@ class OthelloRuleEngine : RuleEngine {
 
     override fun applyMove(state: GameState, move: Move): GameState {
         val color    = state.currentTurn
+        val legal = allLegalMoves(state, color).firstOrNull {
+            it.to == move.to && it.captures.toSet() == move.captures.toSet()
+        } ?: return state
         val newBoard = state.board.copyOf()
 
         // Place new disc
-        newBoard[move.to.row * 8 + move.to.col] = OthelloPiece(color)
+        newBoard[legal.to.row * 8 + legal.to.col] = OthelloPiece(color)
         // Flip captured discs
-        for (pos in move.captures)
+        for (pos in legal.captures)
             newBoard[pos.row * 8 + pos.col] = OthelloPiece(color)
 
-        val next = state.withBoard(newBoard, color.opponent(), move)
+        val next = state.withBoard(newBoard, color.opponent(), legal)
 
         // If opponent has no moves, give the turn back; if neither can move, end game
         return when {
@@ -97,11 +106,19 @@ class OthelloRuleEngine : RuleEngine {
         if (state.status == GameStatus.DRAW)       return 0
 
         var score = 0; var white = 0; var black = 0
+        var whiteFrontier = 0; var blackFrontier = 0
         for (idx in 0 until 64) {
             val p = state.board[idx] as? OthelloPiece ?: continue
             val bonus = POS_WEIGHTS[idx / 8][idx % 8]
             if (p.color == PieceColor.WHITE) { score += bonus; white++ }
             else                             { score -= bonus; black++ }
+            val row = idx / 8; val col = idx % 8
+            if (ALL_DIRS.any { direction ->
+                    val adjacent = Position(row + direction.row, col + direction.col)
+                    adjacent.isValid() && state.get(adjacent) == null
+                }) {
+                if (p.color == PieceColor.WHITE) whiteFrontier++ else blackFrontier++
+            }
         }
 
         val totalDiscs = white + black
@@ -117,6 +134,17 @@ class OthelloRuleEngine : RuleEngine {
             val mobWeight = if (totalDiscs < 20) 12 else if (totalDiscs < 40) 8 else 4
             score += (wMob - bMob) * mobWeight
         }
+
+        // Corners cannot be flipped and frontier discs are exposed to attack.
+        val corners = listOf(0, 7, 56, 63)
+        for (corner in corners) {
+            when ((state.board[corner] as? OthelloPiece)?.color) {
+                PieceColor.WHITE -> score += 180
+                PieceColor.BLACK -> score -= 180
+                else -> {}
+            }
+        }
+        score += (blackFrontier - whiteFrontier) * 5
 
         return score
     }

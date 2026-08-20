@@ -974,19 +974,31 @@ class BoardView(context: Context) : View(context) {
         canvas.save()
         if (popScale != 1f) canvas.scale(popScale, popScale, cx, cy)
         canvas.drawCircle(cx + 1.5f, cy + 2.5f, r, shadowPaint)
+        val disc = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = RadialGradient(
+                cx - r * 0.30f, cy - r * 0.36f, r * 1.25f,
+                if (isWhite) {
+                    intArrayOf(Color.WHITE, Color.parseColor("#E6E0D0"), Color.parseColor("#A79F90"))
+                } else {
+                    intArrayOf(Color.parseColor("#56636A"), Color.parseColor("#20292E"), Color.BLACK)
+                },
+                floatArrayOf(0f, 0.52f, 1f),
+                Shader.TileMode.CLAMP,
+            )
+        }
+        canvas.drawCircle(cx, cy, r, disc)
         Paint(Paint.ANTI_ALIAS_FLAG).also {
-            it.color = if (isWhite) Color.parseColor("#F0F0F0") else Color.parseColor("#181818")
-            canvas.drawCircle(cx, cy, r, it)
+            it.style = Paint.Style.STROKE
+            it.strokeWidth = r * 0.045f
+            it.color = if (isWhite) Color.parseColor("#938A7B") else Color.parseColor("#0B0F11")
+            canvas.drawCircle(cx, cy, r * 0.96f, it)
         }
         Paint(Paint.ANTI_ALIAS_FLAG).also {
-            it.style = Paint.Style.STROKE; it.strokeWidth = r * 0.08f
-            it.color = if (isWhite) Color.parseColor("#B0B0B0") else Color.parseColor("#505050")
-            canvas.drawCircle(cx, cy, r, it)
-        }
-        Paint(Paint.ANTI_ALIAS_FLAG).also {
-            it.style = Paint.Style.STROKE; it.strokeWidth = r * 0.05f
-            it.color = if (isWhite) Color.parseColor("#FFFFFF") else Color.parseColor("#383838")
-            canvas.drawCircle(cx - r * 0.18f, cy - r * 0.18f, r * 0.45f, it)
+            it.color = if (isWhite) Color.argb(145, 255, 255, 255) else Color.argb(90, 255, 255, 255)
+            canvas.drawOval(
+                RectF(cx - r * 0.56f, cy - r * 0.68f, cx - r * 0.08f, cy - r * 0.40f),
+                it,
+            )
         }
         canvas.restore()
     }
