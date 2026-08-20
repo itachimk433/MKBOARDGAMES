@@ -29,6 +29,7 @@ import com.mkdev.mkboardgames.ui.CaptureStripView
 import com.mkdev.mkboardgames.ui.ChessChoiceView
 import com.mkdev.mkboardgames.ui.ChessMenuView
 import com.mkdev.mkboardgames.ui.ChessRulesView
+import com.mkdev.mkboardgames.ui.StyledDialogs
 import kotlinx.coroutines.*
 
 class GameActivity : AppCompatActivity() {
