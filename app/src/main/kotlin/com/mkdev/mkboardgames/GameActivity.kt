@@ -404,13 +404,24 @@ class GameActivity : AppCompatActivity() {
     }
 
     private fun showChessSidePicker() {
+        val isDraughts = gameType == "CHECKERS" || gameType == "INTERNATIONAL_DRAUGHTS"
         val view = ChessChoiceView(
             this,
             title = "Play As",
             subtitle = "Choose your colour before the first move.",
             choices = listOf(
-                ChessChoiceView.Choice("White", "Moves first", "♔", Color.parseColor("#E3B86A")),
-                ChessChoiceView.Choice("Black", "Moves second", "♚", Color.parseColor("#A9B6E8")),
+                ChessChoiceView.Choice(
+                    "White",
+                    "Moves first",
+                    if (isDraughts) "◉" else "♔",
+                    Color.parseColor("#E3B86A"),
+                ),
+                ChessChoiceView.Choice(
+                    "Black",
+                    "Moves second",
+                    if (isDraughts) "●" else "♚",
+                    Color.parseColor("#A9B6E8"),
+                ),
             ),
             gameLabel = styledGameLabel(),
         )
@@ -1340,7 +1351,7 @@ Checkmate your opponent's King.
             choices += ChessChoiceView.Choice(
                 "AI Difficulty",
                 "Adjust the challenge",
-                "♞",
+                if (gameType == "CHECKERS" || gameType == "INTERNATIONAL_DRAUGHTS") "◉" else "♞",
                 Color.parseColor("#8EC7B9"),
             )
             actions += { showDifficultyDialog() }

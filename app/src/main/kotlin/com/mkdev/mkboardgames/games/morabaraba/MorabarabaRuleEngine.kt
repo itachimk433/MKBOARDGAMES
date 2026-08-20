@@ -7,9 +7,10 @@ import com.mkdev.mkboardgames.games.morabaraba.MorabarabaBoard.META_W
 /**
  * Morabaraba rule engine — supports 6, 9, and 12-cow variants.
  *
- * All variants use the same full 24-position 3-ring board.
- * The only difference between variants is pieceCount (how many
- * pieces each player places during the placement phase).
+ * The 9- and 12-cow variants use the full 24-position three-ring board.
+ * The 6-cow variant uses the compact 9-position board. The topology is part
+ * of the rules, not just a visual option, so every move and mill calculation
+ * must use the active variant.
  *
  * Move encoding:
  *   Placement  → Move(from=PLACE, to=<node pos>, captures=[removedPos]?)
@@ -26,6 +27,12 @@ import com.mkdev.mkboardgames.games.morabaraba.MorabarabaBoard.META_W
  */
 class MorabarabaRuleEngine(val pieceCount: Int = 12) : RuleEngine {
 
+    init {
+        require(pieceCount == 6 || pieceCount == 9 || pieceCount == 12) {
+            "Morabaraba supports only 6, 9, or 12 cows"
+        }
+    }
+
     companion object {
         val PLACE = Position(7, 7)
         private const val NO_CAPTURE_DRAW_LIMIT = 40
@@ -38,11 +45,16 @@ class MorabarabaRuleEngine(val pieceCount: Int = 12) : RuleEngine {
             currentTurn = PieceColor.WHITE, metadata = meta)
     }
 
-    // ─── Board topology — same full 24-position board for all variants ────────
+    // ─── Board topology ───────────────────────────────────────────────────────
 
-    private fun activePos() = MorabarabaBoard.POSITIONS
-    private fun activeAdj() = MorabarabaBoard.ADJACENCY
-    private fun activeMil() = MorabarabaBoard.MILLS
+    private fun activePos() =
+        if (pieceCount == 6) MorabarabaBoard.SIMPLE_POSITIONS else MorabarabaBoard.POSITIONS
+
+    private fun activeAdj() =
+        if (pieceCount == 6) MorabarabaBoard.SIMPLE_ADJACENCY else MorabarabaBoard.ADJACENCY
+
+    private fun activeMil() =
+        if (pieceCount == 6) MorabarabaBoard.SIMPLE_MILLS else MorabarabaBoard.MILLS
 
     val activePositions: List<Position>  get() = activePos()
     val activeAdjacency: Array<IntArray> get() = activeAdj()
@@ -54,12 +66,13 @@ class MorabarabaRuleEngine(val pieceCount: Int = 12) : RuleEngine {
     private fun blackPlaced(state: GameState) = (state.metadata[META_B] as? Int) ?: 0
     private fun noCaptureMoves(state: GameState) = (state.metadata[META_NO_CAPTURE] as? Int) ?: 0
 
-    private fun inPlacementPhase(state: GameState): Boolean {
-        val w = whitePlaced(state); val b = blackPlaced(state)
-        return if (state.currentTurn == PieceColor.WHITE) w < pieceCount else b < pieceCount
+    private fun inPlacementPhase(state: GameState, color: PieceColor): Boolean {
+        val placed = if (color == PieceColor.WHITE) whitePlaced(state) else blackPlaced(state)
+        return placed < pieceCount
     }
 
-    fun isInPlacementPhase(state: GameState) = inPlacementPhase(state)
+    fun isInPlacementPhase(state: GameState) =
+        inPlacementPhase(state, state.currentTurn)
 
     private fun isFlying(state: GameState, color: PieceColor): Boolean {
         val wPlaced = whitePlaced(state); val bPlaced = blackPlaced(state)
@@ -107,8 +120,12 @@ class MorabarabaRuleEngine(val pieceCount: Int = 12) : RuleEngine {
 
     override fun allLegalMoves(state: GameState, color: PieceColor): List<Move> {
         if (state.status != GameStatus.IN_PROGRESS) return emptyList()
-        return if (inPlacementPhase(state)) placementMoves(state, color)
-        else movementMoves(state, color)
+        // AI search asks for both colors while the snapshot's currentTurn may
+        // belong to the other side. Keep the state turn-aligned so callers can
+        // safely apply a returned move and so placement is checked per color.
+        val colorState = if (state.currentTurn == color) state else state.copy(currentTurn = color)
+        return if (inPlacementPhase(colorState, color)) placementMoves(colorState, color)
+        else movementMoves(colorState, color)
     }
 
     private fun placementMoves(state: GameState, color: PieceColor): List<Move> {
@@ -155,6 +172,13 @@ class MorabarabaRuleEngine(val pieceCount: Int = 12) : RuleEngine {
     // ─── Apply move ───────────────────────────────────────────────────────────
 
     override fun applyMove(state: GameState, move: Move): GameState {
+        // Morabaraba has mandatory captures only through mills, and a move can
+        // also remove a specifically selected opponent piece. Never allow a
+        // stale UI/AI move to mutate the board.
+        if (state.status != GameStatus.IN_PROGRESS ||
+            allLegalMoves(state, state.currentTurn).none { it == move }
+        ) return state
+
         val color    = state.currentTurn
         val newBoard = state.board.copyOf()
         val meta     = state.metadata.toMutableMap()

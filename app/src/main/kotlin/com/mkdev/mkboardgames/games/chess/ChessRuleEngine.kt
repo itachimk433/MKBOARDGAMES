@@ -162,6 +162,11 @@ class ChessRuleEngine : RuleEngine {
     // ─── Apply move ───────────────────────────────────────────────────────────
 
     override fun applyMove(state: GameState, move: Move): GameState {
+        // Keep the engine authoritative even when a caller supplies a stale
+        // move from a previous board snapshot.
+        if (state.status != GameStatus.IN_PROGRESS ||
+            allLegalMoves(state, state.currentTurn).none { it == move }
+        ) return state
         val next = applyMoveInternal(state, move)
         return next.copy(status = gameStatus(next))
     }
