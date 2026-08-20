@@ -207,6 +207,7 @@ class MorabarabaActivity : AppCompatActivity() {
         dialog.window?.let { window ->
             window.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
             window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+            window.setWindowAnimations(0)
             window.attributes = window.attributes.apply { dimAmount = 0.72f }
             window.setLayout(width, height)
         }
