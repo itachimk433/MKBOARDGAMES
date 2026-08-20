@@ -405,25 +405,27 @@ class GameActivity : AppCompatActivity() {
 
     private fun showChessSidePicker() {
         val isDraughts = gameType == "CHECKERS" || gameType == "INTERNATIONAL_DRAUGHTS"
+        val isFoxAndGeese = gameType == "FOX_AND_GEESE"
         val view = ChessChoiceView(
             this,
             title = "Play As",
             subtitle = "Choose your colour before the first move.",
             choices = listOf(
                 ChessChoiceView.Choice(
-                    "White",
-                    "Moves first",
-                    if (isDraughts) "◉" else "♔",
+                    if (isFoxAndGeese) "Fox" else "White",
+                    if (isFoxAndGeese) "Moves second" else "Moves first",
+                    if (isFoxAndGeese) "🦊" else if (isDraughts) "◉" else "♔",
                     Color.parseColor("#E3B86A"),
                 ),
                 ChessChoiceView.Choice(
-                    "Black",
-                    "Moves second",
-                    if (isDraughts) "●" else "♚",
+                    if (isFoxAndGeese) "Geese" else "Black",
+                    if (isFoxAndGeese) "Moves first" else "Moves second",
+                    if (isFoxAndGeese) "🪿" else if (isDraughts) "●" else "♚",
                     Color.parseColor("#A9B6E8"),
                 ),
             ),
             gameLabel = styledGameLabel(),
+            headerSymbol = if (isFoxAndGeese) "🦊" else if (isDraughts) "◎" else "♛",
         )
         val dialog = Dialog(this)
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
@@ -1351,7 +1353,11 @@ Checkmate your opponent's King.
             choices += ChessChoiceView.Choice(
                 "AI Difficulty",
                 "Adjust the challenge",
-                if (gameType == "CHECKERS" || gameType == "INTERNATIONAL_DRAUGHTS") "◉" else "♞",
+                when {
+                    gameType == "CHECKERS" || gameType == "INTERNATIONAL_DRAUGHTS" -> "◉"
+                    gameType == "FOX_AND_GEESE" -> "🦊"
+                    else -> "♞"
+                },
                 Color.parseColor("#8EC7B9"),
             )
             actions += { showDifficultyDialog() }

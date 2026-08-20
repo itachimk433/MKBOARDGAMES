@@ -26,7 +26,11 @@ class ConnectFourRuleEngine : RuleEngine {
         status = GameStatus.IN_PROGRESS
     )
 
-    override fun legalMovesFrom(state: GameState, position: Position): List<Move> = emptyList()
+    override fun legalMovesFrom(state: GameState, position: Position): List<Move> {
+        if (state.status != GameStatus.IN_PROGRESS) return emptyList()
+        val row = landingRow(state, position.col) ?: return emptyList()
+        return listOf(Move(DROP, Position(row, position.col)))
+    }
 
     override fun allLegalMoves(state: GameState, color: PieceColor): List<Move> {
         if (state.status != GameStatus.IN_PROGRESS) return emptyList()
@@ -41,8 +45,11 @@ class ConnectFourRuleEngine : RuleEngine {
     }
 
     override fun applyMove(state: GameState, move: Move): GameState {
+        if (state.status != GameStatus.IN_PROGRESS || move.to.col !in 0 until COLUMNS) return state
         val col = move.to.col
         val row = landingRow(state, col) ?: return state
+        if (move.from != DROP && move.from != Position(-1, -1)) return state
+        if (move.to.row != 0 && move.to.row != row) return state
         val board = state.board.copyOf()
         board[row * COLUMNS + col] = ConnectFourPiece(state.currentTurn)
         val appliedMove = move.copy(to = Position(row, col))

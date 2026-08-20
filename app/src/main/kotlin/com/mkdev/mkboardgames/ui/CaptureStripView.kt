@@ -244,16 +244,37 @@ class CaptureStripView(context: Context) : View(context) {
     }
 
     private fun drawFoxAndGeesePiece(canvas: Canvas, piece: FoxAndGeesePiece, x: Float, baseY: Float) {
-        strokeP.color = if (piece.type == FoxAndGeesePieceType.FOX)
-            Color.parseColor("#2D7D70")
-        else
-            Color.parseColor("#A84618")
-        fillP.color = if (piece.type == FoxAndGeesePieceType.FOX)
-            Color.parseColor("#4FAF9B")
-        else
-            Color.parseColor("#E86F2D")
-        canvas.drawText(piece.symbol(), x, baseY, strokeP)
-        canvas.drawText(piece.symbol(), x, baseY, fillP)
+        val radius = fillP.textSize * .38f
+        val fox = piece.type == FoxAndGeesePieceType.FOX
+        val fill = if (fox) Color.parseColor("#4FAF9B") else Color.parseColor("#E8D2A6")
+        val edge = if (fox) Color.parseColor("#2D7D70") else Color.parseColor("#9B7650")
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = fill }
+        if (fox) {
+            val ears = Path().apply {
+                moveTo(x - radius * .7f, baseY - radius * .1f)
+                lineTo(x - radius * .45f, baseY - radius * 1.35f)
+                lineTo(x, baseY - radius * .65f)
+                lineTo(x + radius * .45f, baseY - radius * 1.35f)
+                lineTo(x + radius * .7f, baseY - radius * .1f)
+                close()
+            }
+            canvas.drawPath(ears, paint)
+            canvas.drawCircle(x, baseY - radius * .25f, radius, paint)
+        } else {
+            canvas.drawOval(RectF(x - radius * 1.25f, baseY - radius * .7f, x + radius * 1.1f, baseY + radius * .55f), paint)
+            canvas.drawCircle(x + radius * .7f, baseY - radius * .65f, radius * .58f, paint)
+            paint.color = Color.parseColor("#C45A2C")
+            canvas.drawOval(RectF(x + radius * 1.05f, baseY - radius * .72f, x + radius * 1.7f, baseY - radius * .40f), paint)
+        }
+        strokeP.color = edge
+        strokeP.style = Paint.Style.STROKE
+        strokeP.strokeWidth = maxOf(1f, radius * .12f)
+        if (fox) {
+            canvas.drawCircle(x, baseY - radius * .25f, radius, strokeP)
+        } else {
+            canvas.drawOval(RectF(x - radius * 1.25f, baseY - radius * .7f, x + radius * 1.1f, baseY + radius * .55f), strokeP)
+        }
+        strokeP.style = Paint.Style.FILL
     }
 
     private fun drawShogiPiece(canvas: Canvas, piece: ShogiPiece, x: Float, baseY: Float) {

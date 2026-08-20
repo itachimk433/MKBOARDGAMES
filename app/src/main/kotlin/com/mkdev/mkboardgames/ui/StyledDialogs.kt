@@ -21,9 +21,12 @@ object StyledDialogs {
         choices: List<ChessChoiceView.Choice>,
         heightDp: Float = 520f,
         gameLabel: String,
-        headerSymbol: String = if (
-            gameLabel.replace(" ", "").contains("DRAUGHTS", ignoreCase = true)
-        ) "◎" else "♛",
+        headerSymbol: String = when {
+            gameLabel.replace(" ", "").contains("DRAUGHTS", ignoreCase = true) -> "◎"
+            gameLabel.replace(" ", "").contains("CONNECT", ignoreCase = true) -> "●"
+            gameLabel.replace(" ", "").contains("FOX", ignoreCase = true) -> "🦊"
+            else -> "♛"
+        },
         onCancel: (() -> Unit)? = null,
         onChoice: (Int, Dialog) -> Unit,
     ): Dialog {
@@ -64,7 +67,14 @@ object StyledDialogs {
         gameLabel: String,
         onDone: (() -> Unit)? = null,
     ): Dialog {
-        val view = ChessRulesView(context, gameName, rules, gameLabel, if (gameLabel == "L U D O") "⚄" else "♛")
+        val normalizedLabel = gameLabel.replace(" ", "")
+        val headerSymbol = when {
+            normalizedLabel.contains("CONNECT") -> "●"
+            normalizedLabel.contains("FOX") -> "🦊"
+            gameLabel == "L U D O" -> "⚄"
+            else -> "♛"
+        }
+        val view = ChessRulesView(context, gameName, rules, gameLabel, headerSymbol)
         val dialog = Dialog(context)
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
         dialog.setContentView(view)

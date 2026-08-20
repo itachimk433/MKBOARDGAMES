@@ -138,8 +138,8 @@ class ConnectFourActivity : AppCompatActivity() {
             options.map { item ->
                 when (item) {
                     "Resume Match" -> StyledDialogs.choice(item, "Continue where you left off", "Ⅱ", "#E3B86A")
-                    "vs AI" -> StyledDialogs.choice(item, "Play against the computer", "♞", "#8EC7B9")
-                    "2 Players" -> StyledDialogs.choice(item, "Share the board locally", "♙", "#A9B6E8")
+                    "vs AI" -> StyledDialogs.choice(item, "Play against the computer", "●", "#8EC7B9")
+                    "2 Players" -> StyledDialogs.choice(item, "Share the board locally", "●", "#A9B6E8")
                     else -> StyledDialogs.choice(item, "Review the essentials", "?", "#E58A7A")
                 }
             }, 520f, "C O N N E C T · F O U R", onCancel = { if (!matchStarted) finish() }) { which, dialog ->
@@ -378,7 +378,7 @@ Control the centre columns, build threats in more than one direction, and block 
                 when (item) {
                     "New Game" -> StyledDialogs.choice(item, if (inProgress) "Start over and forfeit" else "Begin a fresh match", "↻", "#E3B86A")
                     "How to Play" -> StyledDialogs.choice(item, "Review the essentials", "?", "#A9B6E8")
-                    "AI Difficulty" -> StyledDialogs.choice(item, "Adjust the challenge", "♞", "#8EC7B9")
+                    "AI Difficulty" -> StyledDialogs.choice(item, "Adjust the challenge", "●", "#8EC7B9")
                     else -> StyledDialogs.choice(item, if (inProgress) "Leave this match" else "Choose another game", "⌂", "#E58A7A")
                 }
             }, 520f, "C O N N E C T · F O U R") { which, menu ->

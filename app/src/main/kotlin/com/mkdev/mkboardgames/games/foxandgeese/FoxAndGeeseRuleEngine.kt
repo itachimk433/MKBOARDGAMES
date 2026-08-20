@@ -28,6 +28,7 @@ class FoxAndGeeseRuleEngine : RuleEngine {
     override fun initialState(): GameState = FoxAndGeeseSetup.initialState()
 
     override fun legalMovesFrom(state: GameState, position: Position): List<Move> {
+        if (state.status != GameStatus.IN_PROGRESS) return emptyList()
         val piece = state.get(position) as? FoxAndGeesePiece ?: return emptyList()
         if (piece.color != state.currentTurn) return emptyList()
 
@@ -38,6 +39,7 @@ class FoxAndGeeseRuleEngine : RuleEngine {
     }
 
     override fun allLegalMoves(state: GameState, color: PieceColor): List<Move> {
+        if (state.status != GameStatus.IN_PROGRESS) return emptyList()
         val moves = mutableListOf<Move>()
         for (row in 0 until state.boardSize) {
             for (col in 0 until state.boardSize) {
@@ -121,6 +123,8 @@ class FoxAndGeeseRuleEngine : RuleEngine {
         }
 
     override fun applyMove(state: GameState, move: Move): GameState {
+        if (state.status != GameStatus.IN_PROGRESS) return state
+        if (move !in allLegalMoves(state, state.currentTurn)) return state
         val nextBoard = state.board.copyOf()
         val movingPiece = nextBoard[indexOf(move.from, state.boardSize)] ?: return state
         nextBoard[indexOf(move.from, state.boardSize)] = null

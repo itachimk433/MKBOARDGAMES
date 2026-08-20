@@ -40,6 +40,8 @@ class ChessMenuView(
     private val scaledDensity = resources.displayMetrics.scaledDensity
     private val unit = density.coerceAtLeast(1f)
     private val textScale = scaledDensity.coerceAtMost(2f)
+    private val isConnectFour = gameLabel.replace(" ", "").contains("CONNECT", ignoreCase = true)
+    private val isFoxAndGeese = gameLabel.replace(" ", "").contains("FOX", ignoreCase = true)
 
     private val surfacePaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val panelPaint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -125,14 +127,22 @@ class ChessMenuView(
             MenuAction(
                 label = "vs AI",
                 detail = "Challenge the board",
-                symbol = "♞",
+                symbol = when {
+                    isConnectFour -> "●"
+                    isFoxAndGeese -> "🦊"
+                    else -> "♞"
+                },
                 accent = Color.parseColor("#E3B86A"),
                 action = { onVsAi?.invoke() },
             ),
             MenuAction(
                 label = "2 Players",
                 detail = "Play on one board",
-                symbol = "♙",
+                symbol = when {
+                    isConnectFour -> "●"
+                    isFoxAndGeese -> "🪿"
+                    else -> "♙"
+                },
                 accent = Color.parseColor("#8EC7B9"),
                 action = { onTwoPlayers?.invoke() },
             ),
@@ -203,7 +213,15 @@ class ChessMenuView(
         }
         canvas.drawLine(center - 118f * unit, 36f * unit, center - 42f * unit, 36f * unit, linePaint)
         canvas.drawLine(center + 42f * unit, 36f * unit, center + 118f * unit, 36f * unit, linePaint)
-        canvas.drawText("♛", center, 43f * unit, actionSymbolPaint.apply {
+        canvas.drawText(
+            when {
+                isConnectFour -> "●"
+                isFoxAndGeese -> "🦊"
+                else -> "♛"
+            },
+            center,
+            43f * unit,
+            actionSymbolPaint.apply {
             color = Color.parseColor("#E3B86A")
             textSize = 21f * textScale
         })
