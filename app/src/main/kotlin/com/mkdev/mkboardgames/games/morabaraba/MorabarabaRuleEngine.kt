@@ -8,7 +8,7 @@ import com.mkdev.mkboardgames.games.morabaraba.MorabarabaBoard.META_W
  * Morabaraba rule engine — supports 6, 9, and 12-cow variants.
  *
  * The 9- and 12-cow variants use the full 24-position three-ring board.
- * The 6-cow variant uses the compact 9-position board. The topology is part
+ * The 6-cow variant uses the two-ring 16-position board. The topology is part
  * of the rules, not just a visual option, so every move and mill calculation
  * must use the active variant.
  *
@@ -48,13 +48,13 @@ class MorabarabaRuleEngine(val pieceCount: Int = 12) : RuleEngine {
     // ─── Board topology ───────────────────────────────────────────────────────
 
     private fun activePos() =
-        if (pieceCount == 6) MorabarabaBoard.SIMPLE_POSITIONS else MorabarabaBoard.POSITIONS
+        if (pieceCount == 6) MorabarabaBoard.SIX_POSITIONS else MorabarabaBoard.POSITIONS
 
     private fun activeAdj() =
-        if (pieceCount == 6) MorabarabaBoard.SIMPLE_ADJACENCY else MorabarabaBoard.ADJACENCY
+        if (pieceCount == 6) MorabarabaBoard.SIX_ADJACENCY else MorabarabaBoard.ADJACENCY
 
     private fun activeMil() =
-        if (pieceCount == 6) MorabarabaBoard.SIMPLE_MILLS else MorabarabaBoard.MILLS
+        if (pieceCount == 6) MorabarabaBoard.SIX_MILLS else MorabarabaBoard.MILLS
 
     val activePositions: List<Position>  get() = activePos()
     val activeAdjacency: Array<IntArray> get() = activeAdj()
