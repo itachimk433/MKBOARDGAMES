@@ -5,9 +5,9 @@ import android.content.Context
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.view.Gravity
-import android.view.View
 import android.view.Window
 import android.view.WindowManager
+import kotlin.math.max
 
 /**
  * Shared modal surfaces for every game. Keeping the window setup here prevents
@@ -38,12 +38,15 @@ object StyledDialogs {
             val density = context.resources.displayMetrics.density
             val margin = (24f * density).toInt()
             val maxWidth = (420f * density).toInt()
+            val availableHeightDp = context.resources.displayMetrics.heightPixels / density - 32f
+            val contentHeightDp = max(heightDp, 178f + choices.size * 104f)
             window.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
             window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+            window.setWindowAnimations(0)
             window.attributes = window.attributes.apply { dimAmount = 0.72f }
             window.setLayout(
                 minOf(context.resources.displayMetrics.widthPixels - margin * 2, maxWidth),
-                (heightDp * density).toInt(),
+                (minOf(contentHeightDp, availableHeightDp) * density).toInt(),
             )
             window.setGravity(Gravity.CENTER)
         }

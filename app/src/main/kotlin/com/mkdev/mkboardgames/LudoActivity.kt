@@ -348,7 +348,7 @@ class LudoActivity : AppCompatActivity() {
         StyledDialogs.showChoices(this, "Ludo", "Choose how to begin.",
             listOf(
                 StyledDialogs.choice(options[0], "Classic computer match", "♞", "#8EC7B9"),
-                StyledDialogs.choice(options[1], "Match with abilities and coins", "✦", "#E3B86A"),
+                StyledDialogs.choice(options[1], "Match with abilities and coins", "◉", "#E3B86A"),
                 StyledDialogs.choice(options[2], "Play locally with four colours", "♙", "#A9B6E8"),
                 StyledDialogs.choice(options[3], "Review the essentials", "?", "#E58A7A"),
             ), 520f, "L U D O", onCancel = { if (moves.isEmpty()) finish() }) { which, dialog ->
