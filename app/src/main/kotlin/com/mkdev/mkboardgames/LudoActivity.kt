@@ -412,6 +412,7 @@ class LudoActivity : AppCompatActivity() {
         celebrationMessage = null
         celebrationGeneration++
         matchStarted = true
+        SoundPlayer.playMovement("ludo_start")
         economyEnabled = irregularMode && vsAI
         if (vsAI) SettingsManager.setActiveGame(this, "ludo")
         aiDifficulty = SettingsManager.getLudoDifficulty(this)
@@ -445,6 +446,7 @@ class LudoActivity : AppCompatActivity() {
         if (isAiTurn() && irregularMode && !isReroll) aiPrepareTurn(player)
 
         val nextValue = Random.nextInt(1, 7)
+        SoundPlayer.playMovement("ludo_dice")
         diceView.rollTo(nextValue, motionDirection) {
             val previousRolledValue = rolledValue
             rolledValue = nextValue
@@ -1482,6 +1484,7 @@ class LudoActivity : AppCompatActivity() {
             val movingPlayer = move.metadata["player"] as? Int
                 ?: LudoSetup.playerFromState(state)
             state = engine.applyMove(state, move)
+            SoundPlayer.playMovement("ludo_move")
             moves += move
             rolledValue = 0
             boardView.gameState = state
@@ -1515,6 +1518,7 @@ class LudoActivity : AppCompatActivity() {
                 updateHud()
                 if (isAiTurn()) handler.postDelayed({ rollDice() }, 420L)
             } else {
+                SoundPlayer.playMovement("ludo_win")
                 updateHud()
                 handler.postDelayed({ showResultDialog() }, 220L)
             }

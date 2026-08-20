@@ -54,6 +54,12 @@ object SoundPlayer {
         ids["ttt_x"]            = p.load(ctx, R.raw.ttt_x,            1)
         ids["ttt_o"]            = p.load(ctx, R.raw.ttt_o,            1)
 
+        // Ludo sounds
+        ids["ludo_dice"]        = p.load(ctx, R.raw.ludo_dice,        1)
+        ids["ludo_move"]        = p.load(ctx, R.raw.ludo_move,        1)
+        ids["ludo_start"]       = p.load(ctx, R.raw.ludo_start,       1)
+        ids["ludo_win"]         = p.load(ctx, R.raw.ludo_win,         1)
+
         // UI navigation click (reuses mora_place — short, clicky)
         ids["ui_click"]         = p.load(ctx, R.raw.mora_place,       1)
 
