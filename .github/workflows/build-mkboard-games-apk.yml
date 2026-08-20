@@ -1,4 +1,4 @@
-name: Build MK~Board Games APK + AAB
+name: Build MK BOARD GAMES APK + AAB
 
 on:
   push:
@@ -85,7 +85,7 @@ jobs:
       - name: Print build outputs
         if: always()
         run: |
-          echo "=== MK~Board Games Build Summary ==="
+          echo "=== MK BOARD GAMES Build Summary ==="
           echo "-- APKs --"
           find app/build/outputs/apk -name "*.apk" 2>/dev/null | while read f; do
             echo "  $f  ($(du -sh "$f" | cut -f1))"
@@ -101,7 +101,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="latest-build"
-          TITLE="MK~Board Games – Latest Build"
+          TITLE="MK BOARD GAMES – Latest Build"
           NOTES="**Commit:** \`${{ github.sha }}\`
           **Built:** $(date -u '+%Y-%m-%d %H:%M UTC')
           **Run:** [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})

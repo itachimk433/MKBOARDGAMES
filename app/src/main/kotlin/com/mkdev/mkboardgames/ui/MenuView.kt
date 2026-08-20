@@ -249,7 +249,7 @@ class MenuView(context: Context) : View(context) {
         }
         canvas.restore()
 
-        canvas.drawText("MK~Board Games", w / 2f, h * 0.168f, titlePaint)
+        canvas.drawText("MK BOARD GAMES", w / 2f, h * 0.168f, titlePaint)
         canvas.drawText("Your board game hub", w / 2f, h * 0.198f, subPaint)
         accentPaint.style = Paint.Style.STROKE; accentPaint.strokeWidth = 1.5f * dp
         canvas.drawLine(w * 0.40f, h * 0.205f, w * 0.60f, h * 0.205f, accentPaint)

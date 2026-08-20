@@ -5,7 +5,7 @@
     <uses-permission android:name="android.permission.VIBRATE" />
 
     <!--
-      MK~Board Games does not show ads, use the Advertising ID, query installed
+      MK BOARD GAMES does not show ads, use the Advertising ID, query installed
       packages, or install packages from within the app. These permissions
       are explicitly stripped from the merged manifest in case any library
       (present now or added later) tries to pull them in transitively, so

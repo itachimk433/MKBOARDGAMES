@@ -415,10 +415,10 @@ class MainActivity : AppCompatActivity() {
                 if (bold) setTypeface(typeface, android.graphics.Typeface.BOLD)
                 setPadding(0, (4*dp).toInt(), 0, (4*dp).toInt())
             }
-            ppContent.addView(pTxt("Privacy Policy — MK~Board Games v1.2", bold = true, accent = true))
+            ppContent.addView(pTxt("Privacy Policy — MK BOARD GAMES v1.2", bold = true, accent = true))
             ppContent.addView(pTxt("Effective date: June 2026", bold = false))
-            ppContent.addView(pTxt("\nDATA COLLECTION\nMK~Board Games does not collect or transmit personal data. Game statistics (wins, losses, draws) are stored only on your device."))
-            ppContent.addView(pTxt("\nADVERTISING\nThis version of MK~Board Games contains no advertising. Ads may be introduced in a future update via Google AdMob, in which case this policy will be updated accordingly."))
+            ppContent.addView(pTxt("\nDATA COLLECTION\nMK BOARD GAMES does not collect or transmit personal data. Game statistics (wins, losses, draws) are stored only on your device."))
+            ppContent.addView(pTxt("\nADVERTISING\nThis version of MK BOARD GAMES contains no advertising. Ads may be introduced in a future update via Google AdMob, in which case this policy will be updated accordingly."))
             ppContent.addView(pTxt("\nPERMISSIONS\n• Vibrate — in-game haptic feedback"))
             ppContent.addView(pTxt("\nCONTACT\n$SUPPORT_EMAIL", bold = false))
             val ppScroll = ScrollView(ctx).apply {
@@ -456,12 +456,12 @@ class MainActivity : AppCompatActivity() {
                 if (bold) setTypeface(typeface, android.graphics.Typeface.BOLD)
                 setPadding(0, (4*dp).toInt(), 0, (4*dp).toInt())
             }
-            tosContent.addView(tTxt("Terms of Service — MK~Board Games v1.2", bold = true, accent = true))
+            tosContent.addView(tTxt("Terms of Service — MK BOARD GAMES v1.2", bold = true, accent = true))
             tosContent.addView(tTxt("Effective date: June 2026", bold = false))
-            tosContent.addView(tTxt("\n1. ACCEPTANCE\nBy installing or using MK~Board Games you agree to these terms. If you do not agree, uninstall the app."))
-            tosContent.addView(tTxt("\n2. LICENCE\nMK~Board Games is provided free of charge for personal, non-commercial use. You may not reverse-engineer, redistribute, or sell the app or any part of it."))
-            tosContent.addView(tTxt("\n3. ADVERTISING\nThis version of MK~Board Games is ad-free. Ads may be introduced in a future release. If advertising is added, the relevant ad networks will operate under their own terms and privacy policies and this section will be updated."))
-            tosContent.addView(tTxt("\n4. DISCLAIMER\nMK~Board Games is provided \"as is\" without warranties of any kind. MKDEV is not liable for any loss or damage arising from use of the app."))
+            tosContent.addView(tTxt("\n1. ACCEPTANCE\nBy installing or using MK BOARD GAMES you agree to these terms. If you do not agree, uninstall the app."))
+            tosContent.addView(tTxt("\n2. LICENCE\nMK BOARD GAMES is provided free of charge for personal, non-commercial use. You may not reverse-engineer, redistribute, or sell the app or any part of it."))
+            tosContent.addView(tTxt("\n3. ADVERTISING\nThis version of MK BOARD GAMES is ad-free. Ads may be introduced in a future release. If advertising is added, the relevant ad networks will operate under their own terms and privacy policies and this section will be updated."))
+            tosContent.addView(tTxt("\n4. DISCLAIMER\nMK BOARD GAMES is provided \"as is\" without warranties of any kind. MKDEV is not liable for any loss or damage arising from use of the app."))
             tosContent.addView(tTxt("\n5. CHANGES\nThese terms may be updated at any time. Continued use after an update constitutes acceptance of the revised terms."))
             tosContent.addView(tTxt("\nCONTACT\n$SUPPORT_EMAIL", bold = false))
             val tosScroll = ScrollView(ctx).apply {
@@ -493,7 +493,7 @@ class MainActivity : AppCompatActivity() {
             try {
                 startActivity(Intent(Intent.ACTION_SENDTO).apply {
                     data = Uri.parse("mailto:$SUPPORT_EMAIL")
-                    putExtra(Intent.EXTRA_SUBJECT, "MK~Board Games Support")
+                    putExtra(Intent.EXTRA_SUBJECT, "MK BOARD GAMES Support")
                 })
             } catch (_: Exception) {
                 android.widget.Toast.makeText(ctx, SUPPORT_EMAIL, android.widget.Toast.LENGTH_LONG).show()
