@@ -18,9 +18,13 @@ class ChessRuleEngine : RuleEngine {
 
     override fun allLegalMoves(state: GameState, color: PieceColor): List<Move> {
         val moves = mutableListOf<Move>()
+        // legalMovesFrom is intentionally scoped to the state's active turn for
+        // touch input. AI search also asks for the other side's moves, so use a
+        // turn-scoped snapshot here instead of silently returning no moves.
+        val turnState = if (state.currentTurn == color) state else state.copy(currentTurn = color)
         for (row in 0..7) for (col in 0..7) {
             val pos = Position(row, col)
-            if (state.get(pos)?.color == color) moves += legalMovesFrom(state, pos)
+            if (state.get(pos)?.color == color) moves += legalMovesFrom(turnState, pos)
         }
         return moves
     }
@@ -30,7 +34,7 @@ class ChessRuleEngine : RuleEngine {
     private fun pseudoMovesFrom(
         state: GameState, pos: Position, piece: ChessPiece, forAttack: Boolean = false
     ): List<Move> = when (piece.type) {
-        ChessPieceType.PAWN   -> pawnMoves(state, pos, piece.color)
+        ChessPieceType.PAWN   -> if (forAttack) pawnAttackMoves(pos, piece.color) else pawnMoves(state, pos, piece.color)
         ChessPieceType.KNIGHT -> knightMoves(state, pos, piece.color)
         ChessPieceType.BISHOP -> slidingMoves(state, pos, piece.color, DIAGONALS)
         ChessPieceType.ROOK   -> slidingMoves(state, pos, piece.color, ORTHOGONALS)
@@ -95,12 +99,23 @@ class ChessRuleEngine : RuleEngine {
                 else moves += Move(from, diag, listOf(diag))
             }
             val epRow = if (color == PieceColor.WHITE) 3 else 4
-            if (epCol == diag.col && from.row == epRow) {
+            val adjacent = state.get(Position(from.row, diag.col)) as? ChessPiece
+            if (epCol == diag.col && from.row == epRow &&
+                adjacent?.type == ChessPieceType.PAWN && adjacent.color != color
+            ) {
                 val capturedPawn = Position(from.row, diag.col)
                 moves += Move(from, diag, listOf(capturedPawn), metadata = mapOf("enPassant" to true))
             }
         }
         return moves
+    }
+
+    private fun pawnAttackMoves(from: Position, color: PieceColor): List<Move> {
+        val dir = if (color == PieceColor.WHITE) -1 else 1
+        return listOf(-1, 1).mapNotNull { dc ->
+            val to = Position(from.row + dir, from.col + dc)
+            if (to.isValid()) Move(from, to) else null
+        }
     }
 
     private fun kingMoves(state: GameState, from: Position, color: PieceColor, forAttack: Boolean = false): List<Move> {
@@ -117,6 +132,10 @@ class ChessRuleEngine : RuleEngine {
             val side = if (color == PieceColor.WHITE) "W" else "B"
             if (from == Position(row, 4) && !isInCheck(state, color)) {
                 if (state.metadata["castle${side}K"] == true
+                    && state.get(Position(row, 7)) is ChessPiece &&
+                    (state.get(Position(row, 7)) as ChessPiece).let {
+                        it.type == ChessPieceType.ROOK && it.color == color
+                    }
                     && state.get(Position(row, 5)) == null
                     && state.get(Position(row, 6)) == null
                     && !squareAttacked(state, Position(row, 5), color)
@@ -124,6 +143,10 @@ class ChessRuleEngine : RuleEngine {
                     moves += Move(from, Position(row, 6), metadata = mapOf("castle" to "K"))
                 }
                 if (state.metadata["castle${side}Q"] == true
+                    && state.get(Position(row, 0)) is ChessPiece &&
+                    (state.get(Position(row, 0)) as ChessPiece).let {
+                        it.type == ChessPieceType.ROOK && it.color == color
+                    }
                     && state.get(Position(row, 3)) == null
                     && state.get(Position(row, 2)) == null
                     && state.get(Position(row, 1)) == null
@@ -173,6 +196,14 @@ class ChessRuleEngine : RuleEngine {
         if (piece.type == ChessPieceType.ROOK) {
             if (move.from.col == 7) meta["castle${s}K"] = false
             if (move.from.col == 0) meta["castle${s}Q"] = false
+        }
+        // Capturing a rook on its home square also removes that side's
+        // corresponding castling right.
+        for (capture in move.captures) {
+            if (capture.row == 0 && capture.col == 0) meta["castleBQ"] = false
+            if (capture.row == 0 && capture.col == 7) meta["castleBK"] = false
+            if (capture.row == 7 && capture.col == 0) meta["castleWQ"] = false
+            if (capture.row == 7 && capture.col == 7) meta["castleWK"] = false
         }
         meta["enPassant"] = if (move.metadata["pawnDouble"] == true) move.to.col else -1
 

@@ -20,7 +20,9 @@ class ChessChoiceView(
     private val subtitle: String,
     choices: List<Choice>,
     private val gameLabel: String = "C H E S S",
-    private val headerSymbol: String = "♛",
+    private val headerSymbol: String = if (
+        gameLabel.replace(" ", "").contains("DRAUGHTS", ignoreCase = true)
+    ) "◎" else "♛",
 ) : View(context) {
 
     data class Choice(

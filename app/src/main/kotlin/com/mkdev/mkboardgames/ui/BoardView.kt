@@ -898,26 +898,36 @@ class BoardView(context: Context) : View(context) {
         val r = cellSize * 0.38f
         canvas.drawCircle(cx + 1.5f, cy + 2.5f, r, shadowPaint)
         val isWhite = piece.color == PieceColor.WHITE
-        Paint(Paint.ANTI_ALIAS_FLAG).also {
-            it.color = if (isWhite) Color.parseColor("#F5F5F5") else Color.parseColor("#1E1E1E")
-            canvas.drawCircle(cx, cy, r, it)
+        val base = if (isWhite) Color.parseColor("#F4E7C6") else Color.parseColor("#432B3A")
+        val edge = if (isWhite) Color.parseColor("#B68C56") else Color.parseColor("#1C1420")
+        val highlight = if (isWhite) Color.parseColor("#FFF6DA") else Color.parseColor("#765064")
+        val face = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = RadialGradient(
+                cx - r * 0.32f, cy - r * 0.38f, r * 1.25f,
+                intArrayOf(highlight, base, edge),
+                floatArrayOf(0f, 0.55f, 1f),
+                Shader.TileMode.CLAMP,
+            )
         }
+        canvas.drawCircle(cx, cy, r, face)
         Paint(Paint.ANTI_ALIAS_FLAG).also {
             it.style = Paint.Style.STROKE; it.strokeWidth = r * 0.10f
-            it.color = if (isWhite) Color.parseColor("#9E9E9E") else Color.parseColor("#616161")
+            it.color = edge
             canvas.drawCircle(cx, cy, r * 0.92f, it)
         }
         Paint(Paint.ANTI_ALIAS_FLAG).also {
             it.style = Paint.Style.STROKE; it.strokeWidth = r * 0.06f
-            it.color = if (isWhite) Color.parseColor("#BDBDBD") else Color.parseColor("#424242")
-            canvas.drawCircle(cx, cy, r * 0.72f, it)
+            it.color = if (isWhite) Color.parseColor("#D8B87A") else Color.parseColor("#765064")
+            canvas.drawCircle(cx, cy, r * 0.76f, it)
+            canvas.drawCircle(cx, cy, r * 0.61f, it)
         }
         if (piece.isKing) {
             val kp = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 textAlign = Paint.Align.CENTER; textSize = r * 1.0f
-                color = Color.parseColor("#FFC107")
+                color = if (isWhite) Color.parseColor("#8F5D25") else Color.parseColor("#E7B45C")
+                isFakeBoldText = true
             }
-            canvas.drawText("♛", cx, cy + r * 0.38f, kp)
+            canvas.drawText("✦", cx, cy + r * 0.34f, kp)
         }
     }
 

@@ -898,15 +898,45 @@ Checkmate your opponent's King.
     }
 
     private fun showPromotionChoice(choices: List<Move>) {
-        val promoted = choices.firstOrNull { it.metadata["promote"] == true } ?: return
-        val unpromoted = choices.firstOrNull { it.metadata["promote"] != true } ?: return
-        AlertDialog.Builder(this)
-            .setTitle("Promote this piece?")
-            .setItems(arrayOf("Promote", "Keep unpromoted")) { _, which ->
-                boardView.animateExternalMove(if (which == 0) promoted else unpromoted)
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
+        val promotionChoices = choices.filter { it.promotionType != null }
+        if (promotionChoices.isEmpty()) return
+        val details = mapOf(
+            "QUEEN" to ("Queen" to "Most powerful piece"),
+            "KNIGHT" to ("Knight" to "The only piece that jumps"),
+            "ROOK" to ("Rook" to "Controls ranks and files"),
+            "BISHOP" to ("Bishop" to "Controls diagonals"),
+        )
+        val symbols = mapOf(
+            "QUEEN" to "♕",
+            "KNIGHT" to "♘",
+            "ROOK" to "♖",
+            "BISHOP" to "♗",
+        )
+        val accents = mapOf(
+            "QUEEN" to "#E3B86A",
+            "KNIGHT" to "#8EC7B9",
+            "ROOK" to "#A9B6E8",
+            "BISHOP" to "#E58A7A",
+        )
+        val ordered = listOf("QUEEN", "KNIGHT", "ROOK", "BISHOP")
+        val available = ordered.mapNotNull { type ->
+            val move = promotionChoices.firstOrNull { it.promotionType == type } ?: return@mapNotNull null
+            val (label, detail) = details.getValue(type)
+            ChessChoiceView.Choice(label, detail, symbols.getValue(type), Color.parseColor(accents.getValue(type))) to move
+        }
+        StyledDialogs.showChoices(
+            context = this,
+            title = "Choose a promotion",
+            subtitle = "Your pawn reached the far rank. Select its new piece.",
+            choices = available.map { it.first },
+            heightDp = 560f,
+            gameLabel = styledGameLabel(),
+            headerSymbol = "♕",
+            onChoice = { index, dialog ->
+                dialog.dismiss()
+                boardView.animateExternalMove(available[index].second)
+            },
+        )
     }
 
     private fun handleMove(move: Move, automaticPass: Boolean = false) {

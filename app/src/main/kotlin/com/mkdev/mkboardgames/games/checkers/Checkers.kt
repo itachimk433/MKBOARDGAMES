@@ -8,12 +8,9 @@ import com.mkdev.mkboardgames.engine.Position
 enum class CheckersPieceType { MAN, KING }
 
 data class CheckersPiece(val type: CheckersPieceType, override val color: PieceColor) : Piece(color) {
-    override fun symbol() = when {
-        color == PieceColor.WHITE && type == CheckersPieceType.MAN  -> "●"
-        color == PieceColor.WHITE && type == CheckersPieceType.KING -> "♛"
-        color == PieceColor.BLACK && type == CheckersPieceType.MAN  -> "●"
-        else                                                          -> "♛"
-    }
+    // Draughts are discs, not chess pieces. Rendering supplies the layered
+    // material treatment; this fallback is used in capture strips and logs.
+    override fun symbol() = if (type == CheckersPieceType.KING) "◎" else "●"
     override fun value() = if (type == CheckersPieceType.MAN) 100 else 175
     val isKing get() = type == CheckersPieceType.KING
 }
