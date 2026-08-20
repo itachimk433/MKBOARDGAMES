@@ -89,7 +89,12 @@ class GoRuleEngine : RuleEngine {
             .any { it.metadata[PASS_METADATA] != true }
 
     override fun applyMove(state: GameState, move: Move): GameState {
-        if (state.status != GameStatus.IN_PROGRESS) return state
+        require(state.status == GameStatus.IN_PROGRESS) {
+            "Cannot apply a move after the game has ended"
+        }
+        require(move in allLegalMoves(state, state.currentTurn)) {
+            "Illegal Go move"
+        }
 
         if (move.metadata[PASS_METADATA] == true) {
             val passCount = (state.metadata[PASS_COUNT] as? Int ?: 0) + 1

@@ -52,6 +52,7 @@ class LudoDiceView(context: Context) : View(context) {
     var onRoll: (() -> Unit)? = null
 
     private var animator: ValueAnimator? = null
+    private var rollGeneration = 0
     private var rotationX = -18f
     private var rotationY = -28f
     private var rotationZ = 0f
@@ -79,6 +80,7 @@ class LudoDiceView(context: Context) : View(context) {
         motionDirection: MotionDiceDirection = MotionDiceDirection.UP,
         onFinished: () -> Unit,
     ) {
+        val generation = ++rollGeneration
         animator?.cancel()
         isRolling = true
         val targetValue = nextValue.coerceIn(1, 6)
@@ -102,22 +104,31 @@ class LudoDiceView(context: Context) : View(context) {
             interpolator = AccelerateDecelerateInterpolator()
             addUpdateListener {
                 val progress = it.animatedFraction
+                // Keep the tumble monotonic. Adding a full spin to the target
+                // delta before easing can make the die briefly reverse when
+                // the target face is on the opposite Euler axis.
+                val eased = (progress * progress * (3f - 2f * progress))
                 val tumble = sin(progress * Math.PI).toFloat()
                 rotationX = startX +
-                    (target.x - startX + spin.x) * progress +
+                    (target.x - startX) * eased +
+                    spin.x * progress +
                     (tiltX + spin.wobbleX) * tumble
                 rotationY = startY +
-                    (target.y - startY + spin.y) * progress +
+                    (target.y - startY) * eased +
+                    spin.y * progress +
                     (tiltY + spin.wobbleY) * tumble
                 rotationZ = startZ +
-                    (target.z - startZ + spin.z) * progress +
+                    (target.z - startZ) * eased +
+                    spin.z * progress +
                     spin.wobbleZ * tumble
                 invalidate()
             }
             addListener(object : AnimatorListenerAdapter() {
                 override fun onAnimationEnd(animation: Animator) {
+                    if (generation != rollGeneration) return
                     value = targetValue
                     isRolling = false
+                    animator = null
                     rotationX = target.x
                     rotationY = target.y
                     rotationZ = target.z

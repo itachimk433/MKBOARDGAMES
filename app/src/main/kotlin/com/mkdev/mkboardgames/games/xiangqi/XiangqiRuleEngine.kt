@@ -36,6 +36,12 @@ class XiangqiRuleEngine : com.mkdev.mkboardgames.engine.RuleEngine {
         }
 
     override fun applyMove(state: GameState, move: Move): GameState {
+        require(state.status == GameStatus.IN_PROGRESS) {
+            "Cannot apply a move after the game has ended"
+        }
+        require(move in allLegalMoves(state, state.currentTurn)) {
+            "Illegal Xiangqi move"
+        }
         require(!capturesGeneral(state, move)) {
             "Xiangqi Generals cannot be captured"
         }

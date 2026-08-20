@@ -36,6 +36,12 @@ class ShogiRuleEngine : com.mkdev.mkboardgames.engine.RuleEngine {
     }
 
     override fun applyMove(state: GameState, move: Move): GameState {
+        require(state.status == GameStatus.IN_PROGRESS) {
+            "Cannot apply a move after the game has ended"
+        }
+        require(move in allLegalMoves(state, state.currentTurn)) {
+            "Illegal Shogi move"
+        }
         val applied = applyMoveInternal(state, move)
         return applied.copy(
             moveHistory = state.moveHistory + move,
@@ -235,7 +241,11 @@ class ShogiRuleEngine : com.mkdev.mkboardgames.engine.RuleEngine {
     }
 
     /** Legal drops for a held piece type, exposed to the hand UI. */
-    fun legalDropsFrom(state: GameState, type: ShogiPieceType): List<Move> {
+    fun legalDropsFrom(
+        state: GameState,
+        type: ShogiPieceType,
+        checkPawnDropMate: Boolean = true,
+    ): List<Move> {
         val color = state.currentTurn
         if (state.hands[color].orEmpty().none { it is ShogiPiece && it.type == type }) {
             return emptyList()
@@ -258,7 +268,7 @@ class ShogiRuleEngine : com.mkdev.mkboardgames.engine.RuleEngine {
                     to = to,
                     metadata = mapOf("drop" to type.name),
                 )
-                if (type != ShogiPieceType.PAWN || !isPawnDropMate(state, move)) {
+                if (!checkPawnDropMate || type != ShogiPieceType.PAWN || !isPawnDropMate(state, move)) {
                     moves += move
                 }
             }
@@ -270,7 +280,11 @@ class ShogiRuleEngine : com.mkdev.mkboardgames.engine.RuleEngine {
         val next = applyMoveInternal(state, move)
         val opponent = state.currentTurn.opponent()
         return isKingInCheck(next, opponent) &&
-            boardLegalMoves(next, opponent).isEmpty()
+            boardLegalMoves(next, opponent).isEmpty() &&
+            ShogiPieceType.entries.all { type ->
+                legalDropsFrom(next.copy(currentTurn = opponent), type, checkPawnDropMate = false)
+                    .isEmpty()
+            }
     }
 
     private fun boardLegalMoves(state: GameState, color: PieceColor): List<Move> {

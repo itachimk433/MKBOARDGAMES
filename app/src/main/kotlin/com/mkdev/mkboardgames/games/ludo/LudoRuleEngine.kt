@@ -48,6 +48,11 @@ class LudoRuleEngine : RuleEngine {
             } else {
                 emptyList()
             }
+            // Two opposing tokens form a block in standard Ludo. A token may
+            // not land on or pass through the occupied destination square.
+            if (occupants.size >= 2 && occupants.all { it.player != player }) {
+                continue
+            }
             val protectedTarget = occupants.singleOrNull()?.let { occupant ->
                 val protection = LudoEconomy.player(state, occupant.player)
                 if (protection.protectedToken == occupant.token &&
@@ -105,6 +110,12 @@ class LudoRuleEngine : RuleEngine {
     }
 
     override fun applyMove(state: GameState, move: Move): GameState {
+        require(state.status == GameStatus.IN_PROGRESS) {
+            "Cannot apply a move after the game has ended"
+        }
+        require(move in allLegalMoves(state, state.currentTurn)) {
+            "Illegal Ludo move"
+        }
         val movingPiece = LudoSetup.pieceForMove(state, move)
             ?: (state.get(move.from) as? LudoPiece)
             ?: return state
