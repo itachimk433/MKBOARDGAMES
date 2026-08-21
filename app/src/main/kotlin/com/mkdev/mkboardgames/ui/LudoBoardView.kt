@@ -477,7 +477,7 @@ class LudoBoardView(context: Context) : View(context) {
             addUpdateListener {
                 animatedProgress = it.animatedValue as Float
                 val step = floor(animatedProgress).toInt()
-                if (step != animatedSoundStep) {
+                if (step < animatedPath.lastIndex && step != animatedSoundStep) {
                     animatedSoundStep = step
                     onMoveStep?.invoke()
                 }
