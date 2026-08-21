@@ -938,69 +938,36 @@ class BoardView(context: Context) : View(context) {
         cy: Float
     ) {
         val radius = cellSize * 0.36f
-        canvas.drawCircle(cx + 1.5f, cy + 2.5f, radius, shadowPaint)
         val fox = piece.type == FoxAndGeesePieceType.FOX
-        val fill = if (fox) Color.parseColor("#4FAF9B") else Color.parseColor("#E8D2A6")
-        val edge = if (fox) Color.parseColor("#2D7D70") else Color.parseColor("#9B7650")
-        val detail = if (fox) Color.parseColor("#DDF5E9") else Color.parseColor("#C45A2C")
-        val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = fill }
-        val edgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        val base = if (fox) Color.parseColor("#35B7A1") else Color.parseColor("#F2C879")
+        val highlight = if (fox) Color.parseColor("#A8F1D7") else Color.parseColor("#FFF1B8")
+        val edge = if (fox) Color.parseColor("#126E69") else Color.parseColor("#A85C27")
+        val face = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = RadialGradient(
+                cx - radius * .30f, cy - radius * .38f, radius * 1.25f,
+                intArrayOf(highlight, base, edge),
+                floatArrayOf(0f, .58f, 1f),
+                Shader.TileMode.CLAMP,
+            )
+        }
+        canvas.drawCircle(cx, cy, radius, face)
+        val ring = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = edge
             style = Paint.Style.STROKE
-            strokeWidth = radius * 0.09f
-            strokeJoin = Paint.Join.ROUND
+            strokeWidth = radius * .09f
         }
-        if (fox) {
-            val ears = Path().apply {
-                moveTo(cx - radius * .66f, cy - radius * .34f)
-                lineTo(cx - radius * .50f, cy - radius * 1.02f)
-                lineTo(cx - radius * .08f, cy - radius * .64f)
-                lineTo(cx + radius * .08f, cy - radius * .64f)
-                lineTo(cx + radius * .50f, cy - radius * 1.02f)
-                lineTo(cx + radius * .66f, cy - radius * .34f)
-                close()
-            }
-            canvas.drawPath(ears, fillPaint)
-            canvas.drawPath(ears, edgePaint)
-            canvas.drawCircle(cx, cy, radius * .78f, fillPaint)
-            canvas.drawCircle(cx, cy, radius * .78f, edgePaint)
-            val eyePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#163B38") }
-            canvas.drawCircle(cx - radius * .28f, cy - radius * .12f, radius * .07f, eyePaint)
-            canvas.drawCircle(cx + radius * .28f, cy - radius * .12f, radius * .07f, eyePaint)
-            canvas.drawCircle(cx, cy + radius * .18f, radius * .10f, edgePaint)
-        } else {
-            canvas.drawOval(
-                RectF(cx - radius * .74f, cy - radius * .42f, cx + radius * .72f, cy + radius * .60f),
-                fillPaint,
-            )
-            canvas.drawOval(
-                RectF(cx - radius * .74f, cy - radius * .42f, cx + radius * .72f, cy + radius * .60f),
-                edgePaint,
-            )
-            val neck = Path().apply {
-                moveTo(cx + radius * .18f, cy - radius * .18f)
-                cubicTo(
-                    cx + radius * .08f, cy - radius * .82f,
-                    cx + radius * .30f, cy - radius * 1.02f,
-                    cx + radius * .56f, cy - radius * .68f,
-                )
-                lineTo(cx + radius * .74f, cy - radius * .46f)
-                lineTo(cx + radius * .36f, cy - radius * .32f)
-                close()
-            }
-            canvas.drawPath(neck, fillPaint)
-            canvas.drawPath(neck, edgePaint)
-            val beak = Path().apply {
-                moveTo(cx + radius * .52f, cy - radius * .68f)
-                lineTo(cx + radius * 1.02f, cy - radius * .53f)
-                lineTo(cx + radius * .52f, cy - radius * .36f)
-                close()
-            }
-            val beakPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = detail }
-            canvas.drawPath(beak, beakPaint)
-            val eyePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#4A3025") }
-            canvas.drawCircle(cx + radius * .42f, cy - radius * .70f, radius * .065f, eyePaint)
+        canvas.drawCircle(cx, cy, radius * .91f, ring)
+        ring.color = if (fox) Color.parseColor("#D7FFF0") else Color.parseColor("#FFE9A0")
+        ring.strokeWidth = radius * .035f
+        canvas.drawCircle(cx, cy, radius * .72f, ring)
+        val label = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (fox) Color.parseColor("#083F43") else Color.parseColor("#6B321E")
+            textAlign = Paint.Align.CENTER
+            textSize = radius * 1.02f
+            isFakeBoldText = true
         }
+        val metrics = label.fontMetrics
+        canvas.drawText(if (fox) "F" else "G", cx, cy - (metrics.ascent + metrics.descent) / 2f, label)
     }
 
     private fun drawOthelloPiece(canvas: Canvas, piece: OthelloPiece, cx: Float, cy: Float, pos: Position? = null) {

@@ -320,7 +320,7 @@ object SettingsManager {
         for (g in listOf(
             "chess", "checkers", "international_draughts",
             "othello", "morabaraba", "ttt", "connect_four", "overall",
-            "fox_and_geese", "ludo", "shogi"
+            "fox_and_geese", "ludo", "shogi", "go"
         )) {
             edit.putInt(winKey(g), 0).putInt(lossKey(g), 0)
                 .putInt(drawKey(g), 0).putInt(forfeitKey(g), 0)

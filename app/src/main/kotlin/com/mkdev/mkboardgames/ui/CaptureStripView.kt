@@ -246,35 +246,38 @@ class CaptureStripView(context: Context) : View(context) {
     private fun drawFoxAndGeesePiece(canvas: Canvas, piece: FoxAndGeesePiece, x: Float, baseY: Float) {
         val radius = fillP.textSize * .38f
         val fox = piece.type == FoxAndGeesePieceType.FOX
-        val fill = if (fox) Color.parseColor("#4FAF9B") else Color.parseColor("#E8D2A6")
-        val edge = if (fox) Color.parseColor("#2D7D70") else Color.parseColor("#9B7650")
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = fill }
-        if (fox) {
-            val ears = Path().apply {
-                moveTo(x - radius * .7f, baseY - radius * .1f)
-                lineTo(x - radius * .45f, baseY - radius * 1.35f)
-                lineTo(x, baseY - radius * .65f)
-                lineTo(x + radius * .45f, baseY - radius * 1.35f)
-                lineTo(x + radius * .7f, baseY - radius * .1f)
-                close()
-            }
-            canvas.drawPath(ears, paint)
-            canvas.drawCircle(x, baseY - radius * .25f, radius, paint)
-        } else {
-            canvas.drawOval(RectF(x - radius * 1.25f, baseY - radius * .7f, x + radius * 1.1f, baseY + radius * .55f), paint)
-            canvas.drawCircle(x + radius * .7f, baseY - radius * .65f, radius * .58f, paint)
-            paint.color = Color.parseColor("#C45A2C")
-            canvas.drawOval(RectF(x + radius * 1.05f, baseY - radius * .72f, x + radius * 1.7f, baseY - radius * .40f), paint)
+        val cy = baseY - radius * .25f
+        val base = if (fox) Color.parseColor("#35B7A1") else Color.parseColor("#F2C879")
+        val highlight = if (fox) Color.parseColor("#A8F1D7") else Color.parseColor("#FFF1B8")
+        val edge = if (fox) Color.parseColor("#126E69") else Color.parseColor("#A85C27")
+        val face = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = RadialGradient(
+                x - radius * .30f, cy - radius * .38f, radius * 1.25f,
+                intArrayOf(highlight, base, edge),
+                floatArrayOf(0f, .58f, 1f),
+                Shader.TileMode.CLAMP,
+            )
         }
+        canvas.drawCircle(x, cy, radius, face)
         strokeP.color = edge
         strokeP.style = Paint.Style.STROKE
-        strokeP.strokeWidth = maxOf(1f, radius * .12f)
-        if (fox) {
-            canvas.drawCircle(x, baseY - radius * .25f, radius, strokeP)
-        } else {
-            canvas.drawOval(RectF(x - radius * 1.25f, baseY - radius * .7f, x + radius * 1.1f, baseY + radius * .55f), strokeP)
-        }
+        strokeP.strokeWidth = maxOf(1f, radius * .10f)
+        canvas.drawCircle(x, cy, radius * .91f, strokeP)
+        strokeP.strokeWidth = maxOf(1f, radius * .04f)
+        strokeP.color = if (fox) Color.parseColor("#D7FFF0") else Color.parseColor("#FFE9A0")
+        canvas.drawCircle(x, cy, radius * .72f, strokeP)
         strokeP.style = Paint.Style.FILL
+        val originalTextSize = fillP.textSize
+        val originalFakeBold = fillP.isFakeBoldText
+        fillP.color = if (fox) Color.parseColor("#083F43") else Color.parseColor("#6B321E")
+        fillP.textAlign = Paint.Align.CENTER
+        fillP.textSize = radius * 1.02f
+        fillP.isFakeBoldText = true
+        val metrics = fillP.fontMetrics
+        canvas.drawText(if (fox) "F" else "G", x, cy - (metrics.ascent + metrics.descent) / 2f, fillP)
+        fillP.textAlign = Paint.Align.LEFT
+        fillP.textSize = originalTextSize
+        fillP.isFakeBoldText = originalFakeBold
     }
 
     private fun drawShogiPiece(canvas: Canvas, piece: ShogiPiece, x: Float, baseY: Float) {

@@ -789,7 +789,7 @@ Checkmate your opponent's King.
 
         topCaptureView.setLabel(
             when {
-                gameType == "FOX_AND_GEESE" -> "Fox captured"
+                gameType == "FOX_AND_GEESE" -> ""
                 gameType == "SHOGI" -> "Gote hand"
                 !vsAI && gameType == "CHESS" -> "Black's captures"
                 else -> "Black ⚔"

@@ -379,6 +379,23 @@ class MainActivity : AppCompatActivity() {
         root.addView(ludoDiffRow)
         root.addView(divider())
 
+        // ── Go ──
+        root.addView(sectionHeader("⚫  GO"))
+        var goDiff = SettingsManager.getGoDifficulty(ctx)
+        val (goDiffRow, goDiffVal) = settingRow("🎯", "AI Difficulty", diffs[goDiff])
+        goDiffRow.setOnClickListener {
+            AlertDialog.Builder(ctx, android.R.style.Theme_Material_Dialog_MinWidth)
+                .setTitle("Go · AI Difficulty")
+                .setSingleChoiceItems(diffs, goDiff) { d, i ->
+                    SettingsManager.setGoDifficulty(ctx, i)
+                    goDiff = i
+                    goDiffVal.text = diffs[i]
+                    d.dismiss()
+                }.show()
+        }
+        root.addView(goDiffRow)
+        root.addView(divider())
+
         // ── Shogi ──
         root.addView(sectionHeader("将  SHOGI"))
         var shogiDiff = SettingsManager.getShogiDifficulty(ctx)
@@ -395,8 +412,6 @@ class MainActivity : AppCompatActivity() {
         }
         root.addView(shogiDiffRow)
         root.addView(divider())
-        root.addView(themeRow("Shogi", { SettingsManager.getShogiTheme(ctx) },
-            { v -> SettingsManager.setShogiTheme(ctx, v) }).first)
 
         // ── Legal ──
         root.addView(sectionHeader("📋  LEGAL"))
@@ -532,6 +547,7 @@ class MainActivity : AppCompatActivity() {
             Page("Fox & Geese", "🦊", "fox_and_geese"),
             Page("Ludo", "●", "ludo"),
             Page("Shogi", "将", "shogi"),
+            Page("Go", "⚫", "go"),
         )
 
         var currentPage = 0
