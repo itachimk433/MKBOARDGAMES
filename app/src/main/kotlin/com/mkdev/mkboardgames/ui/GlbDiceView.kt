@@ -120,7 +120,7 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         }
 
         animator = ValueAnimator.ofFloat(0f, 1f).apply {
-            duration = 980L
+            duration = 820L
             interpolator = AccelerateDecelerateInterpolator()
             addUpdateListener {
                 val progress = it.animatedFraction
