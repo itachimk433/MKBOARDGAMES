@@ -160,6 +160,7 @@ class LudoActivity : AppCompatActivity() {
         ))
         statusView = LudoStatusStripView(this)
         boardView = LudoBoardView(this)
+        boardView.onMoveStep = { SoundPlayer.playMovement("ludo_move") }
         diceView = GlbDiceView(this)
         motionView = LudoControlTileView(this, LudoControlTileView.ControlType.MOTION)
         tapRollView = LudoControlTileView(this, LudoControlTileView.ControlType.TAP_TO_ROLL)
@@ -1480,7 +1481,6 @@ class LudoActivity : AppCompatActivity() {
     private fun playMove(move: Move) {
         if (state.status != GameStatus.IN_PROGRESS || rolledValue == 0 || boardView.isLocked) return
         boardView.legalMoves = emptyList()
-        SoundPlayer.playMovement("ludo_move")
         boardView.animateMove(move) {
             val movingPlayer = move.metadata["player"] as? Int
                 ?: LudoSetup.playerFromState(state)

@@ -45,6 +45,7 @@ class LudoBoardView(context: Context) : View(context) {
         }
     var isLocked: Boolean = false
     var onMoveSelected: ((Move) -> Unit)? = null
+    var onMoveStep: (() -> Unit)? = null
     var onTokenLongPressed: ((LudoPiece) -> Unit)? = null
     var onGameOverTapped: (() -> Unit)? = null
 
@@ -67,6 +68,7 @@ class LudoBoardView(context: Context) : View(context) {
     private var animatedPiece: LudoPiece? = null
     private var animatedPath: List<Position> = emptyList()
     private var animatedProgress = 0f
+    private var animatedSoundStep = -1
     private var moveAnimator: ValueAnimator? = null
     private var protectionPulse = 0f
     private val protectionPulseAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
@@ -467,12 +469,18 @@ class LudoBoardView(context: Context) : View(context) {
         animatedPiece = piece
         animatedPath = pathFor(move)
         animatedProgress = 0f
+        animatedSoundStep = -1
         moveAnimator?.cancel()
         moveAnimator = ValueAnimator.ofFloat(0f, animatedPath.lastIndex.toFloat()).apply {
             duration = (animatedPath.lastIndex.coerceAtLeast(1) * 145L) + 70L
             interpolator = LinearInterpolator()
             addUpdateListener {
                 animatedProgress = it.animatedValue as Float
+                val step = floor(animatedProgress).toInt()
+                if (step != animatedSoundStep) {
+                    animatedSoundStep = step
+                    onMoveStep?.invoke()
+                }
                 invalidate()
             }
             addListener(object : AnimatorListenerAdapter() {
@@ -481,6 +489,7 @@ class LudoBoardView(context: Context) : View(context) {
                     animatedPiece = null
                     animatedPath = emptyList()
                     animatedProgress = 0f
+                    animatedSoundStep = -1
                     isLocked = false
                     invalidate()
                     onEnd()
