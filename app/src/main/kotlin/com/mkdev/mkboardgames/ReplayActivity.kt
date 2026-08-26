@@ -46,6 +46,7 @@ class ReplayActivity : AppCompatActivity() {
         const val EXTRA_GAME_TYPE  = "game_type"
         const val EXTRA_RESULT     = "game_result"
         const val EXTRA_BOARD_SIZE = "board_size"   // for TicTacToe
+        const val EXTRA_MORABARABA_PIECE_COUNT = "morabaraba_piece_count"
 
         fun buildMovesJson(moves: List<Move>): String {
             val arr = JSONArray()
@@ -183,6 +184,7 @@ class ReplayActivity : AppCompatActivity() {
         val movesJson     = intent.getStringExtra(EXTRA_MOVES_JSON) ?: "[]"
         resultText        = intent.getStringExtra(EXTRA_RESULT)     ?: ""
         val ticBoardSize  = intent.getIntExtra(EXTRA_BOARD_SIZE, 3)
+        val morabarabaPieceCount = intent.getIntExtra(EXTRA_MORABARABA_PIECE_COUNT, 12)
 
         val isTicTacToe  = gameType == "TICTACTOE"
         val isConnectFour = gameType == "CONNECTFOUR"
@@ -194,7 +196,7 @@ class ReplayActivity : AppCompatActivity() {
             "CONNECTFOUR" -> ConnectFourRuleEngine()
             "CHECKERS"   -> CheckersRuleEngine()
             "INTERNATIONAL_DRAUGHTS" -> InternationalDraughtsRuleEngine()
-            "MORABARABA" -> MorabarabaRuleEngine()
+            "MORABARABA" -> MorabarabaRuleEngine(morabarabaPieceCount)
             "FOX_AND_GEESE" -> FoxAndGeeseRuleEngine()
             "LUDO" -> LudoRuleEngine()
             "XIANGQI" -> XiangqiRuleEngine()

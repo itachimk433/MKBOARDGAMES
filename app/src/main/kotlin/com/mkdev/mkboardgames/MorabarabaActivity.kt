@@ -635,6 +635,7 @@ class MorabarabaActivity : AppCompatActivity() {
             putExtra(ReplayActivity.EXTRA_GAME_TYPE,  "MORABARABA")
             putExtra(ReplayActivity.EXTRA_MOVES_JSON, movesJson)
             putExtra(ReplayActivity.EXTRA_RESULT,     resultLabel)
+            putExtra(ReplayActivity.EXTRA_MORABARABA_PIECE_COUNT, pieceCount)
         })
     }
 
