@@ -250,7 +250,7 @@ class MorabarabaActivity : AppCompatActivity() {
                     if (vsAI) SettingsManager.recordForfeit(this)
                     @Suppress("DEPRECATION") super.onBackPressed()
                 },
-                {},
+                { showBoardAfterDialog() },
             ),
             520f,
         )
