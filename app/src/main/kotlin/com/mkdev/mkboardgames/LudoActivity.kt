@@ -508,6 +508,7 @@ class LudoActivity : AppCompatActivity() {
         pendingRollValue = nextValue.coerceIn(1, 6)
         pendingRollDirection = motionDirection
         pendingRollIsReroll = isReroll
+        val player = LudoSetup.playerFromState(state)
         SoundPlayer.playMovement("ludo_dice")
         diceView.rollTo(pendingRollValue, motionDirection) {
             if (!gameplayActive()) return@rollTo
