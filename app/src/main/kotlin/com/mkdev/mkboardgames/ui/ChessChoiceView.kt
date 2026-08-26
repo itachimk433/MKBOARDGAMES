@@ -22,6 +22,7 @@ internal fun isFullScreenStyledGameLabel(gameLabel: String): Boolean =
         "MORABARABA",
         "TICTACTOE",
         "CONNECTFOUR",
+        "LUDO",
     )
 
 /**

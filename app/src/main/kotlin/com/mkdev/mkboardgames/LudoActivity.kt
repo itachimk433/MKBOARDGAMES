@@ -230,6 +230,7 @@ class LudoActivity : AppCompatActivity() {
             ?: sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)?.also {
                 usingRawAccelerometer = true
             }
+        hideBoardWhileDialogIsOpen()
         showModeDialog()
     }
 
@@ -321,13 +322,14 @@ class LudoActivity : AppCompatActivity() {
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         if (state.status == GameStatus.IN_PROGRESS && moves.isNotEmpty()) {
+            hideBoardWhileDialogIsOpen()
             StyledDialogs.showChoices(this, "Leave Match?", "Leaving counts as a forfeit.",
                 listOf(
                     StyledDialogs.choice("Leave Match", "Forfeit this game", "⚑", "#E58A7A"),
                     StyledDialogs.choice("Keep Playing", "Return to the board", "↩", "#A9B6E8"),
-                ), 420f, "L U D O") { which, dialog ->
+                ), 420f, "L U D O", onCancel = { showBoardAfterDialog() }) { which, dialog ->
                     dialog.dismiss()
-                    if (which == 0) super.onBackPressed()
+                    if (which == 0) super.onBackPressed() else showBoardAfterDialog()
                 }
         } else {
             super.onBackPressed()
@@ -345,6 +347,7 @@ class LudoActivity : AppCompatActivity() {
     }
 
     private fun showModeDialog() {
+        hideBoardWhileDialogIsOpen()
         val options = listOf("vs AI · Normal", "vs AI · Irregular", "4 Players", "How to Play")
         StyledDialogs.showChoices(this, "Ludo", "Choose how to begin.",
             listOf(
@@ -352,7 +355,9 @@ class LudoActivity : AppCompatActivity() {
                 StyledDialogs.choice(options[1], "Match with abilities and coins", "⚄", "#E3B86A"),
                 StyledDialogs.choice(options[2], "Play locally with four colours", "⚄", "#A9B6E8"),
                 StyledDialogs.choice(options[3], "Review the essentials", "⚄", "#E58A7A"),
-            ), 520f, "L U D O", headerSymbol = "⚄", onCancel = { if (moves.isEmpty()) finish() }) { which, dialog ->
+            ), 520f, "L U D O", headerSymbol = "⚄", onCancel = {
+                if (!matchStarted) finish() else showBoardAfterDialog()
+            }) { which, dialog ->
                 when (which) {
                     0 -> {
                         vsAI = true
@@ -381,6 +386,7 @@ class LudoActivity : AppCompatActivity() {
     }
 
     private fun showPlayerPicker() {
+        hideBoardWhileDialogIsOpen()
         StyledDialogs.showChoices(this, "Play As", "Choose your colour before the first roll.",
             LudoSetup.PLAYER_NAMES.mapIndexed { index, name ->
                 StyledDialogs.choice(name, if (index == 0) "Moves first" else "Joins the match", listOf("●", "●", "●", "●")[index], listOf("#E3B86A", "#E58A7A", "#8EC7B9", "#A9B6E8")[index])
@@ -392,6 +398,7 @@ class LudoActivity : AppCompatActivity() {
     }
 
     private fun showRules(showModeAfter: Boolean) {
+        hideBoardWhileDialogIsOpen()
         val message = """
             LUDO — Rules
 
@@ -402,10 +409,11 @@ class LudoActivity : AppCompatActivity() {
             Normal mode is classic Ludo. Irregular mode gives every colour ${LudoEconomy.STARTER_COINS} match-only coins. Captures, tokens reaching home, and final placement reward coins. STORE abilities last for the match: Invincibility blocks one capture, Extra Move adds two spaces, and Reroll replaces the current die. AI behaviour and profiles are visible only in Irregular mode.
         """.trimIndent()
         StyledDialogs.showRules(this, "Ludo", message, "L U D O",
-            onDone = { if (showModeAfter) showModeDialog() })
+            onDone = { if (showModeAfter) showModeDialog() else showBoardAfterDialog() })
     }
 
     private fun startGame() {
+        showBoardAfterDialog()
         moves.clear()
         resultDialogVisible = false
         ludoResultRecorded = false
@@ -1609,6 +1617,7 @@ class LudoActivity : AppCompatActivity() {
 
     private fun showResultDialog() {
         if (state.status == GameStatus.IN_PROGRESS || resultDialogVisible) return
+        hideBoardWhileDialogIsOpen()
         resultDialogVisible = true
         val winner = state.metadata["ludo_winner"] as? Int ?: 0
         if (vsAI && !ludoResultRecorded) {
@@ -1643,10 +1652,18 @@ class LudoActivity : AppCompatActivity() {
             listOf(
                 StyledDialogs.choice("New Match", "Roll into another game", "↻", "#E3B86A"),
                 StyledDialogs.choice("Main Menu", "Choose another game", "⌂", "#E58A7A"),
-            ), 620f, "L U D O") { which, dialog ->
+            ), 620f, "L U D O", onCancel = { showBoardAfterDialog() }) { which, dialog ->
                 dialog.dismiss()
                 resultDialogVisible = false
                 if (which == 0) startGame() else finish()
             }.setOnDismissListener { resultDialogVisible = false }
+    }
+
+    private fun hideBoardWhileDialogIsOpen() {
+        boardView.visibility = View.INVISIBLE
+    }
+
+    private fun showBoardAfterDialog() {
+        boardView.visibility = View.VISIBLE
     }
 }
