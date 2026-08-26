@@ -4,6 +4,7 @@ import android.app.Dialog
 import android.content.Context
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
+import android.os.Build
 import android.view.Gravity
 import android.view.Window
 import android.view.WindowManager
@@ -42,6 +43,21 @@ object StyledDialogs {
         dialog.setOnShowListener {
             val window = dialog.window ?: return@setOnShowListener
             val density = context.resources.displayMetrics.density
+            if (isFullScreenStyledGameLabel(gameLabel)) {
+                window.setBackgroundDrawable(ColorDrawable(Color.parseColor("#0B1D25")))
+                window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+                window.setWindowAnimations(0)
+                window.decorView.setPadding(0, 0, 0, 0)
+                window.setGravity(Gravity.CENTER)
+                window.setLayout(
+                    WindowManager.LayoutParams.MATCH_PARENT,
+                    WindowManager.LayoutParams.MATCH_PARENT,
+                )
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    window.clearFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+                }
+                return@setOnShowListener
+            }
             val margin = (24f * density).toInt()
             val maxWidth = (420f * density).toInt()
             val availableHeightDp = context.resources.displayMetrics.heightPixels / density - 32f

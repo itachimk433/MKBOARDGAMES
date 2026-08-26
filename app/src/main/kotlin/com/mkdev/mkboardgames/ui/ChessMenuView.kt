@@ -40,7 +40,7 @@ class ChessMenuView(
     private val scaledDensity = resources.displayMetrics.scaledDensity
     private val unit = density.coerceAtLeast(1f)
     private val textScale = scaledDensity.coerceAtMost(2f)
-    private val fullScreen = gameLabel.replace(" ", "").equals("CHESS", ignoreCase = true)
+    private val fullScreen = isFullScreenStyledGameLabel(gameLabel)
     private val isConnectFour = gameLabel.replace(" ", "").contains("CONNECT", ignoreCase = true)
     private val isFoxAndGeese = gameLabel.replace(" ", "").contains("FOX", ignoreCase = true)
 

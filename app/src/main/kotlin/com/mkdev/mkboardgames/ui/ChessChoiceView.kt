@@ -9,6 +9,18 @@ import android.view.View
 import android.view.animation.DecelerateInterpolator
 import com.mkdev.mkboardgames.SoundPlayer
 
+internal fun isFullScreenStyledGameLabel(gameLabel: String): Boolean =
+    gameLabel.replace(" ", "").uppercase() in setOf(
+        "CHESS",
+        "DRAUGHTS",
+        "INTLDRAUGHTS",
+        "OTHELLO",
+        "FOX&GEESE",
+        "GO",
+        "SHOGI",
+        "XIANGQI",
+    )
+
 /**
  * The shared Chess-styled choice surface used after selecting "vs AI".
  * Keeping it as a view instead of an AlertDialog makes the side picker feel
@@ -48,7 +60,7 @@ class ChessChoiceView(
     private val scaledDensity = resources.displayMetrics.scaledDensity
     private val unit = density.coerceAtLeast(1f)
     private val textScale = scaledDensity.coerceAtMost(2f)
-    private val fullScreen = gameLabel.replace(" ", "").equals("CHESS", ignoreCase = true)
+    private val fullScreen = isFullScreenStyledGameLabel(gameLabel)
     private val surfacePaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val cardPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {

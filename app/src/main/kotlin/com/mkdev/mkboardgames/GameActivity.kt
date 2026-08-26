@@ -364,7 +364,7 @@ class GameActivity : AppCompatActivity() {
         }
 
         dialog.show()
-        if (gameType == "CHESS") {
+        if (isStyledBoardGame()) {
             styleChessDialog(dialog, 0f)
         } else {
             dialog.window?.let { window ->
@@ -725,7 +725,7 @@ Checkmate your opponent's King.
     }
 
     private fun styleChessDialog(dialog: Dialog, heightDp: Float) {
-        val isChessFullScreen = gameType == "CHESS"
+        val isChessFullScreen = isStyledBoardGame()
         val metrics = resources.displayMetrics
         if (isChessFullScreen) {
             hideChessBoardWhileDialogIsOpen()
@@ -794,13 +794,13 @@ Checkmate your opponent's King.
     }
 
     private fun hideChessBoardWhileDialogIsOpen() {
-        if (gameType == "CHESS") {
+        if (isStyledBoardGame()) {
             gameContainer.visibility = View.INVISIBLE
         }
     }
 
     private fun showChessBoardAfterDialog() {
-        if (gameType == "CHESS") {
+        if (isStyledBoardGame()) {
             gameContainer.visibility = View.VISIBLE
         }
     }
@@ -963,6 +963,7 @@ Checkmate your opponent's King.
     private fun showPromotionChoice(choices: List<Move>) {
         val promotionChoices = choices.filter { it.promotionType != null }
         if (promotionChoices.isEmpty()) return
+        hideChessBoardWhileDialogIsOpen()
         val details = mapOf(
             "QUEEN" to ("Queen" to "Most powerful piece"),
             "KNIGHT" to ("Knight" to "The only piece that jumps"),
@@ -995,8 +996,10 @@ Checkmate your opponent's King.
             heightDp = 560f,
             gameLabel = styledGameLabel(),
             headerSymbol = "♕",
+            onCancel = { showChessBoardAfterDialog() },
             onChoice = { index, dialog ->
                 dialog.dismiss()
+                showChessBoardAfterDialog()
                 boardView.animateExternalMove(available[index].second)
             },
         )
