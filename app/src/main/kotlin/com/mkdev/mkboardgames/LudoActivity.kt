@@ -244,6 +244,7 @@ class LudoActivity : AppCompatActivity() {
         lifecycleActive = true
         makeFullscreen()
         if (::boardView.isInitialized) boardView.resumeAnimations()
+        if (::diceView.isInitialized && !dialogOpen) diceView.setGameplayVisible(true)
         SoundPlayer.movementSoundsEnabled = SettingsManager.isMovementSoundsEnabled(this)
         motionView.motionEnabled = SettingsManager.isMotionDiceEnabled(this)
         syncMotionSensor()
@@ -253,6 +254,7 @@ class LudoActivity : AppCompatActivity() {
         lifecycleActive = false
         handler.removeCallbacksAndMessages(null)
         diceView.cancelRoll()
+        diceView.setGameplayVisible(false)
         boardView.cancelAnimations()
         notificationHost.removeAllViews()
         celebrationGeneration++
@@ -270,6 +272,7 @@ class LudoActivity : AppCompatActivity() {
         lifecycleActive = false
         handler.removeCallbacksAndMessages(null)
         diceView.cancelRoll()
+        diceView.setGameplayVisible(false)
         boardView.cancelAnimations()
         sensorManager.unregisterListener(motionListener)
         super.onDestroy()
@@ -1703,6 +1706,7 @@ class LudoActivity : AppCompatActivity() {
         dialogOpen = true
         handler.removeCallbacksAndMessages(null)
         diceView.cancelRoll()
+        diceView.setGameplayVisible(false)
         boardView.cancelAnimations()
         SoundPlayer.stop("ludo_dice", "ludo_move")
         overlay.visibility = View.INVISIBLE
@@ -1711,6 +1715,7 @@ class LudoActivity : AppCompatActivity() {
     private fun showBoardAfterDialog() {
         dialogOpen = false
         overlay.visibility = View.VISIBLE
+        diceView.setGameplayVisible(true)
         boardView.resumeAnimations()
         if (gameplayActive() && matchStarted && isAiTurn() &&
             state.status == GameStatus.IN_PROGRESS && rolledValue == 0

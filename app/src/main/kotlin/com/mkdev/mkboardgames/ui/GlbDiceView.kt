@@ -163,6 +163,14 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         isRolling = false
     }
 
+    /**
+     * GLSurfaceView can remain above its parent when it uses z-order-on-top.
+     * Dialog transitions must hide the surface itself, not just this container.
+     */
+    fun setGameplayVisible(visible: Boolean) {
+        glSurfaceView.visibility = if (visible) VISIBLE else INVISIBLE
+    }
+
     override fun onTouchEvent(event: MotionEvent): Boolean {
         if (event.actionMasked == MotionEvent.ACTION_UP && !isRolling) {
             performClick()
