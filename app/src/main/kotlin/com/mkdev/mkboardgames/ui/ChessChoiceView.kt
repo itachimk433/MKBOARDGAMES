@@ -48,6 +48,7 @@ class ChessChoiceView(
     private val scaledDensity = resources.displayMetrics.scaledDensity
     private val unit = density.coerceAtLeast(1f)
     private val textScale = scaledDensity.coerceAtMost(2f)
+    private val fullScreen = gameLabel.replace(" ", "").equals("CHESS", ignoreCase = true)
     private val surfacePaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val cardPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -106,6 +107,7 @@ class ChessChoiceView(
     private var animator: ValueAnimator? = null
     private var downX = 0f
     private var downY = 0f
+    private var contentOffset = 0f
 
     init {
         isClickable = true
@@ -116,13 +118,23 @@ class ChessChoiceView(
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val desiredHeight = (178f + hits.size * 104f) * unit
         val measuredWidth = MeasureSpec.getSize(widthMeasureSpec)
-        val measuredHeight = resolveSize(desiredHeight.toInt(), heightMeasureSpec)
+        val measuredHeight = if (fullScreen && MeasureSpec.getMode(heightMeasureSpec) != MeasureSpec.UNSPECIFIED) {
+            MeasureSpec.getSize(heightMeasureSpec)
+        } else {
+            resolveSize(desiredHeight.toInt(), heightMeasureSpec)
+        }
         setMeasuredDimension(measuredWidth, measuredHeight)
     }
 
     override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
+        val contentHeight = (178f + hits.size * 104f) * unit
+        contentOffset = if (fullScreen) {
+            ((height - contentHeight) / 2f).coerceAtLeast(0f)
+        } else {
+            0f
+        }
         val sidePadding = 22f * unit
-        val top = 153f * unit
+        val top = contentOffset + 153f * unit
         val cardHeight = 88f * unit
         val gap = 12f * unit
         hits.forEachIndexed { index, hit ->
@@ -143,25 +155,41 @@ class ChessChoiceView(
             Color.parseColor("#0B1D25"),
             Shader.TileMode.CLAMP,
         )
-        canvas.drawRoundRect(0f, 0f, width, height, 12f * unit, 12f * unit, surfacePaint)
+        if (fullScreen) {
+            canvas.drawRect(0f, 0f, width, height, surfacePaint)
+        } else {
+            canvas.drawRoundRect(0f, 0f, width, height, 12f * unit, 12f * unit, surfacePaint)
+        }
         surfacePaint.shader = null
 
-        drawHeader(canvas, width)
+        drawHeader(canvas, width, contentOffset)
         hits.forEach { drawChoice(canvas, it) }
     }
 
-    private fun drawHeader(canvas: Canvas, width: Float) {
+    private fun drawHeader(canvas: Canvas, width: Float, topOffset: Float) {
         val center = width / 2f
         val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.parseColor("#D7A94D")
             strokeWidth = 1.5f * unit
         }
-        canvas.drawLine(center - 118f * unit, 36f * unit, center - 42f * unit, 36f * unit, linePaint)
-        canvas.drawLine(center + 42f * unit, 36f * unit, center + 118f * unit, 36f * unit, linePaint)
-        canvas.drawText(headerSymbol, center, 43f * unit, crownPaint)
-        canvas.drawText(gameLabel, center, 58f * unit, eyebrowPaint)
-        canvas.drawText(title, center, 99f * unit, titlePaint)
-        canvas.drawText(subtitle, center, 125f * unit, subtitlePaint)
+        canvas.drawLine(
+            center - 118f * unit,
+            topOffset + 36f * unit,
+            center - 42f * unit,
+            topOffset + 36f * unit,
+            linePaint,
+        )
+        canvas.drawLine(
+            center + 42f * unit,
+            topOffset + 36f * unit,
+            center + 118f * unit,
+            topOffset + 36f * unit,
+            linePaint,
+        )
+        canvas.drawText(headerSymbol, center, topOffset + 43f * unit, crownPaint)
+        canvas.drawText(gameLabel, center, topOffset + 58f * unit, eyebrowPaint)
+        canvas.drawText(title, center, topOffset + 99f * unit, titlePaint)
+        canvas.drawText(subtitle, center, topOffset + 125f * unit, subtitlePaint)
     }
 
     private fun drawChoice(canvas: Canvas, hit: ChoiceHit) {

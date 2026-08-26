@@ -40,6 +40,7 @@ class ChessMenuView(
     private val scaledDensity = resources.displayMetrics.scaledDensity
     private val unit = density.coerceAtLeast(1f)
     private val textScale = scaledDensity.coerceAtMost(2f)
+    private val fullScreen = gameLabel.replace(" ", "").equals("CHESS", ignoreCase = true)
     private val isConnectFour = gameLabel.replace(" ", "").contains("CONNECT", ignoreCase = true)
     private val isFoxAndGeese = gameLabel.replace(" ", "").contains("FOX", ignoreCase = true)
 
@@ -103,6 +104,7 @@ class ChessMenuView(
     private val resumeRect = RectF()
     private var downX = 0f
     private var downY = 0f
+    private var contentOffset = 0f
 
     init {
         isClickable = true
@@ -112,15 +114,25 @@ class ChessMenuView(
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val desiredHeight = if (hasResumeMatch) 462f * unit else 414f * unit
         val measuredWidth = MeasureSpec.getSize(widthMeasureSpec)
-        val measuredHeight = resolveSize(desiredHeight.toInt(), heightMeasureSpec)
+        val measuredHeight = if (fullScreen && MeasureSpec.getMode(heightMeasureSpec) != MeasureSpec.UNSPECIFIED) {
+            MeasureSpec.getSize(heightMeasureSpec)
+        } else {
+            resolveSize(desiredHeight.toInt(), heightMeasureSpec)
+        }
         setMeasuredDimension(measuredWidth, measuredHeight)
     }
 
     override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
+        val contentHeight = if (hasResumeMatch) 462f * unit else 414f * unit
+        contentOffset = if (fullScreen) {
+            ((height - contentHeight) / 2f).coerceAtLeast(0f)
+        } else {
+            0f
+        }
         val sidePadding = 18f * unit
         val gap = 10f * unit
         val actionWidth = (width - sidePadding * 2f - gap) / 2f
-        val actionTop = 164f * unit
+        val actionTop = contentOffset + 164f * unit
         val actionHeight = 82f * unit
 
         actions = listOf(
@@ -167,9 +179,9 @@ class ChessMenuView(
         }
         resumeRect.set(
             width * 0.18f,
-            height - 56f * unit,
+            contentOffset + contentHeight - 56f * unit,
             width * 0.82f,
-            height - 8f * unit,
+            contentOffset + contentHeight - 8f * unit,
         )
     }
 
@@ -188,10 +200,14 @@ class ChessMenuView(
             Color.parseColor("#0B1D25"),
             Shader.TileMode.CLAMP,
         )
-        canvas.drawRoundRect(0f, 0f, width, height, corner, corner, surfacePaint)
+        if (fullScreen) {
+            canvas.drawRect(0f, 0f, width, height, surfacePaint)
+        } else {
+            canvas.drawRoundRect(0f, 0f, width, height, corner, corner, surfacePaint)
+        }
         surfacePaint.shader = null
 
-        drawHeader(canvas, width)
+        drawHeader(canvas, width, contentOffset)
         actions.forEach { drawAction(canvas, it) }
         if (hasResumeMatch) {
             drawResumeAction(canvas, width)
@@ -199,20 +215,32 @@ class ChessMenuView(
             canvas.drawText(
                 "Choose your move. The board is waiting.",
                 width / 2f,
-                height - 17f * unit,
+                contentOffset + (if (hasResumeMatch) 462f else 414f) * unit - 17f * unit,
                 footerPaint,
             )
         }
     }
 
-    private fun drawHeader(canvas: Canvas, width: Float) {
+    private fun drawHeader(canvas: Canvas, width: Float, topOffset: Float) {
         val center = width / 2f
         val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.parseColor("#D7A94D")
             strokeWidth = 1.5f * unit
         }
-        canvas.drawLine(center - 118f * unit, 36f * unit, center - 42f * unit, 36f * unit, linePaint)
-        canvas.drawLine(center + 42f * unit, 36f * unit, center + 118f * unit, 36f * unit, linePaint)
+        canvas.drawLine(
+            center - 118f * unit,
+            topOffset + 36f * unit,
+            center - 42f * unit,
+            topOffset + 36f * unit,
+            linePaint,
+        )
+        canvas.drawLine(
+            center + 42f * unit,
+            topOffset + 36f * unit,
+            center + 118f * unit,
+            topOffset + 36f * unit,
+            linePaint,
+        )
         canvas.drawText(
             when {
                 isConnectFour -> "●"
@@ -220,14 +248,19 @@ class ChessMenuView(
                 else -> "♛"
             },
             center,
-            43f * unit,
+            topOffset + 43f * unit,
             actionSymbolPaint.apply {
             color = Color.parseColor("#E3B86A")
             textSize = 21f * textScale
         })
-        canvas.drawText(gameLabel, center, 58f * unit, eyebrowPaint)
-        canvas.drawText("Choose your match", center, 99f * unit, titlePaint)
-        canvas.drawText("A good game starts with the right opponent.", center, 125f * unit, subtitlePaint)
+        canvas.drawText(gameLabel, center, topOffset + 58f * unit, eyebrowPaint)
+        canvas.drawText("Choose your match", center, topOffset + 99f * unit, titlePaint)
+        canvas.drawText(
+            "A good game starts with the right opponent.",
+            center,
+            topOffset + 125f * unit,
+            subtitlePaint,
+        )
     }
 
     private fun drawAction(canvas: Canvas, action: MenuAction) {

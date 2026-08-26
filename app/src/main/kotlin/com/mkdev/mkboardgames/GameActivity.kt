@@ -356,19 +356,23 @@ class GameActivity : AppCompatActivity() {
         }
 
         dialog.show()
-        dialog.window?.let { window ->
-            val metrics = resources.displayMetrics
-            val horizontalMargin = (24f * metrics.density).toInt()
-            val maxWidth = (420f * metrics.density).toInt()
-            val width = minOf(metrics.widthPixels - horizontalMargin * 2, maxWidth)
-            window.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-            window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-            window.setWindowAnimations(0)
-            window.attributes = window.attributes.apply { dimAmount = 0.72f }
-            window.setLayout(width, WindowManager.LayoutParams.WRAP_CONTENT)
-            enableChessWindowBlur(window)
+        if (gameType == "CHESS") {
+            styleChessDialog(dialog, 0f)
+        } else {
+            dialog.window?.let { window ->
+                val metrics = resources.displayMetrics
+                val horizontalMargin = (24f * metrics.density).toInt()
+                val maxWidth = (420f * metrics.density).toInt()
+                val width = minOf(metrics.widthPixels - horizontalMargin * 2, maxWidth)
+                window.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+                window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+                window.setWindowAnimations(0)
+                window.attributes = window.attributes.apply { dimAmount = 0.72f }
+                window.setLayout(width, WindowManager.LayoutParams.WRAP_CONTENT)
+                enableChessWindowBlur(window)
+            }
+            applyChessDialogBlur()
         }
-        applyChessDialogBlur()
     }
 
     private fun showColorPickerDialog() {
@@ -709,7 +713,26 @@ Checkmate your opponent's King.
     }
 
     private fun styleChessDialog(dialog: Dialog, heightDp: Float) {
+        val isChessFullScreen = gameType == "CHESS"
         val metrics = resources.displayMetrics
+        if (isChessFullScreen) {
+            dialog.window?.let { window ->
+                window.setBackgroundDrawable(ColorDrawable(Color.parseColor("#0B1D25")))
+                window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+                window.setWindowAnimations(0)
+                window.decorView.setPadding(0, 0, 0, 0)
+                window.setGravity(Gravity.CENTER)
+                window.setLayout(
+                    WindowManager.LayoutParams.MATCH_PARENT,
+                    WindowManager.LayoutParams.MATCH_PARENT,
+                )
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    window.clearFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+                }
+            }
+            clearChessDialogBlur()
+            return
+        }
         val horizontalMargin = (24f * metrics.density).toInt()
         val maxWidth = (420f * metrics.density).toInt()
         val width = minOf(metrics.widthPixels - horizontalMargin * 2, maxWidth)
