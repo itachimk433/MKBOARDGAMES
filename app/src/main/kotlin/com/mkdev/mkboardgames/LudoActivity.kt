@@ -73,6 +73,7 @@ class LudoActivity : AppCompatActivity() {
     private var matchStarted = false
     private var ludoResultRecorded = false
     private var rolledValue = 0
+    private var pendingMove: Move? = null
     private var resultDialogVisible = false
     private var celebrationMessage: String? = null
     private var celebrationGeneration = 0
@@ -248,6 +249,7 @@ class LudoActivity : AppCompatActivity() {
         SoundPlayer.movementSoundsEnabled = SettingsManager.isMovementSoundsEnabled(this)
         motionView.motionEnabled = SettingsManager.isMotionDiceEnabled(this)
         syncMotionSensor()
+        recoverInterruptedGameplay()
     }
 
     override fun onPause() {
@@ -1515,8 +1517,10 @@ class LudoActivity : AppCompatActivity() {
             state.status != GameStatus.IN_PROGRESS || rolledValue == 0 || boardView.isLocked
         ) return
         boardView.legalMoves = emptyList()
+        pendingMove = move
         boardView.animateMove(move) {
             if (!gameplayActive()) return@animateMove
+            pendingMove = null
             val movingPlayer = move.metadata["player"] as? Int
                 ?: LudoSetup.playerFromState(state)
             state = engine.applyMove(state, move)
@@ -1564,6 +1568,9 @@ class LudoActivity : AppCompatActivity() {
         if (!gameplayActive() ||
             state.status != GameStatus.IN_PROGRESS || rolledValue == 0
         ) return
+        pendingMove = null
+        celebrationGeneration++
+        celebrationMessage = null
         val player = LudoSetup.playerFromState(state)
         val sixStreak = state.metadata[LudoSetup.SIX_STREAK_METADATA] as? Int ?: 0
         val forfeitsAfterThreeSixes = rolledValue == 6 && sixStreak >= 3
@@ -1590,6 +1597,54 @@ class LudoActivity : AppCompatActivity() {
         boardView.legalMoves = emptyList()
         updateHud()
         if (isAiTurn()) postGameplay(420L) { rollDice() }
+    }
+
+    private fun recoverInterruptedGameplay() {
+        if (!gameplayActive() || !matchStarted || state.status != GameStatus.IN_PROGRESS) return
+
+        resumeHudMessageTimeout()
+
+        val interruptedMove = pendingMove
+        if (interruptedMove != null) {
+            boardView.legalMoves = emptyList()
+            postGameplay(0L) {
+                if (pendingMove == interruptedMove) playMove(interruptedMove)
+            }
+            return
+        }
+
+        if (rolledValue == 0) {
+            boardView.legalMoves = emptyList()
+            updateHud()
+            if (isAiTurn()) {
+                postGameplay(420L) {
+                    if (rolledValue == 0 && isAiTurn()) rollDice()
+                }
+            }
+            return
+        }
+
+        val legal = boardView.legalMoves.ifEmpty {
+            engine.legalMovesForDice(
+                state,
+                LudoSetup.playerFromState(state),
+                rolledValue,
+            )
+        }
+        boardView.legalMoves = legal
+        updateHud()
+
+        if (legal.isEmpty()) {
+            val sixStreak = state.metadata[LudoSetup.SIX_STREAK_METADATA] as? Int ?: 0
+            val delay = if (rolledValue == 6 && sixStreak >= 3) 760L else 520L
+            postGameplay(delay) { finishTurnAfterNoMove() }
+        } else if (isAiTurn()) {
+            postGameplay(420L) {
+                if (rolledValue != 0 && isAiTurn() && !boardView.isLocked) {
+                    playMove(chooseAiMove(boardView.legalMoves))
+                }
+            }
+        }
     }
 
     private fun isHumanTurn(): Boolean = !vsAI || LudoSetup.playerFromState(state) == humanPlayer
@@ -1638,6 +1693,17 @@ class LudoActivity : AppCompatActivity() {
         updateHud()
         postGameplay(1800L) {
             if (celebrationGeneration == generation) {
+                celebrationMessage = null
+                updateHud()
+            }
+        }
+    }
+
+    private fun resumeHudMessageTimeout() {
+        val message = celebrationMessage ?: return
+        val generation = celebrationGeneration
+        postGameplay(1800L) {
+            if (celebrationGeneration == generation && celebrationMessage == message) {
                 celebrationMessage = null
                 updateHud()
             }
@@ -1717,11 +1783,7 @@ class LudoActivity : AppCompatActivity() {
         overlay.visibility = View.VISIBLE
         diceView.setGameplayVisible(true)
         boardView.resumeAnimations()
-        if (gameplayActive() && matchStarted && isAiTurn() &&
-            state.status == GameStatus.IN_PROGRESS && rolledValue == 0
-        ) {
-            postGameplay(420L) { rollDice() }
-        }
+        recoverInterruptedGameplay()
     }
 
     private fun launchReplay(result: String) {
