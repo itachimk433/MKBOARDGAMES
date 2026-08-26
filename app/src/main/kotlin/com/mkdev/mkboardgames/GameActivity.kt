@@ -188,6 +188,7 @@ class GameActivity : AppCompatActivity() {
     }
 
     private fun showChessLeaveMatchDialog() {
+        hideChessBoardWhileDialogIsOpen()
         val view = ChessChoiceView(
             this,
             title = "Leave Match?",
@@ -218,7 +219,10 @@ class GameActivity : AppCompatActivity() {
         dialog.setContentView(view)
         dialog.setCanceledOnTouchOutside(true)
         dialog.setOnDismissListener { clearChessDialogBlur() }
-        dialog.setOnCancelListener { clearChessDialogBlur() }
+        dialog.setOnCancelListener {
+            clearChessDialogBlur()
+            showChessBoardAfterDialog()
+        }
         view.onChoiceSelected = { which ->
             when (which) {
                 0 -> {
@@ -231,7 +235,10 @@ class GameActivity : AppCompatActivity() {
                     if (vsAI) SettingsManager.recordForfeit(this)
                     @Suppress("DEPRECATION") super.onBackPressed()
                 }
-                else -> dialog.dismiss()
+                else -> {
+                    dialog.dismiss()
+                    showChessBoardAfterDialog()
+                }
             }
         }
         dialog.show()
@@ -314,6 +321,7 @@ class GameActivity : AppCompatActivity() {
 
     private fun showChessMenu() {
         chessMenuDialog?.dismiss()
+        hideChessBoardWhileDialogIsOpen()
 
         val menuView = ChessMenuView(
             this,
@@ -328,7 +336,7 @@ class GameActivity : AppCompatActivity() {
         dialog.setOnCancelListener {
             chessMenuDialog = null
             clearChessDialogBlur()
-            if (!matchStarted) finish()
+            if (!matchStarted) finish() else showChessBoardAfterDialog()
         }
         dialog.setOnDismissListener {
             clearChessDialogBlur()
@@ -408,6 +416,7 @@ class GameActivity : AppCompatActivity() {
     }
 
     private fun showChessSidePicker() {
+        hideChessBoardWhileDialogIsOpen()
         val isDraughts = gameType == "CHECKERS" || gameType == "INTERNATIONAL_DRAUGHTS"
         val isFoxAndGeese = gameType == "FOX_AND_GEESE"
         val view = ChessChoiceView(
@@ -694,6 +703,7 @@ Checkmate your opponent's King.
     }
 
     private fun showChessRulesDialog(gameName: String, rulesText: String, showModeAfter: Boolean) {
+        hideChessBoardWhileDialogIsOpen()
         val view = ChessRulesView(this, gameName, rulesText, styledGameLabel())
         val dialog = Dialog(this)
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
@@ -702,11 +712,13 @@ Checkmate your opponent's King.
         dialog.setOnCancelListener {
             clearChessDialogBlur()
             if (showModeAfter) showModeDialog()
+            else showChessBoardAfterDialog()
         }
         dialog.setOnDismissListener { clearChessDialogBlur() }
         view.onDone = {
             dialog.dismiss()
             if (showModeAfter) showModeDialog()
+            else showChessBoardAfterDialog()
         }
         dialog.show()
         styleChessDialog(dialog, 620f)
@@ -716,6 +728,7 @@ Checkmate your opponent's King.
         val isChessFullScreen = gameType == "CHESS"
         val metrics = resources.displayMetrics
         if (isChessFullScreen) {
+            hideChessBoardWhileDialogIsOpen()
             dialog.window?.let { window ->
                 window.setBackgroundDrawable(ColorDrawable(Color.parseColor("#0B1D25")))
                 window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
@@ -780,7 +793,20 @@ Checkmate your opponent's King.
         }
     }
 
+    private fun hideChessBoardWhileDialogIsOpen() {
+        if (gameType == "CHESS") {
+            gameContainer.visibility = View.INVISIBLE
+        }
+    }
+
+    private fun showChessBoardAfterDialog() {
+        if (gameType == "CHESS") {
+            gameContainer.visibility = View.VISIBLE
+        }
+    }
+
     private fun startGame(restoring: PausedMatchStore.Match? = null) {
+        showChessBoardAfterDialog()
         matchStarted = true
         resultRecorded = false
         interstitialAd = null
@@ -1354,6 +1380,7 @@ Checkmate your opponent's King.
     }
 
     private fun showChessGameplayMenu(inProgress: Boolean) {
+        hideChessBoardWhileDialogIsOpen()
         val choices = mutableListOf(
             ChessChoiceView.Choice(
                 "New Game",
@@ -1412,7 +1439,10 @@ Checkmate your opponent's King.
         dialog.setContentView(view)
         dialog.setCanceledOnTouchOutside(true)
         dialog.setOnDismissListener { clearChessDialogBlur() }
-        dialog.setOnCancelListener { clearChessDialogBlur() }
+        dialog.setOnCancelListener {
+            clearChessDialogBlur()
+            showChessBoardAfterDialog()
+        }
         view.onChoiceSelected = { which ->
             dialog.dismiss()
             actions.getOrNull(which)?.invoke()
@@ -1422,6 +1452,7 @@ Checkmate your opponent's King.
     }
 
     private fun showChessForfeitDialog() {
+        hideChessBoardWhileDialogIsOpen()
         val view = ChessChoiceView(
             this,
             title = "Forfeit Match?",
@@ -1446,12 +1477,17 @@ Checkmate your opponent's King.
         dialog.setContentView(view)
         dialog.setCanceledOnTouchOutside(true)
         dialog.setOnDismissListener { clearChessDialogBlur() }
-        dialog.setOnCancelListener { clearChessDialogBlur() }
+        dialog.setOnCancelListener {
+            clearChessDialogBlur()
+            showChessBoardAfterDialog()
+        }
         view.onChoiceSelected = { which ->
             dialog.dismiss()
             if (which == 1) {
                 if (vsAI) SettingsManager.recordForfeit(this)
                 showModeDialog()
+            } else {
+                showChessBoardAfterDialog()
             }
         }
         dialog.show()
@@ -1489,6 +1525,7 @@ Checkmate your opponent's King.
     }
 
     private fun showStyledDifficultyDialog(current: Int, setDiff: (Int) -> Unit) {
+        hideChessBoardWhileDialogIsOpen()
         val levels = listOf(
             ChessChoiceView.Choice(
                 "Easy",
@@ -1521,13 +1558,18 @@ Checkmate your opponent's King.
         dialog.setContentView(view)
         dialog.setCanceledOnTouchOutside(true)
         dialog.setOnDismissListener { clearChessDialogBlur() }
-        dialog.setOnCancelListener { clearChessDialogBlur() }
+        dialog.setOnCancelListener {
+            clearChessDialogBlur()
+            showChessBoardAfterDialog()
+        }
         view.onChoiceSelected = { which ->
             val changed = which != current
             setDiff(which)
             dialog.dismiss()
             if (changed && gameState.status == GameStatus.IN_PROGRESS && moveHistory.isNotEmpty()) {
                 showChessRestartDialog()
+            } else {
+                showChessBoardAfterDialog()
             }
         }
         dialog.show()
@@ -1546,6 +1588,7 @@ Checkmate your opponent's King.
     }
 
     private fun showChessRestartDialog() {
+        hideChessBoardWhileDialogIsOpen()
         val view = ChessChoiceView(
             this,
             title = "Restart Match?",
@@ -1570,10 +1613,13 @@ Checkmate your opponent's King.
         dialog.setContentView(view)
         dialog.setCanceledOnTouchOutside(true)
         dialog.setOnDismissListener { clearChessDialogBlur() }
-        dialog.setOnCancelListener { clearChessDialogBlur() }
+        dialog.setOnCancelListener {
+            clearChessDialogBlur()
+            showChessBoardAfterDialog()
+        }
         view.onChoiceSelected = { which ->
             dialog.dismiss()
-            if (which == 1) startGame()
+            if (which == 1) startGame() else showChessBoardAfterDialog()
         }
         dialog.show()
         styleChessDialog(dialog, 470f)
@@ -1647,6 +1693,7 @@ Checkmate your opponent's King.
     }
 
     private fun showChessResultDialog(message: String, resultLabel: String) {
+        hideChessBoardWhileDialogIsOpen()
         val choices = mutableListOf(
             ChessChoiceView.Choice(
                 "Play Again",
@@ -1681,7 +1728,10 @@ Checkmate your opponent's King.
         dialog.setContentView(view)
         dialog.setCanceledOnTouchOutside(true)
         dialog.setOnDismissListener { clearChessDialogBlur() }
-        dialog.setOnCancelListener { clearChessDialogBlur() }
+        dialog.setOnCancelListener {
+            clearChessDialogBlur()
+            showChessBoardAfterDialog()
+        }
         view.onChoiceSelected = { which ->
             dialog.dismiss()
             when (which) {
