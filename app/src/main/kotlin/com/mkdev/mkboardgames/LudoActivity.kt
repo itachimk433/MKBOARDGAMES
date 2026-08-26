@@ -1,7 +1,6 @@
 package com.mkdev.mkboardgames
 
 import android.app.Dialog
-import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
 import android.os.Handler
@@ -1756,14 +1755,12 @@ class LudoActivity : AppCompatActivity() {
             listOf(
                 StyledDialogs.choice("New Match", "Roll into another game", "↻", "#E3B86A"),
                 StyledDialogs.choice("Main Menu", "Choose another game", "⌂", "#E58A7A"),
-                StyledDialogs.choice("Watch Replay", "Review the moves", "▶", "#A9B6E8"),
             ), 620f, "L U D O", onCancel = { showBoardAfterDialog() }) { which, dialog ->
                 dialog.dismiss()
                 resultDialogVisible = false
                 when (which) {
                     0 -> startGame()
                     1 -> finish()
-                    2 -> launchReplay(result)
                 }
             }.setOnDismissListener { resultDialogVisible = false }
     }
@@ -1786,12 +1783,4 @@ class LudoActivity : AppCompatActivity() {
         recoverInterruptedGameplay()
     }
 
-    private fun launchReplay(result: String) {
-        showBoardAfterDialog()
-        startActivity(Intent(this, ReplayActivity::class.java).apply {
-            putExtra(ReplayActivity.EXTRA_GAME_TYPE, "LUDO")
-            putExtra(ReplayActivity.EXTRA_MOVES_JSON, ReplayActivity.buildMovesJson(moves))
-            putExtra(ReplayActivity.EXTRA_RESULT, result)
-        })
-    }
 }
