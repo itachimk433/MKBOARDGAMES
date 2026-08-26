@@ -72,6 +72,9 @@ class LudoActivity : AppCompatActivity() {
     private var matchStarted = false
     private var ludoResultRecorded = false
     private var rolledValue = 0
+    private var pendingRollValue = 0
+    private var pendingRollDirection = MotionDiceDirection.UP
+    private var pendingRollIsReroll = false
     private var pendingMove: Move? = null
     private var resultDialogVisible = false
     private var celebrationMessage: String? = null
@@ -344,6 +347,10 @@ class LudoActivity : AppCompatActivity() {
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
+        if (matchStarted && state.status == GameStatus.IN_PROGRESS && diceRollInProgress()) {
+            Toast.makeText(this, "Wait for the dice to stop rolling", Toast.LENGTH_SHORT).show()
+            return
+        }
         if (state.status == GameStatus.IN_PROGRESS && moves.isNotEmpty()) {
             hideBoardWhileDialogIsOpen()
             StyledDialogs.showChoices(this, "Leave Match?", "Leaving counts as a forfeit.",
@@ -441,6 +448,10 @@ class LudoActivity : AppCompatActivity() {
         resultDialogVisible = false
         ludoResultRecorded = false
         rolledValue = 0
+        pendingRollValue = 0
+        pendingRollDirection = MotionDiceDirection.UP
+        pendingRollIsReroll = false
+        pendingMove = null
         celebrationMessage = null
         celebrationGeneration++
         matchStarted = true
@@ -472,6 +483,8 @@ class LudoActivity : AppCompatActivity() {
         if (!gameplayActive() ||
             state.status != GameStatus.IN_PROGRESS ||
             (rolledValue != 0 && !isReroll) ||
+            pendingRollValue != 0 ||
+            diceView.isRolling ||
             boardView.isLocked
         ) return
 
@@ -479,46 +492,65 @@ class LudoActivity : AppCompatActivity() {
         if (isAiTurn() && irregularMode && !isReroll) aiPrepareTurn(player)
 
         val nextValue = Random.nextInt(1, 7)
+        beginDiceRoll(nextValue, motionDirection, isReroll)
+    }
+
+    /**
+     * Choose the result before starting the animation. The value remains in
+     * pendingRollValue until the animation commits it to the game state, so
+     * leaving the app cannot turn one roll into a new random roll.
+     */
+    private fun beginDiceRoll(
+        nextValue: Int,
+        motionDirection: MotionDiceDirection,
+        isReroll: Boolean,
+    ) {
+        pendingRollValue = nextValue.coerceIn(1, 6)
+        pendingRollDirection = motionDirection
+        pendingRollIsReroll = isReroll
         SoundPlayer.playMovement("ludo_dice")
-        diceView.rollTo(nextValue, motionDirection) {
+        diceView.rollTo(pendingRollValue, motionDirection) {
             if (!gameplayActive()) return@rollTo
+            val completedValue = pendingRollValue
+            if (completedValue == 0) return@rollTo
+            pendingRollValue = 0
             val previousRolledValue = rolledValue
-            rolledValue = nextValue
+            rolledValue = completedValue
             val storedSixStreak =
                 (state.metadata[LudoSetup.SIX_STREAK_METADATA] as? Int ?: 0).coerceAtLeast(0)
-            val previousSixStreak = if (isReroll && previousRolledValue == 6) {
+            val previousSixStreak = if (pendingRollIsReroll && previousRolledValue == 6) {
                 (storedSixStreak - 1).coerceAtLeast(0)
             } else {
                 storedSixStreak
             }
-            val sixStreak = if (nextValue == 6) previousSixStreak + 1 else 0
+            val sixStreak = if (completedValue == 6) previousSixStreak + 1 else 0
             state = state.copy(
                 metadata = state.metadata + mapOf(
-                    "ludo_dice" to nextValue,
+                    "ludo_dice" to completedValue,
                     LudoSetup.SIX_STREAK_METADATA to sixStreak,
-                    "ludo_rerolled" to isReroll,
+                    "ludo_rerolled" to pendingRollIsReroll,
                 )
             )
-            val legal = engine.legalMovesForDice(state, player, nextValue)
+            val legal = engine.legalMovesForDice(state, player, completedValue)
             boardView.gameState = state
             boardView.legalMoves = legal
             updateHud()
-            if (isAiTurn() && irregularMode && aiShouldReroll(player, nextValue, legal)) {
+            if (isAiTurn() && irregularMode && aiShouldReroll(player, completedValue, legal)) {
                 consumeAbility(player, LudoAbility.REROLL)
                 showFloatingNotification(
-                    "${LudoSetup.PLAYER_NAMES[player]} used 🎲 Reroll\nRolled $nextValue → next roll",
+                    "${LudoSetup.PLAYER_NAMES[player]} used 🎲 Reroll\nRolled $completedValue → next roll",
                     player,
                 )
                 postGameplay(380L) { rollDice(MotionDiceDirection.UP, true) }
                 return@rollTo
             }
             val preparedMoves = if (isAiTurn() && irregularMode) {
-                aiMaybeUseExtraMove(player, nextValue, legal)
+                aiMaybeUseExtraMove(player, completedValue, legal)
             } else {
                 legal
             }
             if (preparedMoves.isEmpty()) {
-                if (nextValue == 6 && sixStreak >= 3) {
+                if (completedValue == 6 && sixStreak >= 3) {
                     showHudMessage("THREE SIXES — turn forfeited")
                     Toast.makeText(this, "Three sixes — turn forfeited", Toast.LENGTH_SHORT).show()
                     postGameplay(760L) { finishTurnAfterNoMove() }
@@ -1603,6 +1635,17 @@ class LudoActivity : AppCompatActivity() {
 
         resumeHudMessageTimeout()
 
+        val interruptedRoll = pendingRollValue
+        if (interruptedRoll != 0) {
+            boardView.legalMoves = emptyList()
+            postGameplay(0L) {
+                if (pendingRollValue == interruptedRoll && !diceView.isRolling) {
+                    beginDiceRoll(interruptedRoll, pendingRollDirection, pendingRollIsReroll)
+                }
+            }
+            return
+        }
+
         val interruptedMove = pendingMove
         if (interruptedMove != null) {
             boardView.legalMoves = emptyList()
@@ -1717,6 +1760,9 @@ class LudoActivity : AppCompatActivity() {
 
     private fun gameplayActive(): Boolean =
         lifecycleActive && !dialogOpen && !isFinishing
+
+    private fun diceRollInProgress(): Boolean =
+        pendingRollValue != 0 || (::diceView.isInitialized && diceView.isRolling)
 
     private fun showResultDialog() {
         if (state.status == GameStatus.IN_PROGRESS || resultDialogVisible) return
