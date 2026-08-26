@@ -54,6 +54,7 @@ class ConnectFourActivity : AppCompatActivity() {
         root.addView(scoreView, LinearLayout.LayoutParams(-1, (48 * dp).toInt()))
         AdManager.attachBanner(root)
         setContentView(root)
+        hideBoardWhileDialogIsOpen()
         @Suppress("DEPRECATION")
         window.decorView.setOnSystemUiVisibilityChangeListener { vis ->
             if (vis and View.SYSTEM_UI_FLAG_FULLSCREEN == 0) {
@@ -84,13 +85,14 @@ class ConnectFourActivity : AppCompatActivity() {
             @Suppress("DEPRECATION") super.onBackPressed()
             return
         }
+        hideBoardWhileDialogIsOpen()
         StyledDialogs.showChoices(this, "Leave Match?",
             "Pause to resume later, or leave to forfeit this game.",
             listOf(
                 StyledDialogs.choice("Pause & Exit", "Save and resume later", "Ⅱ", "#E3B86A"),
                 StyledDialogs.choice("Leave Match", "Forfeit this game", "⚑", "#E58A7A"),
                 StyledDialogs.choice("Keep Playing", "Return to the board", "↩", "#A9B6E8"),
-            ), 520f, "C O N N E C T · F O U R") { which, dialog ->
+            ), 520f, "C O N N E C T · F O U R", onCancel = { showBoardAfterDialog() }) { which, dialog ->
                 dialog.dismiss()
                 when (which) {
                     0 -> pauseMatchAndExit()
@@ -99,6 +101,7 @@ class ConnectFourActivity : AppCompatActivity() {
                         if (vsAI) SettingsManager.recordForfeit(this)
                         @Suppress("DEPRECATION") super.onBackPressed()
                     }
+                    2 -> showBoardAfterDialog()
                 }
             }
     }
@@ -127,6 +130,7 @@ class ConnectFourActivity : AppCompatActivity() {
     }
 
     private fun showModeDialog() {
+        hideBoardWhileDialogIsOpen()
         val paused = PausedMatchStore.has(this, "CONNECT_FOUR")
         val options = buildList {
             if (paused) add("Resume Match")
@@ -142,7 +146,9 @@ class ConnectFourActivity : AppCompatActivity() {
                     "2 Players" -> StyledDialogs.choice(item, "Share the board locally", "●", "#A9B6E8")
                     else -> StyledDialogs.choice(item, "Review the essentials", "?", "#E58A7A")
                 }
-            }, 520f, "C O N N E C T · F O U R", onCancel = { if (!matchStarted) finish() }) { which, dialog ->
+            }, 520f, "C O N N E C T · F O U R", onCancel = {
+                if (!matchStarted) finish() else showBoardAfterDialog()
+            }) { which, dialog ->
                 dialog.dismiss()
                 when (options[which]) {
                     "Resume Match" -> resumePausedMatch()
@@ -154,6 +160,7 @@ class ConnectFourActivity : AppCompatActivity() {
     }
 
     private fun showColorPickerDialog() {
+        hideBoardWhileDialogIsOpen()
         StyledDialogs.showChoices(this, "Play As", "Choose your side before the first move.",
             listOf(
                 StyledDialogs.choice("Red", "Moves first", "●", "#E3B86A"),
@@ -166,6 +173,7 @@ class ConnectFourActivity : AppCompatActivity() {
     }
 
     private fun showRules(showModeAfter: Boolean) {
+        hideBoardWhileDialogIsOpen()
         val tv = android.widget.TextView(this).apply {
             setTextColor(Color.parseColor("#E0E0E0"))
             textSize = 14f
@@ -196,11 +204,12 @@ Control the centre columns, build threats in more than one direction, and block 
             "How to Play Connect Four",
             tv.text.toString(),
             "C O N N E C T · F O U R",
-            onDone = { if (showModeAfter) showModeDialog() },
+            onDone = { if (showModeAfter) showModeDialog() else showBoardAfterDialog() },
         )
     }
 
     private fun startGame(restoring: PausedMatchStore.Match? = null) {
+        showBoardAfterDialog()
         matchStarted = true
         resultRecorded = false
         interstitialAd = null
@@ -369,6 +378,7 @@ Control the centre columns, build threats in more than one direction, and block 
     }
 
     fun onMenuClicked() {
+        hideBoardWhileDialogIsOpen()
         val inProgress = gameState.status == GameStatus.IN_PROGRESS && moveHistory.isNotEmpty()
         val items = mutableListOf("New Game", "How to Play")
         if (vsAI) items.add("AI Difficulty")
@@ -381,7 +391,7 @@ Control the centre columns, build threats in more than one direction, and block 
                     "AI Difficulty" -> StyledDialogs.choice(item, "Adjust the challenge", "●", "#8EC7B9")
                     else -> StyledDialogs.choice(item, if (inProgress) "Leave this match" else "Choose another game", "⌂", "#E58A7A")
                 }
-            }, 520f, "C O N N E C T · F O U R") { which, menu ->
+            }, 520f, "C O N N E C T · F O U R", onCancel = { showBoardAfterDialog() }) { which, menu ->
             menu.dismiss()
             when (items[which]) {
                 "New Game" -> if (inProgress) {
@@ -389,12 +399,12 @@ Control the centre columns, build threats in more than one direction, and block 
                         listOf(
                             StyledDialogs.choice("Forfeit & New Game", "Start over now", "↻", "#E58A7A"),
                             StyledDialogs.choice("Cancel", "Keep the current match", "↩", "#A9B6E8"),
-                        ), 420f, "C O N N E C T · F O U R") { selected, confirm ->
+                        ), 420f, "C O N N E C T · F O U R", onCancel = { showBoardAfterDialog() }) { selected, confirm ->
                             confirm.dismiss()
                             if (selected == 0) {
                                 if (vsAI) SettingsManager.recordForfeit(this)
                                 showModeDialog()
-                            }
+                            } else showBoardAfterDialog()
                         }
                 } else showModeDialog()
                 "How to Play" -> showRules(false)
@@ -405,11 +415,12 @@ Control the centre columns, build threats in more than one direction, and block 
                             StyledDialogs.choice("Pause & Exit", "Save and resume later", "Ⅱ", "#E3B86A"),
                             StyledDialogs.choice("Leave Match", "Forfeit this game", "⚑", "#E58A7A"),
                             StyledDialogs.choice("Keep Playing", "Return to the board", "↩", "#A9B6E8"),
-                        ), 520f, "C O N N E C T · F O U R") { selected, leave ->
+                        ), 520f, "C O N N E C T · F O U R", onCancel = { showBoardAfterDialog() }) { selected, leave ->
                             leave.dismiss()
                             when (selected) {
                                 0 -> pauseMatchAndExit()
                                 1 -> { clearPausedMatch(); if (vsAI) SettingsManager.recordForfeit(this); finish() }
+                                2 -> showBoardAfterDialog()
                             }
                         }
                 } else {
@@ -421,12 +432,13 @@ Control the centre columns, build threats in more than one direction, and block 
     }
 
     private fun showDifficultyDialog() {
+        hideBoardWhileDialogIsOpen()
         val labels = arrayOf("Easy", "Medium", "Hard")
         val current = SettingsManager.getConnectFourDifficulty(this)
         StyledDialogs.showChoices(this, "AI Difficulty", "Adjust the challenge.",
             labels.mapIndexed { index, label ->
                 StyledDialogs.choice(label, if (index == current) "Current setting" else "Computer strength", listOf("I", "II", "III")[index], listOf("#8EC7B9", "#E3B86A", "#E58A7A")[index])
-            }, 520f, "C O N N E C T · F O U R") { which, dialog ->
+            }, 520f, "C O N N E C T · F O U R", onCancel = { showBoardAfterDialog() }) { which, dialog ->
                 dialog.dismiss()
                 val changed = which != current
                 SettingsManager.setConnectFourDifficulty(this, which)
@@ -435,16 +447,17 @@ Control the centre columns, build threats in more than one direction, and block 
                         listOf(
                             StyledDialogs.choice("Restart", "Start with the new difficulty", "↻", "#E3B86A"),
                             StyledDialogs.choice("Keep Playing", "Leave the current match unchanged", "↩", "#A9B6E8"),
-                        ), 420f, "C O N N E C T · F O U R") { restart, restartDialog ->
+                        ), 420f, "C O N N E C T · F O U R", onCancel = { showBoardAfterDialog() }) { restart, restartDialog ->
                             restartDialog.dismiss()
-                            if (restart == 0) startGame()
+                            if (restart == 0) startGame() else showBoardAfterDialog()
                         }
-                }
+                } else showBoardAfterDialog()
             }
     }
 
     private fun showResultDialog() {
         if (gameState.status == GameStatus.IN_PROGRESS) return
+        hideBoardWhileDialogIsOpen()
         val message = when (gameState.status) {
             GameStatus.WHITE_WINS -> if (vsAI && playerColor == PieceColor.WHITE) "You win!" else "Red wins!"
             GameStatus.BLACK_WINS -> if (vsAI && playerColor == PieceColor.BLACK) "You win!" else "Yellow wins!"
@@ -461,7 +474,7 @@ Control the centre columns, build threats in more than one direction, and block 
                 StyledDialogs.choice("Play Again", "Start a fresh game", "↻", "#E3B86A"),
                 StyledDialogs.choice("Main Menu", "Choose another match", "⌂", "#E58A7A"),
                 StyledDialogs.choice("Watch Replay", "Review the moves", "▶", "#A9B6E8"),
-            ), 520f, "C O N N E C T · F O U R") { which, dialog ->
+            ), 520f, "C O N N E C T · F O U R", onCancel = { showBoardAfterDialog() }) { which, dialog ->
                 dialog.dismiss()
                 when (which) {
                     0 -> startGame()
@@ -473,6 +486,14 @@ Control the centre columns, build threats in more than one direction, and block 
                     })
                 }
             }
+    }
+
+    private fun hideBoardWhileDialogIsOpen() {
+        boardView.visibility = View.INVISIBLE
+    }
+
+    private fun showBoardAfterDialog() {
+        boardView.visibility = View.VISIBLE
     }
 
     inner class ConnectBoardView(ctx: Context) : View(ctx) {
