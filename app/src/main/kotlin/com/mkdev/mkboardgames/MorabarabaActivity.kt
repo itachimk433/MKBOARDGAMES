@@ -16,6 +16,7 @@ import com.mkdev.mkboardgames.ui.CaptureStripView
 import com.mkdev.mkboardgames.ui.ChessChoiceView
 import com.mkdev.mkboardgames.ui.ChessRulesView
 import com.mkdev.mkboardgames.ui.MorabaraBoardView
+import com.mkdev.mkboardgames.ui.isFullScreenStyledGameLabel
 import kotlinx.coroutines.*
 
 class MorabarabaActivity : AppCompatActivity() {
@@ -78,6 +79,7 @@ class MorabarabaActivity : AppCompatActivity() {
 
         AdManager.attachBanner(root)
         setContentView(root)
+        hideBoardWhileDialogIsOpen()
         showModeDialog()
     }
 
@@ -182,12 +184,15 @@ class MorabarabaActivity : AppCompatActivity() {
             choices = choices,
             gameLabel = "M O R A B A R A B A",
         )
+        hideBoardWhileDialogIsOpen()
         val dialog = Dialog(this)
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
         dialog.setContentView(view)
         dialog.setCanceledOnTouchOutside(true)
         dialog.setOnCancelListener {
-            onCancel?.invoke()
+            onCancel?.invoke() ?: run {
+                if (matchStarted) showBoardAfterDialog() else finish()
+            }
         }
         view.onChoiceSelected = { which ->
             dialog.dismiss()
@@ -199,6 +204,20 @@ class MorabarabaActivity : AppCompatActivity() {
 
     private fun styleMorabarabaDialog(dialog: Dialog, heightDp: Float) {
         val metrics = resources.displayMetrics
+        if (isFullScreenStyledGameLabel("M O R A B A R A B A")) {
+            dialog.window?.let { window ->
+                window.setBackgroundDrawable(ColorDrawable(Color.parseColor("#0B1D25")))
+                window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+                window.setWindowAnimations(0)
+                window.decorView.setPadding(0, 0, 0, 0)
+                window.setGravity(Gravity.CENTER)
+                window.setLayout(
+                    WindowManager.LayoutParams.MATCH_PARENT,
+                    WindowManager.LayoutParams.MATCH_PARENT,
+                )
+            }
+            return
+        }
         val horizontalMargin = (24f * metrics.density).toInt()
         val maxWidth = (420f * metrics.density).toInt()
         val width = minOf(metrics.widthPixels - horizontalMargin * 2, maxWidth)
@@ -236,6 +255,7 @@ class MorabarabaActivity : AppCompatActivity() {
     }
 
     private fun startGame(restoring: PausedMatchStore.Match? = null) {
+        showBoardAfterDialog()
         matchStarted = true
         resultRecorded = false
         interstitialAd = null
@@ -486,7 +506,7 @@ class MorabarabaActivity : AppCompatActivity() {
                 ChessChoiceView.Choice("Forfeit & New Game", "Start a fresh match", "↻", Color.parseColor("#E58A7A")),
             ),
             listOf(
-                {},
+                { showBoardAfterDialog() },
                 {
                     if (vsAI) SettingsManager.recordForfeit(this)
                     showModeDialog()
@@ -509,7 +529,7 @@ class MorabarabaActivity : AppCompatActivity() {
                 SettingsManager.setMorabarabaDifficulty(this, which)
                 if (changed && gameState.status == GameStatus.IN_PROGRESS && moveHistory.isNotEmpty()) {
                     showRestartDialog()
-                }
+                } else showBoardAfterDialog()
             }
         }, 520f)
     }
@@ -522,7 +542,7 @@ class MorabarabaActivity : AppCompatActivity() {
                 ChessChoiceView.Choice("Keep Playing", "Continue this match", "↩", Color.parseColor("#A9B6E8")),
                 ChessChoiceView.Choice("Restart", "Start with the new difficulty", "↻", Color.parseColor("#E3B86A")),
             ),
-            listOf({}, { showModeDialog() }),
+            listOf({ showBoardAfterDialog() }, { showModeDialog() }),
             470f,
         )
     }
@@ -618,6 +638,7 @@ class MorabarabaActivity : AppCompatActivity() {
     // ─── Tutorial ────────────────────────────────────────────────────────────
 
     private fun showTutorial(showModeAfter: Boolean = false) {
+        hideBoardWhileDialogIsOpen()
         val rulesText = """
 MORABARABA — Rules
 
@@ -658,13 +679,23 @@ You win by either:
         val view = ChessRulesView(this, "Morabaraba", rulesText, "M O R A B A R A B A")
         dialog.setContentView(view)
         dialog.setCanceledOnTouchOutside(true)
-        dialog.setOnCancelListener { if (showModeAfter) showModeDialog() }
+        dialog.setOnCancelListener {
+            if (showModeAfter) showModeDialog() else showBoardAfterDialog()
+        }
         view.onDone = {
             dialog.dismiss()
-            if (showModeAfter) showModeDialog()
+            if (showModeAfter) showModeDialog() else showBoardAfterDialog()
         }
         dialog.show()
         styleMorabarabaDialog(dialog, 620f)
+    }
+
+    private fun hideBoardWhileDialogIsOpen() {
+        boardView.visibility = View.INVISIBLE
+    }
+
+    private fun showBoardAfterDialog() {
+        boardView.visibility = View.VISIBLE
     }
 
     private fun makeFullscreen() {

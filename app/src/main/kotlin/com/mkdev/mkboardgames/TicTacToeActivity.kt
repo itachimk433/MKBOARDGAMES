@@ -64,6 +64,7 @@ class TicTacToeActivity : AppCompatActivity() {
 
         AdManager.attachBanner(root)
         setContentView(root)
+        hideBoardWhileDialogIsOpen()
 
         @Suppress("DEPRECATION")
         window.decorView.setOnSystemUiVisibilityChangeListener { vis ->
@@ -90,13 +91,14 @@ class TicTacToeActivity : AppCompatActivity() {
         if (!matchStarted || gameState.status != GameStatus.IN_PROGRESS) {
             @Suppress("DEPRECATION") super.onBackPressed(); return
         }
+        hideBoardWhileDialogIsOpen()
         StyledDialogs.showChoices(this, "Leave Match?",
             "Pause to resume later, or leave to forfeit this game.",
             listOf(
                 StyledDialogs.choice("Pause & Exit", "Save and resume later", "Ⅱ", "#E3B86A"),
                 StyledDialogs.choice("Leave Match", "Forfeit this game", "⚑", "#E58A7A"),
                 StyledDialogs.choice("Keep Playing", "Return to the board", "↩", "#A9B6E8"),
-            ), 520f, "T I C · T A C · T O E") { which, dialog ->
+            ), 520f, "T I C · T A C · T O E", onCancel = { showBoardAfterDialog() }) { which, dialog ->
             dialog.dismiss()
             when (which) {
                 0 -> pauseMatchAndExit()
@@ -105,6 +107,7 @@ class TicTacToeActivity : AppCompatActivity() {
                     if (vsAI) SettingsManager.recordForfeit(this)
                     @Suppress("DEPRECATION") super.onBackPressed()
                 }
+                2 -> showBoardAfterDialog()
             }
         }
     }
@@ -137,6 +140,7 @@ class TicTacToeActivity : AppCompatActivity() {
     // ─── Dialogs ──────────────────────────────────────────────────────────────
 
     private fun showModeDialog() {
+        hideBoardWhileDialogIsOpen()
         val paused = PausedMatchStore.has(this, "TICTACTOE")
         val options = buildList {
             if (paused) add("Resume Match")
@@ -152,7 +156,9 @@ class TicTacToeActivity : AppCompatActivity() {
                     "2 Players" -> StyledDialogs.choice(item, "Share the board locally", "♙", "#A9B6E8")
                     else -> StyledDialogs.choice(item, "Review the essentials", "?", "#E58A7A")
                 }
-            }, 520f, "T I C · T A C · T O E", onCancel = { if (!matchStarted) finish() }) { which, dialog ->
+            }, 520f, "T I C · T A C · T O E", onCancel = {
+                if (!matchStarted) finish() else showBoardAfterDialog()
+            }) { which, dialog ->
             dialog.dismiss()
             when (options[which]) {
                 "Resume Match" -> resumePausedMatch()
@@ -164,6 +170,7 @@ class TicTacToeActivity : AppCompatActivity() {
     }
 
     private fun showBoardSizeDialog(fromMode: Boolean) {
+        hideBoardWhileDialogIsOpen()
         val sizeLabels = arrayOf(
             "3×3 — Classic  (3 in a row)",
             "4×4 — Medium   (4 in a row)",
@@ -190,6 +197,7 @@ class TicTacToeActivity : AppCompatActivity() {
     }
 
     private fun showColorPickerDialog() {
+        hideBoardWhileDialogIsOpen()
         StyledDialogs.showChoices(this, "Play As", "Choose your side before the first move.",
             listOf(
                 StyledDialogs.choice("X", "Goes first", "X", "#E3B86A"),
@@ -202,6 +210,7 @@ class TicTacToeActivity : AppCompatActivity() {
     }
 
     private fun showRules(showModeAfter: Boolean = false) {
+        hideBoardWhileDialogIsOpen()
         val dp = resources.displayMetrics.density
         val tv = android.widget.TextView(this).apply {
             setTextColor(Color.parseColor("#E0E0E0"))
@@ -254,6 +263,7 @@ Strategy
     // ─── Game flow ────────────────────────────────────────────────────────────
 
     private fun startGame(restoring: PausedMatchStore.Match? = null) {
+        showBoardAfterDialog()
         matchStarted = true
         resultRecorded = false
         interstitialAd = null
@@ -422,6 +432,7 @@ Strategy
     }
 
     fun onMenuClicked() {
+        hideBoardWhileDialogIsOpen()
         val inProgress = gameState.status == GameStatus.IN_PROGRESS && moveHistory.isNotEmpty()
         val items = mutableListOf("New Game", "How to Play")
         if (vsAI) items.add("AI Difficulty")
@@ -434,7 +445,7 @@ Strategy
                     "AI Difficulty" -> StyledDialogs.choice(item, "Adjust the challenge", "♞", "#8EC7B9")
                     else -> StyledDialogs.choice(item, if (inProgress) "Leave this match" else "Choose another game", "⌂", "#E58A7A")
                 }
-            }, 520f, "T I C · T A C · T O E") { which, dialog ->
+            }, 520f, "T I C · T A C · T O E", onCancel = { showBoardAfterDialog() }) { which, dialog ->
                 dialog.dismiss()
                 when (items[which]) {
                     "New Game" -> if (inProgress) {
@@ -442,12 +453,12 @@ Strategy
                             listOf(
                                 StyledDialogs.choice("Forfeit & New Game", "Start over now", "↻", "#E58A7A"),
                                 StyledDialogs.choice("Cancel", "Keep the current match", "↩", "#A9B6E8"),
-                            ), 420f, "T I C · T A C · T O E") { selected, confirm ->
+                            ), 420f, "T I C · T A C · T O E", onCancel = { showBoardAfterDialog() }) { selected, confirm ->
                                 confirm.dismiss()
                                 if (selected == 0) {
                                     if (vsAI) SettingsManager.recordForfeit(this)
                                     showModeDialog()
-                                }
+                                } else showBoardAfterDialog()
                             }
                     } else showModeDialog()
                     "How to Play" -> showRules(showModeAfter = false)
@@ -457,9 +468,10 @@ Strategy
                         StyledDialogs.showChoices(this, "AI Difficulty", "Adjust the challenge.",
                             diffs.mapIndexed { index, label ->
                                 StyledDialogs.choice(label, if (index == current) "Current setting" else "Computer strength", listOf("I", "II", "III")[index], listOf("#8EC7B9", "#E3B86A", "#E58A7A")[index])
-                            }, 520f, "T I C · T A C · T O E") { selected, difficulty ->
+                            }, 520f, "T I C · T A C · T O E", onCancel = { showBoardAfterDialog() }) { selected, difficulty ->
                                 difficulty.dismiss()
                                 SettingsManager.setTttDifficulty(this, selected)
+                                showBoardAfterDialog()
                             }
                     }
                     "Main Menu" -> if (inProgress) {
@@ -468,11 +480,12 @@ Strategy
                                 StyledDialogs.choice("Pause & Exit", "Save and resume later", "Ⅱ", "#E3B86A"),
                                 StyledDialogs.choice("Leave Match", "Forfeit this game", "⚑", "#E58A7A"),
                                 StyledDialogs.choice("Keep Playing", "Return to the board", "↩", "#A9B6E8"),
-                            ), 520f, "T I C · T A C · T O E") { selected, leave ->
+                            ), 520f, "T I C · T A C · T O E", onCancel = { showBoardAfterDialog() }) { selected, leave ->
                                 leave.dismiss()
                                 when (selected) {
                                     0 -> pauseMatchAndExit()
                                     1 -> { clearPausedMatch(); if (vsAI) SettingsManager.recordForfeit(this); finish() }
+                                    2 -> showBoardAfterDialog()
                                 }
                             }
                     } else { clearPausedMatch(); finish() }
@@ -482,6 +495,7 @@ Strategy
 
     private fun showResultDialog() {
         if (gameState.status == GameStatus.IN_PROGRESS) return
+        hideBoardWhileDialogIsOpen()
         val msg = when (gameState.status) {
             GameStatus.WHITE_WINS ->
                 if (vsAI && playerColor == PieceColor.WHITE) "You win! 🎉" else "X wins!"
@@ -501,7 +515,7 @@ Strategy
                 StyledDialogs.choice("Play Again", "Start a fresh game", "↻", "#E3B86A"),
                 StyledDialogs.choice("Main Menu", "Choose another match", "⌂", "#E58A7A"),
                 StyledDialogs.choice("Watch Replay", "Review the moves", "▶", "#A9B6E8"),
-            ), 520f, "T I C · T A C · T O E") { which, dialog ->
+            ), 520f, "T I C · T A C · T O E", onCancel = { showBoardAfterDialog() }) { which, dialog ->
                 dialog.dismiss()
                 when (which) {
                     0 -> startGame()
@@ -509,6 +523,14 @@ Strategy
                     2 -> launchReplay(resultLabel)
                 }
             }
+    }
+
+    private fun hideBoardWhileDialogIsOpen() {
+        boardView.visibility = View.INVISIBLE
+    }
+
+    private fun showBoardAfterDialog() {
+        boardView.visibility = View.VISIBLE
     }
 
     private fun launchReplay(resultLabel: String) {

@@ -10,7 +10,7 @@ import android.view.animation.DecelerateInterpolator
 import com.mkdev.mkboardgames.SoundPlayer
 
 internal fun isFullScreenStyledGameLabel(gameLabel: String): Boolean =
-    gameLabel.replace(" ", "").uppercase() in setOf(
+    gameLabel.replace(" ", "").replace("·", "").uppercase() in setOf(
         "CHESS",
         "DRAUGHTS",
         "INTLDRAUGHTS",
@@ -19,6 +19,8 @@ internal fun isFullScreenStyledGameLabel(gameLabel: String): Boolean =
         "GO",
         "SHOGI",
         "XIANGQI",
+        "MORABARABA",
+        "TICTACTOE",
     )
 
 /**

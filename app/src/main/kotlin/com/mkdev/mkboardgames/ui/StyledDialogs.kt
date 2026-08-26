@@ -98,6 +98,21 @@ object StyledDialogs {
         dialog.setOnShowListener {
             val window = dialog.window ?: return@setOnShowListener
             val density = context.resources.displayMetrics.density
+            if (isFullScreenStyledGameLabel(gameLabel)) {
+                window.setBackgroundDrawable(ColorDrawable(Color.parseColor("#0B1D25")))
+                window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+                window.setWindowAnimations(0)
+                window.decorView.setPadding(0, 0, 0, 0)
+                window.setGravity(Gravity.CENTER)
+                window.setLayout(
+                    WindowManager.LayoutParams.MATCH_PARENT,
+                    WindowManager.LayoutParams.MATCH_PARENT,
+                )
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    window.clearFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+                }
+                return@setOnShowListener
+            }
             val margin = (24f * density).toInt()
             window.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
             window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
