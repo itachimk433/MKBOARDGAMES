@@ -1765,6 +1765,7 @@ Checkmate your opponent's King.
     }
 
     private fun launchReplay(resultLabel: String) {
+        showChessBoardAfterDialog()
         val movesJson = ReplayActivity.buildMovesJson(gameState.moveHistory)
         startActivity(Intent(this, ReplayActivity::class.java).apply {
             putExtra(ReplayActivity.EXTRA_GAME_TYPE,  gameType)

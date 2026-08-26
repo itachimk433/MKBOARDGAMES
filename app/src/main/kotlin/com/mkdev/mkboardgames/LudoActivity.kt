@@ -362,24 +362,24 @@ class LudoActivity : AppCompatActivity() {
                     0 -> {
                         vsAI = true
                         irregularMode = false
-                        showPlayerPicker()
                         dialog.dismiss()
+                        showPlayerPicker()
                     }
                     1 -> {
                         vsAI = true
                         irregularMode = true
-                        showPlayerPicker()
                         dialog.dismiss()
+                        showPlayerPicker()
                     }
                     2 -> {
                         vsAI = false
                         irregularMode = false
-                        startGame()
                         dialog.dismiss()
+                        startGame()
                     }
                     3 -> {
-                        showRules(true)
                         dialog.dismiss()
+                        showRules(true)
                     }
                 }
             }
@@ -392,8 +392,8 @@ class LudoActivity : AppCompatActivity() {
                 StyledDialogs.choice(name, if (index == 0) "Moves first" else "Joins the match", listOf("●", "●", "●", "●")[index], listOf("#E3B86A", "#E58A7A", "#8EC7B9", "#A9B6E8")[index])
             }, 520f, "L U D O", headerSymbol = "⚄", onCancel = { showModeDialog() }) { which, dialog ->
                 humanPlayer = which
-                startGame()
                 dialog.dismiss()
+                startGame()
             }
     }
 
@@ -1652,10 +1652,15 @@ class LudoActivity : AppCompatActivity() {
             listOf(
                 StyledDialogs.choice("New Match", "Roll into another game", "↻", "#E3B86A"),
                 StyledDialogs.choice("Main Menu", "Choose another game", "⌂", "#E58A7A"),
+                StyledDialogs.choice("Watch Replay", "Review the moves", "▶", "#A9B6E8"),
             ), 620f, "L U D O", onCancel = { showBoardAfterDialog() }) { which, dialog ->
                 dialog.dismiss()
                 resultDialogVisible = false
-                if (which == 0) startGame() else finish()
+                when (which) {
+                    0 -> startGame()
+                    1 -> finish()
+                    2 -> launchReplay(result)
+                }
             }.setOnDismissListener { resultDialogVisible = false }
     }
 
@@ -1665,5 +1670,14 @@ class LudoActivity : AppCompatActivity() {
 
     private fun showBoardAfterDialog() {
         boardView.visibility = View.VISIBLE
+    }
+
+    private fun launchReplay(result: String) {
+        showBoardAfterDialog()
+        startActivity(Intent(this, ReplayActivity::class.java).apply {
+            putExtra(ReplayActivity.EXTRA_GAME_TYPE, "LUDO")
+            putExtra(ReplayActivity.EXTRA_MOVES_JSON, ReplayActivity.buildMovesJson(moves))
+            putExtra(ReplayActivity.EXTRA_RESULT, result)
+        })
     }
 }

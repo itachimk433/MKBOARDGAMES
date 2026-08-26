@@ -534,6 +534,7 @@ Strategy
     }
 
     private fun launchReplay(resultLabel: String) {
+        showBoardAfterDialog()
         val movesJson = ReplayActivity.buildMovesJson(gameState.moveHistory)
         startActivity(Intent(this, ReplayActivity::class.java).apply {
             putExtra(ReplayActivity.EXTRA_GAME_TYPE,  "TICTACTOE")

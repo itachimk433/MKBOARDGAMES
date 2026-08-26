@@ -627,6 +627,7 @@ class MorabarabaActivity : AppCompatActivity() {
     // ─── Replay ───────────────────────────────────────────────────────────────
 
     private fun launchReplay(resultLabel: String) {
+        showBoardAfterDialog()
         val movesJson = ReplayActivity.buildMovesJson(gameState.moveHistory)
         startActivity(Intent(this, ReplayActivity::class.java).apply {
             putExtra(ReplayActivity.EXTRA_GAME_TYPE,  "MORABARABA")
@@ -679,12 +680,14 @@ You win by either:
         val view = ChessRulesView(this, "Morabaraba", rulesText, "M O R A B A R A B A")
         dialog.setContentView(view)
         dialog.setCanceledOnTouchOutside(true)
-        dialog.setOnCancelListener {
-            if (showModeAfter) showModeDialog() else showBoardAfterDialog()
+        dialog.setOnDismissListener {
+            if (!isFinishing) {
+                if (showModeAfter) showModeDialog() else showBoardAfterDialog()
+            }
         }
+        dialog.setOnCancelListener { }
         view.onDone = {
             dialog.dismiss()
-            if (showModeAfter) showModeDialog() else showBoardAfterDialog()
         }
         dialog.show()
         styleMorabarabaDialog(dialog, 620f)

@@ -479,11 +479,14 @@ Control the centre columns, build threats in more than one direction, and block 
                 when (which) {
                     0 -> startGame()
                     1 -> finish()
-                    2 -> startActivity(Intent(this, ReplayActivity::class.java).apply {
-                        putExtra(ReplayActivity.EXTRA_GAME_TYPE, "CONNECTFOUR")
-                        putExtra(ReplayActivity.EXTRA_MOVES_JSON, ReplayActivity.buildMovesJson(gameState.moveHistory))
-                        putExtra(ReplayActivity.EXTRA_RESULT, result)
-                    })
+                    2 -> {
+                        showBoardAfterDialog()
+                        startActivity(Intent(this, ReplayActivity::class.java).apply {
+                            putExtra(ReplayActivity.EXTRA_GAME_TYPE, "CONNECTFOUR")
+                            putExtra(ReplayActivity.EXTRA_MOVES_JSON, ReplayActivity.buildMovesJson(gameState.moveHistory))
+                            putExtra(ReplayActivity.EXTRA_RESULT, result)
+                        })
+                    }
                 }
             }
     }

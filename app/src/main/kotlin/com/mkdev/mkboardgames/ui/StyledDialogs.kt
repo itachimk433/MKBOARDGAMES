@@ -123,8 +123,10 @@ object StyledDialogs {
                 (620f * density).toInt(),
             )
         }
-        view.onDone = {
+        dialog.setOnDismissListener {
             onDone?.invoke()
+        }
+        view.onDone = {
             dialog.dismiss()
         }
         dialog.show()
