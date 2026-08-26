@@ -29,6 +29,7 @@ class MorabarabaActivity : AppCompatActivity() {
     private lateinit var hudView:           MorabarabaHudView
     private lateinit var topCaptureView:    CaptureStripView
     private lateinit var bottomCaptureView: CaptureStripView
+    private lateinit var gameRoot: View
     private var engine:                     MorabarabaRuleEngine = MorabarabaRuleEngine()
     private var gameState:                  GameState = GameState(arrayOfNulls(49), boardSize = 7)
     private var vsAI                        = true
@@ -78,6 +79,7 @@ class MorabarabaActivity : AppCompatActivity() {
         root.addView(bottomCaptureView, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, capH))
 
         AdManager.attachBanner(root)
+        gameRoot = root
         setContentView(root)
         hideBoardWhileDialogIsOpen()
         showModeDialog()
@@ -694,11 +696,11 @@ You win by either:
     }
 
     private fun hideBoardWhileDialogIsOpen() {
-        boardView.visibility = View.INVISIBLE
+        gameRoot.visibility = View.INVISIBLE
     }
 
     private fun showBoardAfterDialog() {
-        boardView.visibility = View.VISIBLE
+        gameRoot.visibility = View.VISIBLE
     }
 
     private fun makeFullscreen() {

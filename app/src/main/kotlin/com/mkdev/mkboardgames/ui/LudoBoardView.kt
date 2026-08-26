@@ -70,6 +70,7 @@ class LudoBoardView(context: Context) : View(context) {
     private var animatedProgress = 0f
     private var animatedSoundStep = -1
     private var moveAnimator: ValueAnimator? = null
+    private var moveGeneration = 0
     private var protectionPulse = 0f
     private val protectionPulseAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
         duration = 950L
@@ -108,14 +109,33 @@ class LudoBoardView(context: Context) : View(context) {
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
-        protectionPulseAnimator.start()
+        resumeAnimations()
     }
 
     override fun onDetachedFromWindow() {
-        cancelPendingLongPress()
-        protectionPulseAnimator.cancel()
-        moveAnimator?.cancel()
+        cancelAnimations()
         super.onDetachedFromWindow()
+    }
+
+    fun cancelAnimations() {
+        cancelPendingLongPress()
+        moveGeneration++
+        moveAnimator?.cancel()
+        moveAnimator = null
+        animatedMove = null
+        animatedPiece = null
+        animatedPath = emptyList()
+        animatedProgress = 0f
+        animatedSoundStep = -1
+        isLocked = false
+        protectionPulseAnimator.cancel()
+        invalidate()
+    }
+
+    fun resumeAnimations() {
+        if (isAttachedToWindow && !protectionPulseAnimator.isStarted) {
+            protectionPulseAnimator.start()
+        }
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
@@ -470,6 +490,7 @@ class LudoBoardView(context: Context) : View(context) {
         animatedPath = pathFor(move)
         animatedProgress = 0f
         animatedSoundStep = -1
+        val generation = ++moveGeneration
         moveAnimator?.cancel()
         moveAnimator = ValueAnimator.ofFloat(0f, animatedPath.lastIndex.toFloat()).apply {
             duration = (animatedPath.lastIndex.coerceAtLeast(1) * 145L) + 70L
@@ -485,6 +506,8 @@ class LudoBoardView(context: Context) : View(context) {
             }
             addListener(object : AnimatorListenerAdapter() {
                 override fun onAnimationEnd(animation: Animator) {
+                    if (generation != moveGeneration) return
+                    moveAnimator = null
                     animatedMove = null
                     animatedPiece = null
                     animatedPath = emptyList()

@@ -12,6 +12,7 @@ object SoundPlayer {
 
     private var pool: SoundPool? = null
     private val ids = mutableMapOf<String, Int>()
+    private val activeStreams = mutableMapOf<String, MutableSet<Int>>()
     private var ready = false
 
     fun init(ctx: Context) {
@@ -70,11 +71,29 @@ object SoundPlayer {
     var movementSoundsEnabled: Boolean = true
 
     fun play(key: String, volume: Float = 1f) {
-        ids[key]?.let { pool?.play(it, volume, volume, 0, 0, 1f) }
+        ids[key]?.let { soundId ->
+            val streamId = pool?.play(soundId, volume, volume, 0, 0, 1f) ?: 0
+            if (streamId != 0) {
+                val streams = activeStreams.getOrPut(key) { LinkedHashSet() }
+                streams.add(streamId)
+                while (streams.size > 8) {
+                    val oldest = streams.first()
+                    streams.remove(oldest)
+                    pool?.stop(oldest)
+                }
+            }
+        }
     }
 
     /** Play a movement/game sound only when movement sounds are enabled. */
     fun playMovement(key: String, volume: Float = 1f) {
         if (movementSoundsEnabled) play(key, volume)
+    }
+
+    fun stop(vararg keys: String) {
+        val soundPool = pool ?: return
+        keys.forEach { key ->
+            activeStreams.remove(key)?.forEach(soundPool::stop)
+        }
     }
 }

@@ -41,6 +41,7 @@ class TicTacToeActivity : AppCompatActivity() {
     private lateinit var hudView:   HudView
     private lateinit var boardView: TicBoardView
     private lateinit var scoreView: ScoreView
+    private lateinit var gameRoot: View
 
     // ─── Lifecycle ────────────────────────────────────────────────────────────
 
@@ -63,6 +64,7 @@ class TicTacToeActivity : AppCompatActivity() {
         root.addView(scoreView, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (48 * dp).toInt()))
 
         AdManager.attachBanner(root)
+        gameRoot = root
         setContentView(root)
         hideBoardWhileDialogIsOpen()
 
@@ -256,7 +258,7 @@ Strategy
             "How to Play Tic-Tac-Toe",
             tv.text.toString(),
             "T I C · T A C · T O E",
-            onDone = { if (showModeAfter) showModeDialog() },
+            onDone = { if (showModeAfter) showModeDialog() else showBoardAfterDialog() },
         )
     }
 
@@ -526,11 +528,11 @@ Strategy
     }
 
     private fun hideBoardWhileDialogIsOpen() {
-        boardView.visibility = View.INVISIBLE
+        gameRoot.visibility = View.INVISIBLE
     }
 
     private fun showBoardAfterDialog() {
-        boardView.visibility = View.VISIBLE
+        gameRoot.visibility = View.VISIBLE
     }
 
     private fun launchReplay(resultLabel: String) {

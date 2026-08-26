@@ -61,6 +61,8 @@ class LudoActivity : AppCompatActivity() {
     private val engine = LudoRuleEngine()
     private val handler = Handler(Looper.getMainLooper())
     private val moves = mutableListOf<Move>()
+    private var lifecycleActive = false
+    private var dialogOpen = false
 
     private var state: GameState = engine.initialState()
     private var vsAI = true
@@ -161,7 +163,9 @@ class LudoActivity : AppCompatActivity() {
         ))
         statusView = LudoStatusStripView(this)
         boardView = LudoBoardView(this)
-        boardView.onMoveStep = { SoundPlayer.playMovement("ludo_move") }
+        boardView.onMoveStep = {
+            if (gameplayActive()) SoundPlayer.playMovement("ludo_move")
+        }
         diceView = GlbDiceView(this)
         motionView = LudoControlTileView(this, LudoControlTileView.ControlType.MOTION)
         tapRollView = LudoControlTileView(this, LudoControlTileView.ControlType.TAP_TO_ROLL)
@@ -214,8 +218,8 @@ class LudoActivity : AppCompatActivity() {
             if (profilesEnabled()) showPlayerProfile(player) else showRenameDialog(player)
         }
         statusView.profilesEnabled = true
-        diceView.onRoll = { if (matchStarted && isHumanTurn()) rollDice() }
-        tapRollView.onTap = { if (matchStarted && isHumanTurn()) rollDice() }
+        diceView.onRoll = { if (gameplayActive() && matchStarted && isHumanTurn()) rollDice() }
+        tapRollView.onTap = { if (gameplayActive() && matchStarted && isHumanTurn()) rollDice() }
         motionView.motionEnabled = SettingsManager.isMotionDiceEnabled(this)
         motionView.onMotionToggle = { enabled ->
             SettingsManager.setMotionDiceEnabled(this, enabled)
@@ -237,13 +241,22 @@ class LudoActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        lifecycleActive = true
         makeFullscreen()
+        if (::boardView.isInitialized) boardView.resumeAnimations()
         SoundPlayer.movementSoundsEnabled = SettingsManager.isMovementSoundsEnabled(this)
         motionView.motionEnabled = SettingsManager.isMotionDiceEnabled(this)
         syncMotionSensor()
     }
 
     override fun onPause() {
+        lifecycleActive = false
+        handler.removeCallbacksAndMessages(null)
+        diceView.cancelRoll()
+        boardView.cancelAnimations()
+        notificationHost.removeAllViews()
+        celebrationGeneration++
+        SoundPlayer.stop("ludo_dice", "ludo_move", "ludo_start", "ludo_win")
         sensorManager.unregisterListener(motionListener)
         super.onPause()
     }
@@ -254,7 +267,10 @@ class LudoActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        lifecycleActive = false
         handler.removeCallbacksAndMessages(null)
+        diceView.cancelRoll()
+        boardView.cancelAnimations()
         sensorManager.unregisterListener(motionListener)
         super.onDestroy()
     }
@@ -300,7 +316,9 @@ class LudoActivity : AppCompatActivity() {
 
             lastMotionAt = now
             runOnUiThread {
-                if (matchStarted && SettingsManager.isMotionDiceEnabled(this@LudoActivity)) {
+                if (gameplayActive() && matchStarted &&
+                    SettingsManager.isMotionDiceEnabled(this@LudoActivity)
+                ) {
                     rollDice(direction, false)
                 }
             }
@@ -422,7 +440,7 @@ class LudoActivity : AppCompatActivity() {
         celebrationMessage = null
         celebrationGeneration++
         matchStarted = true
-        SoundPlayer.playMovement("ludo_start")
+        if (gameplayActive()) SoundPlayer.playMovement("ludo_start")
         economyEnabled = irregularMode && vsAI
         if (vsAI) SettingsManager.setActiveGame(this, "ludo")
         aiDifficulty = SettingsManager.getLudoDifficulty(this)
@@ -439,7 +457,7 @@ class LudoActivity : AppCompatActivity() {
         motionView.motionEnabled = SettingsManager.isMotionDiceEnabled(this)
         syncMotionSensor()
         updateHud()
-        if (isAiTurn()) handler.postDelayed({ rollDice() }, 650L)
+        if (isAiTurn()) postGameplay(650L) { rollDice() }
     }
 
     private fun rollDice() {
@@ -447,7 +465,8 @@ class LudoActivity : AppCompatActivity() {
     }
 
     private fun rollDice(motionDirection: MotionDiceDirection, isReroll: Boolean) {
-        if (state.status != GameStatus.IN_PROGRESS ||
+        if (!gameplayActive() ||
+            state.status != GameStatus.IN_PROGRESS ||
             (rolledValue != 0 && !isReroll) ||
             boardView.isLocked
         ) return
@@ -458,6 +477,7 @@ class LudoActivity : AppCompatActivity() {
         val nextValue = Random.nextInt(1, 7)
         SoundPlayer.playMovement("ludo_dice")
         diceView.rollTo(nextValue, motionDirection) {
+            if (!gameplayActive()) return@rollTo
             val previousRolledValue = rolledValue
             rolledValue = nextValue
             val storedSixStreak =
@@ -485,7 +505,7 @@ class LudoActivity : AppCompatActivity() {
                     "${LudoSetup.PLAYER_NAMES[player]} used 🎲 Reroll\nRolled $nextValue → next roll",
                     player,
                 )
-                handler.postDelayed({ rollDice(MotionDiceDirection.UP, true) }, 380L)
+                postGameplay(380L) { rollDice(MotionDiceDirection.UP, true) }
                 return@rollTo
             }
             val preparedMoves = if (isAiTurn() && irregularMode) {
@@ -497,13 +517,13 @@ class LudoActivity : AppCompatActivity() {
                 if (nextValue == 6 && sixStreak >= 3) {
                     showHudMessage("THREE SIXES — turn forfeited")
                     Toast.makeText(this, "Three sixes — turn forfeited", Toast.LENGTH_SHORT).show()
-                    handler.postDelayed({ finishTurnAfterNoMove() }, 760L)
+                    postGameplay(760L) { finishTurnAfterNoMove() }
                 } else {
                     Toast.makeText(this, "No move possible — turn skipped", Toast.LENGTH_SHORT).show()
-                    handler.postDelayed({ finishTurnAfterNoMove() }, 520L)
+                    postGameplay(520L) { finishTurnAfterNoMove() }
                 }
             } else if (isAiTurn()) {
-                handler.postDelayed({ playMove(chooseAiMove(preparedMoves)) }, 420L)
+                postGameplay(420L) { playMove(chooseAiMove(preparedMoves)) }
             }
         }
     }
@@ -1488,9 +1508,12 @@ class LudoActivity : AppCompatActivity() {
     }
 
     private fun playMove(move: Move) {
-        if (state.status != GameStatus.IN_PROGRESS || rolledValue == 0 || boardView.isLocked) return
+        if (!gameplayActive() ||
+            state.status != GameStatus.IN_PROGRESS || rolledValue == 0 || boardView.isLocked
+        ) return
         boardView.legalMoves = emptyList()
         boardView.animateMove(move) {
+            if (!gameplayActive()) return@animateMove
             val movingPlayer = move.metadata["player"] as? Int
                 ?: LudoSetup.playerFromState(state)
             state = engine.applyMove(state, move)
@@ -1525,17 +1548,19 @@ class LudoActivity : AppCompatActivity() {
             }
             if (state.status == GameStatus.IN_PROGRESS) {
                 updateHud()
-                if (isAiTurn()) handler.postDelayed({ rollDice() }, 420L)
+                if (isAiTurn()) postGameplay(420L) { rollDice() }
             } else {
                 SoundPlayer.playMovement("ludo_win")
                 updateHud()
-                handler.postDelayed({ showResultDialog() }, 220L)
+                postGameplay(220L) { showResultDialog() }
             }
         }
     }
 
     private fun finishTurnAfterNoMove() {
-        if (state.status != GameStatus.IN_PROGRESS || rolledValue == 0) return
+        if (!gameplayActive() ||
+            state.status != GameStatus.IN_PROGRESS || rolledValue == 0
+        ) return
         val player = LudoSetup.playerFromState(state)
         val sixStreak = state.metadata[LudoSetup.SIX_STREAK_METADATA] as? Int ?: 0
         val forfeitsAfterThreeSixes = rolledValue == 6 && sixStreak >= 3
@@ -1561,7 +1586,7 @@ class LudoActivity : AppCompatActivity() {
         boardView.gameState = state
         boardView.legalMoves = emptyList()
         updateHud()
-        if (isAiTurn()) handler.postDelayed({ rollDice() }, 420L)
+        if (isAiTurn()) postGameplay(420L) { rollDice() }
     }
 
     private fun isHumanTurn(): Boolean = !vsAI || LudoSetup.playerFromState(state) == humanPlayer
@@ -1608,13 +1633,22 @@ class LudoActivity : AppCompatActivity() {
         val generation = celebrationGeneration
         celebrationMessage = message
         updateHud()
-        handler.postDelayed({
+        postGameplay(1800L) {
             if (celebrationGeneration == generation) {
                 celebrationMessage = null
                 updateHud()
             }
-        }, 1800L)
+        }
     }
+
+    private fun postGameplay(delayMillis: Long, action: () -> Unit) {
+        handler.postDelayed({
+            if (gameplayActive()) action()
+        }, delayMillis)
+    }
+
+    private fun gameplayActive(): Boolean =
+        lifecycleActive && !dialogOpen && !isFinishing
 
     private fun showResultDialog() {
         if (state.status == GameStatus.IN_PROGRESS || resultDialogVisible) return
@@ -1666,11 +1700,23 @@ class LudoActivity : AppCompatActivity() {
     }
 
     private fun hideBoardWhileDialogIsOpen() {
-        boardView.visibility = View.INVISIBLE
+        dialogOpen = true
+        handler.removeCallbacksAndMessages(null)
+        diceView.cancelRoll()
+        boardView.cancelAnimations()
+        SoundPlayer.stop("ludo_dice", "ludo_move")
+        overlay.visibility = View.INVISIBLE
     }
 
     private fun showBoardAfterDialog() {
-        boardView.visibility = View.VISIBLE
+        dialogOpen = false
+        overlay.visibility = View.VISIBLE
+        boardView.resumeAnimations()
+        if (gameplayActive() && matchStarted && isAiTurn() &&
+            state.status == GameStatus.IN_PROGRESS && rolledValue == 0
+        ) {
+            postGameplay(420L) { rollDice() }
+        }
     }
 
     private fun launchReplay(result: String) {

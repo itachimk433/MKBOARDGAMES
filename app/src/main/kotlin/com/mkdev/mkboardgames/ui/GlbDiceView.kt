@@ -50,6 +50,7 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
     var onRoll: (() -> Unit)? = null
 
     private var animator: ValueAnimator? = null
+    private var rollGeneration = 0
     private var rotationX = -18f
     private var rotationY = -28f
     private var rotationZ = 0f
@@ -99,6 +100,7 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         motionDirection: MotionDiceDirection = MotionDiceDirection.UP,
         onFinished: () -> Unit,
     ) {
+        val generation = ++rollGeneration
         animator?.cancel()
         isRolling = true
         val targetValue = nextValue.coerceIn(1, 6)
@@ -138,8 +140,10 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
             }
             addListener(object : AnimatorListenerAdapter() {
                 override fun onAnimationEnd(animation: Animator) {
+                    if (generation != rollGeneration) return
                     value = targetValue
                     isRolling = false
+                    animator = null
                     rotationX = target.x
                     rotationY = target.y
                     rotationZ = target.z
@@ -149,6 +153,14 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
             })
             start()
         }
+    }
+
+    fun cancelRoll() {
+        rollGeneration++
+        animator?.cancel()
+        animator = null
+        fallbackView.cancelRoll()
+        isRolling = false
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
@@ -165,8 +177,7 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
     }
 
     override fun onDetachedFromWindow() {
-        animator?.cancel()
-        animator = null
+        cancelRoll()
         super.onDetachedFromWindow()
     }
 

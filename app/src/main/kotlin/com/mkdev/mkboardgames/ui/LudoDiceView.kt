@@ -140,6 +140,13 @@ class LudoDiceView(context: Context) : View(context) {
         }
     }
 
+    fun cancelRoll() {
+        rollGeneration++
+        animator?.cancel()
+        animator = null
+        isRolling = false
+    }
+
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         val density = resources.displayMetrics.density
@@ -217,8 +224,7 @@ class LudoDiceView(context: Context) : View(context) {
     }
 
     override fun onDetachedFromWindow() {
-        animator?.cancel()
-        animator = null
+        cancelRoll()
         super.onDetachedFromWindow()
     }
 

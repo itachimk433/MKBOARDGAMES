@@ -37,6 +37,7 @@ class ConnectFourActivity : AppCompatActivity() {
     private lateinit var hudView: HudView
     private lateinit var boardView: ConnectBoardView
     private lateinit var scoreView: ScoreView
+    private lateinit var gameRoot: View
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -53,6 +54,7 @@ class ConnectFourActivity : AppCompatActivity() {
         root.addView(boardView, LinearLayout.LayoutParams(-1, 0).apply { weight = 1f })
         root.addView(scoreView, LinearLayout.LayoutParams(-1, (48 * dp).toInt()))
         AdManager.attachBanner(root)
+        gameRoot = root
         setContentView(root)
         hideBoardWhileDialogIsOpen()
         @Suppress("DEPRECATION")
@@ -492,11 +494,11 @@ Control the centre columns, build threats in more than one direction, and block 
     }
 
     private fun hideBoardWhileDialogIsOpen() {
-        boardView.visibility = View.INVISIBLE
+        gameRoot.visibility = View.INVISIBLE
     }
 
     private fun showBoardAfterDialog() {
-        boardView.visibility = View.VISIBLE
+        gameRoot.visibility = View.VISIBLE
     }
 
     inner class ConnectBoardView(ctx: Context) : View(ctx) {
