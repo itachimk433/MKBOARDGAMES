@@ -53,6 +53,9 @@ class MenuView(context: Context) : View(context) {
     private val ludoHomeIconBitmap: Bitmap? = try {
         context.assets.open("ludo_home_icon.png").use { BitmapFactory.decodeStream(it) }
     } catch (e: Exception) { null }
+    private val draughtsHomeIconBitmap: Bitmap? = try {
+        context.assets.open("draughts_home_icon.png").use { BitmapFactory.decodeStream(it) }
+    } catch (e: Exception) { null }
     private val morabarabaHomeIconBitmap: Bitmap? = try {
         context.assets.open("morabaraba_home_icon.png").use { BitmapFactory.decodeStream(it) }
     } catch (e: Exception) { null }
@@ -341,8 +344,9 @@ class MenuView(context: Context) : View(context) {
 
     private fun drawMiniBoard(canvas: Canvas, left: Float, top: Float, size: Float, type: GameType) {
         when (type) {
-            GameType.CHESS, GameType.CHECKERS, GameType.INTERNATIONAL_DRAUGHTS ->
+            GameType.CHESS, GameType.INTERNATIONAL_DRAUGHTS ->
                 drawChessCheckersMini(canvas, left, top, size, type)
+            GameType.CHECKERS -> drawChessCheckersMini(canvas, left, top, size, type)
             GameType.OTHELLO    -> drawOthelloMini(canvas, left, top, size)
             GameType.MORABARABA -> drawMorabarabaMini(canvas, left, top, size)
             GameType.TICTACTOE  -> drawTicTacToeMini(canvas, left, top, size)
@@ -501,6 +505,13 @@ class MenuView(context: Context) : View(context) {
     }
 
     private fun drawChessCheckersMini(canvas: Canvas, left: Float, top: Float, size: Float, type: GameType) {
+        if (type == GameType.CHECKERS) {
+            draughtsHomeIconBitmap?.let {
+                canvas.drawBitmap(it, null, RectF(left, top, left + size, top + size), bitmapPaint)
+                return
+            }
+        }
+
         val boardSize = if (type == GameType.INTERNATIONAL_DRAUGHTS) 10 else 8
         val cell = size / boardSize.toFloat()
         for (r in 0 until boardSize) for (c in 0 until boardSize) {
