@@ -376,6 +376,25 @@ class BoardView(context: Context) : View(context) {
 
     fun animateExternalMove(move: Move) = startMoveAnimation(move)
 
+    /**
+     * Cancel an in-flight move animation without applying its callback.
+     *
+     * Replay controls can jump to another state while the previous animation
+     * is still running. Clearing the callback before cancelling prevents the
+     * old move from overwriting the newly selected replay state.
+     */
+    fun cancelMoveAnimation() {
+        val activeAnimator = animator
+        animator = null
+        pendingMove = null
+        activeAnimator?.cancel()
+        animPiece = null
+        animFromPos = null
+        animProgress = 0f
+        isLocked = false
+        invalidate()
+    }
+
     /** Pop-in animation for Othello: placed disc + all flipped discs grow in with overshoot. */
     fun playOthelloPopAnim(positions: Set<Position>) {
         recentOthelloPieces = positions
@@ -396,6 +415,7 @@ class BoardView(context: Context) : View(context) {
     }
 
     private fun startMoveAnimation(move: Move) {
+        cancelMoveAnimation()
         if (isGoBoard()) {
             selectedPos = null
             legalMoves = emptyList()
@@ -428,16 +448,18 @@ class BoardView(context: Context) : View(context) {
         animFromPx  = cellCenter(move.from); animToPx = cellCenter(move.to)
         pendingMove = move; isLocked = true
 
-        animator?.cancel()
         animator = ValueAnimator.ofFloat(0f, 1f).apply {
             duration = 280L; interpolator = AccelerateDecelerateInterpolator()
             addUpdateListener { animProgress = it.animatedValue as Float; invalidate() }
             addListener(object : AnimatorListenerAdapter() {
                 override fun onAnimationEnd(animation: Animator) {
+                    if (animation !== animator) return
+                    animator = null
                     animPiece = null; animFromPos = null; animProgress = 0f
                     isLocked  = false; invalidate()
-                    pendingMove?.let { onMoveMade?.invoke(it) }
+                    val completedMove = pendingMove
                     pendingMove = null
+                    completedMove?.let { onMoveMade?.invoke(it) }
                 }
             })
             start()

@@ -47,6 +47,10 @@ class ReplayActivity : AppCompatActivity() {
         const val EXTRA_RESULT     = "game_result"
         const val EXTRA_BOARD_SIZE = "board_size"   // for TicTacToe
         const val EXTRA_MORABARABA_PIECE_COUNT = "morabaraba_piece_count"
+        private val MOVE_METADATA_KEYS = arrayOf(
+            "dice", "player", "token", "targetProgress", "drop", "promote", "pass",
+            "pawnDouble", "enPassant", "castle",
+        )
 
         fun buildMovesJson(moves: List<Move>): String {
             val arr = JSONArray()
@@ -63,7 +67,7 @@ class ReplayActivity : AppCompatActivity() {
                     obj.put("caps", caps)
                 }
                 if (m.promotionType != null) obj.put("promo", m.promotionType)
-                for (key in arrayOf("dice", "player", "token", "targetProgress", "drop", "promote", "pass")) {
+                for (key in MOVE_METADATA_KEYS) {
                     val value = m.metadata[key]
                     if (value is Int || value is String || value is Boolean) obj.put(key, value)
                 }
@@ -89,12 +93,14 @@ class ReplayActivity : AppCompatActivity() {
                 }
                 val promo = if (obj.has("promo")) obj.getString("promo") else null
                 val metadata = mutableMapOf<String, Any>()
-                for (key in arrayOf("dice", "player", "token", "targetProgress")) {
-                    if (obj.has(key)) metadata[key] = obj.getInt(key)
+                for (key in MOVE_METADATA_KEYS) {
+                    if (!obj.has(key) || obj.isNull(key)) continue
+                    when (val value = obj.get(key)) {
+                        is Boolean -> metadata[key] = value
+                        is String -> metadata[key] = value
+                        is Number -> metadata[key] = value.toInt()
+                    }
                 }
-                if (obj.has("drop")) metadata["drop"] = obj.getString("drop")
-                if (obj.has("promote")) metadata["promote"] = obj.getBoolean("promote")
-                if (obj.has("pass")) metadata["pass"] = obj.getBoolean("pass")
                 list += Move(from, to, caps, promo, metadata)
             }
             return list
@@ -361,11 +367,15 @@ class ReplayActivity : AppCompatActivity() {
 
             vibrateMove()
             boardView?.let { bv ->
+                bv.cancelMoveAnimation()
                 bv.gameState = states[cursor - 1]
+                val targetCursor = cursor
                 bv.onMoveMade = {
-                    bv.onMoveMade = null
-                    bv.gameState  = states[cursor]
-                    bv.isLocked   = true
+                    if (cursor == targetCursor) {
+                        bv.onMoveMade = null
+                        bv.gameState  = states[targetCursor]
+                        bv.isLocked   = true
+                    }
                 }
                 bv.animateExternalMove(move)
             }
@@ -391,7 +401,12 @@ class ReplayActivity : AppCompatActivity() {
             }
         } else {
             cursor              = newCursor
-            boardView?.let { it.gameState = states[cursor]; it.isLocked = true }
+            boardView?.let {
+                it.cancelMoveAnimation()
+                it.onMoveMade = null
+                it.gameState = states[cursor]
+                it.isLocked = true
+            }
             ticBoardView?.showState(states[cursor])
             connectBoardView?.showState(states[cursor])
             moraBoardView?.let { it.gameState = states[cursor]; it.isLocked = true }
