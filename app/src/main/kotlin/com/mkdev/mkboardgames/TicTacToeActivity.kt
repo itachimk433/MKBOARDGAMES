@@ -24,6 +24,7 @@ class TicTacToeActivity : AppCompatActivity() {
     private var vsAI        = true
     private var playerColor = PieceColor.WHITE
     private var matchStarted = false
+    private var activityResumed = false
     private val moveHistory = ArrayDeque<GameState>()
     private val scope       = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
@@ -79,11 +80,19 @@ class TicTacToeActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume(); makeFullscreen()
+        activityResumed = true
         SoundPlayer.movementSoundsEnabled = SettingsManager.isMovementSoundsEnabled(this)
         if (::boardView.isInitialized) {
             SettingsManager.activateGameTheme(this, "ttt")
             boardView.applyTheme()
         }
+        resumeComputerTurnIfNeeded()
+    }
+    override fun onPause() {
+        activityResumed = false
+        scope.coroutineContext.cancelChildren()
+        SoundPlayer.stopAll()
+        super.onPause()
     }
     override fun onWindowFocusChanged(h: Boolean) { super.onWindowFocusChanged(h); if (h) makeFullscreen() }
     override fun onDestroy() { super.onDestroy(); scope.cancel() }
@@ -385,10 +394,25 @@ Strategy
                     }
                 } catch (e: Throwable) { null }
             }
+            if (!isActive || !activityResumed) {
+                boardView.isLocked = false
+                return@launch
+            }
             hudView.setThinking(false)
             if (move != null) { boardView.isLocked = false; handleMove(move) }
             else boardView.isLocked = false
         }
+    }
+
+    private fun resumeComputerTurnIfNeeded() {
+        if (!activityResumed ||
+            !::boardView.isInitialized ||
+            !matchStarted ||
+            gameState.status != GameStatus.IN_PROGRESS ||
+            !vsAI ||
+            gameState.currentTurn == playerColor
+        ) return
+        triggerAI()
     }
 
     // ─── HUD / undo / menu ────────────────────────────────────────────────────

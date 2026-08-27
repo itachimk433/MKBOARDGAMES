@@ -51,6 +51,7 @@ class GameActivity : AppCompatActivity() {
     private var vsAI = true
     private var playerColor = PieceColor.WHITE
     private var matchStarted = false
+    private var activityResumed = false
     private val moveHistory      = ArrayDeque<GameState>()
     private val scope            = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
@@ -156,7 +157,19 @@ class GameActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume(); makeFullscreen()
+        activityResumed = true
         SoundPlayer.movementSoundsEnabled = SettingsManager.isMovementSoundsEnabled(this)
+        resumeComputerTurnIfNeeded()
+    }
+
+    override fun onPause() {
+        activityResumed = false
+        autoPassJob?.cancel()
+        autoPassJob = null
+        scope.coroutineContext.cancelChildren()
+        SoundPlayer.stopAll()
+        if (::boardView.isInitialized) boardView.cancelMoveAnimation()
+        super.onPause()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -1128,7 +1141,7 @@ Checkmate your opponent's King.
         when (gameState.status) {
             GameStatus.WHITE_WINS, GameStatus.BLACK_WINS -> {
                 SoundPlayer.play("move_check")
-                boardView.postDelayed({ SoundPlayer.play("game_end") }, 200)
+                boardView.postDelayed({ if (activityResumed) SoundPlayer.play("game_end") }, 200)
                 return
             }
             GameStatus.DRAW -> { SoundPlayer.play("game_draw"); return }
@@ -1154,7 +1167,7 @@ Checkmate your opponent's King.
     private fun playCheckersSound(move: Move) {
         when (gameState.status) {
             GameStatus.WHITE_WINS, GameStatus.BLACK_WINS -> {
-                boardView.postDelayed({ SoundPlayer.play("game_end") }, 200)
+                boardView.postDelayed({ if (activityResumed) SoundPlayer.play("game_end") }, 200)
                 return
             }
             GameStatus.DRAW -> { SoundPlayer.play("game_draw"); return }
@@ -1177,7 +1190,7 @@ Checkmate your opponent's King.
     private fun playOthelloSound(move: Move) {
         when (gameState.status) {
             GameStatus.WHITE_WINS, GameStatus.BLACK_WINS -> {
-                boardView.postDelayed({ SoundPlayer.play("game_end") }, 200)
+                boardView.postDelayed({ if (activityResumed) SoundPlayer.play("game_end") }, 200)
                 return
             }
             GameStatus.DRAW -> { SoundPlayer.play("game_draw"); return }
@@ -1185,11 +1198,22 @@ Checkmate your opponent's King.
         }
         SoundPlayer.playMovement("othello_place")
         if (move.captures.isNotEmpty()) {
-            boardView.postDelayed({ SoundPlayer.playMovement("othello_flip") }, 150)
+            boardView.postDelayed({ if (activityResumed) SoundPlayer.playMovement("othello_flip") }, 150)
         }
     }
 
     // ─── AI ───────────────────────────────────────────────────────────────────
+
+    private fun resumeComputerTurnIfNeeded() {
+        if (!activityResumed ||
+            !::boardView.isInitialized ||
+            !matchStarted ||
+            gameState.status != GameStatus.IN_PROGRESS ||
+            !vsAI ||
+            gameState.currentTurn == playerColor
+        ) return
+        if (!scheduleGoAutoPassIfNeeded()) triggerAI()
+    }
 
     private fun triggerAI() {
         boardView.isLocked = true; hudView.setThinking(true)
@@ -1270,7 +1294,7 @@ Checkmate your opponent's King.
                 gameState.currentTurn == thinkingState.currentTurn &&
                     gameState.moveHistory.size == thinkingState.moveHistory.size &&
                     gameState.status == thinkingState.status
-            if (move != null && isActive && stateIsStillCurrent) boardView.animateExternalMove(move)
+            if (move != null && isActive && activityResumed && stateIsStillCurrent) boardView.animateExternalMove(move)
             else boardView.isLocked = false
         }
     }

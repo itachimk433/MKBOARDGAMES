@@ -100,4 +100,15 @@ object SoundPlayer {
             activeStreams.remove(key)?.forEach(soundPool::stop)
         }
     }
+
+    /** Stop every currently playing sound, including sounds started by delayed callbacks. */
+    fun stopAll() {
+        val soundPool = pool
+        if (soundPool != null) {
+            activeStreams.values.forEach { streams ->
+                streams.forEach(soundPool::stop)
+            }
+        }
+        activeStreams.clear()
+    }
 }

@@ -23,6 +23,7 @@ class ConnectFourActivity : AppCompatActivity() {
     private var vsAI = true
     private var playerColor = PieceColor.WHITE
     private var matchStarted = false
+    private var activityResumed = false
     private val moveHistory = ArrayDeque<GameState>()
     private val redoGameStates = ArrayDeque<GameState>()
     private val redoRemovedMoves = ArrayDeque<List<GameState>>()
@@ -68,12 +69,21 @@ class ConnectFourActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        activityResumed = true
         makeFullscreen()
         SoundPlayer.movementSoundsEnabled = SettingsManager.isMovementSoundsEnabled(this)
         if (::boardView.isInitialized) {
             SettingsManager.activateGameTheme(this, "connect_four")
             boardView.applyTheme()
         }
+        resumeComputerTurnIfNeeded()
+    }
+
+    override fun onPause() {
+        activityResumed = false
+        scope.coroutineContext.cancelChildren()
+        SoundPlayer.stopAll()
+        super.onPause()
     }
 
     override fun onDestroy() {
@@ -260,6 +270,7 @@ Control the centre columns, build threats in more than one direction, and block 
     }
 
     private fun handleMove(move: Move, fromAI: Boolean = false) {
+        if (!activityResumed) return
         if (boardView.isLocked && !fromAI) return
         boardView.isLocked = true
         redoGameStates.clear()
@@ -335,10 +346,25 @@ Control the centre columns, build threats in more than one direction, and block 
                     }
                 } catch (_: Throwable) { null }
             }
+            if (!isActive || !activityResumed) {
+                boardView.isLocked = false
+                return@launch
+            }
             hudView.setThinking(false)
             if (move != null) handleMove(move, fromAI = true)
             else boardView.isLocked = false
         }
+    }
+
+    private fun resumeComputerTurnIfNeeded() {
+        if (!activityResumed ||
+            !::boardView.isInitialized ||
+            !matchStarted ||
+            gameState.status != GameStatus.IN_PROGRESS ||
+            !vsAI ||
+            gameState.currentTurn == playerColor
+        ) return
+        triggerAI()
     }
 
     private fun updateHud() {

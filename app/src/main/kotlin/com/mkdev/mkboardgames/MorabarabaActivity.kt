@@ -35,6 +35,7 @@ class MorabarabaActivity : AppCompatActivity() {
     private var vsAI                        = true
     private var playerColor                 = PieceColor.WHITE
     private var matchStarted                = false
+    private var activityResumed             = false
     private var pieceCount                  = 12
     private val scope                       = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private val moveHistory                 = ArrayDeque<GameState>()
@@ -87,11 +88,23 @@ class MorabarabaActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume(); makeFullscreen()
+        activityResumed = true
         SoundPlayer.movementSoundsEnabled = SettingsManager.isMovementSoundsEnabled(this)
         if (::boardView.isInitialized) {
             SettingsManager.activateGameTheme(this, "morabaraba")
             boardView.applyTheme()
         }
+        resumeComputerTurnIfNeeded()
+    }
+
+    override fun onPause() {
+        activityResumed = false
+        aiJob?.cancel()
+        aiJob = null
+        scope.coroutineContext.cancelChildren()
+        SoundPlayer.stopAll()
+        if (::boardView.isInitialized) boardView.cancelAnim()
+        super.onPause()
     }
     override fun onWindowFocusChanged(h: Boolean) { super.onWindowFocusChanged(h); if (h) makeFullscreen() }
     override fun onDestroy() { super.onDestroy(); scope.cancel() }
@@ -370,7 +383,7 @@ class MorabarabaActivity : AppCompatActivity() {
     private fun playMorabarabaSound(prev: com.mkdev.mkboardgames.engine.GameState, move: Move) {
         when (gameState.status) {
             com.mkdev.mkboardgames.engine.GameStatus.WHITE_WINS, com.mkdev.mkboardgames.engine.GameStatus.BLACK_WINS -> {
-                boardView.postDelayed({ SoundPlayer.play("game_end") }, 200)
+                boardView.postDelayed({ if (activityResumed) SoundPlayer.play("game_end") }, 200)
                 return
             }
             com.mkdev.mkboardgames.engine.GameStatus.DRAW -> { SoundPlayer.play("game_draw"); return }
@@ -382,7 +395,7 @@ class MorabarabaActivity : AppCompatActivity() {
         when {
             move.captures.isNotEmpty() -> {
                 SoundPlayer.playMovement("mora_capture")
-                boardView.postDelayed({ SoundPlayer.playMovement("mora_mill") }, 250)
+                boardView.postDelayed({ if (activityResumed) SoundPlayer.playMovement("mora_mill") }, 250)
             }
             isPlacementPhase -> SoundPlayer.playMovement("mora_place")
             else             -> SoundPlayer.playMovement("mora_move")
@@ -421,11 +434,22 @@ class MorabarabaActivity : AppCompatActivity() {
                     legal.randomOrNull()
                 }
             }
-            if (!isActive) return@launch
+            if (!isActive || !activityResumed) return@launch
             hudView.setThinking(false)
             if (move != null) boardView.animateExternalMove(move)
             else boardView.isLocked = false
         }
+    }
+
+    private fun resumeComputerTurnIfNeeded() {
+        if (!activityResumed ||
+            !::boardView.isInitialized ||
+            !matchStarted ||
+            gameState.status != GameStatus.IN_PROGRESS ||
+            !vsAI ||
+            gameState.currentTurn == playerColor
+        ) return
+        triggerAI()
     }
 
     // ─── HUD helpers ─────────────────────────────────────────────────────────
