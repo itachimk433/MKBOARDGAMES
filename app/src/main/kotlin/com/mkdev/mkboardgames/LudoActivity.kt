@@ -262,7 +262,7 @@ class LudoActivity : AppCompatActivity() {
         boardView.cancelAnimations()
         notificationHost.removeAllViews()
         celebrationGeneration++
-        SoundPlayer.stop("ludo_dice", "ludo_move", "ludo_start", "ludo_win")
+        SoundPlayer.stop("ludo_dice", "ludo_move", "ludo_start", "ludo_star", "ludo_win")
         sensorManager.unregisterListener(motionListener)
         super.onPause()
     }
@@ -1555,6 +1555,9 @@ class LudoActivity : AppCompatActivity() {
             pendingMove = null
             val movingPlayer = move.metadata["player"] as? Int
                 ?: LudoSetup.playerFromState(state)
+            if (LudoSetup.isStarTrackCell(move.to)) {
+                SoundPlayer.playMovement("ludo_star")
+            }
             state = engine.applyMove(state, move)
             moves += move
             rolledValue = 0
@@ -1818,7 +1821,7 @@ class LudoActivity : AppCompatActivity() {
         diceView.cancelRoll()
         diceView.setGameplayVisible(false)
         boardView.cancelAnimations()
-        SoundPlayer.stop("ludo_dice", "ludo_move")
+        SoundPlayer.stop("ludo_dice", "ludo_move", "ludo_star")
         overlay.visibility = View.INVISIBLE
     }
 

@@ -59,8 +59,10 @@ object SoundPlayer {
 
         // Ludo sounds
         ids["ludo_dice"]        = p.load(ctx, R.raw.ludo_dice,        1)
-        ids["ludo_move"]        = p.load(ctx, R.raw.ludo_move,        1)
+        // Use the cleaner shared board-piece cue for each animated token step.
+        ids["ludo_move"]        = p.load(ctx, R.raw.move_self,         1)
         ids["ludo_start"]       = p.load(ctx, R.raw.ludo_start,       1)
+        ids["ludo_star"]        = p.load(ctx, R.raw.ludo_start,       1)
         ids["ludo_win"]         = p.load(ctx, R.raw.ludo_win,         1)
 
         // UI navigation click (reuses mora_place — short, clicky)

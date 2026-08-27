@@ -75,6 +75,7 @@ object LudoSetup {
      * the four star cells as safe. Tokens on these cells cannot be captured.
      */
     val SAFE_TRACK_INDICES: Set<Int> = setOf(0, 13, 16, 23, 26, 39, 42, 49)
+    val STAR_TRACK_INDICES: Set<Int> = setOf(16, 23, 42, 49)
 
     // The board artwork is green, yellow, red, blue clockwise from top-left.
     // The app's player order is red, blue, green, yellow.
@@ -95,6 +96,11 @@ object LudoSetup {
     fun isSafeTrackCell(position: Position): Boolean =
         PATH.withIndex().any { (index, pathPosition) ->
             index in SAFE_TRACK_INDICES && pathPosition == position
+        }
+
+    fun isStarTrackCell(position: Position): Boolean =
+        PATH.withIndex().any { (index, pathPosition) ->
+            index in STAR_TRACK_INDICES && pathPosition == position
         }
 
     fun homeLanePosition(player: Int, progress: Int): Position {
