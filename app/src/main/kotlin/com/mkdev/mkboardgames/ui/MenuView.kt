@@ -53,6 +53,9 @@ class MenuView(context: Context) : View(context) {
     private val ludoHomeIconBitmap: Bitmap? = try {
         context.assets.open("ludo_home_icon.png").use { BitmapFactory.decodeStream(it) }
     } catch (e: Exception) { null }
+    private val internationalDraughtsHomeIconBitmap: Bitmap? = try {
+        context.assets.open("international_draughts_home_icon.png").use { BitmapFactory.decodeStream(it) }
+    } catch (e: Exception) { null }
     private val draughtsHomeIconBitmap: Bitmap? = try {
         context.assets.open("draughts_home_icon.png").use { BitmapFactory.decodeStream(it) }
     } catch (e: Exception) { null }
@@ -505,6 +508,12 @@ class MenuView(context: Context) : View(context) {
     }
 
     private fun drawChessCheckersMini(canvas: Canvas, left: Float, top: Float, size: Float, type: GameType) {
+        if (type == GameType.INTERNATIONAL_DRAUGHTS) {
+            internationalDraughtsHomeIconBitmap?.let {
+                canvas.drawBitmap(it, null, RectF(left, top, left + size, top + size), bitmapPaint)
+                return
+            }
+        }
         if (type == GameType.CHECKERS) {
             draughtsHomeIconBitmap?.let {
                 canvas.drawBitmap(it, null, RectF(left, top, left + size, top + size), bitmapPaint)
