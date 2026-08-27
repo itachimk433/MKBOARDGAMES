@@ -778,7 +778,7 @@ class MenuView(context: Context) : View(context) {
             color = Color.parseColor("#4FAF9B")
         }
         val goosePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#E86F2D")
+            color = Color.parseColor("#F2F2F2")
         }
         val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.argb(55, 0, 0, 0)

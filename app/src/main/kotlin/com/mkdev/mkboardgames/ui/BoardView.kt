@@ -920,9 +920,9 @@ class BoardView(context: Context) : View(context) {
         val r = cellSize * 0.38f
         canvas.drawCircle(cx + 1.5f, cy + 2.5f, r, shadowPaint)
         val isWhite = piece.color == PieceColor.WHITE
-        val base = if (isWhite) Color.parseColor("#F4E7C6") else Color.parseColor("#432B3A")
-        val edge = if (isWhite) Color.parseColor("#B68C56") else Color.parseColor("#1C1420")
-        val highlight = if (isWhite) Color.parseColor("#FFF6DA") else Color.parseColor("#765064")
+        val base = if (isWhite) Color.parseColor("#F2F2F2") else Color.parseColor("#432B3A")
+        val edge = if (isWhite) Color.parseColor("#858585") else Color.parseColor("#1C1420")
+        val highlight = if (isWhite) Color.WHITE else Color.parseColor("#765064")
         val face = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = RadialGradient(
                 cx - r * 0.32f, cy - r * 0.38f, r * 1.25f,
@@ -939,14 +939,14 @@ class BoardView(context: Context) : View(context) {
         }
         Paint(Paint.ANTI_ALIAS_FLAG).also {
             it.style = Paint.Style.STROKE; it.strokeWidth = r * 0.06f
-            it.color = if (isWhite) Color.parseColor("#D8B87A") else Color.parseColor("#765064")
+            it.color = if (isWhite) Color.parseColor("#C7C7C7") else Color.parseColor("#765064")
             canvas.drawCircle(cx, cy, r * 0.76f, it)
             canvas.drawCircle(cx, cy, r * 0.61f, it)
         }
         if (piece.isKing) {
             val kp = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 textAlign = Paint.Align.CENTER; textSize = r * 1.0f
-                color = if (isWhite) Color.parseColor("#8F5D25") else Color.parseColor("#E7B45C")
+                color = if (isWhite) Color.parseColor("#555555") else Color.parseColor("#E7B45C")
                 isFakeBoldText = true
             }
             val metrics = kp.fontMetrics
@@ -967,9 +967,9 @@ class BoardView(context: Context) : View(context) {
     ) {
         val radius = cellSize * 0.36f
         val fox = piece.type == FoxAndGeesePieceType.FOX
-        val base = if (fox) Color.parseColor("#35B7A1") else Color.parseColor("#F2C879")
-        val highlight = if (fox) Color.parseColor("#A8F1D7") else Color.parseColor("#FFF1B8")
-        val edge = if (fox) Color.parseColor("#126E69") else Color.parseColor("#A85C27")
+        val base = if (fox) Color.parseColor("#35B7A1") else Color.parseColor("#F2F2F2")
+        val highlight = if (fox) Color.parseColor("#A8F1D7") else Color.WHITE
+        val edge = if (fox) Color.parseColor("#126E69") else Color.parseColor("#858585")
         val face = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = RadialGradient(
                 cx - radius * .30f, cy - radius * .38f, radius * 1.25f,
@@ -985,11 +985,11 @@ class BoardView(context: Context) : View(context) {
             strokeWidth = radius * .09f
         }
         canvas.drawCircle(cx, cy, radius * .91f, ring)
-        ring.color = if (fox) Color.parseColor("#D7FFF0") else Color.parseColor("#FFE9A0")
+        ring.color = if (fox) Color.parseColor("#D7FFF0") else Color.parseColor("#C7C7C7")
         ring.strokeWidth = radius * .035f
         canvas.drawCircle(cx, cy, radius * .72f, ring)
         val label = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = if (fox) Color.parseColor("#083F43") else Color.parseColor("#6B321E")
+            color = if (fox) Color.parseColor("#083F43") else Color.parseColor("#333333")
             textAlign = Paint.Align.CENTER
             textSize = radius * 1.02f
             isFakeBoldText = true

@@ -251,9 +251,9 @@ class CaptureStripView(context: Context) : View(context) {
         val radius = fillP.textSize * .38f
         val fox = piece.type == FoxAndGeesePieceType.FOX
         val cy = baseY - radius * .25f
-        val base = if (fox) Color.parseColor("#35B7A1") else Color.parseColor("#F2C879")
-        val highlight = if (fox) Color.parseColor("#A8F1D7") else Color.parseColor("#FFF1B8")
-        val edge = if (fox) Color.parseColor("#126E69") else Color.parseColor("#A85C27")
+        val base = if (fox) Color.parseColor("#35B7A1") else Color.parseColor("#F2F2F2")
+        val highlight = if (fox) Color.parseColor("#A8F1D7") else Color.WHITE
+        val edge = if (fox) Color.parseColor("#126E69") else Color.parseColor("#858585")
         val face = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = RadialGradient(
                 x - radius * .30f, cy - radius * .38f, radius * 1.25f,
@@ -268,12 +268,12 @@ class CaptureStripView(context: Context) : View(context) {
         strokeP.strokeWidth = maxOf(1f, radius * .10f)
         canvas.drawCircle(x, cy, radius * .91f, strokeP)
         strokeP.strokeWidth = maxOf(1f, radius * .04f)
-        strokeP.color = if (fox) Color.parseColor("#D7FFF0") else Color.parseColor("#FFE9A0")
+        strokeP.color = if (fox) Color.parseColor("#D7FFF0") else Color.parseColor("#C7C7C7")
         canvas.drawCircle(x, cy, radius * .72f, strokeP)
         strokeP.style = Paint.Style.FILL
         val originalTextSize = fillP.textSize
         val originalFakeBold = fillP.isFakeBoldText
-        fillP.color = if (fox) Color.parseColor("#083F43") else Color.parseColor("#6B321E")
+        fillP.color = if (fox) Color.parseColor("#083F43") else Color.parseColor("#333333")
         fillP.textAlign = Paint.Align.CENTER
         fillP.textSize = radius * 1.02f
         fillP.isFakeBoldText = true
