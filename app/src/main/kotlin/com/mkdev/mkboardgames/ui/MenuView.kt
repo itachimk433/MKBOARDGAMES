@@ -53,8 +53,11 @@ class MenuView(context: Context) : View(context) {
     private val ludoBoardBitmap: Bitmap? = try {
         context.assets.open("ludo_board_reference.png").use { BitmapFactory.decodeStream(it) }
     } catch (e: Exception) { null }
-    private val shogiBoardBitmap: Bitmap? = try {
-        context.assets.open("shogi_board_empty.png").use { BitmapFactory.decodeStream(it) }
+    private val shogiHomeIconBitmap: Bitmap? = try {
+        context.assets.open("shogi_home_icon.png").use { BitmapFactory.decodeStream(it) }
+    } catch (e: Exception) { null }
+    private val xiangqiHomeIconBitmap: Bitmap? = try {
+        context.assets.open("xiangqi_home_icon.png").use { BitmapFactory.decodeStream(it) }
     } catch (e: Exception) { null }
 
     private val bgPaint        = Paint().apply { color = Color.parseColor("#121212") }
@@ -375,24 +378,24 @@ class MenuView(context: Context) : View(context) {
 
     private fun drawShogiMini(canvas: Canvas, left: Float, top: Float, size: Float) {
         val boardRect = RectF(left, top, left + size, top + size)
-        shogiBoardBitmap?.let {
+        shogiHomeIconBitmap?.let {
             canvas.drawBitmap(it, null, boardRect, bitmapPaint)
-        } ?: run {
-            val cell = size / 9f
-            val board = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#C38A4C") }
-            val line = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.parseColor("#33251A")
-                style = Paint.Style.STROKE
-                strokeWidth = cell * 0.035f
-            }
-            canvas.drawRect(boardRect, board)
-            for (i in 0..9) {
-                canvas.drawLine(left + i * cell, top, left + i * cell, top + size, line)
-                canvas.drawLine(left, top + i * cell, left + size, top + i * cell, line)
-            }
+            return
         }
 
         val cell = size / 9f
+        val board = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#C38A4C") }
+        val line = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#33251A")
+            style = Paint.Style.STROKE
+            strokeWidth = cell * 0.035f
+        }
+        canvas.drawRect(boardRect, board)
+        for (i in 0..9) {
+            canvas.drawLine(left + i * cell, top, left + i * cell, top + size, line)
+            canvas.drawLine(left, top + i * cell, left + size, top + i * cell, line)
+        }
+
         val piecePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             textAlign = Paint.Align.CENTER
             textSize = cell * 0.48f
@@ -415,6 +418,11 @@ class MenuView(context: Context) : View(context) {
     }
 
     private fun drawXiangqiMini(canvas: Canvas, left: Float, top: Float, size: Float) {
+        xiangqiHomeIconBitmap?.let {
+            canvas.drawBitmap(it, null, RectF(left, top, left + size, top + size), bitmapPaint)
+            return
+        }
+
         val cellW = size / 9f
         val cellH = size / 10f
         val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
