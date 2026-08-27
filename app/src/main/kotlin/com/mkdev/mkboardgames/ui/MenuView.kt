@@ -53,6 +53,9 @@ class MenuView(context: Context) : View(context) {
     private val ludoHomeIconBitmap: Bitmap? = try {
         context.assets.open("ludo_home_icon.png").use { BitmapFactory.decodeStream(it) }
     } catch (e: Exception) { null }
+    private val othelloHomeIconBitmap: Bitmap? = try {
+        context.assets.open("othello_home_icon.png").use { BitmapFactory.decodeStream(it) }
+    } catch (e: Exception) { null }
     private val chessHomeIconBitmap: Bitmap? = try {
         context.assets.open("chess_home_icon.png").use { BitmapFactory.decodeStream(it) }
     } catch (e: Exception) { null }
@@ -629,6 +632,11 @@ class MenuView(context: Context) : View(context) {
     }
 
     private fun drawOthelloMini(canvas: Canvas, left: Float, top: Float, size: Float) {
+        othelloHomeIconBitmap?.let {
+            canvas.drawBitmap(it, null, RectF(left, top, left + size, top + size), bitmapPaint)
+            return
+        }
+
         val boardSize = 8
         val cell = size / boardSize.toFloat()
         val bgP = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#2A684B") }
