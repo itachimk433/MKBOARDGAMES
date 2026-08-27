@@ -62,6 +62,9 @@ class MenuView(context: Context) : View(context) {
     private val goHomeIconBitmap: Bitmap? = try {
         context.assets.open("go_home_icon.png").use { BitmapFactory.decodeStream(it) }
     } catch (e: Exception) { null }
+    private val foxAndGeeseHomeIconBitmap: Bitmap? = try {
+        context.assets.open("fox_and_geese_home_icon.png").use { BitmapFactory.decodeStream(it) }
+    } catch (e: Exception) { null }
 
     private val bgPaint        = Paint().apply { color = Color.parseColor("#121212") }
     private val cardPaint      = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#202429") }
@@ -717,6 +720,11 @@ class MenuView(context: Context) : View(context) {
     }
 
     private fun drawFoxAndGeeseMini(canvas: Canvas, left: Float, top: Float, size: Float) {
+        foxAndGeeseHomeIconBitmap?.let {
+            canvas.drawBitmap(it, null, RectF(left, top, left + size, top + size), bitmapPaint)
+            return
+        }
+
         val boardSize = FoxAndGeeseSetup.BOARD_SIZE
         val cell = size / boardSize.toFloat()
         fun point(row: Int, col: Int): Pair<Float, Float> =
