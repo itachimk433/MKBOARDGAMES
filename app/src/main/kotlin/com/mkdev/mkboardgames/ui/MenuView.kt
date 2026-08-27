@@ -53,6 +53,9 @@ class MenuView(context: Context) : View(context) {
     private val ludoHomeIconBitmap: Bitmap? = try {
         context.assets.open("ludo_home_icon.png").use { BitmapFactory.decodeStream(it) }
     } catch (e: Exception) { null }
+    private val morabarabaHomeIconBitmap: Bitmap? = try {
+        context.assets.open("morabaraba_home_icon.png").use { BitmapFactory.decodeStream(it) }
+    } catch (e: Exception) { null }
     private val connectFourHomeIconBitmap: Bitmap? = try {
         context.assets.open("connect_four_home_icon.png").use { BitmapFactory.decodeStream(it) }
     } catch (e: Exception) { null }
@@ -641,6 +644,11 @@ class MenuView(context: Context) : View(context) {
     }
 
     private fun drawMorabarabaMini(canvas: Canvas, left: Float, top: Float, size: Float) {
+        morabarabaHomeIconBitmap?.let {
+            canvas.drawBitmap(it, null, RectF(left, top, left + size, top + size), bitmapPaint)
+            return
+        }
+
         val lp = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.parseColor("#7FC8F8"); style = Paint.Style.STROKE
             strokeWidth = size * 0.03f; alpha = 180
