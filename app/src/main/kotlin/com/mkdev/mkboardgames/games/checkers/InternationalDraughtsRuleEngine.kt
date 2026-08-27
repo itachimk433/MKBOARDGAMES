@@ -235,7 +235,16 @@ class InternationalDraughtsRuleEngine : RuleEngine {
             while (Position(row, col).isValid(BOARD_SIZE) &&
                 state.get(row, col) == null
             ) {
-                moves += Move(from, Position(row, col))
+                val landing = Position(row, col)
+                moves += Move(
+                    from = from,
+                    to = landing,
+                    promotionType = if (reachesKingRow(piece, landing)) {
+                        CheckersPieceType.KING.name
+                    } else {
+                        null
+                    },
+                )
                 if (!piece.isKing) break
                 row += direction.row
                 col += direction.col
@@ -253,11 +262,14 @@ class InternationalDraughtsRuleEngine : RuleEngine {
         }
         newBoard[move.from.row * BOARD_SIZE + move.from.col] = null
 
-        val movedPiece = if (piece.isKing || move.promotionType == CheckersPieceType.KING.name) {
-            CheckersPiece(CheckersPieceType.KING, piece.color)
-        } else {
-            piece
-        }
+        // Derive promotion from the destination as well as the move metadata.
+        // This keeps moves recorded before promotion metadata was added
+        // replayable and prevents a quiet promotion from depending on its caller.
+        val movedPiece = if (
+            piece.isKing ||
+            move.promotionType == CheckersPieceType.KING.name ||
+            reachesKingRow(piece, move.to)
+        ) CheckersPiece(CheckersPieceType.KING, piece.color) else piece
         newBoard[move.to.row * BOARD_SIZE + move.to.col] = movedPiece
 
         val next = state.withBoard(newBoard, piece.color.opponent(), move)
@@ -324,14 +336,19 @@ class InternationalDraughtsRuleEngine : RuleEngine {
 
     private fun promote(piece: CheckersPiece, landing: Position): CheckersPiece {
         if (piece.isKing) return piece
-        val reached = (piece.color == PieceColor.WHITE && landing.row == 0) ||
-            (piece.color == PieceColor.BLACK && landing.row == BOARD_SIZE - 1)
+        val reached = reachesKingRow(piece, landing)
         return if (reached) {
             CheckersPiece(CheckersPieceType.KING, piece.color)
         } else {
             piece
         }
     }
+
+    private fun reachesKingRow(piece: CheckersPiece, landing: Position): Boolean =
+        !piece.isKing && (
+            (piece.color == PieceColor.WHITE && landing.row == 0) ||
+                (piece.color == PieceColor.BLACK && landing.row == BOARD_SIZE - 1)
+            )
 
     companion object {
         const val BOARD_SIZE = InternationalDraughtsSetup.BOARD_SIZE

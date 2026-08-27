@@ -323,7 +323,11 @@ class ReplayActivity : AppCompatActivity() {
                 root.addView(lbv, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0).apply { weight = 1f })
             }
             else -> {
-                val bv = BoardView(this).apply { isLocked = true; ruleEngine = engine }
+                val bv = BoardView(this).apply {
+                    isLocked = true
+                    ruleEngine = engine
+                    onGameOverTapped = { showReplayResultDialog() }
+                }
                 boardView = bv
                 root.addView(bv, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0).apply { weight = 1f })
             }
@@ -442,10 +446,25 @@ class ReplayActivity : AppCompatActivity() {
 
     private fun showReplayResultDialog() {
         AlertDialog.Builder(this)
-            .setTitle("Ludo")
+            .setTitle(replayGameName())
             .setMessage(resultText.ifBlank { "Replay finished." })
             .setPositiveButton("Close", null)
             .show()
+    }
+
+    private fun replayGameName(): String = when (gameType) {
+        "CHECKERS" -> "Draughts"
+        "INTERNATIONAL_DRAUGHTS" -> "International Draughts"
+        "FOX_AND_GEESE" -> "Fox and Geese"
+        "SHOGI" -> "Shogi"
+        "XIANGQI" -> "Xiangqi"
+        "GO" -> "Go"
+        "CHESS" -> "Chess"
+        "LUDO" -> "Ludo"
+        "MORABARABA" -> "Morabaraba"
+        "TICTACTOE" -> "Tic-Tac-Toe"
+        "CONNECTFOUR" -> "Connect Four"
+        else -> "Replay"
     }
 
     override fun onDestroy() { super.onDestroy(); stopAutoPlay() }

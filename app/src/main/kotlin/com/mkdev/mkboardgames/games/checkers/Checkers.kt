@@ -10,9 +10,13 @@ enum class CheckersPieceType { MAN, KING }
 data class CheckersPiece(val type: CheckersPieceType, override val color: PieceColor) : Piece(color) {
     // Draughts are discs, not chess pieces. Rendering supplies the layered
     // material treatment; this fallback is used in capture strips and logs.
-    override fun symbol() = if (type == CheckersPieceType.KING) "◎" else "●"
+    override fun symbol() = if (type == CheckersPieceType.KING) KING_SYMBOL else "●"
     override fun value() = if (type == CheckersPieceType.MAN) 100 else 175
     val isKing get() = type == CheckersPieceType.KING
+
+    companion object {
+        const val KING_SYMBOL = "♛"
+    }
 }
 
 object CheckersSetup {

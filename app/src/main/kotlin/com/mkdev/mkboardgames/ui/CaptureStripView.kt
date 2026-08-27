@@ -64,6 +64,10 @@ class CaptureStripView(context: Context) : View(context) {
     }
     // For checkers: circle-based rendering
     private val circleP = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val kingP = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textAlign = Paint.Align.CENTER
+        isFakeBoldText = true
+    }
 
     private var pieces: List<Piece> = emptyList()
     private var label: String = ""
@@ -331,11 +335,18 @@ class CaptureStripView(context: Context) : View(context) {
             Color.parseColor("#AAAAAA") else Color.parseColor("#888888")
         canvas.drawCircle(cx, cy, r * 0.88f, circleP)
         circleP.style = Paint.Style.FILL
-        // King crown dot
+        // Use the same crown mark as the board for captured kings.
         if (piece.isKing) {
-            circleP.color = if (piece.color == PieceColor.WHITE)
+            kingP.color = if (piece.color == PieceColor.WHITE)
                 Color.parseColor("#7FC8F8") else Color.parseColor("#EF5350")
-            canvas.drawCircle(cx, cy, r * 0.28f, circleP)
+            kingP.textSize = r * 1.05f
+            val metrics = kingP.fontMetrics
+            canvas.drawText(
+                CheckersPiece.KING_SYMBOL,
+                cx,
+                cy - (metrics.ascent + metrics.descent) / 2f,
+                kingP,
+            )
         }
     }
 }

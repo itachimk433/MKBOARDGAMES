@@ -949,7 +949,13 @@ class BoardView(context: Context) : View(context) {
                 color = if (isWhite) Color.parseColor("#8F5D25") else Color.parseColor("#E7B45C")
                 isFakeBoldText = true
             }
-            canvas.drawText("✦", cx, cy + r * 0.34f, kp)
+            val metrics = kp.fontMetrics
+            canvas.drawText(
+                CheckersPiece.KING_SYMBOL,
+                cx,
+                cy - (metrics.ascent + metrics.descent) / 2f + r * 0.04f,
+                kp,
+            )
         }
     }
 
