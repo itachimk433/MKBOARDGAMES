@@ -59,6 +59,9 @@ class MenuView(context: Context) : View(context) {
     private val xiangqiHomeIconBitmap: Bitmap? = try {
         context.assets.open("xiangqi_home_icon.png").use { BitmapFactory.decodeStream(it) }
     } catch (e: Exception) { null }
+    private val goHomeIconBitmap: Bitmap? = try {
+        context.assets.open("go_home_icon.png").use { BitmapFactory.decodeStream(it) }
+    } catch (e: Exception) { null }
 
     private val bgPaint        = Paint().apply { color = Color.parseColor("#121212") }
     private val cardPaint      = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#202429") }
@@ -344,6 +347,11 @@ class MenuView(context: Context) : View(context) {
     }
 
     private fun drawGoMini(canvas: Canvas, left: Float, top: Float, size: Float) {
+        goHomeIconBitmap?.let {
+            canvas.drawBitmap(it, null, RectF(left, top, left + size, top + size), bitmapPaint)
+            return
+        }
+
         val cell = size / (GoSetup.BOARD_SIZE - 1).toFloat()
         val boardPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.parseColor("#C98525")
