@@ -40,6 +40,8 @@ object SoundPlayer {
         ids["checkers_move"]    = p.load(ctx, R.raw.checkers_move,    1)
         ids["checkers_capture"] = p.load(ctx, R.raw.checkers_capture, 1)
         ids["checkers_king"]    = p.load(ctx, R.raw.checkers_king,    1)
+        // Shared piece movement/placement sound for Fox and Geese, Xiangqi, Shogi, and Go.
+        ids["board_piece_move"] = p.load(ctx, R.raw.checkers_move,    1)
 
         // Othello sounds (new)
         ids["othello_place"]    = p.load(ctx, R.raw.othello_place,    1)

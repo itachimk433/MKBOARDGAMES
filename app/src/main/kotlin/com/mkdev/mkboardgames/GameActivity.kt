@@ -1033,6 +1033,12 @@ Checkmate your opponent's King.
             if (gameType == "CHECKERS" || gameType == "INTERNATIONAL_DRAUGHTS")
                 playCheckersSound(move)
             if (gameType == "OTHELLO") playOthelloSound(move)
+            if ((gameType == "FOX_AND_GEESE" ||
+                    gameType == "XIANGQI" ||
+                    gameType == "SHOGI" ||
+                    gameType == "GO") &&
+                move.metadata[GoRuleEngine.PASS_METADATA] != true
+            ) SoundPlayer.playMovement("board_piece_move")
             if (gameState.status != GameStatus.IN_PROGRESS) {
                 recordResult()
                 val ad = interstitialAd
