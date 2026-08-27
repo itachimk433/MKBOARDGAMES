@@ -53,6 +53,9 @@ class MenuView(context: Context) : View(context) {
     private val ludoHomeIconBitmap: Bitmap? = try {
         context.assets.open("ludo_home_icon.png").use { BitmapFactory.decodeStream(it) }
     } catch (e: Exception) { null }
+    private val connectFourHomeIconBitmap: Bitmap? = try {
+        context.assets.open("connect_four_home_icon.png").use { BitmapFactory.decodeStream(it) }
+    } catch (e: Exception) { null }
     private val shogiHomeIconBitmap: Bitmap? = try {
         context.assets.open("shogi_home_icon.png").use { BitmapFactory.decodeStream(it) }
     } catch (e: Exception) { null }
@@ -698,6 +701,11 @@ class MenuView(context: Context) : View(context) {
     }
 
     private fun drawConnectFourMini(canvas: Canvas, left: Float, top: Float, size: Float) {
+        connectFourHomeIconBitmap?.let {
+            canvas.drawBitmap(it, null, RectF(left, top, left + size, top + size), bitmapPaint)
+            return
+        }
+
         val cols = 7
         val rows = 6
         val cell = size / cols
