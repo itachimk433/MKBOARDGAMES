@@ -104,6 +104,7 @@ class BoardView(context: Context) : View(context) {
     private var animFromPx  = PointF()
     private var animToPx    = PointF()
     private var animFromPos: Position? = null
+    private var animToPos: Position? = null
     private var animProgress: Float = 0f
     private var animator: ValueAnimator? = null
     private var pendingMove: Move? = null
@@ -448,6 +449,7 @@ class BoardView(context: Context) : View(context) {
         activeAnimator?.cancel()
         animPiece = null
         animFromPos = null
+        animToPos = null
         animProgress = 0f
         isLocked = false
         invalidate()
@@ -502,7 +504,7 @@ class BoardView(context: Context) : View(context) {
         val piece = gameState.get(move.from) ?: run { isLocked = false; onMoveMade?.invoke(move); return }
 
         selectedPos = null; legalMoves = emptyList()
-        animPiece   = piece; animFromPos = move.from
+        animPiece   = piece; animFromPos = move.from; animToPos = move.to
         animFromPx  = cellCenter(move.from); animToPx = cellCenter(move.to)
         pendingMove = move; isLocked = true
 
@@ -513,7 +515,7 @@ class BoardView(context: Context) : View(context) {
                 override fun onAnimationEnd(animation: Animator) {
                     if (animation !== animator) return
                     animator = null
-                    animPiece = null; animFromPos = null; animProgress = 0f
+                    animPiece = null; animFromPos = null; animToPos = null; animProgress = 0f
                     isLocked  = false; invalidate()
                     val completedMove = pendingMove
                     pendingMove = null
