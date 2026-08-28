@@ -83,7 +83,7 @@ class LudoBoardView(context: Context) : View(context) {
     }
 
     private val boardBitmap: Bitmap? = runCatching {
-        context.assets.open("ludo_board_reference.png").use { BitmapFactory.decodeStream(it) }
+        context.assets.open("ludo_board_reference.webp").use { BitmapFactory.decodeStream(it) }
     }.getOrNull()
     private val boardPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val piecePaint = Paint(Paint.ANTI_ALIAS_FLAG)

@@ -55,6 +55,16 @@ class BoardView(context: Context) : View(context) {
     var showMustCaptureHints: Boolean = false
     var rotateBlackPieces: Boolean = false
     var directMoveMode: Boolean = false
+    var useCanvasChessBoard: Boolean = true
+        set(value) {
+            if (field == value) return
+            field = value
+            updateBoardGeometry()
+            // Keep an in-flight move aligned when the board style changes.
+            animFromPos?.let { animFromPx = cellCenter(it) }
+            animToPos?.let { animToPx = cellCenter(it) }
+            invalidate()
+        }
     var onPromotionChoice: ((List<Move>) -> Unit)? = null
 
     // ─── Selection ───────────────────────────────────────────────────────────
@@ -161,17 +171,17 @@ class BoardView(context: Context) : View(context) {
     )
 
     private val xiangqiBoardBitmap: Bitmap? = try {
-        context.assets.open("xiangqi_board_empty.png").use { BitmapFactory.decodeStream(it) }
+        context.assets.open("xiangqi_board.webp").use { BitmapFactory.decodeStream(it) }
     } catch (_: Throwable) {
         null
     }
     private val shogiBoardBitmap: Bitmap? = try {
-        context.assets.open("shogi_board_empty.png").use { BitmapFactory.decodeStream(it) }
+        context.assets.open("shogi_board.webp").use { BitmapFactory.decodeStream(it) }
     } catch (_: Throwable) {
         null
     }
     private val goBoardBitmap: Bitmap? = try {
-        context.assets.open("go_board_empty.png").use { BitmapFactory.decodeStream(it) }
+        context.assets.open("go_board.webp").use { BitmapFactory.decodeStream(it) }
     } catch (_: Throwable) {
         null
     }
@@ -312,7 +322,7 @@ class BoardView(context: Context) : View(context) {
             }
             return
         }
-        if (isChessBoard()) {
+        if (isChessCanvasBoard()) {
             val bitmap = chessBoardBitmap
             if (bitmap != null) {
                 val scale = minOf(
@@ -514,7 +524,7 @@ class BoardView(context: Context) : View(context) {
         if (isShogiBoard()) return shogiPoint(pos)
         if (isXiangqiBoard()) return xiangqiPoint(pos)
         if (isGoBoard()) return goPoint(pos)
-        if (isChessBoard()) return chessPoint(pos)
+        if (isChessCanvasBoard()) return chessPoint(pos)
         val last = gameState.boardSize - 1
         val dr = if (isFlipped) last - pos.row else pos.row
         val dc = if (isFlipped) last - pos.col else pos.col
@@ -524,10 +534,17 @@ class BoardView(context: Context) : View(context) {
 
     // ─── Drawing ─────────────────────────────────────────────────────────────
     override fun onDraw(canvas: Canvas) {
-        if (isChessBoard()) {
+        if (isChessCanvasBoard()) {
             drawChessBoard(canvas)
             drawChessHighlights(canvas)
             drawChessPieces(canvas)
+            return
+        }
+        if (isChessBoard()) {
+            drawBoard(canvas)
+            drawLabels(canvas)
+            drawHighlights(canvas)
+            drawPieces(canvas)
             return
         }
         if (isShogiBoard()) {
@@ -1228,6 +1245,9 @@ class BoardView(context: Context) : View(context) {
     private fun isChessBoard(): Boolean =
         ruleEngine is ChessRuleEngine || gameState.board.any { it is ChessPiece }
 
+    private fun isChessCanvasBoard(): Boolean =
+        isChessBoard() && useCanvasChessBoard && chessBoardBitmap != null
+
     private fun goPoint(position: Position): PointF {
         val displayedRow = if (isFlipped) 12 - position.row else position.row
         val displayedCol = if (isFlipped) 12 - position.col else position.col
@@ -1277,7 +1297,7 @@ class BoardView(context: Context) : View(context) {
     }
 
     private fun screenToBoard(x: Float, y: Float): Position? {
-        if (isChessBoard()) {
+        if (isChessCanvasBoard()) {
             if (chessCellWidth <= 0f || chessCellHeight <= 0f) return null
             val displayedCol = (0 until 8).firstOrNull {
                 x >= chessLineX(it) && x < chessLineX(it + 1)

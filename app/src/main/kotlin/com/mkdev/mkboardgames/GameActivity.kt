@@ -112,6 +112,12 @@ class GameActivity : AppCompatActivity() {
         }
         boardView        = BoardView(this)
         bottomCaptureView = CaptureStripView(this).also { it.dividerOnTop = true }
+        hudView.onBoardStyleToggle = {
+            if (gameType == "CHESS") {
+                boardView.useCanvasChessBoard = !boardView.useCanvasChessBoard
+                hudView.setChessMode(true, boardView.useCanvasChessBoard)
+            }
+        }
         topCaptureView.onPieceSelected = ::handleShogiHandTap
         bottomCaptureView.onPieceSelected = ::handleShogiHandTap
 
@@ -122,6 +128,7 @@ class GameActivity : AppCompatActivity() {
         gameState = engine.initialState()
         boardView.ruleEngine = engine
         boardView.gameState = gameState
+        hudView.setChessMode(gameType == "CHESS", boardView.useCanvasChessBoard)
 
         container.addView(hudView,
             android.widget.LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, hudH))
@@ -1807,11 +1814,15 @@ Checkmate your opponent's King.
     // ─── HUD View ─────────────────────────────────────────────────────────────
 
     inner class HudView(ctx: Context) : View(ctx) {
+        var onBoardStyleToggle: (() -> Unit)? = null
+
         private var title    = "White to move"
         private var canUndo  = false
         private var canRedo  = false
         private var thinking = false
         private var goMode   = false
+        private var chessMode = false
+        private var canvasBoard = true
         private var detail   = ""
 
         private val dp = resources.displayMetrics.density
@@ -1839,6 +1850,7 @@ Checkmate your opponent's King.
 
         private val backRect = RectF()
         private val passRect = RectF()
+        private val boardStyleRect = RectF()
         private val undoRect = RectF()
         private val redoRect = RectF()
         private val menuRect = RectF()
@@ -1860,6 +1872,12 @@ Checkmate your opponent's King.
             if (width > 0 && height > 0) onSizeChanged(width, height, width, height)
             invalidate()
         }
+        fun setChessMode(enabled: Boolean, canvasBoard: Boolean) {
+            chessMode = enabled
+            this.canvasBoard = canvasBoard
+            if (width > 0 && height > 0) onSizeChanged(width, height, width, height)
+            invalidate()
+        }
 
         override fun onSizeChanged(w: Int, h: Int, ow: Int, oh: Int) {
             val bw = 44f * dp; val bh = 28f * dp; val by = (h - bh) / 2f
@@ -1868,6 +1886,11 @@ Checkmate your opponent's King.
                 passRect.set(w - bw * 4.4f, by, w - bw * 3.35f, by + bh)
             } else {
                 passRect.set(0f, 0f, 0f, 0f)
+            }
+            if (chessMode) {
+                boardStyleRect.set(w - bw * 4.4f, by, w - bw * 3.35f, by + bh)
+            } else {
+                boardStyleRect.set(0f, 0f, 0f, 0f)
             }
             undoRect.set(w - bw * 3.3f,  by, w - bw * 2.2f,  by + bh)
             redoRect.set(w - bw * 2.15f, by, w - bw * 1.1f,  by + bh)
@@ -1880,6 +1903,10 @@ Checkmate your opponent's King.
                 when {
                     backRect.contains(e.x, e.y) -> { SoundPlayer.play("ui_click"); this@GameActivity.onBackPressed() }
                     goMode && passRect.contains(e.x, e.y) -> { SoundPlayer.play("ui_click"); onPassClicked() }
+                    chessMode && boardStyleRect.contains(e.x, e.y) -> {
+                        SoundPlayer.play("ui_click")
+                        onBoardStyleToggle?.invoke()
+                    }
                     undoRect.contains(e.x, e.y) -> { SoundPlayer.play("ui_click"); onUndoClicked() }
                     redoRect.contains(e.x, e.y) -> { SoundPlayer.play("ui_click"); onRedoClicked() }
                     menuRect.contains(e.x, e.y) -> { SoundPlayer.play("ui_click"); onMenuClicked() }
@@ -1896,11 +1923,20 @@ Checkmate your opponent's King.
             val rr = 5f * dp
             canvas.drawRoundRect(backRect, rr, rr, btnBgPaint)
             if (goMode) canvas.drawRoundRect(passRect, rr, rr, btnBgPaint)
+            if (chessMode) canvas.drawRoundRect(boardStyleRect, rr, rr, btnBgPaint)
             canvas.drawRoundRect(undoRect, rr, rr, btnBgPaint)
             canvas.drawRoundRect(redoRect, rr, rr, btnBgPaint)
             canvas.drawRoundRect(menuRect, rr, rr, btnBgPaint)
             canvas.drawText("← Back", backRect.centerX(), backRect.centerY() + btnPaint.textSize * 0.36f, btnPaint)
             if (goMode) canvas.drawText("Pass", passRect.centerX(), passRect.centerY() + btnPaint.textSize * 0.36f, btnPaint)
+            if (chessMode) {
+                canvas.drawText(
+                    if (canvasBoard) "Canvas" else "Board",
+                    boardStyleRect.centerX(),
+                    boardStyleRect.centerY() + btnPaint.textSize * 0.36f,
+                    btnPaint,
+                )
+            }
             canvas.drawText("Undo", undoRect.centerX(), undoRect.centerY() + btnPaint.textSize * 0.36f,
                 if (canUndo) btnPaint else dimPaint)
             canvas.drawText("Redo", redoRect.centerX(), redoRect.centerY() + btnPaint.textSize * 0.36f,
