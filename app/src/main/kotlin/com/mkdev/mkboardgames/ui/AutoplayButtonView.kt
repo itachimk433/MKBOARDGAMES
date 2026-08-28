@@ -9,14 +9,15 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.view.View
 import android.view.animation.AccelerateDecelerateInterpolator
+import android.view.animation.LinearInterpolator
 import android.view.animation.OvershootInterpolator
 import com.mkdev.mkboardgames.SoundPlayer
 
 /**
  * A tactile Chess autoplay control.
  *
- * Green means the player's pieces remain under manual control. Red means
- * autoplay is active and the configured Chess AI can make the player's moves.
+ * The button stays neutral while the player's pieces remain under manual
+ * control. A moving blue border marks the active autoplay state.
  */
 class AutoplayButtonView(context: Context) : View(context) {
 
@@ -29,12 +30,19 @@ class AutoplayButtonView(context: Context) : View(context) {
     private var pressScale = 1f
     private var stateAnimator: ValueAnimator? = null
     private var pressAnimator: ValueAnimator? = null
+    private var borderAnimator: ValueAnimator? = null
+    private var borderProgress = 0f
 
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val edgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeWidth = 1.8f * dp
+    }
+    private val movingBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+        strokeWidth = 3.2f * dp
     }
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.CENTER
@@ -48,12 +56,14 @@ class AutoplayButtonView(context: Context) : View(context) {
     init {
         isClickable = true
         isFocusable = true
-        contentDescription = "Autoplay"
+        updateContentDescription()
         setOnClickListener { toggleAutoplay() }
     }
 
     fun setAutoplayEnabled(value: Boolean, animate: Boolean = true) {
         enabled = value
+        updateContentDescription()
+        if (value) startBorderAnimation() else stopBorderAnimation()
         val target = if (value) 1f else 0f
         stateAnimator?.cancel()
         if (!animate) {
@@ -80,6 +90,31 @@ class AutoplayButtonView(context: Context) : View(context) {
         onAutoplayChanged?.invoke(next)
     }
 
+    private fun updateContentDescription() {
+        contentDescription = if (enabled) "Autoplay On" else "Autoplay Off"
+    }
+
+    private fun startBorderAnimation() {
+        if (borderAnimator?.isRunning == true) return
+        borderAnimator = ValueAnimator.ofFloat(0f, 360f).apply {
+            duration = 1500L
+            repeatCount = ValueAnimator.INFINITE
+            interpolator = LinearInterpolator()
+            addUpdateListener {
+                borderProgress = it.animatedValue as Float
+                invalidate()
+            }
+            start()
+        }
+    }
+
+    private fun stopBorderAnimation() {
+        borderAnimator?.cancel()
+        borderAnimator = null
+        borderProgress = 0f
+        invalidate()
+    }
+
     private fun runClickAnimation() {
         pressAnimator?.cancel()
         pressAnimator = ValueAnimator.ofFloat(1f, 0.91f, 1.04f, 1f).apply {
@@ -96,27 +131,28 @@ class AutoplayButtonView(context: Context) : View(context) {
     override fun onDetachedFromWindow() {
         stateAnimator?.cancel()
         pressAnimator?.cancel()
+        borderAnimator?.cancel()
         stateAnimator = null
         pressAnimator = null
+        borderAnimator = null
         super.onDetachedFromWindow()
     }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
-        val buttonWidth = 146f * dp
-        val buttonHeight = 36f * dp
+        val buttonDiameter = minOf(width.toFloat(), height.toFloat()) - 12f * dp
         buttonRect.set(
-            (width - buttonWidth) / 2f,
-            (height - buttonHeight) / 2f,
-            (width + buttonWidth) / 2f,
-            (height + buttonHeight) / 2f,
+            (width - buttonDiameter) / 2f,
+            (height - buttonDiameter) / 2f,
+            (width + buttonDiameter) / 2f,
+            (height + buttonDiameter) / 2f,
         )
 
-        val green = Color.parseColor("#55E28C")
-        val red = Color.parseColor("#FF5F6D")
-        val accent = ArgbEvaluator().evaluate(stateProgress, green, red) as Int
-        val radius = buttonHeight / 2f
+        val offAccent = Color.parseColor("#6B7785")
+        val blueAccent = Color.parseColor("#42A5F5")
+        val accent = ArgbEvaluator().evaluate(stateProgress, offAccent, blueAccent) as Int
+        val radius = buttonDiameter / 2f
 
         canvas.save()
         canvas.scale(pressScale, pressScale, buttonRect.centerX(), buttonRect.centerY())
@@ -124,34 +160,32 @@ class AutoplayButtonView(context: Context) : View(context) {
         // Layered translucent edges create a soft light around the button
         // without requiring a software blur layer on older Android versions.
         glowPaint.color = Color.argb(24, Color.red(accent), Color.green(accent), Color.blue(accent))
-        canvas.drawRoundRect(
-            buttonRect.left - 4f * dp,
-            buttonRect.top - 4f * dp,
-            buttonRect.right + 4f * dp,
-            buttonRect.bottom + 4f * dp,
-            radius + 4f * dp,
-            radius + 4f * dp,
-            glowPaint,
-        )
+        canvas.drawCircle(buttonRect.centerX(), buttonRect.centerY(), radius + 4f * dp, glowPaint)
         glowPaint.color = Color.argb(44, Color.red(accent), Color.green(accent), Color.blue(accent))
-        canvas.drawRoundRect(
-            buttonRect.left - 1.5f * dp,
-            buttonRect.top - 1.5f * dp,
-            buttonRect.right + 1.5f * dp,
-            buttonRect.bottom + 1.5f * dp,
-            radius + 1.5f * dp,
-            radius + 1.5f * dp,
-            glowPaint,
-        )
+        canvas.drawCircle(buttonRect.centerX(), buttonRect.centerY(), radius + 1.5f * dp, glowPaint)
 
         fillPaint.color = Color.parseColor("#1E252C")
-        canvas.drawRoundRect(buttonRect, radius, radius, fillPaint)
+        canvas.drawCircle(buttonRect.centerX(), buttonRect.centerY(), radius, fillPaint)
         edgePaint.color = accent
-        canvas.drawRoundRect(buttonRect, radius, radius, edgePaint)
+        canvas.drawCircle(buttonRect.centerX(), buttonRect.centerY(), radius, edgePaint)
+
+        if (enabled) {
+            movingBorderPaint.color = blueAccent
+            val movingRect = RectF(buttonRect).apply { inset(1.5f * dp, 1.5f * dp) }
+            canvas.drawArc(movingRect, borderProgress - 42f, 112f, false, movingBorderPaint)
+        }
 
         textPaint.color = Color.WHITE
+        textPaint.textSize = minOf(
+            11f * resources.displayMetrics.scaledDensity.coerceAtMost(3f),
+            buttonDiameter * 0.14f,
+        )
+        val autoplayLabel = if (enabled) "Autoplay On" else "Autoplay Off"
+        if (textPaint.measureText(autoplayLabel) > buttonDiameter - 8f * dp) {
+            textPaint.textSize *= (buttonDiameter - 8f * dp) / textPaint.measureText(autoplayLabel)
+        }
         canvas.drawText(
-            "Autoplay",
+            autoplayLabel,
             buttonRect.centerX(),
             buttonRect.centerY() - (textPaint.ascent() + textPaint.descent()) / 2f,
             textPaint,

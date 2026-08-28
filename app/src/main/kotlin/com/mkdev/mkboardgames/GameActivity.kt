@@ -100,7 +100,7 @@ class GameActivity : AppCompatActivity() {
         val hudH  = (56 * dp).toInt()
         val capH  = if (gameType == "GO") (58 * dp).toInt() else (36 * dp).toInt()
         val boardStyleSwitchH = (44 * dp).toInt()
-        val autoplayButtonH = (50 * dp).toInt()
+        val autoplayButtonH = (76 * dp).toInt()
 
         val container = android.widget.LinearLayout(this).apply {
             orientation = android.widget.LinearLayout.VERTICAL

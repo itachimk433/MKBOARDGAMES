@@ -78,6 +78,7 @@ class CaptureStripView(context: Context) : View(context) {
     private var summaryScore = 0.0
     private var summaryCaptures = 0
     private var summaryActive = false
+    private val pieceHitboxes = mutableListOf<Triple<Float, Float, Piece>>()
     var onPieceSelected: ((Piece) -> Unit)? = null
     var dividerOnTop: Boolean = false
 
@@ -121,11 +122,8 @@ class CaptureStripView(context: Context) : View(context) {
 
     override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
         if (event.action == android.view.MotionEvent.ACTION_UP && selectable && pieces.isNotEmpty()) {
-            val gap = height * 0.62f
-            if (gap > 0f) {
-                val index = ((event.x - gap * 0.2f) / gap).toInt()
-                pieces.getOrNull(index)?.let { onPieceSelected?.invoke(it) }
-            }
+            pieceHitboxes.firstOrNull { event.x >= it.first && event.x <= it.second }
+                ?.let { onPieceSelected?.invoke(it.third) }
         }
         return true
     }
@@ -151,9 +149,11 @@ class CaptureStripView(context: Context) : View(context) {
 
         if (pieces.isEmpty()) return
 
-        val sz  = h * 0.52f     // glyph/circle size
-        val gap = h * 0.62f     // horizontal stride
-        var x   = gap * 0.52f   // start X
+        val sz = h * 0.52f     // glyph/circle size
+        val sameKindGap = h * 0.39f
+        val newKindGap = h * 0.74f
+        var x = h * 0.30f
+        pieceHitboxes.clear()
 
         strokeP.textSize = sz; fillP.textSize = sz
         strokeP.strokeWidth = sz * 0.04f
@@ -161,10 +161,12 @@ class CaptureStripView(context: Context) : View(context) {
         val baseY = h * 0.72f   // text baseline
 
         // Clip pieces area away from label
-        val maxX = if (label.isNotEmpty()) w - lblP.measureText(label) - 20f * dp else w - gap * 0.3f
+        val maxX = if (label.isNotEmpty()) w - lblP.measureText(label) - 20f * dp else w - sz * 0.4f
 
-        for (p in pieces) {
-            if (x > maxX) break
+        val groupedPieces = pieces.groupBy { pieceKindKey(it) }.values.flatten()
+        for ((index, p) in groupedPieces.withIndex()) {
+            val next = groupedPieces.getOrNull(index + 1)
+            if (x + sz * 0.5f > maxX) break
 
             when (p) {
                 is CheckersPiece -> drawCheckersPiece(canvas, p, x + sz * 0.5f, h / 2f, sz * 0.36f)
@@ -173,8 +175,18 @@ class CaptureStripView(context: Context) : View(context) {
                 is ShogiPiece   -> drawShogiPiece(canvas, p, x, baseY)
                 else             -> drawMorabaraPiece(canvas, p, x + sz * 0.5f, h / 2f, sz * 0.36f)
             }
-            x += gap
+            pieceHitboxes += Triple(x - sz * 0.25f, x + sz * 0.75f, p)
+            val sameKind = next != null && pieceKindKey(next) == pieceKindKey(p)
+            x += if (sameKind) sameKindGap else newKindGap
         }
+    }
+
+    private fun pieceKindKey(piece: Piece): String = when (piece) {
+        is ChessPiece -> "chess:${piece.type.name}:${piece.color.name}"
+        is CheckersPiece -> "checkers:${piece.type.name}:${piece.color.name}"
+        is FoxAndGeesePiece -> "fox:${piece.type.name}:${piece.color.name}"
+        is ShogiPiece -> "shogi:${piece.type.name}:${piece.promoted}:${piece.color.name}"
+        else -> "${piece::class.java.name}:${piece.symbol()}:${piece.color.name}"
     }
 
     private fun drawSummary(canvas: Canvas) {

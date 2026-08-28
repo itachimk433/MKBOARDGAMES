@@ -855,33 +855,45 @@ class ReplayActivity : AppCompatActivity() {
             canvas.drawRect(half - dp / 2f, 6f * dp, half + dp / 2f, h - 6f * dp, divP)
 
             lblP.textSize  = 9f * sp.coerceAtMost(3f)
-            pieceP.textSize = h * 0.44f
+            pieceP.textSize = h * 0.34f
             val labelY  = lblP.textSize + 4f * dp
-            val pieceY  = h * 0.72f
+            val pieceY  = h * 0.70f
             val padStart = 8f * dp
-            val gap      = pieceP.textSize * 0.80f
+            val sameKindGap = pieceP.textSize * 0.58f
+            val newKindGap = pieceP.textSize * 0.98f
 
             // LEFT: White's captures, or Gote's hand in Shogi.
             canvas.drawText(if (gameType == "SHOGI") "Gote hand" else "White ⚔", padStart, labelY, lblP)
-            var x = padStart + gap / 2f
-            for (piece in snapshot.byWhite) {
+            var x = padStart + pieceP.textSize * 0.34f
+            val leftPieces = snapshot.byWhite.groupBy { pieceKindKey(it) }.values.flatten()
+            for ((index, piece) in leftPieces.withIndex()) {
                 pieceP.color = pieceColor(piece)
                 canvas.drawText(piece.symbol(), x, pieceY, pieceP)
-                x += gap
-                if (x > half - gap / 2f) break
+                val sameKind = leftPieces.getOrNull(index + 1)?.let { pieceKindKey(it) == pieceKindKey(piece) } == true
+                x += if (sameKind) sameKindGap else newKindGap
+                if (x > half - pieceP.textSize * 0.34f) break
             }
 
             // RIGHT: Black's captures, or Sente's hand in Shogi.
             lblP.textAlign = Paint.Align.RIGHT
             canvas.drawText(if (gameType == "SHOGI") "Sente hand" else "Black ⚔", w - padStart, labelY, lblP)
             lblP.textAlign = Paint.Align.LEFT
-            var rx = half + padStart + gap / 2f
-            for (piece in snapshot.byBlack) {
+            var rx = half + padStart + pieceP.textSize * 0.34f
+            val rightPieces = snapshot.byBlack.groupBy { pieceKindKey(it) }.values.flatten()
+            for ((index, piece) in rightPieces.withIndex()) {
                 pieceP.color = pieceColor(piece)
                 canvas.drawText(piece.symbol(), rx, pieceY, pieceP)
-                rx += gap
-                if (rx > w - gap / 2f) break
+                val sameKind = rightPieces.getOrNull(index + 1)?.let { pieceKindKey(it) == pieceKindKey(piece) } == true
+                rx += if (sameKind) sameKindGap else newKindGap
+                if (rx > w - pieceP.textSize * 0.34f) break
             }
+        }
+
+        private fun pieceKindKey(piece: Piece): String = when (piece) {
+            is ChessPiece -> "chess:${piece.type.name}:${piece.color.name}"
+            is CheckersPiece -> "checkers:${piece.type.name}:${piece.color.name}"
+            is ShogiPiece -> "shogi:${piece.type.name}:${piece.promoted}:${piece.color.name}"
+            else -> "${piece::class.java.name}:${piece.symbol()}:${piece.color.name}"
         }
 
         /**
