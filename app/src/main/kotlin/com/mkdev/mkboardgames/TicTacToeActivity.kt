@@ -264,7 +264,7 @@ Strategy
         }
         StyledDialogs.showRules(
             this,
-            "How to Play Tic-Tac-Toe",
+            "Tic-Tac-Toe",
             tv.text.toString(),
             "T I C · T A C · T O E",
             onDone = { if (showModeAfter) showModeDialog() else showBoardAfterDialog() },

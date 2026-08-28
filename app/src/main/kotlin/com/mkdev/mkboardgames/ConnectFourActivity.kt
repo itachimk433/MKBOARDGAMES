@@ -213,7 +213,7 @@ Control the centre columns, build threats in more than one direction, and block 
         }
         StyledDialogs.showRules(
             this,
-            "How to Play Connect Four",
+            "Connect Four",
             tv.text.toString(),
             "C O N N E C T · F O U R",
             onDone = { if (showModeAfter) showModeDialog() else showBoardAfterDialog() },

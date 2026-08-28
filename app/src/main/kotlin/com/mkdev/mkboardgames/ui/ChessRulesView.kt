@@ -57,7 +57,9 @@ class ChessRulesView(
             setTextColor(Color.WHITE)
             setTypeface(typeface, android.graphics.Typeface.BOLD)
             setTextSize(25f)
-        }, LayoutParams(LayoutParams.MATCH_PARENT, (46f * density).toInt()))
+            setIncludeFontPadding(false)
+            minimumHeight = (46f * density).toInt()
+        }, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
 
         addView(TextView(context).apply {
             text = "Learn the essentials before your first move."
