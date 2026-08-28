@@ -59,10 +59,7 @@ class BoardView(context: Context) : View(context) {
         set(value) {
             if (field == value) return
             field = value
-            updateBoardGeometry()
-            // Keep an in-flight move aligned when the board style changes.
-            animFromPos?.let { animFromPx = cellCenter(it) }
-            animToPos?.let { animToPx = cellCenter(it) }
+            refreshBoardStyleGeometry()
             invalidate()
         }
     var onPromotionChoice: ((List<Move>) -> Unit)? = null
@@ -355,6 +352,13 @@ class BoardView(context: Context) : View(context) {
         labelPaint.textSize       = cellSize * 0.22f
         labelPaint.color          = Color.argb(130, 120, 80, 40)
         mustCapturePaint.strokeWidth = cellSize * 0.055f
+    }
+
+    private fun refreshBoardStyleGeometry() {
+        updateBoardGeometry()
+        // Keep an in-flight move aligned when the board style changes.
+        animFromPos?.let { animFromPx = cellCenter(it) }
+        animToPos?.let { animToPx = cellCenter(it) }
     }
 
     // ─── Touch ───────────────────────────────────────────────────────────────
