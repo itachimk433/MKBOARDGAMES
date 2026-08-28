@@ -24,6 +24,7 @@ import com.mkdev.mkboardgames.games.othello.OthelloRuleEngine
 import com.mkdev.mkboardgames.games.shogi.ShogiPiece
 import com.mkdev.mkboardgames.games.shogi.ShogiRuleEngine
 import com.mkdev.mkboardgames.games.xiangqi.XiangqiRuleEngine
+import com.mkdev.mkboardgames.ui.AutoplayButtonView
 import com.mkdev.mkboardgames.ui.BoardView
 import com.mkdev.mkboardgames.ui.BoardStyleSwitchView
 import com.mkdev.mkboardgames.ui.CaptureStripView
@@ -41,6 +42,7 @@ class GameActivity : AppCompatActivity() {
 
     private lateinit var boardView:        BoardView
     private lateinit var boardStyleSwitch: BoardStyleSwitchView
+    private lateinit var autoplayButton:   AutoplayButtonView
     private lateinit var hudView:          HudView
     private lateinit var topCaptureView:   CaptureStripView
     private lateinit var goNoticeView:    android.widget.TextView
@@ -54,6 +56,8 @@ class GameActivity : AppCompatActivity() {
     private var playerColor = PieceColor.WHITE
     private var matchStarted = false
     private var activityResumed = false
+    private var autoplayEnabled = false
+    private var autoplayMoveInProgress = false
     private val moveHistory      = ArrayDeque<GameState>()
     private val scope            = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
@@ -96,6 +100,7 @@ class GameActivity : AppCompatActivity() {
         val hudH  = (56 * dp).toInt()
         val capH  = if (gameType == "GO") (58 * dp).toInt() else (36 * dp).toInt()
         val boardStyleSwitchH = (44 * dp).toInt()
+        val autoplayButtonH = (50 * dp).toInt()
 
         val container = android.widget.LinearLayout(this).apply {
             orientation = android.widget.LinearLayout.VERTICAL
@@ -115,10 +120,29 @@ class GameActivity : AppCompatActivity() {
         }
         boardView        = BoardView(this)
         boardStyleSwitch = BoardStyleSwitchView(this)
+        autoplayButton   = AutoplayButtonView(this)
         bottomCaptureView = CaptureStripView(this).also { it.dividerOnTop = true }
         boardStyleSwitch.onStyleChanged = { useCanvasBoard ->
             if (gameType == "CHESS") {
                 boardView.useCanvasChessBoard = useCanvasBoard
+            }
+        }
+        autoplayButton.onAutoplayChanged = { enabled ->
+            if (gameType == "CHESS" && vsAI) {
+                autoplayEnabled = enabled
+                if (!enabled && autoplayMoveInProgress) {
+                    autoplayMoveInProgress = false
+                    boardView.cancelMoveAnimation()
+                    hudView.setThinking(false)
+                }
+                if (enabled &&
+                    matchStarted &&
+                    gameState.status == GameStatus.IN_PROGRESS &&
+                    !boardView.isLocked &&
+                    aiControlsCurrentTurn()
+                ) {
+                    triggerAI()
+                }
             }
         }
         topCaptureView.onPieceSelected = ::handleShogiHandTap
@@ -132,6 +156,7 @@ class GameActivity : AppCompatActivity() {
         boardView.ruleEngine = engine
         boardView.gameState = gameState
         boardStyleSwitch.setCanvasSelected(boardView.useCanvasChessBoard, animate = false)
+        autoplayButton.setAutoplayEnabled(false, animate = false)
 
         container.addView(hudView,
             android.widget.LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, hudH))
@@ -152,6 +177,14 @@ class GameActivity : AppCompatActivity() {
         container.addView(boardView,
             android.widget.LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0)
                 .apply { weight = 1f })
+        container.addView(autoplayButton,
+            android.widget.LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                autoplayButtonH,
+            ).apply {
+                autoplayButton.visibility =
+                    if (gameType == "CHESS" && vsAI) View.VISIBLE else View.GONE
+            })
         container.addView(bottomCaptureView,
             android.widget.LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, capH))
 
@@ -842,6 +875,13 @@ Checkmate your opponent's King.
         interstitialAd = null
         autoPassJob?.cancel()
         autoPassJob = null
+        autoplayEnabled = false
+        autoplayMoveInProgress = false
+        if (::autoplayButton.isInitialized) {
+            autoplayButton.setAutoplayEnabled(false, animate = false)
+            autoplayButton.visibility =
+                if (gameType == "CHESS" && vsAI) View.VISIBLE else View.GONE
+        }
         redoGameStates.clear(); redoCaptures.clear(); redoMoves.clear(); redoCapSnaps.clear()
         AdManager.loadInterstitial(this) { interstitialAd = it }
         moveHistory.clear(); capturedByWhite.clear(); capturedByBlack.clear(); captureSnapshots.clear()
@@ -894,11 +934,9 @@ Checkmate your opponent's King.
         if (restoring != null) {
             restoreMoves(restoring.moves)
             clearPausedMatch()
-            if (!scheduleGoAutoPassIfNeeded() &&
-                vsAI && gameState.currentTurn != playerColor
-            ) triggerAI()
+            if (!scheduleGoAutoPassIfNeeded() && aiControlsCurrentTurn()) triggerAI()
         } else if (!scheduleGoAutoPassIfNeeded() &&
-            vsAI && gameState.currentTurn != playerColor
+            aiControlsCurrentTurn()
         ) {
             triggerAI()
         }
@@ -1037,6 +1075,7 @@ Checkmate your opponent's King.
 
     private fun handleMove(move: Move, automaticPass: Boolean = false) {
         if (boardView.isLocked) return
+        autoplayMoveInProgress = false
         try {
             val moverColor = gameState.get(move.from)?.color
                 ?: gameState.currentTurn
@@ -1088,9 +1127,7 @@ Checkmate your opponent's King.
                     showGoNotice("You no longer have available moves. Passing automatically…")
                 }
             }
-            if (!scheduleGoAutoPassIfNeeded() &&
-                vsAI && gameState.currentTurn != playerColor
-            ) triggerAI()
+            if (!scheduleGoAutoPassIfNeeded() && aiControlsCurrentTurn()) triggerAI()
         } catch (e: Exception) {
             Toast.makeText(this, "Move error — please try again", Toast.LENGTH_SHORT).show()
             if (moveHistory.isNotEmpty()) {
@@ -1221,13 +1258,18 @@ Checkmate your opponent's King.
 
     // ─── AI ───────────────────────────────────────────────────────────────────
 
+    private fun aiControlsCurrentTurn(): Boolean =
+        vsAI && (
+            gameState.currentTurn != playerColor ||
+                (gameType == "CHESS" && autoplayEnabled)
+            )
+
     private fun resumeComputerTurnIfNeeded() {
         if (!activityResumed ||
             !::boardView.isInitialized ||
             !matchStarted ||
             gameState.status != GameStatus.IN_PROGRESS ||
-            !vsAI ||
-            gameState.currentTurn == playerColor
+            !aiControlsCurrentTurn()
         ) return
         if (!scheduleGoAutoPassIfNeeded()) triggerAI()
     }
@@ -1244,6 +1286,8 @@ Checkmate your opponent's King.
                 return@launch
             }
             val thinkingState = gameState
+            val autoplayingPlayerTurn =
+                gameType == "CHESS" && thinkingState.currentTurn == playerColor
             val move = withContext(Dispatchers.Default) {
                 try {
                     when (gameType) {
@@ -1311,8 +1355,18 @@ Checkmate your opponent's King.
                 gameState.currentTurn == thinkingState.currentTurn &&
                     gameState.moveHistory.size == thinkingState.moveHistory.size &&
                     gameState.status == thinkingState.status
-            if (move != null && isActive && activityResumed && stateIsStillCurrent) boardView.animateExternalMove(move)
-            else boardView.isLocked = false
+            val playerAutoplayStillEnabled = !autoplayingPlayerTurn || autoplayEnabled
+            if (move != null &&
+                isActive &&
+                activityResumed &&
+                stateIsStillCurrent &&
+                playerAutoplayStillEnabled
+            ) {
+                autoplayMoveInProgress = autoplayingPlayerTurn
+                boardView.animateExternalMove(move)
+            } else {
+                boardView.isLocked = false
+            }
         }
     }
 
