@@ -242,11 +242,7 @@ class ChessMenuView(
             linePaint,
         )
         canvas.drawText(
-            when {
-                isConnectFour -> "●"
-                isFoxAndGeese -> "🦊"
-                else -> "♛"
-            },
+            "●",
             center,
             topOffset + 43f * unit,
             actionSymbolPaint.apply {

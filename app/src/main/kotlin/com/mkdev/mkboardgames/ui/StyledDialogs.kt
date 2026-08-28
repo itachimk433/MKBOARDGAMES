@@ -22,12 +22,7 @@ object StyledDialogs {
         choices: List<ChessChoiceView.Choice>,
         heightDp: Float = 520f,
         gameLabel: String,
-        headerSymbol: String = when {
-            gameLabel.replace(" ", "").contains("DRAUGHTS", ignoreCase = true) -> "◎"
-            gameLabel.replace(" ", "").contains("CONNECT", ignoreCase = true) -> "●"
-            gameLabel.replace(" ", "").contains("FOX", ignoreCase = true) -> "🦊"
-            else -> "♛"
-        },
+        headerSymbol: String = "●",
         onCancel: (() -> Unit)? = null,
         onChoice: (Int, Dialog) -> Unit,
     ): Dialog {

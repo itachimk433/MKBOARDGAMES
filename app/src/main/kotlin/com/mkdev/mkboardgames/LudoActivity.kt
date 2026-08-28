@@ -385,7 +385,7 @@ class LudoActivity : AppCompatActivity() {
                 StyledDialogs.choice(options[1], "Match with abilities and coins", "⚄", "#E3B86A"),
                 StyledDialogs.choice(options[2], "Play locally with four colours", "⚄", "#A9B6E8"),
                 StyledDialogs.choice(options[3], "Review the essentials", "⚄", "#E58A7A"),
-            ), 520f, "L U D O", headerSymbol = "⚄", onCancel = {
+            ), 520f, "L U D O", headerSymbol = "●", onCancel = {
                 if (!matchStarted) finish() else showBoardAfterDialog()
             }) { which, dialog ->
                 when (which) {
@@ -420,7 +420,7 @@ class LudoActivity : AppCompatActivity() {
         StyledDialogs.showChoices(this, "Play As", "Choose your colour before the first roll.",
             LudoSetup.PLAYER_NAMES.mapIndexed { index, name ->
                 StyledDialogs.choice(name, if (index == 0) "Moves first" else "Joins the match", listOf("●", "●", "●", "●")[index], listOf("#E3B86A", "#E58A7A", "#8EC7B9", "#A9B6E8")[index])
-            }, 520f, "L U D O", headerSymbol = "⚄", onCancel = { showModeDialog() }) { which, dialog ->
+            }, 520f, "L U D O", headerSymbol = "●", onCancel = { showModeDialog() }) { which, dialog ->
                 humanPlayer = which
                 dialog.dismiss()
                 startGame()

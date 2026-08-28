@@ -451,7 +451,7 @@ class GameActivity : AppCompatActivity() {
                 ),
             ),
             gameLabel = styledGameLabel(),
-            headerSymbol = if (isFoxAndGeese) "🦊" else if (isDraughts) "◎" else "♛",
+            headerSymbol = "●",
         )
         val dialog = Dialog(this)
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
@@ -1008,7 +1008,7 @@ Checkmate your opponent's King.
             choices = available.map { it.first },
             heightDp = 560f,
             gameLabel = styledGameLabel(),
-            headerSymbol = "♕",
+            headerSymbol = "●",
             onCancel = { showChessBoardAfterDialog() },
             onChoice = { index, dialog ->
                 dialog.dismiss()
