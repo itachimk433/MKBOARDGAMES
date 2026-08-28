@@ -155,17 +155,20 @@ class BoardView(context: Context) : View(context) {
     private var chessImageRect = RectF()
     private var chessCellWidth = 0f
     private var chessCellHeight = 0f
-    // The supplied chess board includes a wooden frame. These are the measured
-    // boundaries of its playable 8x8 area in the uploaded image.
+    // The supplied chess board includes a wooden frame and a slight camera
+    // perspective. These are the measured boundaries of its playable 8x8 area
+    // in the 1024px asset. Keep every boundary instead of deriving cells from
+    // one average size: the draw, highlight, animation, and touch paths all
+    // use these same lines.
     private val suppliedChessGridX = floatArrayOf(
-        58f / 1254f, 204f / 1254f, 347f / 1254f, 487f / 1254f,
-        627f / 1254f, 770f / 1254f, 911f / 1254f, 1053f / 1254f,
-        1198f / 1254f,
+        42f / 1024f, 163f / 1024f, 278f / 1024f, 395f / 1024f,
+        511f / 1024f, 628f / 1024f, 744f / 1024f, 860f / 1024f,
+        983f / 1024f,
     )
     private val suppliedChessGridY = floatArrayOf(
-        52f / 1254f, 191f / 1254f, 332f / 1254f, 473f / 1254f,
-        615f / 1254f, 756f / 1254f, 897f / 1254f, 1038f / 1254f,
-        1179f / 1254f,
+        33f / 1024f, 151f / 1024f, 265f / 1024f, 381f / 1024f,
+        498f / 1024f, 613f / 1024f, 729f / 1024f, 845f / 1024f,
+        975f / 1024f,
     )
     // The original framed board is a 1024px image with a slightly different
     // inner border. Keeping its geometry separate prevents pieces and taps
