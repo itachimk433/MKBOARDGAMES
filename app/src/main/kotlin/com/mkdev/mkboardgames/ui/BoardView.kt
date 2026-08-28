@@ -55,7 +55,7 @@ class BoardView(context: Context) : View(context) {
     var showMustCaptureHints: Boolean = false
     var rotateBlackPieces: Boolean = false
     var directMoveMode: Boolean = false
-    var useCanvasChessBoard: Boolean = true
+    var chessBoardStyle: ChessBoardStyle = ChessBoardStyle.CANVAS
         set(value) {
             if (field == value) return
             field = value
@@ -155,17 +155,30 @@ class BoardView(context: Context) : View(context) {
     private var chessImageRect = RectF()
     private var chessCellWidth = 0f
     private var chessCellHeight = 0f
-    // The supplied chess board includes a wooden frame and printed labels.
-    // These are the measured boundaries of its playable 8x8 area.
-    private val chessGridX = floatArrayOf(
+    // The supplied chess board includes a wooden frame. These are the measured
+    // boundaries of its playable 8x8 area in the uploaded image.
+    private val suppliedChessGridX = floatArrayOf(
         58f / 1254f, 204f / 1254f, 347f / 1254f, 487f / 1254f,
         627f / 1254f, 770f / 1254f, 911f / 1254f, 1053f / 1254f,
         1198f / 1254f,
     )
-    private val chessGridY = floatArrayOf(
+    private val suppliedChessGridY = floatArrayOf(
         52f / 1254f, 191f / 1254f, 332f / 1254f, 473f / 1254f,
         615f / 1254f, 756f / 1254f, 897f / 1254f, 1038f / 1254f,
         1179f / 1254f,
+    )
+    // The original framed board is a 1024px image with a slightly different
+    // inner border. Keeping its geometry separate prevents pieces and taps
+    // from drifting when switching between the two photographs.
+    private val classicChessGridX = floatArrayOf(
+        48f / 1024f, 166f / 1024f, 284f / 1024f, 401f / 1024f,
+        512f / 1024f, 630f / 1024f, 748f / 1024f, 864f / 1024f,
+        978f / 1024f,
+    )
+    private val classicChessGridY = floatArrayOf(
+        45f / 1024f, 158f / 1024f, 272f / 1024f, 385f / 1024f,
+        500f / 1024f, 615f / 1024f, 730f / 1024f, 845f / 1024f,
+        959f / 1024f,
     )
 
     private val xiangqiBoardBitmap: Bitmap? = try {
@@ -183,8 +196,13 @@ class BoardView(context: Context) : View(context) {
     } catch (_: Throwable) {
         null
     }
-    private val chessBoardBitmap: Bitmap? = try {
+    private val classicChessBoardBitmap: Bitmap? = try {
         context.assets.open("chess_board.jpg").use { BitmapFactory.decodeStream(it) }
+    } catch (_: Throwable) {
+        null
+    }
+    private val suppliedChessBoardBitmap: Bitmap? = try {
+        context.assets.open("chess_board_wood.jpg").use { BitmapFactory.decodeStream(it) }
     } catch (_: Throwable) {
         null
     }
@@ -320,8 +338,8 @@ class BoardView(context: Context) : View(context) {
             }
             return
         }
-        if (isChessCanvasBoard()) {
-            val bitmap = chessBoardBitmap
+        if (isChessImageBoard()) {
+            val bitmap = chessBitmap()
             if (bitmap != null) {
                 val scale = minOf(
                     width.toFloat() / bitmap.width,
@@ -339,6 +357,7 @@ class BoardView(context: Context) : View(context) {
                 chessCellHeight = (chessLineY(8) - chessLineY(0)) / 8f
                 cellSize = minOf(chessCellWidth, chessCellHeight)
                 piecePaint.textSize = cellSize * 0.60f
+                labelPaint.textSize = cellSize * 0.18f
                 mustCapturePaint.strokeWidth = cellSize * 0.055f
             }
             return
@@ -349,6 +368,10 @@ class BoardView(context: Context) : View(context) {
         cellSize  = boardSz / gameState.boardSize.toFloat()
         boardLeft = (width - boardSz) / 2f
         boardTop  = (height - boardSz) / 2f
+        if (isChessBoard()) {
+            chessCellWidth = cellSize
+            chessCellHeight = cellSize
+        }
         piecePaint.textSize       = cellSize * 0.60f
         labelPaint.textSize       = cellSize * 0.22f
         labelPaint.color          = Color.argb(130, 120, 80, 40)
@@ -530,7 +553,7 @@ class BoardView(context: Context) : View(context) {
         if (isShogiBoard()) return shogiPoint(pos)
         if (isXiangqiBoard()) return xiangqiPoint(pos)
         if (isGoBoard()) return goPoint(pos)
-        if (isChessCanvasBoard()) return chessPoint(pos)
+        if (isChessBoard()) return chessPoint(pos)
         val last = gameState.boardSize - 1
         val dr = if (isFlipped) last - pos.row else pos.row
         val dc = if (isFlipped) last - pos.col else pos.col
@@ -540,17 +563,11 @@ class BoardView(context: Context) : View(context) {
 
     // ─── Drawing ─────────────────────────────────────────────────────────────
     override fun onDraw(canvas: Canvas) {
-        if (isChessCanvasBoard()) {
-            drawChessBoard(canvas)
-            drawChessHighlights(canvas)
-            drawChessPieces(canvas)
-            return
-        }
         if (isChessBoard()) {
-            drawBoard(canvas)
-            drawLabels(canvas)
-            drawHighlights(canvas)
-            drawPieces(canvas)
+            if (isChessImageBoard()) drawChessBoard(canvas) else drawBoard(canvas)
+            drawChessHighlights(canvas)
+            drawChessLabels(canvas)
+            drawChessPieces(canvas)
             return
         }
         if (isShogiBoard()) {
@@ -579,7 +596,7 @@ class BoardView(context: Context) : View(context) {
 
     private fun drawChessBoard(canvas: Canvas) {
         canvas.drawColor(Color.rgb(20, 20, 20))
-        chessBoardBitmap?.let {
+        chessBitmap()?.let {
             canvas.drawBitmap(
                 it,
                 null,
@@ -587,6 +604,56 @@ class BoardView(context: Context) : View(context) {
                 Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG),
             )
         }
+    }
+
+    private fun drawChessLabels(canvas: Canvas) {
+        val inset = cellSize * 0.105f
+        labelPaint.textSize = (cellSize * 0.17f).coerceIn(10f, 24f)
+        labelPaint.style = Paint.Style.FILL
+
+        for (displayedRow in 0 until 8) {
+            for (displayedCol in 0 until 8) {
+                val left = chessLineX(displayedCol)
+                val top = chessLineY(displayedRow)
+                val right = chessLineX(displayedCol + 1)
+                val bottom = chessLineY(displayedRow + 1)
+                val file = ('a' + if (isFlipped) 7 - displayedCol else displayedCol).toString()
+                val rank = (if (isFlipped) displayedRow + 1 else 8 - displayedRow).toString()
+
+                // Keep labels in opposite corners from the piece centre and
+                // change their colour per square for legibility on both photos.
+                val lightSquare = (displayedRow + displayedCol) % 2 == 0
+                labelPaint.color = if (lightSquare) {
+                    Color.argb(205, 45, 28, 18)
+                } else {
+                    Color.argb(220, 255, 244, 220)
+                }
+                labelPaint.setShadowLayer(
+                    cellSize * 0.018f,
+                    0f,
+                    cellSize * 0.012f,
+                    Color.argb(145, 0, 0, 0),
+                )
+                val metrics = labelPaint.fontMetrics
+                if (displayedRow == 7) {
+                    canvas.drawText(
+                        file,
+                        right - inset,
+                        bottom - inset - metrics.descent,
+                        labelPaint,
+                    )
+                }
+                if (displayedCol == 0) {
+                    canvas.drawText(
+                        rank,
+                        left + inset,
+                        top + inset - metrics.ascent,
+                        labelPaint,
+                    )
+                }
+            }
+        }
+        labelPaint.clearShadowLayer()
     }
 
     private fun drawChessHighlights(canvas: Canvas) {
@@ -1251,8 +1318,26 @@ class BoardView(context: Context) : View(context) {
     private fun isChessBoard(): Boolean =
         ruleEngine is ChessRuleEngine || gameState.board.any { it is ChessPiece }
 
-    private fun isChessCanvasBoard(): Boolean =
-        isChessBoard() && useCanvasChessBoard && chessBoardBitmap != null
+    private fun chessBitmap(): Bitmap? = when (chessBoardStyle) {
+        ChessBoardStyle.CANVAS -> null
+        ChessBoardStyle.CLASSIC_WOOD -> classicChessBoardBitmap
+        ChessBoardStyle.SUPPLIED_WOOD -> suppliedChessBoardBitmap
+    }
+
+    private fun isChessImageBoard(): Boolean =
+        isChessBoard() && chessBitmap() != null
+
+    private fun chessGridX(): FloatArray = when (chessBoardStyle) {
+        ChessBoardStyle.SUPPLIED_WOOD -> suppliedChessGridX
+        ChessBoardStyle.CLASSIC_WOOD -> classicChessGridX
+        ChessBoardStyle.CANVAS -> floatArrayOf()
+    }
+
+    private fun chessGridY(): FloatArray = when (chessBoardStyle) {
+        ChessBoardStyle.SUPPLIED_WOOD -> suppliedChessGridY
+        ChessBoardStyle.CLASSIC_WOOD -> classicChessGridY
+        ChessBoardStyle.CANVAS -> floatArrayOf()
+    }
 
     private fun goPoint(position: Position): PointF {
         val displayedRow = if (isFlipped) 12 - position.row else position.row
@@ -1273,10 +1358,18 @@ class BoardView(context: Context) : View(context) {
     }
 
     private fun chessLineX(index: Int): Float =
-        chessImageRect.left + chessImageRect.width() * chessGridX[index]
+        if (isChessImageBoard()) {
+            chessImageRect.left + chessImageRect.width() * chessGridX()[index]
+        } else {
+            boardLeft + index * cellSize
+        }
 
     private fun chessLineY(index: Int): Float =
-        chessImageRect.top + chessImageRect.height() * chessGridY[index]
+        if (isChessImageBoard()) {
+            chessImageRect.top + chessImageRect.height() * chessGridY()[index]
+        } else {
+            boardTop + index * cellSize
+        }
 
     private fun shogiPoint(position: Position): PointF {
         val displayedRow = if (isFlipped) 8 - position.row else position.row
@@ -1303,7 +1396,7 @@ class BoardView(context: Context) : View(context) {
     }
 
     private fun screenToBoard(x: Float, y: Float): Position? {
-        if (isChessCanvasBoard()) {
+        if (isChessBoard()) {
             if (chessCellWidth <= 0f || chessCellHeight <= 0f) return null
             val displayedCol = (0 until 8).firstOrNull {
                 x >= chessLineX(it) && x < chessLineX(it + 1)

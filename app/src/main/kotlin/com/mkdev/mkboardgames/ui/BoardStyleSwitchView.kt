@@ -14,18 +14,18 @@ import com.mkdev.mkboardgames.SoundPlayer
 /**
  * A compact, nameless switch for changing the Chess board presentation.
  *
- * The left position is the generated canvas board and the right position is
- * the photographed board. The moving thumb and accent color provide the state
- * cue without taking space away from the game HUD.
+ * The three positions are the generated canvas board, the original framed wood
+ * board, and the newly supplied wood board. The moving thumb and accent color
+ * provide the state cue without taking space away from the game HUD.
  */
 class BoardStyleSwitchView(context: Context) : View(context) {
 
-    var onStyleChanged: ((useCanvasBoard: Boolean) -> Unit)? = null
+    var onStyleChanged: ((style: ChessBoardStyle) -> Unit)? = null
 
     private val dp = resources.displayMetrics.density
     private val trackRect = RectF()
     private var thumbPosition = 0f
-    private var canvasSelected = true
+    private var selectedStyle = ChessBoardStyle.CANVAS
     private var animator: ValueAnimator? = null
 
     private val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -47,9 +47,9 @@ class BoardStyleSwitchView(context: Context) : View(context) {
         setOnClickListener { toggleStyle() }
     }
 
-    fun setCanvasSelected(selected: Boolean, animate: Boolean = true) {
-        canvasSelected = selected
-        val target = if (selected) 0f else 1f
+    fun setSelectedStyle(style: ChessBoardStyle, animate: Boolean = true) {
+        selectedStyle = style
+        val target = style.ordinal / (ChessBoardStyle.entries.lastIndex.toFloat())
         animator?.cancel()
         if (!animate) {
             thumbPosition = target
@@ -69,8 +69,9 @@ class BoardStyleSwitchView(context: Context) : View(context) {
 
     private fun toggleStyle() {
         SoundPlayer.play("ui_click")
-        val next = !canvasSelected
-        setCanvasSelected(next)
+        val nextOrdinal = (selectedStyle.ordinal + 1) % ChessBoardStyle.entries.size
+        val next = ChessBoardStyle.entries[nextOrdinal]
+        setSelectedStyle(next)
         onStyleChanged?.invoke(next)
     }
 
@@ -83,16 +84,24 @@ class BoardStyleSwitchView(context: Context) : View(context) {
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
-        val trackWidth = 74f * dp
+        val trackWidth = 88f * dp
         val trackHeight = 32f * dp
         val left = (width - trackWidth) / 2f
         val top = (height - trackHeight) / 2f
         trackRect.set(left, top, left + trackWidth, top + trackHeight)
 
         val radius = trackHeight / 2f
-        val canvasColor = Color.parseColor("#5DD6FF")
-        val boardColor = Color.parseColor("#FFB454")
-        val thumbColor = ArgbEvaluator().evaluate(thumbPosition, canvasColor, boardColor) as Int
+        val stateColors = intArrayOf(
+            Color.parseColor("#5DD6FF"),
+            Color.parseColor("#FFB454"),
+            Color.parseColor("#D97A45"),
+        )
+        val thumbColor = when {
+            thumbPosition <= 0.5f ->
+                ArgbEvaluator().evaluate(thumbPosition * 2f, stateColors[0], stateColors[1]) as Int
+            else ->
+                ArgbEvaluator().evaluate((thumbPosition - 0.5f) * 2f, stateColors[1], stateColors[2]) as Int
+        }
 
         trackPaint.color = Color.parseColor("#222A36")
         canvas.drawRoundRect(trackRect, radius, radius, trackPaint)
@@ -100,20 +109,18 @@ class BoardStyleSwitchView(context: Context) : View(context) {
 
         // Small, nameless state markers keep the control understandable even
         // when the thumb is between positions during its transition.
-        indicatorPaint.color = Color.argb(
-            (175 * (1f - thumbPosition)).toInt(),
-            Color.red(canvasColor),
-            Color.green(canvasColor),
-            Color.blue(canvasColor),
-        )
-        canvas.drawCircle(left + 13f * dp, top + radius, 2.5f * dp, indicatorPaint)
-        indicatorPaint.color = Color.argb(
-            (175 * thumbPosition).toInt(),
-            Color.red(boardColor),
-            Color.green(boardColor),
-            Color.blue(boardColor),
-        )
-        canvas.drawCircle(left + trackWidth - 13f * dp, top + radius, 2.5f * dp, indicatorPaint)
+        val markerInset = 13f * dp
+        val markerStep = (trackWidth - markerInset * 2f) / (stateColors.lastIndex)
+        stateColors.forEachIndexed { index, color ->
+            val distance = kotlin.math.abs(thumbPosition - index / 2f)
+            indicatorPaint.color = Color.argb(
+                (175f * (1f - distance.coerceIn(0f, 1f))).toInt(),
+                Color.red(color),
+                Color.green(color),
+                Color.blue(color),
+            )
+            canvas.drawCircle(left + markerInset + markerStep * index, top + radius, 2.5f * dp, indicatorPaint)
+        }
 
         val thumbRadius = 11f * dp
         val thumbCenterX = left + 16f * dp + thumbPosition * (trackWidth - 32f * dp)

@@ -31,6 +31,7 @@ import com.mkdev.mkboardgames.ui.CaptureStripView
 import com.mkdev.mkboardgames.ui.ChessChoiceView
 import com.mkdev.mkboardgames.ui.ChessMenuView
 import com.mkdev.mkboardgames.ui.ChessRulesView
+import com.mkdev.mkboardgames.ui.ChessBoardStyle
 import com.mkdev.mkboardgames.ui.StyledDialogs
 import kotlinx.coroutines.*
 
@@ -122,9 +123,9 @@ class GameActivity : AppCompatActivity() {
         boardStyleSwitch = BoardStyleSwitchView(this)
         autoplayButton   = AutoplayButtonView(this)
         bottomCaptureView = CaptureStripView(this).also { it.dividerOnTop = true }
-        boardStyleSwitch.onStyleChanged = { useCanvasBoard ->
+        boardStyleSwitch.onStyleChanged = { style ->
             if (gameType == "CHESS") {
-                boardView.useCanvasChessBoard = useCanvasBoard
+                boardView.chessBoardStyle = style
             }
         }
         autoplayButton.onAutoplayChanged = { enabled ->
@@ -155,7 +156,7 @@ class GameActivity : AppCompatActivity() {
         gameState = engine.initialState()
         boardView.ruleEngine = engine
         boardView.gameState = gameState
-        boardStyleSwitch.setCanvasSelected(boardView.useCanvasChessBoard, animate = false)
+        boardStyleSwitch.setSelectedStyle(boardView.chessBoardStyle, animate = false)
         autoplayButton.setAutoplayEnabled(false, animate = false)
 
         container.addView(hudView,
