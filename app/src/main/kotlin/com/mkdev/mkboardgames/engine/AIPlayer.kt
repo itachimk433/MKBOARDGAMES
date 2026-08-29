@@ -299,10 +299,35 @@ class AIPlayer(
         return victimValue * 16 - attackerValue
     }
 
+    private fun orderingScore(state: GameState, move: Move): Int {
+        val piece = state.get(move.from) ?: return 0
+        val captureBonus = if (move.isCapture) {
+            val victim = move.captures.maxOfOrNull { pos -> state.get(pos)?.value() ?: 0 } ?: 0
+            val attacker = piece.value()
+            1000 + victim * 16 - attacker
+        } else 0
+        val promotionBonus = if (move.promotionType != null) 600 else 0
+        val centerBonus = if (move.to.row in 2..5 && move.to.col in 2..5) 35 else 0
+        val pieceSquareBonus = when (piece) {
+            is com.mkdev.mkboardgames.games.chess.ChessPiece -> {
+                val row = move.to.row
+                val col = move.to.col
+                when (piece.type) {
+                    com.mkdev.mkboardgames.games.chess.ChessPieceType.PAWN -> if (piece.color == PieceColor.WHITE) row else 7 - row
+                    com.mkdev.mkboardgames.games.chess.ChessPieceType.KNIGHT -> 12 + (if (row in 2..5 && col in 2..5) 12 else 0)
+                    com.mkdev.mkboardgames.games.chess.ChessPieceType.BISHOP -> 15 + (if (row in 2..5 && col in 2..5) 10 else 0)
+                    com.mkdev.mkboardgames.games.chess.ChessPieceType.ROOK -> 12 + (if (row in 2..5 || col in 2..5) 8 else 0)
+                    com.mkdev.mkboardgames.games.chess.ChessPieceType.QUEEN -> 18
+                    com.mkdev.mkboardgames.games.chess.ChessPieceType.KING -> 10
+                }
+            }
+            else -> 0
+        }
+        return captureBonus + promotionBonus + centerBonus + pieceSquareBonus
+    }
+
     private fun orderedMoves(state: GameState, color: PieceColor): List<Move> {
-        val moves = engine.allLegalMoves(state, color)
-        val (captures, quiet) = moves.partition { it.isCapture }
-        val sortedCaptures = captures.sortedByDescending { mvvLva(state, it) }
-        return sortedCaptures + quiet
+        return engine.allLegalMoves(state, color)
+            .sortedByDescending { orderingScore(state, it) }
     }
 }

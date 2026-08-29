@@ -1650,6 +1650,12 @@ Checkmate your opponent's King.
                 "III",
                 Color.parseColor("#E58A7A"),
             ),
+            ChessChoiceView.Choice(
+                "Master",
+                if (current == 3) "Current setting" else "Elite-level challenge",
+                "IV",
+                Color.parseColor("#D8A7FF"),
+            ),
         )
         val view = ChessChoiceView(
             this,

@@ -58,23 +58,34 @@ object SettingsManager {
         prefs(ctx).getString(KEY_ACTIVE_GAME, "overall") ?: "overall"
 
     // ── Chess ────────────────────────────────────────────────────────────────
-    fun getChessDifficulty(ctx: Context) = prefs(ctx).getInt(KEY_CHESS_DIFFICULTY, 0)
-    fun setChessDifficulty(ctx: Context, v: Int) = prefs(ctx).edit().putInt(KEY_CHESS_DIFFICULTY, v).apply()
-    fun chessAiDepth(ctx: Context) = when (getChessDifficulty(ctx)) {
-        0    -> 2   // Easy
-        2    -> 6   // Hard  — deep search + quiescence
-        else -> 4   // Medium
+    fun chessDifficultyLabels() = arrayOf("Easy", "Medium", "Hard", "Master")
+    fun chessAiDepthForTest(level: Int): Int = when (level.coerceIn(0, 3)) {
+        0 -> 2   // Easy
+        1 -> 5   // Medium — deeper search with better ordering
+        2 -> 7   // Hard — strong tactical search
+        3 -> 9   // Master — elite-level depth 
+        else -> 5
     }
-    fun chessAiTimeLimitMs(ctx: Context): Long = when (getChessDifficulty(ctx)) {
-        0    -> 600L
-        2    -> 2500L
-        else -> 1400L
+    fun chessAiTimeLimitMsForTest(level: Int): Long = when (level.coerceIn(0, 3)) {
+        0 -> 600L
+        1 -> 1800L
+        2 -> 3800L
+        3 -> 9000L
+        else -> 1800L
     }
-    fun chessAiQuiesceDepth(ctx: Context): Int = when (getChessDifficulty(ctx)) {
-        0    -> 0
-        2    -> 3
+    fun chessAiQuiesceDepthForTest(level: Int): Int = when (level.coerceIn(0, 3)) {
+        0 -> 0
+        1 -> 2
+        2 -> 4
+        3 -> 5
         else -> 2
     }
+
+    fun getChessDifficulty(ctx: Context) = prefs(ctx).getInt(KEY_CHESS_DIFFICULTY, 1).coerceIn(0, 3)
+    fun setChessDifficulty(ctx: Context, v: Int) = prefs(ctx).edit().putInt(KEY_CHESS_DIFFICULTY, v.coerceIn(0, 3)).apply()
+    fun chessAiDepth(ctx: Context) = chessAiDepthForTest(getChessDifficulty(ctx))
+    fun chessAiTimeLimitMs(ctx: Context): Long = chessAiTimeLimitMsForTest(getChessDifficulty(ctx))
+    fun chessAiQuiesceDepth(ctx: Context): Int = chessAiQuiesceDepthForTest(getChessDifficulty(ctx))
 
     // ── Checkers ─────────────────────────────────────────────────────────────
     fun getCheckersDifficulty(ctx: Context) = prefs(ctx).getInt(KEY_CHECKERS_DIFFICULTY, 0)

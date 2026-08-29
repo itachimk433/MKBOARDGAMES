@@ -81,7 +81,7 @@ class MainActivity : AppCompatActivity() {
 
         val ctx    = this
         val dp     = resources.displayMetrics.density
-        val diffs  = arrayOf("Easy", "Medium", "Hard")
+        val diffs  = SettingsManager.chessDifficultyLabels()
         val themes = SettingsManager.THEMES.map { it.name }.toTypedArray()
 
         // Wrapper: sticky title on top, scrollable rows below
