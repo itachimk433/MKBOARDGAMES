@@ -12,21 +12,21 @@ import android.view.animation.AccelerateDecelerateInterpolator
 import com.mkdev.mkboardgames.SoundPlayer
 
 /**
- * A compact switch for changing the Chess board presentation.
+ * A compact switch for changing a board presentation.
  *
- * The six positions are the generated canvas board, two wood boards, the
- * polished realistic board, and the two additional supplied monochrome boards.
- * The moving thumb and accent color provide the state cue without taking space
- * away from the game HUD.
+ * The host configures how many positions are available. The moving thumb and
+ * accent color provide the state cue without taking space away from the game
+ * HUD.
  */
 class BoardStyleSwitchView(context: Context) : View(context) {
 
-    var onStyleChanged: ((style: ChessBoardStyle) -> Unit)? = null
+    var onStyleChanged: ((index: Int) -> Unit)? = null
 
     private val dp = resources.displayMetrics.density
     private val trackRect = RectF()
     private var thumbPosition = 0f
-    private var selectedStyle = ChessBoardStyle.CANVAS
+    private var styleCount = 2
+    private var selectedIndex = 0
     private var animator: ValueAnimator? = null
 
     private val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -44,13 +44,20 @@ class BoardStyleSwitchView(context: Context) : View(context) {
     init {
         isClickable = true
         isFocusable = true
-        contentDescription = "Chess board style"
+        contentDescription = "Board style"
         setOnClickListener { toggleStyle() }
     }
 
-    fun setSelectedStyle(style: ChessBoardStyle, animate: Boolean = true) {
-        selectedStyle = style
-        val target = style.ordinal / (ChessBoardStyle.entries.lastIndex.toFloat())
+    fun setStyleCount(count: Int) {
+        styleCount = count.coerceIn(2, 5)
+        selectedIndex = selectedIndex.coerceIn(0, styleCount - 1)
+        thumbPosition = selectedIndex / (styleCount - 1).toFloat()
+        invalidate()
+    }
+
+    fun setSelectedIndex(index: Int, animate: Boolean = true) {
+        selectedIndex = index.coerceIn(0, styleCount - 1)
+        val target = selectedIndex / (styleCount - 1).toFloat()
         animator?.cancel()
         if (!animate) {
             thumbPosition = target
@@ -70,10 +77,9 @@ class BoardStyleSwitchView(context: Context) : View(context) {
 
     private fun toggleStyle() {
         SoundPlayer.play("ui_click")
-        val nextOrdinal = (selectedStyle.ordinal + 1) % ChessBoardStyle.entries.size
-        val next = ChessBoardStyle.entries[nextOrdinal]
-        setSelectedStyle(next)
-        onStyleChanged?.invoke(next)
+        val nextIndex = (selectedIndex + 1) % styleCount
+        setSelectedIndex(nextIndex)
+        onStyleChanged?.invoke(nextIndex)
     }
 
     override fun onDetachedFromWindow() {
@@ -92,14 +98,18 @@ class BoardStyleSwitchView(context: Context) : View(context) {
         trackRect.set(left, top, left + trackWidth, top + trackHeight)
 
         val radius = trackHeight / 2f
-        val stateColors = intArrayOf(
+        val palette = intArrayOf(
             Color.parseColor("#5DD6FF"),
             Color.parseColor("#FFB454"),
             Color.parseColor("#D97A45"),
             Color.parseColor("#EAE7E2"),
             Color.parseColor("#FFFFFF"),
-            Color.parseColor("#FF3030"),
         )
+        val stateColors = if (styleCount == 2) {
+            intArrayOf(palette.first(), Color.parseColor("#FF3030"))
+        } else {
+            palette.copyOf(styleCount)
+        }
 
         val segmentPosition = thumbPosition * (stateColors.size - 1)
         val segmentIndex = segmentPosition.toInt().coerceIn(0, stateColors.size - 2)

@@ -12,6 +12,8 @@ import android.view.animation.OvershootInterpolator
 import com.mkdev.mkboardgames.SettingsManager
 import com.mkdev.mkboardgames.engine.*
 import com.mkdev.mkboardgames.games.checkers.CheckersPiece
+import com.mkdev.mkboardgames.games.checkers.CheckersRuleEngine
+import com.mkdev.mkboardgames.games.checkers.InternationalDraughtsRuleEngine
 import com.mkdev.mkboardgames.games.chess.ChessPiece
 import com.mkdev.mkboardgames.games.chess.ChessRuleEngine
 import com.mkdev.mkboardgames.games.foxandgeese.FoxAndGeeseSetup
@@ -56,6 +58,13 @@ class BoardView(context: Context) : View(context) {
     var rotateBlackPieces: Boolean = false
     var directMoveMode: Boolean = false
     var chessBoardStyle: ChessBoardStyle = ChessBoardStyle.CANVAS
+        set(value) {
+            if (field == value) return
+            field = value
+            refreshBoardStyleGeometry()
+            invalidate()
+        }
+    var draughtsBoardStyle: DraughtsBoardStyle = DraughtsBoardStyle.CANVAS
         set(value) {
             if (field == value) return
             field = value
@@ -155,6 +164,9 @@ class BoardView(context: Context) : View(context) {
     private var chessImageRect = RectF()
     private var chessCellWidth = 0f
     private var chessCellHeight = 0f
+    private var draughtsImageRect = RectF()
+    private var draughtsCellWidth = 0f
+    private var draughtsCellHeight = 0f
     // The supplied chess board includes a wooden frame and a slight camera
     // perspective. These are the measured boundaries of its playable 8x8 area
     // in the 1024px asset. Keep every boundary instead of deriving cells from
@@ -202,15 +214,15 @@ class BoardView(context: Context) : View(context) {
         510f / 1024f, 632f / 1024f, 755f / 1024f, 876f / 1024f,
         1004f / 1024f,
     )
-    // The red-and-black supplied image uses rounded dark tiles inside a white
-    // inset frame. Its printed labels are part of the image, so the regular
-    // dynamic labels are disabled for this style.
-    private val redBlackChessGridX = floatArrayOf(
+    // The supplied red-and-black Draughts image uses an inset 8x8 grid. Keep
+    // its geometry separate from the Chess photographs so switching games
+    // never reuses the wrong playable bounds.
+    private val redBlackDraughtsGridX = floatArrayOf(
         60f / 1024f, 173f / 1024f, 286f / 1024f, 399f / 1024f,
         512f / 1024f, 625f / 1024f, 738f / 1024f, 851f / 1024f,
         964f / 1024f,
     )
-    private val redBlackChessGridY = floatArrayOf(
+    private val redBlackDraughtsGridY = floatArrayOf(
         60f / 1024f, 173f / 1024f, 286f / 1024f, 399f / 1024f,
         512f / 1024f, 625f / 1024f, 738f / 1024f, 851f / 1024f,
         964f / 1024f,
@@ -247,8 +259,8 @@ class BoardView(context: Context) : View(context) {
     } catch (_: Throwable) {
         null
     }
-    private val redBlackChessBoardBitmap: Bitmap? = try {
-        context.assets.open("chess_board_red_black.png").use { BitmapFactory.decodeStream(it) }
+    private val draughtsBoardBitmap: Bitmap? = try {
+        context.assets.open("draughts_board_red_black.png").use { BitmapFactory.decodeStream(it) }
     } catch (_: Throwable) {
         null
     }
@@ -470,6 +482,31 @@ class BoardView(context: Context) : View(context) {
             }
             return
         }
+        if (isDraughtsImageBoard()) {
+            val bitmap = draughtsBoardBitmap
+            if (bitmap != null) {
+                val scale = minOf(
+                    width.toFloat() / bitmap.width,
+                    height.toFloat() / bitmap.height,
+                )
+                val imageWidth = bitmap.width * scale
+                val imageHeight = bitmap.height * scale
+                draughtsImageRect.set(
+                    (width - imageWidth) / 2f,
+                    (height - imageHeight) / 2f,
+                    (width + imageWidth) / 2f,
+                    (height + imageHeight) / 2f,
+                )
+                draughtsCellWidth =
+                    (draughtsLineX(8) - draughtsLineX(0)) / 8f
+                draughtsCellHeight =
+                    (draughtsLineY(8) - draughtsLineY(0)) / 8f
+                cellSize = minOf(draughtsCellWidth, draughtsCellHeight)
+                piecePaint.textSize = cellSize * 0.60f
+                mustCapturePaint.strokeWidth = cellSize * 0.055f
+            }
+            return
+        }
         val dp      = resources.displayMetrics.density
         val margin  = 4f * dp
         val boardSz = minOf(width.toFloat() - margin * 2, height.toFloat() - margin * 2)
@@ -662,6 +699,7 @@ class BoardView(context: Context) : View(context) {
         if (isXiangqiBoard()) return xiangqiPoint(pos)
         if (isGoBoard()) return goPoint(pos)
         if (isChessBoard()) return chessPoint(pos)
+        if (isDraughtsImageBoard()) return draughtsPoint(pos)
         val last = gameState.boardSize - 1
         val dr = if (isFlipped) last - pos.row else pos.row
         val dc = if (isFlipped) last - pos.col else pos.col
@@ -676,6 +714,12 @@ class BoardView(context: Context) : View(context) {
             drawChessHighlights(canvas)
             drawChessLabels(canvas)
             drawChessPieces(canvas)
+            return
+        }
+        if (isDraughtsImageBoard()) {
+            drawDraughtsBoard(canvas)
+            drawDraughtsHighlights(canvas)
+            drawDraughtsPieces(canvas)
             return
         }
         if (isShogiBoard()) {
@@ -715,7 +759,6 @@ class BoardView(context: Context) : View(context) {
     }
 
     private fun drawChessLabels(canvas: Canvas) {
-        if (chessBoardStyle == ChessBoardStyle.RED_BLACK) return
         val inset = cellSize * 0.105f
         labelPaint.textSize = (cellSize * 0.17f).coerceIn(10f, 24f)
         labelPaint.style = Paint.Style.FILL
@@ -805,6 +848,74 @@ class BoardView(context: Context) : View(context) {
                 if (position == skipPos) continue
                 val piece = gameState.get(position) ?: continue
                 val point = chessPoint(position)
+                if (showMustCaptureHints && position in mustCapturePieces) {
+                    canvas.drawCircle(point.x, point.y, cellSize * 0.42f, mustCapturePaint)
+                }
+                drawPieceAt(canvas, piece, point.x, point.y, position)
+            }
+        }
+        animPiece?.let {
+            drawPieceAt(
+                canvas,
+                it,
+                lerp(animFromPx.x, animToPx.x, animProgress),
+                lerp(animFromPx.y, animToPx.y, animProgress),
+            )
+        }
+    }
+
+    private fun drawDraughtsBoard(canvas: Canvas) {
+        canvas.drawColor(Color.rgb(20, 20, 20))
+        draughtsBoardBitmap?.let {
+            canvas.drawBitmap(
+                it,
+                null,
+                draughtsImageRect,
+                Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG),
+            )
+        }
+    }
+
+    private fun drawDraughtsHighlights(canvas: Canvas) {
+        gameState.lastMove?.let {
+            drawDraughtsCell(canvas, it.from, highlightGold)
+            drawDraughtsCell(canvas, it.to, highlightGold)
+        }
+        selectedPos?.let { drawDraughtsCell(canvas, it, highlightBlue) }
+
+        val showHints = directMoveMode || SettingsManager.getCheckersHints(context)
+        if (showHints) {
+            legalMoves.forEach { move ->
+                val point = draughtsPoint(move.to)
+                if (!directMoveMode && move.isCapture) {
+                    canvas.drawCircle(point.x, point.y, cellSize * 0.44f, ringPaint)
+                } else {
+                    canvas.drawCircle(point.x, point.y, cellSize * 0.17f, dotPaint)
+                }
+            }
+        }
+    }
+
+    private fun drawDraughtsCell(canvas: Canvas, position: Position, paint: Paint) {
+        val displayedCol = if (isFlipped) 7 - position.col else position.col
+        val displayedRow = if (isFlipped) 7 - position.row else position.row
+        canvas.drawRect(
+            draughtsLineX(displayedCol),
+            draughtsLineY(displayedRow),
+            draughtsLineX(displayedCol + 1),
+            draughtsLineY(displayedRow + 1),
+            paint,
+        )
+    }
+
+    private fun drawDraughtsPieces(canvas: Canvas) {
+        val skipPos = animFromPos
+        for (row in 0 until gameState.boardSize) {
+            for (col in 0 until gameState.boardSize) {
+                val position = Position(row, col)
+                if (position == skipPos) continue
+                val piece = gameState.get(position) ?: continue
+                val point = draughtsPoint(position)
                 if (showMustCaptureHints && position in mustCapturePieces) {
                     canvas.drawCircle(point.x, point.y, cellSize * 0.42f, mustCapturePaint)
                 }
@@ -1443,13 +1554,21 @@ class BoardView(context: Context) : View(context) {
     private fun isChessBoard(): Boolean =
         ruleEngine is ChessRuleEngine || gameState.board.any { it is ChessPiece }
 
+    private fun isDraughtsBoard(): Boolean =
+        ruleEngine is CheckersRuleEngine ||
+            ruleEngine is InternationalDraughtsRuleEngine ||
+            gameState.board.any { it is CheckersPiece }
+
+    private fun isDraughtsImageBoard(): Boolean =
+        isDraughtsBoard() && draughtsBoardStyle == DraughtsBoardStyle.RED_BLACK &&
+            draughtsBoardBitmap != null
+
     private fun chessBitmap(): Bitmap? = when (chessBoardStyle) {
         ChessBoardStyle.CANVAS -> null
         ChessBoardStyle.CLASSIC_WOOD -> classicChessBoardBitmap
         ChessBoardStyle.SUPPLIED_WOOD -> suppliedChessBoardBitmap
         ChessBoardStyle.REALISTIC_BLACK_WHITE -> realisticChessBoardBitmap
         ChessBoardStyle.BLACK_WHITE -> blackWhiteChessBoardBitmap
-        ChessBoardStyle.RED_BLACK -> redBlackChessBoardBitmap
     }
 
     private fun isChessImageBoard(): Boolean =
@@ -1460,7 +1579,6 @@ class BoardView(context: Context) : View(context) {
         ChessBoardStyle.CLASSIC_WOOD -> classicChessGridX
         ChessBoardStyle.REALISTIC_BLACK_WHITE -> realisticChessGridX
         ChessBoardStyle.BLACK_WHITE -> blackWhiteChessGridX
-        ChessBoardStyle.RED_BLACK -> redBlackChessGridX
         ChessBoardStyle.CANVAS -> floatArrayOf()
     }
 
@@ -1469,7 +1587,6 @@ class BoardView(context: Context) : View(context) {
         ChessBoardStyle.CLASSIC_WOOD -> classicChessGridY
         ChessBoardStyle.REALISTIC_BLACK_WHITE -> realisticChessGridY
         ChessBoardStyle.BLACK_WHITE -> blackWhiteChessGridY
-        ChessBoardStyle.RED_BLACK -> redBlackChessGridY
         ChessBoardStyle.CANVAS -> floatArrayOf()
     }
 
@@ -1505,6 +1622,21 @@ class BoardView(context: Context) : View(context) {
             boardTop + index * cellSize
         }
 
+    private fun draughtsPoint(position: Position): PointF {
+        val displayedRow = if (isFlipped) 7 - position.row else position.row
+        val displayedCol = if (isFlipped) 7 - position.col else position.col
+        return PointF(
+            (draughtsLineX(displayedCol) + draughtsLineX(displayedCol + 1)) / 2f,
+            (draughtsLineY(displayedRow) + draughtsLineY(displayedRow + 1)) / 2f,
+        )
+    }
+
+    private fun draughtsLineX(index: Int): Float =
+        draughtsImageRect.left + draughtsImageRect.width() * redBlackDraughtsGridX[index]
+
+    private fun draughtsLineY(index: Int): Float =
+        draughtsImageRect.top + draughtsImageRect.height() * redBlackDraughtsGridY[index]
+
     private fun shogiPoint(position: Position): PointF {
         val displayedRow = if (isFlipped) 8 - position.row else position.row
         val displayedCol = if (isFlipped) 8 - position.col else position.col
@@ -1537,6 +1669,19 @@ class BoardView(context: Context) : View(context) {
             } ?: return null
             val displayedRow = (0 until 8).firstOrNull {
                 y >= chessLineY(it) && y < chessLineY(it + 1)
+            } ?: return null
+            return Position(
+                if (isFlipped) 7 - displayedRow else displayedRow,
+                if (isFlipped) 7 - displayedCol else displayedCol,
+            )
+        }
+        if (isDraughtsImageBoard()) {
+            if (draughtsCellWidth <= 0f || draughtsCellHeight <= 0f) return null
+            val displayedCol = (0 until 8).firstOrNull {
+                x >= draughtsLineX(it) && x < draughtsLineX(it + 1)
+            } ?: return null
+            val displayedRow = (0 until 8).firstOrNull {
+                y >= draughtsLineY(it) && y < draughtsLineY(it + 1)
             } ?: return null
             return Position(
                 if (isFlipped) 7 - displayedRow else displayedRow,

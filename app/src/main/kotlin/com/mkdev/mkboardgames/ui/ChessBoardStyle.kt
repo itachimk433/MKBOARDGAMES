@@ -12,5 +12,4 @@ enum class ChessBoardStyle {
     SUPPLIED_WOOD,
     REALISTIC_BLACK_WHITE,
     BLACK_WHITE,
-    RED_BLACK,
 }

@@ -32,6 +32,7 @@ import com.mkdev.mkboardgames.ui.ChessChoiceView
 import com.mkdev.mkboardgames.ui.ChessMenuView
 import com.mkdev.mkboardgames.ui.ChessRulesView
 import com.mkdev.mkboardgames.ui.ChessBoardStyle
+import com.mkdev.mkboardgames.ui.DraughtsBoardStyle
 import com.mkdev.mkboardgames.ui.StyledDialogs
 import kotlinx.coroutines.*
 
@@ -128,9 +129,10 @@ class GameActivity : AppCompatActivity() {
             gravity = Gravity.START
             setPadding((10 * dp).toInt(), 0, 0, 0)
         }
-        boardStyleSwitch.onStyleChanged = { style ->
-            if (gameType == "CHESS") {
-                boardView.chessBoardStyle = style
+        boardStyleSwitch.onStyleChanged = { styleIndex ->
+            when (gameType) {
+                "CHESS" -> boardView.chessBoardStyle = ChessBoardStyle.entries[styleIndex]
+                "CHECKERS" -> boardView.draughtsBoardStyle = DraughtsBoardStyle.entries[styleIndex]
             }
         }
         autoplayButton.onAutoplayChanged = { enabled ->
@@ -161,7 +163,16 @@ class GameActivity : AppCompatActivity() {
         gameState = engine.initialState()
         boardView.ruleEngine = engine
         boardView.gameState = gameState
-        boardStyleSwitch.setSelectedStyle(boardView.chessBoardStyle, animate = false)
+        val hasBoardStyles = gameType == "CHESS" || gameType == "CHECKERS"
+        boardStyleSwitch.setStyleCount(
+            if (gameType == "CHECKERS") DraughtsBoardStyle.entries.size
+            else ChessBoardStyle.entries.size,
+        )
+        boardStyleSwitch.setSelectedIndex(
+            if (gameType == "CHECKERS") boardView.draughtsBoardStyle.ordinal
+            else boardView.chessBoardStyle.ordinal,
+            animate = false,
+        )
         autoplayButton.setAutoplayEnabled(false, animate = false)
 
         container.addView(hudView,
@@ -175,7 +186,7 @@ class GameActivity : AppCompatActivity() {
             ))
         boardStyleRow.addView(boardStyleSwitch,
             android.widget.LinearLayout.LayoutParams((118 * dp).toInt(), boardStyleSwitchH))
-        boardStyleSwitch.visibility = if (gameType == "CHESS") View.VISIBLE else View.GONE
+        boardStyleSwitch.visibility = if (hasBoardStyles) View.VISIBLE else View.GONE
         container.addView(boardStyleRow,
             android.widget.LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
