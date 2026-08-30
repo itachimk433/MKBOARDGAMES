@@ -255,7 +255,8 @@ class BoardView(context: Context) : View(context) {
             style = Paint.Style.STROKE
             strokeWidth = 5f
         }
-        canvas.drawRoundRect(boardRect.inset(12f, 12f), 18f, 18f, accentPaint)
+        val accentRect = RectF(boardRect).apply { inset(12f, 12f) }
+        canvas.drawRoundRect(accentRect, 18f, 18f, accentPaint)
         return bitmap
     }
 
