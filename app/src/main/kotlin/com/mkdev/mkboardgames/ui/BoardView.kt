@@ -345,54 +345,6 @@ class BoardView(context: Context) : View(context) {
     private val piecePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.CENTER; isFakeBoldText = true
     }
-    private val stauntonPiecePaint = Paint(
-        Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG or Paint.DITHER_FLAG,
-    )
-    private val whiteChessPieceOutlinePaint = Paint(
-        Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG or Paint.DITHER_FLAG,
-    ).apply {
-        colorFilter = PorterDuffColorFilter(Color.parseColor("#24201D"), PorterDuff.Mode.SRC_IN)
-    }
-    private val blackChessPieceOutlinePaint = Paint(
-        Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG or Paint.DITHER_FLAG,
-    ).apply {
-        colorFilter = PorterDuffColorFilter(Color.parseColor("#F5E8CC"), PorterDuff.Mode.SRC_IN)
-    }
-    private val stauntonPieceBitmaps by lazy {
-        loadChessPieceBitmaps("chess_piece_staunton")
-    }
-    private val illustratedPieceBitmaps by lazy {
-        loadChessPieceBitmaps("chess_piece_illustrated")
-    }
-
-    private fun loadChessPieceBitmaps(prefix: String): Map<Pair<PieceColor, ChessPieceType>, Bitmap> {
-        val names = mapOf(
-            PieceColor.WHITE to mapOf(
-                ChessPieceType.PAWN to "${prefix}_white_pawn.png",
-                ChessPieceType.ROOK to "${prefix}_white_rook.png",
-                ChessPieceType.KNIGHT to "${prefix}_white_knight.png",
-                ChessPieceType.BISHOP to "${prefix}_white_bishop.png",
-                ChessPieceType.QUEEN to "${prefix}_white_queen.png",
-                ChessPieceType.KING to "${prefix}_white_king.png",
-            ),
-            PieceColor.BLACK to mapOf(
-                ChessPieceType.PAWN to "${prefix}_black_pawn.png",
-                ChessPieceType.ROOK to "${prefix}_black_rook.png",
-                ChessPieceType.KNIGHT to "${prefix}_black_knight.png",
-                ChessPieceType.BISHOP to "${prefix}_black_bishop.png",
-                ChessPieceType.QUEEN to "${prefix}_black_queen.png",
-                ChessPieceType.KING to "${prefix}_black_king.png",
-            ),
-        )
-        return names.flatMap { (color, types) ->
-            types.map { (type, filename) -> (color to type) to filename }
-        }.associate { (key, filename) ->
-            key to context.assets.open(filename).use { stream ->
-                BitmapFactory.decodeStream(stream)
-                    ?: error("Unable to decode Chess piece asset: $filename")
-            }
-        }
-    }
     private val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(80, 0, 0, 0)
         maskFilter = BlurMaskFilter(6f, BlurMaskFilter.Blur.NORMAL)
@@ -1400,11 +1352,11 @@ class BoardView(context: Context) : View(context) {
     private fun drawChessPiece(canvas: Canvas, piece: ChessPiece, cx: Float, cy: Float) {
         when (chessPieceStyle) {
             ChessPieceStyle.STAUNTON -> {
-                drawBitmapChessPiece(canvas, piece, cx, cy, stauntonPieceBitmaps)
+                drawVectorStauntonChessPiece(canvas, piece, cx, cy)
                 return
             }
             ChessPieceStyle.ILLUSTRATED -> {
-                drawBitmapChessPiece(canvas, piece, cx, cy, illustratedPieceBitmaps)
+                drawVectorIllustratedChessPiece(canvas, piece, cx, cy)
                 return
             }
             ChessPieceStyle.UNICODE -> Unit
@@ -1439,75 +1391,83 @@ class BoardView(context: Context) : View(context) {
         if (shouldRotate) canvas.restore()
     }
 
-    private fun drawBitmapChessPiece(
+    /**
+     * The second Chess set is drawn entirely from Canvas paths. Keeping the
+     * silhouette in code makes the outline thickness and board-size scaling
+     * consistent on every device.
+     */
+    private fun drawVectorIllustratedChessPiece(
         canvas: Canvas,
         piece: ChessPiece,
         cx: Float,
         cy: Float,
-        bitmaps: Map<Pair<PieceColor, ChessPieceType>, Bitmap>,
     ) {
-        val bitmap = bitmaps[piece.color to piece.type]
-            ?: error("Missing Chess piece asset for ${piece.color} ${piece.type}")
-        val maxWidth = cellSize * 0.78f
-        val maxHeight = cellSize * 0.86f
-        val bitmapScale = minOf(
-            maxWidth / bitmap.width.toFloat(),
-            maxHeight / bitmap.height.toFloat(),
-        )
-        val drawWidth = bitmap.width * bitmapScale
-        val drawHeight = bitmap.height * bitmapScale
-        val destination = RectF(
-            cx - drawWidth / 2f,
-            cy - drawHeight / 2f,
-            cx + drawWidth / 2f,
-            cy + drawHeight / 2f,
-        )
-        canvas.save()
-        if (rotateBlackPieces && piece.color == PieceColor.BLACK) {
-            canvas.rotate(180f, cx, cy)
+        val shouldRotate = rotateBlackPieces && piece.color == PieceColor.BLACK
+        val isWhite = piece.color == PieceColor.WHITE
+        val scale = cellSize
+        val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = LinearGradient(
+                cx - scale * 0.24f,
+                cy - scale * 0.46f,
+                cx + scale * 0.24f,
+                cy + scale * 0.42f,
+                if (isWhite) {
+                    intArrayOf(
+                        Color.parseColor("#FFFFFF"),
+                        Color.parseColor("#E9E4DB"),
+                        Color.parseColor("#A69B8E"),
+                    )
+                } else {
+                    intArrayOf(
+                        Color.parseColor("#686D72"),
+                        Color.parseColor("#2D3135"),
+                        Color.parseColor("#0B0D0F"),
+                    )
+                },
+                null,
+                Shader.TileMode.CLAMP,
+            )
+            style = Paint.Style.FILL
+        }
+        val edge = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (isWhite) Color.parseColor("#4A4138") else Color.parseColor("#050505")
+            style = Paint.Style.STROKE
+            strokeWidth = scale * 0.032f
+            strokeJoin = Paint.Join.ROUND
+            strokeCap = Paint.Cap.ROUND
+        }
+        val detail = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (isWhite) {
+                Color.argb(175, 255, 255, 255)
+            } else {
+                Color.argb(165, 196, 204, 210)
+            }
+            style = Paint.Style.STROKE
+            strokeWidth = scale * 0.016f
+            strokeCap = Paint.Cap.ROUND
         }
 
-        // The supplied and illustrated assets have a very fine built-in edge.
-        // Draw their alpha silhouette behind the artwork to make both sets
-        // readable on every board square without altering the piece artwork.
-        val outlineRadius = maxOf(1f, cellSize * 0.028f)
-        val diagonalOffset = outlineRadius * 0.7071f
-        val outlinePaint = if (piece.color == PieceColor.WHITE) {
-            whiteChessPieceOutlinePaint
-        } else {
-            blackChessPieceOutlinePaint
+        canvas.save()
+        if (shouldRotate) canvas.rotate(180f, cx, cy)
+        drawStauntonShadow(canvas, cx, cy, scale)
+        drawStauntonBase(canvas, cx, cy, scale, fill, edge, detail)
+        when (piece.type) {
+            ChessPieceType.PAWN ->
+                drawStauntonPawn(canvas, cx, cy, scale, fill, edge, detail)
+            ChessPieceType.ROOK ->
+                drawStauntonRook(canvas, cx, cy, scale, fill, edge, detail)
+            ChessPieceType.KNIGHT ->
+                drawStauntonKnight(canvas, cx, cy, scale, fill, edge, detail)
+            ChessPieceType.BISHOP ->
+                drawStauntonBishop(canvas, cx, cy, scale, fill, edge, detail)
+            ChessPieceType.QUEEN ->
+                drawStauntonQueen(canvas, cx, cy, scale, fill, edge, detail)
+            ChessPieceType.KING ->
+                drawStauntonKing(canvas, cx, cy, scale, fill, edge, detail)
         }
-        val outlineOffsets = arrayOf(
-            -outlineRadius to 0f,
-            outlineRadius to 0f,
-            0f to -outlineRadius,
-            0f to outlineRadius,
-            -diagonalOffset to -diagonalOffset,
-            diagonalOffset to -diagonalOffset,
-            -diagonalOffset to diagonalOffset,
-            diagonalOffset to diagonalOffset,
-        )
-        for ((offsetX, offsetY) in outlineOffsets) {
-            canvas.drawBitmap(
-                bitmap,
-                null,
-                RectF(
-                    destination.left + offsetX,
-                    destination.top + offsetY,
-                    destination.right + offsetX,
-                    destination.bottom + offsetY,
-                ),
-                outlinePaint,
-            )
-        }
-        canvas.drawBitmap(bitmap, null, destination, stauntonPiecePaint)
         canvas.restore()
     }
 
-    /**
-     * Legacy vector fallback retained for compatibility with older state
-     * snapshots; current Chess rendering uses the supplied bitmap set above.
-     */
     private fun drawVectorStauntonChessPiece(canvas: Canvas, piece: ChessPiece, cx: Float, cy: Float) {
         val shouldRotate = rotateBlackPieces && piece.color == PieceColor.BLACK
         val isWhite = piece.color == PieceColor.WHITE
