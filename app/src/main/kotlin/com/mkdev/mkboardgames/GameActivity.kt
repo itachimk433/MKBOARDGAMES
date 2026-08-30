@@ -880,8 +880,13 @@ Checkmate your opponent's King.
         styleChessDialog(dialog, 620f)
     }
 
-    private fun styleChessDialog(dialog: Dialog, heightDp: Float) {
-        val isChessFullScreen = isStyledBoardGame()
+    private fun styleChessDialog(
+        dialog: Dialog,
+        heightDp: Float,
+        fullScreen: Boolean = isStyledBoardGame(),
+        blurBackground: Boolean = true,
+    ) {
+        val isChessFullScreen = fullScreen
         val metrics = resources.displayMetrics
         if (isChessFullScreen) {
             hideChessBoardWhileDialogIsOpen()
@@ -914,7 +919,7 @@ Checkmate your opponent's King.
             window.setLayout(width, height)
             enableChessWindowBlur(window)
         }
-        applyChessDialogBlur()
+        if (blurBackground) applyChessDialogBlur()
     }
 
     private fun enableChessWindowBlur(window: Window) {
@@ -1909,7 +1914,6 @@ Checkmate your opponent's King.
     }
 
     private fun showChessResultDialog(message: String, resultLabel: String) {
-        hideChessBoardWhileDialogIsOpen()
         val choices = mutableListOf(
             ChessChoiceView.Choice(
                 "Play Again",
@@ -1957,7 +1961,7 @@ Checkmate your opponent's King.
             }
         }
         dialog.show()
-        styleChessDialog(dialog, 520f)
+        styleChessDialog(dialog, 520f, fullScreen = false, blurBackground = false)
     }
 
     private fun buildGoResultMessage(outcome: String): String {

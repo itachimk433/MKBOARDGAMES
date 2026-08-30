@@ -1351,7 +1351,7 @@ class BoardView(context: Context) : View(context) {
         val glyphBounds = Rect()
         piecePaint.getTextBounds(symbol, 0, symbol.length, glyphBounds)
         val glyphDimension = maxOf(glyphBounds.width(), glyphBounds.height()).toFloat()
-        val targetDimension = cellSize * 0.60f
+        val targetDimension = cellSize * 0.66f
         val glyphScale = if (glyphDimension > 0f) targetDimension / glyphDimension else 1f
         val glyphBaseline = cy - (glyphBounds.top + glyphBounds.bottom) / 2f
 
@@ -1362,7 +1362,7 @@ class BoardView(context: Context) : View(context) {
         if (shouldRotate) { canvas.save(); canvas.rotate(180f, cx, cy) }
         canvas.scale(glyphScale, glyphScale, cx, cy)
         piecePaint.style = Paint.Style.STROKE
-        piecePaint.strokeWidth = cellSize * 0.025f / glyphScale
+        piecePaint.strokeWidth = cellSize * 0.018f / glyphScale
         piecePaint.color = if (piece.color == PieceColor.WHITE) Color.parseColor("#757575")
                            else Color.parseColor("#EEEEEE")
         canvas.drawText(symbol, cx, glyphBaseline, piecePaint)
