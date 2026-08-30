@@ -349,22 +349,29 @@ class BoardView(context: Context) : View(context) {
         Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG or Paint.DITHER_FLAG,
     )
     private val stauntonPieceBitmaps by lazy {
+        loadChessPieceBitmaps("chess_piece_staunton")
+    }
+    private val illustratedPieceBitmaps by lazy {
+        loadChessPieceBitmaps("chess_piece_illustrated")
+    }
+
+    private fun loadChessPieceBitmaps(prefix: String): Map<Pair<PieceColor, ChessPieceType>, Bitmap> {
         val names = mapOf(
             PieceColor.WHITE to mapOf(
-                ChessPieceType.PAWN to "chess_piece_staunton_white_pawn.png",
-                ChessPieceType.ROOK to "chess_piece_staunton_white_rook.png",
-                ChessPieceType.KNIGHT to "chess_piece_staunton_white_knight.png",
-                ChessPieceType.BISHOP to "chess_piece_staunton_white_bishop.png",
-                ChessPieceType.QUEEN to "chess_piece_staunton_white_queen.png",
-                ChessPieceType.KING to "chess_piece_staunton_white_king.png",
+                ChessPieceType.PAWN to "${prefix}_white_pawn.png",
+                ChessPieceType.ROOK to "${prefix}_white_rook.png",
+                ChessPieceType.KNIGHT to "${prefix}_white_knight.png",
+                ChessPieceType.BISHOP to "${prefix}_white_bishop.png",
+                ChessPieceType.QUEEN to "${prefix}_white_queen.png",
+                ChessPieceType.KING to "${prefix}_white_king.png",
             ),
             PieceColor.BLACK to mapOf(
-                ChessPieceType.PAWN to "chess_piece_staunton_black_pawn.png",
-                ChessPieceType.ROOK to "chess_piece_staunton_black_rook.png",
-                ChessPieceType.KNIGHT to "chess_piece_staunton_black_knight.png",
-                ChessPieceType.BISHOP to "chess_piece_staunton_black_bishop.png",
-                ChessPieceType.QUEEN to "chess_piece_staunton_black_queen.png",
-                ChessPieceType.KING to "chess_piece_staunton_black_king.png",
+                ChessPieceType.PAWN to "${prefix}_black_pawn.png",
+                ChessPieceType.ROOK to "${prefix}_black_rook.png",
+                ChessPieceType.KNIGHT to "${prefix}_black_knight.png",
+                ChessPieceType.BISHOP to "${prefix}_black_bishop.png",
+                ChessPieceType.QUEEN to "${prefix}_black_queen.png",
+                ChessPieceType.KING to "${prefix}_black_king.png",
             ),
         )
         names.flatMap { (color, types) ->
@@ -1381,9 +1388,16 @@ class BoardView(context: Context) : View(context) {
     }
 
     private fun drawChessPiece(canvas: Canvas, piece: ChessPiece, cx: Float, cy: Float) {
-        if (chessPieceStyle == ChessPieceStyle.STAUNTON) {
-            drawSuppliedStauntonChessPiece(canvas, piece, cx, cy)
-            return
+        when (chessPieceStyle) {
+            ChessPieceStyle.STAUNTON -> {
+                drawBitmapChessPiece(canvas, piece, cx, cy, stauntonPieceBitmaps)
+                return
+            }
+            ChessPieceStyle.ILLUSTRATED -> {
+                drawBitmapChessPiece(canvas, piece, cx, cy, illustratedPieceBitmaps)
+                return
+            }
+            ChessPieceStyle.UNICODE -> Unit
         }
         val shouldRotate = rotateBlackPieces && piece.color == PieceColor.BLACK
         val symbol = piece.symbol()
@@ -1415,13 +1429,14 @@ class BoardView(context: Context) : View(context) {
         if (shouldRotate) canvas.restore()
     }
 
-    private fun drawSuppliedStauntonChessPiece(
+    private fun drawBitmapChessPiece(
         canvas: Canvas,
         piece: ChessPiece,
         cx: Float,
         cy: Float,
+        bitmaps: Map<Pair<PieceColor, ChessPieceType>, Bitmap>,
     ) {
-        val bitmap = stauntonPieceBitmaps[piece.color to piece.type]
+        val bitmap = bitmaps[piece.color to piece.type]
             ?: error("Missing Chess piece asset for ${piece.color} ${piece.type}")
         val maxWidth = cellSize * 0.78f
         val maxHeight = cellSize * 0.86f

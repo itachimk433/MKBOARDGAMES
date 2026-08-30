@@ -8,4 +8,5 @@ package com.mkdev.mkboardgames.ui
 enum class ChessPieceStyle {
     UNICODE,
     STAUNTON,
+    ILLUSTRATED,
 }
