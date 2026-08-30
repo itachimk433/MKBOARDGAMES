@@ -184,9 +184,9 @@ class BoardView(context: Context) : View(context) {
         959f / 1024f,
     )
     private val realisticChessGridX = floatArrayOf(
-        58f / 1024f, 171.5f / 1024f, 285f / 1024f, 398.5f / 1024f,
-        512f / 1024f, 625.5f / 1024f, 739f / 1024f, 852.5f / 1024f,
-        966f / 1024f,
+        48f / 1024f, 164f / 1024f, 280f / 1024f, 396f / 1024f,
+        512f / 1024f, 628f / 1024f, 744f / 1024f, 860f / 1024f,
+        976f / 1024f,
     )
     private val realisticChessGridY = realisticChessGridX.copyOf()
 
@@ -227,16 +227,24 @@ class BoardView(context: Context) : View(context) {
         }
         canvas.drawRect(0f, 0f, size.toFloat(), size.toFloat(), bg)
 
-        val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE
-            strokeWidth = 28f
+        // Keep the outer edge close to the bitmap bounds so this presentation
+        // has the same visible footprint as the first (canvas) board.
+        val boardRect = RectF(14f, 14f, size - 14f, size - 14f)
+        val boardRadius = 42f
+        val framePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.FILL
             color = Color.parseColor("#2F3540")
         }
-        val boardInset = 58f
-        val squareSize = (size - boardInset * 2f) / 8f
-        val boardRect = RectF(boardInset, boardInset, size - boardInset, size - boardInset)
-        canvas.drawRoundRect(boardRect, 28f, 28f, borderPaint)
+        canvas.drawRoundRect(boardRect, boardRadius, boardRadius, framePaint)
 
+        val boardInset = 48f
+        val squareSize = (size - boardInset * 2f) / 8f
+        val gridRect = RectF(boardInset, boardInset, size - boardInset, size - boardInset)
+        val gridPath = Path().apply {
+            addRoundRect(gridRect, 18f, 18f, Path.Direction.CW)
+        }
+        canvas.save()
+        canvas.clipPath(gridPath)
         for (row in 0 until 8) {
             for (col in 0 until 8) {
                 val isLight = (row + col) % 2 == 0
@@ -248,13 +256,15 @@ class BoardView(context: Context) : View(context) {
                 canvas.drawRect(left, top, left + squareSize, top + squareSize, squarePaint)
             }
         }
+        canvas.restore()
 
         val bevelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.argb(80, 255, 255, 255)
             style = Paint.Style.STROKE
-            strokeWidth = 4f
+            strokeWidth = 5f
         }
-        canvas.drawRoundRect(boardRect, 24f, 24f, bevelPaint)
+        val bevelRect = RectF(boardRect).apply { inset(5f, 5f) }
+        canvas.drawRoundRect(bevelRect, boardRadius - 5f, boardRadius - 5f, bevelPaint)
 
         return bitmap
     }
@@ -393,9 +403,19 @@ class BoardView(context: Context) : View(context) {
         if (isChessImageBoard()) {
             val bitmap = chessBitmap()
             if (bitmap != null) {
+                // The first canvas board leaves a 4dp edge on the smaller
+                // dimension. Give the realistic board the same outer bounds;
+                // the other photo boards retain their original full-bleed fit.
+                val canvasBoardMargin = if (chessBoardStyle == ChessBoardStyle.REALISTIC_BLACK_WHITE) {
+                    4f * resources.displayMetrics.density
+                } else {
+                    0f
+                }
+                val availableWidth = (width.toFloat() - canvasBoardMargin * 2f).coerceAtLeast(0f)
+                val availableHeight = (height.toFloat() - canvasBoardMargin * 2f).coerceAtLeast(0f)
                 val scale = minOf(
-                    width.toFloat() / bitmap.width,
-                    height.toFloat() / bitmap.height,
+                    availableWidth / bitmap.width,
+                    availableHeight / bitmap.height,
                 )
                 val imageWidth = bitmap.width * scale
                 val imageHeight = bitmap.height * scale
