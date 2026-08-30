@@ -348,6 +348,16 @@ class BoardView(context: Context) : View(context) {
     private val stauntonPiecePaint = Paint(
         Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG or Paint.DITHER_FLAG,
     )
+    private val whiteChessPieceOutlinePaint = Paint(
+        Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG or Paint.DITHER_FLAG,
+    ).apply {
+        colorFilter = PorterDuffColorFilter(Color.parseColor("#24201D"), PorterDuff.Mode.SRC_IN)
+    }
+    private val blackChessPieceOutlinePaint = Paint(
+        Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG or Paint.DITHER_FLAG,
+    ).apply {
+        colorFilter = PorterDuffColorFilter(Color.parseColor("#F5E8CC"), PorterDuff.Mode.SRC_IN)
+    }
     private val stauntonPieceBitmaps by lazy {
         loadChessPieceBitmaps("chess_piece_staunton")
     }
@@ -1455,6 +1465,40 @@ class BoardView(context: Context) : View(context) {
         canvas.save()
         if (rotateBlackPieces && piece.color == PieceColor.BLACK) {
             canvas.rotate(180f, cx, cy)
+        }
+
+        // The supplied and illustrated assets have a very fine built-in edge.
+        // Draw their alpha silhouette behind the artwork to make both sets
+        // readable on every board square without altering the piece artwork.
+        val outlineRadius = maxOf(1f, cellSize * 0.028f)
+        val diagonalOffset = outlineRadius * 0.7071f
+        val outlinePaint = if (piece.color == PieceColor.WHITE) {
+            whiteChessPieceOutlinePaint
+        } else {
+            blackChessPieceOutlinePaint
+        }
+        val outlineOffsets = arrayOf(
+            -outlineRadius to 0f,
+            outlineRadius to 0f,
+            0f to -outlineRadius,
+            0f to outlineRadius,
+            -diagonalOffset to -diagonalOffset,
+            diagonalOffset to -diagonalOffset,
+            -diagonalOffset to diagonalOffset,
+            diagonalOffset to diagonalOffset,
+        )
+        for ((offsetX, offsetY) in outlineOffsets) {
+            canvas.drawBitmap(
+                bitmap,
+                null,
+                RectF(
+                    destination.left + offsetX,
+                    destination.top + offsetY,
+                    destination.right + offsetX,
+                    destination.bottom + offsetY,
+                ),
+                outlinePaint,
+            )
         }
         canvas.drawBitmap(bitmap, null, destination, stauntonPiecePaint)
         canvas.restore()
