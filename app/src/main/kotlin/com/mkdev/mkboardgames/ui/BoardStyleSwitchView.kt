@@ -12,11 +12,12 @@ import android.view.animation.AccelerateDecelerateInterpolator
 import com.mkdev.mkboardgames.SoundPlayer
 
 /**
- * A compact, nameless switch for changing the Chess board presentation.
+ * A compact switch for changing the Chess board presentation.
  *
- * The three positions are the generated canvas board, the original framed wood
- * board, and the newly supplied wood board. The moving thumb and accent color
- * provide the state cue without taking space away from the game HUD.
+ * The four positions are the generated canvas board, the original framed wood
+ * board, the supplied wood board, and a black-and-white board with a more
+ * polished, realistic look. The moving thumb and accent color provide the state
+ * cue without taking space away from the game HUD.
  */
 class BoardStyleSwitchView(context: Context) : View(context) {
 
@@ -84,8 +85,8 @@ class BoardStyleSwitchView(context: Context) : View(context) {
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
-        val trackWidth = 88f * dp
-        val trackHeight = 32f * dp
+        val trackWidth = 110f * dp
+        val trackHeight = 30f * dp
         val left = (width - trackWidth) / 2f
         val top = (height - trackHeight) / 2f
         trackRect.set(left, top, left + trackWidth, top + trackHeight)
@@ -95,26 +96,28 @@ class BoardStyleSwitchView(context: Context) : View(context) {
             Color.parseColor("#5DD6FF"),
             Color.parseColor("#FFB454"),
             Color.parseColor("#D97A45"),
+            Color.parseColor("#EAE7E2"),
         )
-        val thumbColor = when {
-            thumbPosition <= 0.5f ->
-                ArgbEvaluator().evaluate(thumbPosition * 2f, stateColors[0], stateColors[1]) as Int
-            else ->
-                ArgbEvaluator().evaluate((thumbPosition - 0.5f) * 2f, stateColors[1], stateColors[2]) as Int
-        }
+
+        val segmentPosition = thumbPosition * (stateColors.size - 1)
+        val segmentIndex = segmentPosition.toInt().coerceIn(0, stateColors.size - 2)
+        val segmentProgress = (segmentPosition - segmentIndex).coerceIn(0f, 1f)
+        val thumbColor = ArgbEvaluator().evaluate(
+            segmentProgress,
+            stateColors[segmentIndex],
+            stateColors[segmentIndex + 1],
+        ) as Int
 
         trackPaint.color = Color.parseColor("#222A36")
         canvas.drawRoundRect(trackRect, radius, radius, trackPaint)
         canvas.drawRoundRect(trackRect, radius, radius, trackEdgePaint)
 
-        // Small, nameless state markers keep the control understandable even
-        // when the thumb is between positions during its transition.
-        val markerInset = 13f * dp
+        val markerInset = 12f * dp
         val markerStep = (trackWidth - markerInset * 2f) / (stateColors.lastIndex)
         stateColors.forEachIndexed { index, color ->
-            val distance = kotlin.math.abs(thumbPosition - index / 2f)
+            val distance = kotlin.math.abs(thumbPosition - index / (stateColors.size - 1).toFloat())
             indicatorPaint.color = Color.argb(
-                (175f * (1f - distance.coerceIn(0f, 1f))).toInt(),
+                ((180f * (1f - distance.coerceIn(0f, 1f))).toInt()).coerceIn(0, 255),
                 Color.red(color),
                 Color.green(color),
                 Color.blue(color),

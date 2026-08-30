@@ -7,23 +7,18 @@ import kotlin.test.assertTrue
 class SettingsManagerChessDifficultyTest {
     @Test
     fun chessDifficultyProfilesIncludeMasterAndIncreaseStrength() {
-        val easyDepth = SettingsManager.chessAiDepthForTest(0)
-        val mediumDepth = SettingsManager.chessAiDepthForTest(1)
-        val hardDepth = SettingsManager.chessAiDepthForTest(2)
-        val masterDepth = SettingsManager.chessAiDepthForTest(3)
+        val easyProfile = SettingsManager.chessAiProfileForLevel(0)
+        val mediumProfile = SettingsManager.chessAiProfileForLevel(1)
+        val hardProfile = SettingsManager.chessAiProfileForLevel(2)
+        val masterProfile = SettingsManager.chessAiProfileForLevel(3)
 
-        assertEquals(2, easyDepth)
-        assertTrue(mediumDepth >= 4)
-        assertTrue(hardDepth > mediumDepth)
-        assertTrue(masterDepth > hardDepth)
+        assertEquals(2, easyProfile.depth)
+        assertTrue(mediumProfile.depth >= 4)
+        assertTrue(hardProfile.depth > mediumProfile.depth)
+        assertTrue(masterProfile.depth > hardProfile.depth)
 
-        val easyTimeMs = SettingsManager.chessAiTimeLimitMsForTest(0)
-        val mediumTimeMs = SettingsManager.chessAiTimeLimitMsForTest(1)
-        val hardTimeMs = SettingsManager.chessAiTimeLimitMsForTest(2)
-        val masterTimeMs = SettingsManager.chessAiTimeLimitMsForTest(3)
-
-        assertTrue(easyTimeMs < mediumTimeMs)
-        assertTrue(mediumTimeMs < hardTimeMs)
-        assertTrue(hardTimeMs < masterTimeMs)
+        assertTrue(easyProfile.timeLimitMs < mediumProfile.timeLimitMs)
+        assertTrue(mediumProfile.timeLimitMs < hardProfile.timeLimitMs)
+        assertTrue(hardProfile.timeLimitMs < masterProfile.timeLimitMs)
     }
 }

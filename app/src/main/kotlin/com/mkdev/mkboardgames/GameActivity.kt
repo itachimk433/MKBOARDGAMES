@@ -123,13 +123,18 @@ class GameActivity : AppCompatActivity() {
         boardStyleSwitch = BoardStyleSwitchView(this)
         autoplayButton   = AutoplayButtonView(this)
         bottomCaptureView = CaptureStripView(this).also { it.dividerOnTop = true }
+        val boardStyleRow = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.HORIZONTAL
+            gravity = Gravity.START
+            setPadding((10 * dp).toInt(), 0, 0, 0)
+        }
         boardStyleSwitch.onStyleChanged = { style ->
             if (gameType == "CHESS") {
                 boardView.chessBoardStyle = style
             }
         }
         autoplayButton.onAutoplayChanged = { enabled ->
-            if (gameType == "CHESS" && vsAI) {
+            if (gameType != "LUDO" && vsAI) {
                 autoplayEnabled = enabled
                 if (!enabled && autoplayMoveInProgress) {
                     autoplayMoveInProgress = false
@@ -168,21 +173,23 @@ class GameActivity : AppCompatActivity() {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 (58 * dp).toInt(),
             ))
-        container.addView(boardStyleSwitch,
+        boardStyleRow.addView(boardStyleSwitch,
+            android.widget.LinearLayout.LayoutParams((118 * dp).toInt(), boardStyleSwitchH))
+        boardStyleSwitch.visibility = if (gameType == "CHESS") View.VISIBLE else View.GONE
+        container.addView(boardStyleRow,
             android.widget.LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 boardStyleSwitchH,
-            ).apply {
-                boardStyleSwitch.visibility = if (gameType == "CHESS") View.VISIBLE else View.GONE
-            })
+            ))
         container.addView(boardView,
             android.widget.LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0)
                 .apply { weight = 1f })
         container.addView(autoplayButton,
             android.widget.LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
                 autoplayButtonH,
             ).apply {
+                gravity = Gravity.CENTER_HORIZONTAL
                 autoplayButton.visibility =
                     if (gameType == "CHESS" && vsAI) View.VISIBLE else View.GONE
             })
@@ -213,13 +220,26 @@ class GameActivity : AppCompatActivity() {
         resumeComputerTurnIfNeeded()
     }
 
-    override fun onPause() {
-        activityResumed = false
+    private fun stopAutoplayAndAiThinking() {
+        autoplayEnabled = false
+        autoplayMoveInProgress = false
         autoPassJob?.cancel()
         autoPassJob = null
+        if (::autoplayButton.isInitialized) {
+            autoplayButton.setAutoplayEnabled(false, animate = false)
+        }
+        if (::boardView.isInitialized) {
+            boardView.isLocked = false
+            boardView.cancelMoveAnimation()
+        }
+        hudView.setThinking(false)
         scope.coroutineContext.cancelChildren()
+    }
+
+    override fun onPause() {
+        activityResumed = false
+        stopAutoplayAndAiThinking()
         SoundPlayer.stopAll()
-        if (::boardView.isInitialized) boardView.cancelMoveAnimation()
         super.onPause()
     }
 
@@ -881,7 +901,7 @@ Checkmate your opponent's King.
         if (::autoplayButton.isInitialized) {
             autoplayButton.setAutoplayEnabled(false, animate = false)
             autoplayButton.visibility =
-                if (gameType == "CHESS" && vsAI) View.VISIBLE else View.GONE
+                if (gameType != "LUDO" && vsAI) View.VISIBLE else View.GONE
         }
         redoGameStates.clear(); redoCaptures.clear(); redoMoves.clear(); redoCapSnaps.clear()
         AdManager.loadInterstitial(this) { interstitialAd = it }
@@ -1260,9 +1280,9 @@ Checkmate your opponent's King.
     // ─── AI ───────────────────────────────────────────────────────────────────
 
     private fun aiControlsCurrentTurn(): Boolean =
-        vsAI && (
+        vsAI && gameType != "LUDO" && (
             gameState.currentTurn != playerColor ||
-                (gameType == "CHESS" && autoplayEnabled)
+                autoplayEnabled
             )
 
     private fun resumeComputerTurnIfNeeded() {
@@ -1276,19 +1296,24 @@ Checkmate your opponent's King.
     }
 
     private fun triggerAI() {
+        if (!activityResumed || !matchStarted || gameState.status != GameStatus.IN_PROGRESS) {
+            boardView.isLocked = false
+            hudView.setThinking(false)
+            return
+        }
         boardView.isLocked = true; hudView.setThinking(true)
         scope.launch {
             if (gameType == "GO") {
                 delay(SettingsManager.goAiThinkingDelayMs(this@GameActivity))
             }
-            if (!isActive || gameState.status != GameStatus.IN_PROGRESS) {
+            if (!isActive || !activityResumed || gameState.status != GameStatus.IN_PROGRESS) {
                 boardView.isLocked = false
                 hudView.setThinking(false)
                 return@launch
             }
             val thinkingState = gameState
             val autoplayingPlayerTurn =
-                gameType == "CHESS" && thinkingState.currentTurn == playerColor
+                gameType != "LUDO" && thinkingState.currentTurn == playerColor
             val move = withContext(Dispatchers.Default) {
                 try {
                     when (gameType) {

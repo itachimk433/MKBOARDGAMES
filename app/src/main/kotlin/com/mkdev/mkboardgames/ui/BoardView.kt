@@ -209,6 +209,55 @@ class BoardView(context: Context) : View(context) {
     } catch (_: Throwable) {
         null
     }
+    private val realisticChessBoardBitmap: Bitmap? = createRealisticChessBoardBitmap()
+
+    private fun createRealisticChessBoardBitmap(): Bitmap {
+        val size = 1024
+        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+
+        val bg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#171B20")
+        }
+        canvas.drawRect(0f, 0f, size.toFloat(), size.toFloat(), bg)
+
+        val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = 28f
+            color = Color.parseColor("#2F3540")
+        }
+        val boardInset = 58f
+        val squareSize = (size - boardInset * 2f) / 8f
+        val boardRect = RectF(boardInset, boardInset, size - boardInset, size - boardInset)
+        canvas.drawRoundRect(boardRect, 28f, 28f, borderPaint)
+
+        for (row in 0 until 8) {
+            for (col in 0 until 8) {
+                val isLight = (row + col) % 2 == 0
+                val squarePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = if (isLight) Color.parseColor("#EAE5DA") else Color.parseColor("#30363F")
+                }
+                val left = boardInset + col * squareSize
+                val top = boardInset + row * squareSize
+                canvas.drawRect(left, top, left + squareSize, top + squareSize, squarePaint)
+            }
+        }
+
+        val bevelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(80, 255, 255, 255)
+            style = Paint.Style.STROKE
+            strokeWidth = 4f
+        }
+        canvas.drawRoundRect(boardRect, 24f, 24f, bevelPaint)
+
+        val accentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(120, 255, 215, 120)
+            style = Paint.Style.STROKE
+            strokeWidth = 5f
+        }
+        canvas.drawRoundRect(boardRect.inset(12f, 12f), 18f, 18f, accentPaint)
+        return bitmap
+    }
 
     // ─── Paints ───────────────────────────────────────────────────────────────
     private var lightPaint  = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -1325,6 +1374,7 @@ class BoardView(context: Context) : View(context) {
         ChessBoardStyle.CANVAS -> null
         ChessBoardStyle.CLASSIC_WOOD -> classicChessBoardBitmap
         ChessBoardStyle.SUPPLIED_WOOD -> suppliedChessBoardBitmap
+        ChessBoardStyle.REALISTIC_BLACK_WHITE -> realisticChessBoardBitmap
     }
 
     private fun isChessImageBoard(): Boolean =
@@ -1333,12 +1383,14 @@ class BoardView(context: Context) : View(context) {
     private fun chessGridX(): FloatArray = when (chessBoardStyle) {
         ChessBoardStyle.SUPPLIED_WOOD -> suppliedChessGridX
         ChessBoardStyle.CLASSIC_WOOD -> classicChessGridX
+        ChessBoardStyle.REALISTIC_BLACK_WHITE -> classicChessGridX
         ChessBoardStyle.CANVAS -> floatArrayOf()
     }
 
     private fun chessGridY(): FloatArray = when (chessBoardStyle) {
         ChessBoardStyle.SUPPLIED_WOOD -> suppliedChessGridY
         ChessBoardStyle.CLASSIC_WOOD -> classicChessGridY
+        ChessBoardStyle.REALISTIC_BLACK_WHITE -> classicChessGridY
         ChessBoardStyle.CANVAS -> floatArrayOf()
     }
 

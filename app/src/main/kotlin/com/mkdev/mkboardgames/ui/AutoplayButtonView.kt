@@ -7,6 +7,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
+import android.view.MotionEvent
 import android.view.View
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.view.animation.LinearInterpolator
@@ -58,6 +59,15 @@ class AutoplayButtonView(context: Context) : View(context) {
         isFocusable = true
         updateContentDescription()
         setOnClickListener { toggleAutoplay() }
+    }
+
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        val desiredWidth = (150f * dp).toInt()
+        val desiredHeight = (76f * dp).toInt()
+        setMeasuredDimension(
+            resolveSize(desiredWidth, widthMeasureSpec),
+            resolveSize(desiredHeight, heightMeasureSpec),
+        )
     }
 
     fun setAutoplayEnabled(value: Boolean, animate: Boolean = true) {
@@ -126,6 +136,45 @@ class AutoplayButtonView(context: Context) : View(context) {
             }
             start()
         }
+    }
+
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        val buttonDiameter = minOf(width.toFloat(), height.toFloat()) - 12f * dp
+        val buttonRect = RectF(
+            (width - buttonDiameter) / 2f,
+            (height - buttonDiameter) / 2f,
+            (width + buttonDiameter) / 2f,
+            (height + buttonDiameter) / 2f,
+        )
+        val radius = buttonDiameter / 2f
+        val withinCircle = kotlin.math.hypot(
+            event.x - buttonRect.centerX(),
+            event.y - buttonRect.centerY(),
+        ) <= radius
+
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> return if (withinCircle) {
+                isPressed = true
+                true
+            } else {
+                false
+            }
+            MotionEvent.ACTION_MOVE -> return withinCircle && isPressed
+            MotionEvent.ACTION_UP -> {
+                if (!withinCircle || !isPressed) {
+                    isPressed = false
+                    return false
+                }
+                isPressed = false
+                performClick()
+                return true
+            }
+            MotionEvent.ACTION_CANCEL -> {
+                isPressed = false
+                return false
+            }
+        }
+        return super.onTouchEvent(event)
     }
 
     override fun onDetachedFromWindow() {

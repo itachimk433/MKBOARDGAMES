@@ -58,34 +58,23 @@ object SettingsManager {
         prefs(ctx).getString(KEY_ACTIVE_GAME, "overall") ?: "overall"
 
     // ── Chess ────────────────────────────────────────────────────────────────
+    data class ChessAiProfile(val depth: Int, val timeLimitMs: Long, val quiesceDepth: Int)
+
     fun chessDifficultyLabels() = arrayOf("Easy", "Medium", "Hard", "Master")
-    fun chessAiDepthForTest(level: Int): Int = when (level.coerceIn(0, 3)) {
-        0 -> 2   // Easy
-        1 -> 5   // Medium — deeper search with better ordering
-        2 -> 7   // Hard — strong tactical search
-        3 -> 9   // Master — elite-level depth 
-        else -> 5
-    }
-    fun chessAiTimeLimitMsForTest(level: Int): Long = when (level.coerceIn(0, 3)) {
-        0 -> 600L
-        1 -> 1800L
-        2 -> 3800L
-        3 -> 9000L
-        else -> 1800L
-    }
-    fun chessAiQuiesceDepthForTest(level: Int): Int = when (level.coerceIn(0, 3)) {
-        0 -> 0
-        1 -> 2
-        2 -> 4
-        3 -> 5
-        else -> 2
+
+    fun chessAiProfileForLevel(level: Int): ChessAiProfile = when (level.coerceIn(0, 3)) {
+        0 -> ChessAiProfile(2, 600L, 0)  // Easy
+        1 -> ChessAiProfile(5, 1200L, 2) // Medium — stronger but still snappy
+        2 -> ChessAiProfile(7, 2200L, 4) // Hard — deeper tactical search
+        3 -> ChessAiProfile(9, 5000L, 5) // Master — elite-level strength with a fast enough response
+        else -> ChessAiProfile(5, 1200L, 2)
     }
 
     fun getChessDifficulty(ctx: Context) = prefs(ctx).getInt(KEY_CHESS_DIFFICULTY, 1).coerceIn(0, 3)
     fun setChessDifficulty(ctx: Context, v: Int) = prefs(ctx).edit().putInt(KEY_CHESS_DIFFICULTY, v.coerceIn(0, 3)).apply()
-    fun chessAiDepth(ctx: Context) = chessAiDepthForTest(getChessDifficulty(ctx))
-    fun chessAiTimeLimitMs(ctx: Context): Long = chessAiTimeLimitMsForTest(getChessDifficulty(ctx))
-    fun chessAiQuiesceDepth(ctx: Context): Int = chessAiQuiesceDepthForTest(getChessDifficulty(ctx))
+    fun chessAiDepth(ctx: Context) = chessAiProfileForLevel(getChessDifficulty(ctx)).depth
+    fun chessAiTimeLimitMs(ctx: Context): Long = chessAiProfileForLevel(getChessDifficulty(ctx)).timeLimitMs
+    fun chessAiQuiesceDepth(ctx: Context): Int = chessAiProfileForLevel(getChessDifficulty(ctx)).quiesceDepth
 
     // ── Checkers ─────────────────────────────────────────────────────────────
     fun getCheckersDifficulty(ctx: Context) = prefs(ctx).getInt(KEY_CHECKERS_DIFFICULTY, 0)
