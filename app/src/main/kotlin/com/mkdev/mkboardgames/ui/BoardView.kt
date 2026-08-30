@@ -483,11 +483,18 @@ class BoardView(context: Context) : View(context) {
             return
         }
         if (isDraughtsImageBoard()) {
-            val bitmap = draughtsBoardBitmap
+            val bitmap = draughtsBitmap()
             if (bitmap != null) {
+                val boardMargin = if (draughtsBoardStyle == DraughtsBoardStyle.REALISTIC_BLACK_WHITE) {
+                    4f * resources.displayMetrics.density
+                } else {
+                    0f
+                }
+                val availableWidth = (width.toFloat() - boardMargin * 2f).coerceAtLeast(0f)
+                val availableHeight = (height.toFloat() - boardMargin * 2f).coerceAtLeast(0f)
                 val scale = minOf(
-                    width.toFloat() / bitmap.width,
-                    height.toFloat() / bitmap.height,
+                    availableWidth / bitmap.width,
+                    availableHeight / bitmap.height,
                 )
                 val imageWidth = bitmap.width * scale
                 val imageHeight = bitmap.height * scale
@@ -866,7 +873,7 @@ class BoardView(context: Context) : View(context) {
 
     private fun drawDraughtsBoard(canvas: Canvas) {
         canvas.drawColor(Color.rgb(20, 20, 20))
-        draughtsBoardBitmap?.let {
+        draughtsBitmap()?.let {
             canvas.drawBitmap(
                 it,
                 null,
@@ -1560,8 +1567,34 @@ class BoardView(context: Context) : View(context) {
             gameState.board.any { it is CheckersPiece }
 
     private fun isDraughtsImageBoard(): Boolean =
-        isDraughtsBoard() && draughtsBoardStyle == DraughtsBoardStyle.RED_BLACK &&
-            draughtsBoardBitmap != null
+        isDraughtsBoard() && draughtsBitmap() != null
+
+    private fun draughtsBitmap(): Bitmap? = when (draughtsBoardStyle) {
+        DraughtsBoardStyle.CANVAS -> null
+        DraughtsBoardStyle.RED_BLACK -> draughtsBoardBitmap
+        DraughtsBoardStyle.CLASSIC_WOOD -> classicChessBoardBitmap
+        DraughtsBoardStyle.SUPPLIED_WOOD -> suppliedChessBoardBitmap
+        DraughtsBoardStyle.REALISTIC_BLACK_WHITE -> realisticChessBoardBitmap
+        DraughtsBoardStyle.BLACK_WHITE -> blackWhiteChessBoardBitmap
+    }
+
+    private fun draughtsGridX(): FloatArray = when (draughtsBoardStyle) {
+        DraughtsBoardStyle.RED_BLACK -> redBlackDraughtsGridX
+        DraughtsBoardStyle.SUPPLIED_WOOD -> suppliedChessGridX
+        DraughtsBoardStyle.CLASSIC_WOOD -> classicChessGridX
+        DraughtsBoardStyle.REALISTIC_BLACK_WHITE -> realisticChessGridX
+        DraughtsBoardStyle.BLACK_WHITE -> blackWhiteChessGridX
+        DraughtsBoardStyle.CANVAS -> floatArrayOf()
+    }
+
+    private fun draughtsGridY(): FloatArray = when (draughtsBoardStyle) {
+        DraughtsBoardStyle.RED_BLACK -> redBlackDraughtsGridY
+        DraughtsBoardStyle.SUPPLIED_WOOD -> suppliedChessGridY
+        DraughtsBoardStyle.CLASSIC_WOOD -> classicChessGridY
+        DraughtsBoardStyle.REALISTIC_BLACK_WHITE -> realisticChessGridY
+        DraughtsBoardStyle.BLACK_WHITE -> blackWhiteChessGridY
+        DraughtsBoardStyle.CANVAS -> floatArrayOf()
+    }
 
     private fun chessBitmap(): Bitmap? = when (chessBoardStyle) {
         ChessBoardStyle.CANVAS -> null
@@ -1632,10 +1665,10 @@ class BoardView(context: Context) : View(context) {
     }
 
     private fun draughtsLineX(index: Int): Float =
-        draughtsImageRect.left + draughtsImageRect.width() * redBlackDraughtsGridX[index]
+        draughtsImageRect.left + draughtsImageRect.width() * draughtsGridX()[index]
 
     private fun draughtsLineY(index: Int): Float =
-        draughtsImageRect.top + draughtsImageRect.height() * redBlackDraughtsGridY[index]
+        draughtsImageRect.top + draughtsImageRect.height() * draughtsGridY()[index]
 
     private fun shogiPoint(position: Position): PointF {
         val displayedRow = if (isFlipped) 8 - position.row else position.row

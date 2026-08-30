@@ -49,7 +49,7 @@ class BoardStyleSwitchView(context: Context) : View(context) {
     }
 
     fun setStyleCount(count: Int) {
-        styleCount = count.coerceIn(2, 5)
+        styleCount = count.coerceIn(2, 6)
         selectedIndex = selectedIndex.coerceIn(0, styleCount - 1)
         thumbPosition = selectedIndex / (styleCount - 1).toFloat()
         invalidate()
@@ -98,17 +98,25 @@ class BoardStyleSwitchView(context: Context) : View(context) {
         trackRect.set(left, top, left + trackWidth, top + trackHeight)
 
         val radius = trackHeight / 2f
-        val palette = intArrayOf(
+        val chessPalette = intArrayOf(
             Color.parseColor("#5DD6FF"),
             Color.parseColor("#FFB454"),
             Color.parseColor("#D97A45"),
             Color.parseColor("#EAE7E2"),
             Color.parseColor("#FFFFFF"),
         )
-        val stateColors = if (styleCount == 2) {
-            intArrayOf(palette.first(), Color.parseColor("#FF3030"))
-        } else {
-            palette.copyOf(styleCount)
+        val draughtsPalette = intArrayOf(
+            Color.parseColor("#5DD6FF"),
+            Color.parseColor("#FF3030"),
+            Color.parseColor("#FFB454"),
+            Color.parseColor("#D97A45"),
+            Color.parseColor("#EAE7E2"),
+            Color.parseColor("#FFFFFF"),
+        )
+        val stateColors = when (styleCount) {
+            2 -> intArrayOf(chessPalette.first(), Color.parseColor("#FF3030"))
+            6 -> draughtsPalette
+            else -> chessPalette.copyOf(styleCount)
         }
 
         val segmentPosition = thumbPosition * (stateColors.size - 1)
