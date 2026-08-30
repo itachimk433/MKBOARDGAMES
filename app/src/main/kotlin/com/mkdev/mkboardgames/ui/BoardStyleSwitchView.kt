@@ -14,10 +14,10 @@ import com.mkdev.mkboardgames.SoundPlayer
 /**
  * A compact switch for changing the Chess board presentation.
  *
- * The four positions are the generated canvas board, the original framed wood
- * board, the supplied wood board, and a black-and-white board with a more
- * polished, realistic look. The moving thumb and accent color provide the state
- * cue without taking space away from the game HUD.
+ * The six positions are the generated canvas board, two wood boards, the
+ * polished realistic board, and the two additional supplied monochrome boards.
+ * The moving thumb and accent color provide the state cue without taking space
+ * away from the game HUD.
  */
 class BoardStyleSwitchView(context: Context) : View(context) {
 
@@ -97,6 +97,8 @@ class BoardStyleSwitchView(context: Context) : View(context) {
             Color.parseColor("#FFB454"),
             Color.parseColor("#D97A45"),
             Color.parseColor("#EAE7E2"),
+            Color.parseColor("#FFFFFF"),
+            Color.parseColor("#FF3030"),
         )
 
         val segmentPosition = thumbPosition * (stateColors.size - 1)

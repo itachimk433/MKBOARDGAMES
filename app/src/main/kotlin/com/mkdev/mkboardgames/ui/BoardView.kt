@@ -189,6 +189,32 @@ class BoardView(context: Context) : View(context) {
         976f / 1024f,
     )
     private val realisticChessGridY = realisticChessGridX.copyOf()
+    // The black-and-white supplied image has an inset frame around an
+    // otherwise regular 8x8 board. These lines are measured from the 1024px
+    // optimized asset after resizing the uploaded 1254px source.
+    private val blackWhiteChessGridX = floatArrayOf(
+        25f / 1024f, 148f / 1024f, 269f / 1024f, 390f / 1024f,
+        511f / 1024f, 632f / 1024f, 753f / 1024f, 876f / 1024f,
+        1004f / 1024f,
+    )
+    private val blackWhiteChessGridY = floatArrayOf(
+        25f / 1024f, 145f / 1024f, 266f / 1024f, 387f / 1024f,
+        510f / 1024f, 632f / 1024f, 755f / 1024f, 876f / 1024f,
+        1004f / 1024f,
+    )
+    // The red-and-black supplied image uses rounded dark tiles inside a white
+    // inset frame. Its printed labels are part of the image, so the regular
+    // dynamic labels are disabled for this style.
+    private val redBlackChessGridX = floatArrayOf(
+        60f / 1024f, 173f / 1024f, 286f / 1024f, 399f / 1024f,
+        512f / 1024f, 625f / 1024f, 738f / 1024f, 851f / 1024f,
+        964f / 1024f,
+    )
+    private val redBlackChessGridY = floatArrayOf(
+        60f / 1024f, 173f / 1024f, 286f / 1024f, 399f / 1024f,
+        512f / 1024f, 625f / 1024f, 738f / 1024f, 851f / 1024f,
+        964f / 1024f,
+    )
 
     private val xiangqiBoardBitmap: Bitmap? = try {
         context.assets.open("xiangqi_board.webp").use { BitmapFactory.decodeStream(it) }
@@ -216,6 +242,16 @@ class BoardView(context: Context) : View(context) {
         null
     }
     private val realisticChessBoardBitmap: Bitmap? = createRealisticChessBoardBitmap()
+    private val blackWhiteChessBoardBitmap: Bitmap? = try {
+        context.assets.open("chess_board_black_white.png").use { BitmapFactory.decodeStream(it) }
+    } catch (_: Throwable) {
+        null
+    }
+    private val redBlackChessBoardBitmap: Bitmap? = try {
+        context.assets.open("chess_board_red_black.png").use { BitmapFactory.decodeStream(it) }
+    } catch (_: Throwable) {
+        null
+    }
 
     private fun createRealisticChessBoardBitmap(): Bitmap {
         val size = 1024
@@ -679,6 +715,7 @@ class BoardView(context: Context) : View(context) {
     }
 
     private fun drawChessLabels(canvas: Canvas) {
+        if (chessBoardStyle == ChessBoardStyle.RED_BLACK) return
         val inset = cellSize * 0.105f
         labelPaint.textSize = (cellSize * 0.17f).coerceIn(10f, 24f)
         labelPaint.style = Paint.Style.FILL
@@ -1411,6 +1448,8 @@ class BoardView(context: Context) : View(context) {
         ChessBoardStyle.CLASSIC_WOOD -> classicChessBoardBitmap
         ChessBoardStyle.SUPPLIED_WOOD -> suppliedChessBoardBitmap
         ChessBoardStyle.REALISTIC_BLACK_WHITE -> realisticChessBoardBitmap
+        ChessBoardStyle.BLACK_WHITE -> blackWhiteChessBoardBitmap
+        ChessBoardStyle.RED_BLACK -> redBlackChessBoardBitmap
     }
 
     private fun isChessImageBoard(): Boolean =
@@ -1420,6 +1459,8 @@ class BoardView(context: Context) : View(context) {
         ChessBoardStyle.SUPPLIED_WOOD -> suppliedChessGridX
         ChessBoardStyle.CLASSIC_WOOD -> classicChessGridX
         ChessBoardStyle.REALISTIC_BLACK_WHITE -> realisticChessGridX
+        ChessBoardStyle.BLACK_WHITE -> blackWhiteChessGridX
+        ChessBoardStyle.RED_BLACK -> redBlackChessGridX
         ChessBoardStyle.CANVAS -> floatArrayOf()
     }
 
@@ -1427,6 +1468,8 @@ class BoardView(context: Context) : View(context) {
         ChessBoardStyle.SUPPLIED_WOOD -> suppliedChessGridY
         ChessBoardStyle.CLASSIC_WOOD -> classicChessGridY
         ChessBoardStyle.REALISTIC_BLACK_WHITE -> realisticChessGridY
+        ChessBoardStyle.BLACK_WHITE -> blackWhiteChessGridY
+        ChessBoardStyle.RED_BLACK -> redBlackChessGridY
         ChessBoardStyle.CANVAS -> floatArrayOf()
     }
 
