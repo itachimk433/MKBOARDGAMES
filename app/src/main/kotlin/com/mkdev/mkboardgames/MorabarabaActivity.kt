@@ -116,7 +116,8 @@ class MorabarabaActivity : AppCompatActivity() {
             @Suppress("DEPRECATION") super.onBackPressed(); return
         }
         if (gameState.status != GameStatus.IN_PROGRESS) {
-            @Suppress("DEPRECATION") super.onBackPressed(); return
+            showResult()
+            return
         }
         stopAutomatedGameplay()
         showLeaveMatchDialog()

@@ -57,6 +57,7 @@ class BoardView(context: Context) : View(context) {
     var showMustCaptureHints: Boolean = false
     var rotateBlackPieces: Boolean = false
     var directMoveMode: Boolean = false
+    var onEmptySpaceTapped: (() -> Unit)? = null
     var chessBoardStyle: ChessBoardStyle = ChessBoardStyle.CANVAS
         set(value) {
             if (field == value) return
@@ -545,8 +546,12 @@ class BoardView(context: Context) : View(context) {
                 onGameOverTapped?.invoke()
                 return true
             }
-            if (!isLocked && animPiece == null)
-                handleTap(screenToBoard(event.x, event.y) ?: return true)
+            val position = screenToBoard(event.x, event.y)
+            if (position == null) {
+                onEmptySpaceTapped?.invoke()
+                return true
+            }
+            if (!isLocked && animPiece == null) handleTap(position)
         }
         return true
     }

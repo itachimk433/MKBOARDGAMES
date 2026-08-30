@@ -347,6 +347,10 @@ class LudoActivity : AppCompatActivity() {
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
+        if (matchStarted && state.status != GameStatus.IN_PROGRESS) {
+            showResultDialog()
+            return
+        }
         if (matchStarted && state.status == GameStatus.IN_PROGRESS && diceRollInProgress()) {
             Toast.makeText(this, "Wait for the dice to stop rolling", Toast.LENGTH_SHORT).show()
             return

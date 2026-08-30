@@ -67,6 +67,19 @@ class GameActivity : AppCompatActivity() {
     private var resultRecorded = false
     private var interstitialAd: Any? = null
     private var chessMenuDialog: Dialog? = null
+    private var boardStyleSwitchEnabled = false
+    private val boardStyleSwitchFadeRunnable = Runnable {
+        if (!boardStyleSwitchEnabled || !::boardStyleSwitch.isInitialized) return@Runnable
+        boardStyleSwitch.animate()
+            .alpha(0f)
+            .setDuration(900L)
+            .withEndAction {
+                if (boardStyleSwitch.alpha <= 0.01f) {
+                    boardStyleSwitch.visibility = View.INVISIBLE
+                }
+            }
+            .start()
+    }
 
     private val redoGameStates = ArrayDeque<GameState>()
     private val redoCaptures   = ArrayDeque<Pair<List<Piece>, List<Piece>>>()
@@ -128,6 +141,13 @@ class GameActivity : AppCompatActivity() {
             orientation = android.widget.LinearLayout.HORIZONTAL
             gravity = Gravity.START
             setPadding((10 * dp).toInt(), 0, 0, 0)
+            isClickable = true
+        }
+        boardStyleRow.setOnTouchListener { _, event ->
+            if (event.action == android.view.MotionEvent.ACTION_UP) {
+                revealBoardStyleSwitch()
+            }
+            true
         }
         boardStyleSwitch.onStyleChanged = { styleIndex ->
             when (gameType) {
@@ -135,6 +155,7 @@ class GameActivity : AppCompatActivity() {
                 "CHECKERS" -> boardView.draughtsBoardStyle = DraughtsBoardStyle.entries[styleIndex]
             }
         }
+        boardView.onEmptySpaceTapped = ::revealBoardStyleSwitch
         autoplayButton.onAutoplayChanged = { enabled ->
             if (gameType != "LUDO" && vsAI) {
                 autoplayEnabled = enabled
@@ -163,7 +184,7 @@ class GameActivity : AppCompatActivity() {
         gameState = engine.initialState()
         boardView.ruleEngine = engine
         boardView.gameState = gameState
-        val hasBoardStyles = gameType == "CHESS" || gameType == "CHECKERS"
+        boardStyleSwitchEnabled = gameType == "CHESS" || gameType == "CHECKERS"
         boardStyleSwitch.setStyleCount(
             if (gameType == "CHECKERS") DraughtsBoardStyle.entries.size
             else ChessBoardStyle.entries.size,
@@ -186,7 +207,7 @@ class GameActivity : AppCompatActivity() {
             ))
         boardStyleRow.addView(boardStyleSwitch,
             android.widget.LinearLayout.LayoutParams((118 * dp).toInt(), boardStyleSwitchH))
-        boardStyleSwitch.visibility = if (hasBoardStyles) View.VISIBLE else View.GONE
+        boardStyleSwitch.visibility = if (boardStyleSwitchEnabled) View.VISIBLE else View.GONE
         container.addView(boardStyleRow,
             android.widget.LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -266,8 +287,36 @@ class GameActivity : AppCompatActivity() {
         scope.cancel()
     }
 
+    private fun scheduleBoardStyleSwitchFade() {
+        if (!boardStyleSwitchEnabled || !::boardStyleSwitch.isInitialized) return
+        boardStyleSwitch.removeCallbacks(boardStyleSwitchFadeRunnable)
+        boardStyleSwitch.animate().cancel()
+        boardStyleSwitch.alpha = 1f
+        boardStyleSwitch.visibility = View.VISIBLE
+        boardStyleSwitch.postDelayed(boardStyleSwitchFadeRunnable, 5_000L)
+    }
+
+    private fun revealBoardStyleSwitch() {
+        if (!boardStyleSwitchEnabled || !::boardStyleSwitch.isInitialized) return
+        boardStyleSwitch.removeCallbacks(boardStyleSwitchFadeRunnable)
+        boardStyleSwitch.animate().cancel()
+        if (boardStyleSwitch.visibility != View.VISIBLE) {
+            boardStyleSwitch.visibility = View.VISIBLE
+            boardStyleSwitch.alpha = 0f
+        }
+        boardStyleSwitch.animate()
+            .alpha(1f)
+            .setDuration(220L)
+            .start()
+        boardStyleSwitch.postDelayed(boardStyleSwitchFadeRunnable, 5_000L)
+    }
+
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
+        if (matchStarted && gameState.status != GameStatus.IN_PROGRESS) {
+            showResultDialog()
+            return
+        }
         if (!matchStarted || gameState.status != GameStatus.IN_PROGRESS) {
             @Suppress("DEPRECATION") super.onBackPressed(); return
         }
@@ -988,6 +1037,7 @@ Checkmate your opponent's King.
         ) {
             triggerAI()
         }
+        scheduleBoardStyleSwitchFade()
     }
 
     private fun resumePausedMatch() {
@@ -2014,6 +2064,7 @@ Checkmate your opponent's King.
                     undoRect.contains(e.x, e.y) -> { SoundPlayer.play("ui_click"); onUndoClicked() }
                     redoRect.contains(e.x, e.y) -> { SoundPlayer.play("ui_click"); onRedoClicked() }
                     menuRect.contains(e.x, e.y) -> { SoundPlayer.play("ui_click"); onMenuClicked() }
+                    else -> revealBoardStyleSwitch()
                 }
             }
             return true

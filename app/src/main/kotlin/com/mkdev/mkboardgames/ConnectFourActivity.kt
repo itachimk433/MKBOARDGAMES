@@ -103,6 +103,10 @@ class ConnectFourActivity : AppCompatActivity() {
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
+        if (matchStarted && gameState.status != GameStatus.IN_PROGRESS) {
+            showResultDialog()
+            return
+        }
         if (!matchStarted || gameState.status != GameStatus.IN_PROGRESS) {
             @Suppress("DEPRECATION") super.onBackPressed()
             return
