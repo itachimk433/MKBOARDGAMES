@@ -32,6 +32,7 @@ import com.mkdev.mkboardgames.ui.ChessChoiceView
 import com.mkdev.mkboardgames.ui.ChessMenuView
 import com.mkdev.mkboardgames.ui.ChessRulesView
 import com.mkdev.mkboardgames.ui.ChessBoardStyle
+import com.mkdev.mkboardgames.ui.ChessPieceStyle
 import com.mkdev.mkboardgames.ui.DraughtsBoardStyle
 import com.mkdev.mkboardgames.ui.StyledDialogs
 import kotlinx.coroutines.*
@@ -44,6 +45,7 @@ class GameActivity : AppCompatActivity() {
 
     private lateinit var boardView:        BoardView
     private lateinit var boardStyleSwitch: BoardStyleSwitchView
+    private lateinit var pieceStyleSwitch: BoardStyleSwitchView
     private lateinit var autoplayButton:   AutoplayButtonView
     private lateinit var hudView:          HudView
     private lateinit var topCaptureView:   CaptureStripView
@@ -68,6 +70,7 @@ class GameActivity : AppCompatActivity() {
     private var interstitialAd: Any? = null
     private var chessMenuDialog: Dialog? = null
     private var boardStyleSwitchEnabled = false
+    private var pieceStyleSwitchEnabled = false
     private val boardStyleSwitchFadeRunnable = Runnable {
         if (!boardStyleSwitchEnabled || !::boardStyleSwitch.isInitialized) return@Runnable
         boardStyleSwitch.animate()
@@ -76,6 +79,18 @@ class GameActivity : AppCompatActivity() {
             .withEndAction {
                 if (boardStyleSwitch.alpha <= 0.01f) {
                     boardStyleSwitch.visibility = View.INVISIBLE
+                }
+            }
+            .start()
+    }
+    private val pieceStyleSwitchFadeRunnable = Runnable {
+        if (!pieceStyleSwitchEnabled || !::pieceStyleSwitch.isInitialized) return@Runnable
+        pieceStyleSwitch.animate()
+            .alpha(0f)
+            .setDuration(900L)
+            .withEndAction {
+                if (pieceStyleSwitch.alpha <= 0.01f) {
+                    pieceStyleSwitch.visibility = View.INVISIBLE
                 }
             }
             .start()
@@ -135,6 +150,7 @@ class GameActivity : AppCompatActivity() {
         }
         boardView        = BoardView(this)
         boardStyleSwitch = BoardStyleSwitchView(this)
+        pieceStyleSwitch = BoardStyleSwitchView(this)
         autoplayButton   = AutoplayButtonView(this)
         bottomCaptureView = CaptureStripView(this).also { it.dividerOnTop = true }
         val boardStyleRow = android.widget.LinearLayout(this).apply {
@@ -154,6 +170,9 @@ class GameActivity : AppCompatActivity() {
                 "CHESS" -> boardView.chessBoardStyle = ChessBoardStyle.entries[styleIndex]
                 "CHECKERS" -> boardView.draughtsBoardStyle = DraughtsBoardStyle.entries[styleIndex]
             }
+        }
+        pieceStyleSwitch.onStyleChanged = { styleIndex ->
+            boardView.chessPieceStyle = ChessPieceStyle.entries[styleIndex]
         }
         boardView.onEmptySpaceTapped = ::revealBoardStyleSwitch
         autoplayButton.onAutoplayChanged = { enabled ->
@@ -194,6 +213,9 @@ class GameActivity : AppCompatActivity() {
             else boardView.chessBoardStyle.ordinal,
             animate = false,
         )
+        pieceStyleSwitchEnabled = gameType == "CHESS"
+        pieceStyleSwitch.setStyleCount(ChessPieceStyle.entries.size)
+        pieceStyleSwitch.setSelectedIndex(boardView.chessPieceStyle.ordinal, animate = false)
         autoplayButton.setAutoplayEnabled(false, animate = false)
 
         container.addView(hudView,
@@ -208,6 +230,21 @@ class GameActivity : AppCompatActivity() {
         boardStyleRow.addView(boardStyleSwitch,
             android.widget.LinearLayout.LayoutParams((118 * dp).toInt(), boardStyleSwitchH))
         boardStyleSwitch.visibility = if (boardStyleSwitchEnabled) View.VISIBLE else View.GONE
+        val pieceStyleRow = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.HORIZONTAL
+            gravity = Gravity.END
+            setPadding(0, 0, (10 * dp).toInt(), 0)
+            isClickable = true
+        }
+        pieceStyleRow.setOnTouchListener { _, event ->
+            if (event.action == android.view.MotionEvent.ACTION_UP) {
+                revealBoardStyleSwitch()
+            }
+            true
+        }
+        pieceStyleRow.addView(pieceStyleSwitch,
+            android.widget.LinearLayout.LayoutParams((118 * dp).toInt(), boardStyleSwitchH))
+        pieceStyleRow.visibility = if (pieceStyleSwitchEnabled) View.VISIBLE else View.GONE
         container.addView(boardStyleRow,
             android.widget.LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -216,6 +253,11 @@ class GameActivity : AppCompatActivity() {
         container.addView(boardView,
             android.widget.LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0)
                 .apply { weight = 1f })
+        container.addView(pieceStyleRow,
+            android.widget.LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                boardStyleSwitchH,
+            ))
         container.addView(autoplayButton,
             android.widget.LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -288,27 +330,49 @@ class GameActivity : AppCompatActivity() {
     }
 
     private fun scheduleBoardStyleSwitchFade() {
-        if (!boardStyleSwitchEnabled || !::boardStyleSwitch.isInitialized) return
-        boardStyleSwitch.removeCallbacks(boardStyleSwitchFadeRunnable)
-        boardStyleSwitch.animate().cancel()
-        boardStyleSwitch.alpha = 1f
-        boardStyleSwitch.visibility = View.VISIBLE
-        boardStyleSwitch.postDelayed(boardStyleSwitchFadeRunnable, 5_000L)
+        if (boardStyleSwitchEnabled && ::boardStyleSwitch.isInitialized) {
+            boardStyleSwitch.removeCallbacks(boardStyleSwitchFadeRunnable)
+            boardStyleSwitch.animate().cancel()
+            boardStyleSwitch.alpha = 1f
+            boardStyleSwitch.visibility = View.VISIBLE
+            boardStyleSwitch.postDelayed(boardStyleSwitchFadeRunnable, 5_000L)
+        }
+        if (pieceStyleSwitchEnabled && ::pieceStyleSwitch.isInitialized) {
+            pieceStyleSwitch.removeCallbacks(pieceStyleSwitchFadeRunnable)
+            pieceStyleSwitch.animate().cancel()
+            pieceStyleSwitch.alpha = 1f
+            pieceStyleSwitch.visibility = View.VISIBLE
+            pieceStyleSwitch.postDelayed(pieceStyleSwitchFadeRunnable, 5_000L)
+        }
     }
 
     private fun revealBoardStyleSwitch() {
-        if (!boardStyleSwitchEnabled || !::boardStyleSwitch.isInitialized) return
-        boardStyleSwitch.removeCallbacks(boardStyleSwitchFadeRunnable)
-        boardStyleSwitch.animate().cancel()
-        if (boardStyleSwitch.visibility != View.VISIBLE) {
-            boardStyleSwitch.visibility = View.VISIBLE
-            boardStyleSwitch.alpha = 0f
+        if (boardStyleSwitchEnabled && ::boardStyleSwitch.isInitialized) {
+            boardStyleSwitch.removeCallbacks(boardStyleSwitchFadeRunnable)
+            boardStyleSwitch.animate().cancel()
+            if (boardStyleSwitch.visibility != View.VISIBLE) {
+                boardStyleSwitch.visibility = View.VISIBLE
+                boardStyleSwitch.alpha = 0f
+            }
+            boardStyleSwitch.animate()
+                .alpha(1f)
+                .setDuration(220L)
+                .start()
+            boardStyleSwitch.postDelayed(boardStyleSwitchFadeRunnable, 5_000L)
         }
-        boardStyleSwitch.animate()
-            .alpha(1f)
-            .setDuration(220L)
-            .start()
-        boardStyleSwitch.postDelayed(boardStyleSwitchFadeRunnable, 5_000L)
+        if (pieceStyleSwitchEnabled && ::pieceStyleSwitch.isInitialized) {
+            pieceStyleSwitch.removeCallbacks(pieceStyleSwitchFadeRunnable)
+            pieceStyleSwitch.animate().cancel()
+            if (pieceStyleSwitch.visibility != View.VISIBLE) {
+                pieceStyleSwitch.visibility = View.VISIBLE
+                pieceStyleSwitch.alpha = 0f
+            }
+            pieceStyleSwitch.animate()
+                .alpha(1f)
+                .setDuration(220L)
+                .start()
+            pieceStyleSwitch.postDelayed(pieceStyleSwitchFadeRunnable, 5_000L)
+        }
     }
 
     @Deprecated("Deprecated in Java")

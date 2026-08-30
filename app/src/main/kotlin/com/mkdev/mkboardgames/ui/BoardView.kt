@@ -65,6 +65,12 @@ class BoardView(context: Context) : View(context) {
             refreshBoardStyleGeometry()
             invalidate()
         }
+    var chessPieceStyle: ChessPieceStyle = ChessPieceStyle.UNICODE
+        set(value) {
+            if (field == value) return
+            field = value
+            invalidate()
+        }
     var draughtsBoardStyle: DraughtsBoardStyle = DraughtsBoardStyle.CANVAS
         set(value) {
             if (field == value) return
@@ -1343,6 +1349,10 @@ class BoardView(context: Context) : View(context) {
     }
 
     private fun drawChessPiece(canvas: Canvas, piece: ChessPiece, cx: Float, cy: Float) {
+        if (chessPieceStyle == ChessPieceStyle.STAUNTON) {
+            drawStauntonChessPiece(canvas, piece, cx, cy)
+            return
+        }
         val shouldRotate = rotateBlackPieces && piece.color == PieceColor.BLACK
         val symbol = piece.symbol()
         piecePaint.style = Paint.Style.FILL
@@ -1371,6 +1381,348 @@ class BoardView(context: Context) : View(context) {
         canvas.drawText(symbol, cx, glyphBaseline, piecePaint)
         canvas.restore()
         if (shouldRotate) canvas.restore()
+    }
+
+    /**
+     * A compact, hand-drawn Staunton-style set based on the supplied reference:
+     * broad stepped bases, tapered bodies, and recognizable crowns/silhouettes.
+     * Drawing it here keeps it sharp at every board size and works on every
+     * board photograph without needing a separate sprite sheet.
+     */
+    private fun drawStauntonChessPiece(canvas: Canvas, piece: ChessPiece, cx: Float, cy: Float) {
+        val shouldRotate = rotateBlackPieces && piece.color == PieceColor.BLACK
+        val isWhite = piece.color == PieceColor.WHITE
+        val scale = cellSize
+        val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (isWhite) Color.parseColor("#F4F0E7") else Color.parseColor("#171513")
+            style = Paint.Style.FILL
+        }
+        val edge = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (isWhite) Color.parseColor("#3F3831") else Color.parseColor("#050505")
+            style = Paint.Style.STROKE
+            strokeWidth = scale * 0.018f
+            strokeJoin = Paint.Join.ROUND
+            strokeCap = Paint.Cap.ROUND
+        }
+        val detail = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (isWhite) Color.parseColor("#6E6257") else Color.parseColor("#51483F")
+            style = Paint.Style.STROKE
+            strokeWidth = scale * 0.014f
+            strokeCap = Paint.Cap.ROUND
+        }
+
+        canvas.save()
+        if (shouldRotate) canvas.rotate(180f, cx, cy)
+        drawStauntonShadow(canvas, cx, cy, scale)
+        drawStauntonBase(canvas, cx, cy, scale, fill, edge, detail)
+        when (piece.type) {
+            com.mkdev.mkboardgames.games.chess.ChessPieceType.PAWN ->
+                drawStauntonPawn(canvas, cx, cy, scale, fill, edge, detail)
+            com.mkdev.mkboardgames.games.chess.ChessPieceType.ROOK ->
+                drawStauntonRook(canvas, cx, cy, scale, fill, edge, detail)
+            com.mkdev.mkboardgames.games.chess.ChessPieceType.KNIGHT ->
+                drawStauntonKnight(canvas, cx, cy, scale, fill, edge, detail)
+            com.mkdev.mkboardgames.games.chess.ChessPieceType.BISHOP ->
+                drawStauntonBishop(canvas, cx, cy, scale, fill, edge, detail)
+            com.mkdev.mkboardgames.games.chess.ChessPieceType.QUEEN ->
+                drawStauntonQueen(canvas, cx, cy, scale, fill, edge, detail)
+            com.mkdev.mkboardgames.games.chess.ChessPieceType.KING ->
+                drawStauntonKing(canvas, cx, cy, scale, fill, edge, detail)
+        }
+        canvas.restore()
+    }
+
+    private fun drawStauntonShadow(canvas: Canvas, cx: Float, cy: Float, scale: Float) {
+        val shadow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(72, 0, 0, 0)
+            style = Paint.Style.FILL
+            maskFilter = BlurMaskFilter(scale * 0.035f, BlurMaskFilter.Blur.NORMAL)
+        }
+        canvas.drawOval(
+            cx - scale * 0.25f, cy + scale * 0.34f,
+            cx + scale * 0.28f, cy + scale * 0.46f, shadow,
+        )
+    }
+
+    private fun drawStauntonBase(
+        canvas: Canvas,
+        cx: Float,
+        cy: Float,
+        scale: Float,
+        fill: Paint,
+        edge: Paint,
+        detail: Paint,
+    ) {
+        val base = RectF(
+            cx - scale * 0.275f,
+            cy + scale * 0.30f,
+            cx + scale * 0.275f,
+            cy + scale * 0.425f,
+        )
+        canvas.drawRoundRect(base, scale * 0.045f, scale * 0.045f, fill)
+        canvas.drawRoundRect(base, scale * 0.045f, scale * 0.045f, edge)
+        canvas.drawLine(
+            cx - scale * 0.255f, cy + scale * 0.345f,
+            cx + scale * 0.255f, cy + scale * 0.345f, detail,
+        )
+        canvas.drawLine(
+            cx - scale * 0.235f, cy + scale * 0.385f,
+            cx + scale * 0.235f, cy + scale * 0.385f, detail,
+        )
+    }
+
+    private fun drawStauntonPawn(
+        canvas: Canvas, cx: Float, cy: Float, scale: Float,
+        fill: Paint, edge: Paint, detail: Paint,
+    ) {
+        val body = Path().apply {
+            moveTo(cx - scale * 0.16f, cy + scale * 0.31f)
+            cubicTo(
+                cx - scale * 0.13f, cy + scale * 0.20f,
+                cx - scale * 0.09f, cy + scale * 0.11f,
+                cx - scale * 0.08f, cy + scale * 0.03f,
+            )
+            cubicTo(
+                cx - scale * 0.15f, cy - scale * 0.04f,
+                cx - scale * 0.16f, cy - scale * 0.10f,
+                cx - scale * 0.14f, cy - scale * 0.14f,
+            )
+            lineTo(cx + scale * 0.14f, cy - scale * 0.14f)
+            cubicTo(
+                cx + scale * 0.16f, cy - scale * 0.10f,
+                cx + scale * 0.15f, cy - scale * 0.04f,
+                cx + scale * 0.08f, cy + scale * 0.03f,
+            )
+            cubicTo(
+                cx + scale * 0.09f, cy + scale * 0.11f,
+                cx + scale * 0.13f, cy + scale * 0.20f,
+                cx + scale * 0.16f, cy + scale * 0.31f,
+            )
+            close()
+        }
+        drawStauntonPath(canvas, body, fill, edge)
+        canvas.drawCircle(cx, cy - scale * 0.23f, scale * 0.115f, fill)
+        canvas.drawCircle(cx, cy - scale * 0.23f, scale * 0.115f, edge)
+        canvas.drawLine(
+            cx - scale * 0.105f, cy - scale * 0.075f,
+            cx + scale * 0.105f, cy - scale * 0.075f, detail,
+        )
+    }
+
+    private fun drawStauntonRook(
+        canvas: Canvas, cx: Float, cy: Float, scale: Float,
+        fill: Paint, edge: Paint, detail: Paint,
+    ) {
+        drawStauntonPath(
+            canvas, taperedStauntonBody(cx, cy, scale, -0.26f, 0.17f), fill, edge,
+        )
+        val crown = Path().apply {
+            moveTo(cx - scale * 0.20f, cy - scale * 0.22f)
+            lineTo(cx - scale * 0.20f, cy - scale * 0.40f)
+            lineTo(cx - scale * 0.12f, cy - scale * 0.40f)
+            lineTo(cx - scale * 0.12f, cy - scale * 0.33f)
+            lineTo(cx - scale * 0.04f, cy - scale * 0.33f)
+            lineTo(cx - scale * 0.04f, cy - scale * 0.40f)
+            lineTo(cx + scale * 0.04f, cy - scale * 0.40f)
+            lineTo(cx + scale * 0.04f, cy - scale * 0.33f)
+            lineTo(cx + scale * 0.12f, cy - scale * 0.33f)
+            lineTo(cx + scale * 0.12f, cy - scale * 0.40f)
+            lineTo(cx + scale * 0.20f, cy - scale * 0.40f)
+            lineTo(cx + scale * 0.20f, cy - scale * 0.22f)
+            close()
+        }
+        drawStauntonPath(canvas, crown, fill, edge)
+        drawStauntonBand(canvas, cx, cy - scale * 0.21f, scale * 0.18f, detail)
+    }
+
+    private fun drawStauntonKnight(
+        canvas: Canvas, cx: Float, cy: Float, scale: Float,
+        fill: Paint, edge: Paint, detail: Paint,
+    ) {
+        val horse = Path().apply {
+            moveTo(cx - scale * 0.18f, cy + scale * 0.30f)
+            cubicTo(
+                cx - scale * 0.12f, cy + scale * 0.16f,
+                cx - scale * 0.17f, cy + scale * 0.07f,
+                cx - scale * 0.20f, cy - scale * 0.02f,
+            )
+            cubicTo(
+                cx - scale * 0.22f, cy - scale * 0.11f,
+                cx - scale * 0.15f, cy - scale * 0.17f,
+                cx - scale * 0.08f, cy - scale * 0.19f,
+            )
+            cubicTo(
+                cx - scale * 0.15f, cy - scale * 0.29f,
+                cx - scale * 0.12f, cy - scale * 0.40f,
+                cx - scale * 0.03f, cy - scale * 0.45f,
+            )
+            lineTo(cx + scale * 0.02f, cy - scale * 0.36f)
+            cubicTo(
+                cx + scale * 0.12f, cy - scale * 0.35f,
+                cx + scale * 0.20f, cy - scale * 0.28f,
+                cx + scale * 0.21f, cy - scale * 0.18f,
+            )
+            cubicTo(
+                cx + scale * 0.22f, cy - scale * 0.10f,
+                cx + scale * 0.15f, cy - scale * 0.04f,
+                cx + scale * 0.10f, cy + scale * 0.02f,
+            )
+            cubicTo(
+                cx + scale * 0.10f, cy + scale * 0.12f,
+                cx + scale * 0.15f, cy + scale * 0.23f,
+                cx + scale * 0.18f, cy + scale * 0.30f,
+            )
+            close()
+        }
+        drawStauntonPath(canvas, horse, fill, edge)
+        val eye = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (edge.color == Color.parseColor("#050505")) {
+                Color.WHITE
+            } else {
+                Color.parseColor("#2E2925")
+            }
+            style = Paint.Style.FILL
+        }
+        canvas.drawCircle(cx + scale * 0.085f, cy - scale * 0.23f, scale * 0.018f, eye)
+        canvas.drawLine(
+            cx - scale * 0.09f, cy - scale * 0.15f,
+            cx + scale * 0.07f, cy - scale * 0.09f, detail,
+        )
+    }
+
+    private fun drawStauntonBishop(
+        canvas: Canvas, cx: Float, cy: Float, scale: Float,
+        fill: Paint, edge: Paint, detail: Paint,
+    ) {
+        drawStauntonPath(
+            canvas, taperedStauntonBody(cx, cy, scale, -0.24f, 0.13f), fill, edge,
+        )
+        val mitre = Path().apply {
+            moveTo(cx, cy - scale * 0.45f)
+            cubicTo(
+                cx - scale * 0.12f, cy - scale * 0.40f,
+                cx - scale * 0.15f, cy - scale * 0.28f,
+                cx - scale * 0.10f, cy - scale * 0.19f,
+            )
+            cubicTo(
+                cx - scale * 0.06f, cy - scale * 0.13f,
+                cx + scale * 0.06f, cy - scale * 0.13f,
+                cx + scale * 0.10f, cy - scale * 0.19f,
+            )
+            cubicTo(
+                cx + scale * 0.15f, cy - scale * 0.28f,
+                cx + scale * 0.12f, cy - scale * 0.40f,
+                cx, cy - scale * 0.45f,
+            )
+            close()
+        }
+        drawStauntonPath(canvas, mitre, fill, edge)
+        canvas.drawLine(
+            cx - scale * 0.055f, cy - scale * 0.38f,
+            cx + scale * 0.055f, cy - scale * 0.22f, detail,
+        )
+        drawStauntonBand(canvas, cx, cy - scale * 0.20f, scale * 0.14f, detail)
+    }
+
+    private fun drawStauntonQueen(
+        canvas: Canvas, cx: Float, cy: Float, scale: Float,
+        fill: Paint, edge: Paint, detail: Paint,
+    ) {
+        drawStauntonPath(
+            canvas, taperedStauntonBody(cx, cy, scale, -0.21f, 0.14f), fill, edge,
+        )
+        val crown = Path().apply {
+            moveTo(cx - scale * 0.20f, cy - scale * 0.18f)
+            lineTo(cx - scale * 0.16f, cy - scale * 0.39f)
+            lineTo(cx - scale * 0.08f, cy - scale * 0.29f)
+            lineTo(cx, cy - scale * 0.42f)
+            lineTo(cx + scale * 0.08f, cy - scale * 0.29f)
+            lineTo(cx + scale * 0.16f, cy - scale * 0.39f)
+            lineTo(cx + scale * 0.20f, cy - scale * 0.18f)
+            close()
+        }
+        drawStauntonPath(canvas, crown, fill, edge)
+        drawStauntonBand(canvas, cx, cy - scale * 0.18f, scale * 0.18f, detail)
+        val jewel = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (edge.color == Color.parseColor("#050505")) {
+                Color.parseColor("#8A7B6E")
+            } else {
+                Color.parseColor("#6E6257")
+            }
+            style = Paint.Style.FILL
+        }
+        canvas.drawCircle(cx, cy - scale * 0.40f, scale * 0.025f, jewel)
+    }
+
+    private fun drawStauntonKing(
+        canvas: Canvas, cx: Float, cy: Float, scale: Float,
+        fill: Paint, edge: Paint, detail: Paint,
+    ) {
+        drawStauntonPath(
+            canvas, taperedStauntonBody(cx, cy, scale, -0.22f, 0.15f), fill, edge,
+        )
+        val crown = Path().apply {
+            moveTo(cx - scale * 0.19f, cy - scale * 0.18f)
+            lineTo(cx - scale * 0.17f, cy - scale * 0.37f)
+            lineTo(cx + scale * 0.17f, cy - scale * 0.37f)
+            lineTo(cx + scale * 0.19f, cy - scale * 0.18f)
+            close()
+        }
+        drawStauntonPath(canvas, crown, fill, edge)
+        drawStauntonBand(canvas, cx, cy - scale * 0.18f, scale * 0.17f, detail)
+        val cross = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (edge.color == Color.parseColor("#050505")) {
+                Color.parseColor("#51483F")
+            } else {
+                Color.parseColor("#3F3831")
+            }
+            style = Paint.Style.FILL
+        }
+        canvas.drawRoundRect(
+            cx - scale * 0.025f, cy - scale * 0.48f,
+            cx + scale * 0.025f, cy - scale * 0.30f,
+            scale * 0.012f, scale * 0.012f, cross,
+        )
+        canvas.drawRoundRect(
+            cx - scale * 0.075f, cy - scale * 0.43f,
+            cx + scale * 0.075f, cy - scale * 0.38f,
+            scale * 0.012f, scale * 0.012f, cross,
+        )
+    }
+
+    private fun taperedStauntonBody(
+        cx: Float,
+        cy: Float,
+        scale: Float,
+        top: Float,
+        topWidth: Float,
+    ): Path = Path().apply {
+        moveTo(cx - scale * 0.17f, cy + scale * 0.31f)
+        cubicTo(
+            cx - scale * 0.15f, cy + scale * 0.17f,
+            cx - scale * topWidth, cy + scale * 0.05f,
+            cx - scale * topWidth, cy + scale * top,
+        )
+        lineTo(cx + scale * topWidth, cy + scale * top)
+        cubicTo(
+            cx + scale * topWidth, cy + scale * 0.05f,
+            cx + scale * 0.15f, cy + scale * 0.17f,
+            cx + scale * 0.17f, cy + scale * 0.31f,
+        )
+        close()
+    }
+
+    private fun drawStauntonPath(canvas: Canvas, path: Path, fill: Paint, edge: Paint) {
+        canvas.drawPath(path, fill)
+        canvas.drawPath(path, edge)
+    }
+
+    private fun drawStauntonBand(canvas: Canvas, cx: Float, y: Float, halfWidth: Float, detail: Paint) {
+        canvas.drawLine(cx - halfWidth, y, cx + halfWidth, y, detail)
+        canvas.drawLine(
+            cx - halfWidth * 0.90f, y + cellSize * 0.025f,
+            cx + halfWidth * 0.90f, y + cellSize * 0.025f, detail,
+        )
     }
 
     private fun drawCheckersPiece(canvas: Canvas, piece: CheckersPiece, cx: Float, cy: Float) {
