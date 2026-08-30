@@ -895,13 +895,18 @@ Checkmate your opponent's King.
     }
 
     private fun showChessBoardAfterDialog() {
+        showChessBoardAfterDialog(resumeAi = true)
+    }
+
+    private fun showChessBoardAfterDialog(resumeAi: Boolean) {
         if (isStyledBoardGame()) {
             gameContainer.visibility = View.VISIBLE
+            if (resumeAi) resumeComputerTurnIfNeeded()
         }
     }
 
     private fun startGame(restoring: PausedMatchStore.Match? = null) {
-        showChessBoardAfterDialog()
+        showChessBoardAfterDialog(resumeAi = false)
         matchStarted = true
         resultRecorded = false
         interstitialAd = null

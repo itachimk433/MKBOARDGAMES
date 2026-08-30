@@ -445,6 +445,7 @@ class ReplayActivity : AppCompatActivity() {
     }
 
     private fun showReplayResultDialog() {
+        stopAutoPlay()
         AlertDialog.Builder(this)
             .setTitle(replayGameName())
             .setMessage(resultText.ifBlank { "Replay finished." })
@@ -467,10 +468,18 @@ class ReplayActivity : AppCompatActivity() {
         else -> "Replay"
     }
 
+    override fun onPause() {
+        stopAutoPlay()
+        super.onPause()
+    }
+
     override fun onDestroy() { super.onDestroy(); stopAutoPlay() }
 
     @Deprecated("Deprecated in Java")
-    override fun onBackPressed() { finish() }
+    override fun onBackPressed() {
+        stopAutoPlay()
+        finish()
+    }
 
     override fun onResume()                          { super.onResume(); makeFullscreen() }
     override fun onWindowFocusChanged(h: Boolean) { super.onWindowFocusChanged(h); if (h) makeFullscreen() }

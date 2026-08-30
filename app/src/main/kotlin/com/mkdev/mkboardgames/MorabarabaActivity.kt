@@ -99,15 +99,16 @@ class MorabarabaActivity : AppCompatActivity() {
 
     override fun onPause() {
         activityResumed = false
-        aiJob?.cancel()
-        aiJob = null
-        scope.coroutineContext.cancelChildren()
+        stopAutomatedGameplay()
         SoundPlayer.stopAll()
-        if (::boardView.isInitialized) boardView.cancelAnim()
         super.onPause()
     }
     override fun onWindowFocusChanged(h: Boolean) { super.onWindowFocusChanged(h); if (h) makeFullscreen() }
-    override fun onDestroy() { super.onDestroy(); scope.cancel() }
+    override fun onDestroy() {
+        stopAutomatedGameplay()
+        super.onDestroy()
+        scope.cancel()
+    }
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
@@ -117,10 +118,12 @@ class MorabarabaActivity : AppCompatActivity() {
         if (gameState.status != GameStatus.IN_PROGRESS) {
             @Suppress("DEPRECATION") super.onBackPressed(); return
         }
+        stopAutomatedGameplay()
         showLeaveMatchDialog()
     }
 
     private fun pauseMatchAndExit() {
+        stopAutomatedGameplay()
         PausedMatchStore.save(
             this,
             gameType = "MORABARABA",
@@ -416,6 +419,14 @@ class MorabarabaActivity : AppCompatActivity() {
 
     // ─── AI ───────────────────────────────────────────────────────────────────
 
+    private fun stopAutomatedGameplay() {
+        aiJob?.cancel()
+        aiJob = null
+        scope.coroutineContext.cancelChildren()
+        if (::boardView.isInitialized) boardView.cancelAnim()
+        if (::hudView.isInitialized) hudView.setThinking(false)
+    }
+
     private fun triggerAI() {
         boardView.isLocked = true
         hudView.setThinking(true)
@@ -496,7 +507,12 @@ class MorabarabaActivity : AppCompatActivity() {
     fun onBack()  { onBackPressed() }
     fun onUndo()  { doUndo() }
     fun onRedo()  { doRedo() }
-    fun onMenu()  { showMenuDialog() }
+    fun onMenu()  {
+        // In-app dialogs do not trigger onPause(), so stop AI and animations
+        // before hiding the board behind the menu.
+        stopAutomatedGameplay()
+        showMenuDialog()
+    }
 
     private fun showMenuDialog() {
         val inProgress = gameState.status == GameStatus.IN_PROGRESS && moveHistory.isNotEmpty()
@@ -724,8 +740,9 @@ You win by either:
         gameRoot.visibility = View.INVISIBLE
     }
 
-    private fun showBoardAfterDialog() {
+    private fun showBoardAfterDialog(resumeAi: Boolean = true) {
         gameRoot.visibility = View.VISIBLE
+        if (resumeAi) resumeComputerTurnIfNeeded()
     }
 
     private fun makeFullscreen() {

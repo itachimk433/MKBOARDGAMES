@@ -81,14 +81,24 @@ class ConnectFourActivity : AppCompatActivity() {
 
     override fun onPause() {
         activityResumed = false
-        scope.coroutineContext.cancelChildren()
+        stopAutomatedGameplay()
         SoundPlayer.stopAll()
         super.onPause()
     }
 
     override fun onDestroy() {
+        stopAutomatedGameplay()
         super.onDestroy()
         scope.cancel()
+    }
+
+    private fun stopAutomatedGameplay() {
+        scope.coroutineContext.cancelChildren()
+        if (::boardView.isInitialized) {
+            boardView.cancelDropAnimation()
+            boardView.isLocked = false
+        }
+        if (::hudView.isInitialized) hudView.setThinking(false)
     }
 
     @Deprecated("Deprecated in Java")
@@ -97,6 +107,7 @@ class ConnectFourActivity : AppCompatActivity() {
             @Suppress("DEPRECATION") super.onBackPressed()
             return
         }
+        stopAutomatedGameplay()
         hideBoardWhileDialogIsOpen()
         StyledDialogs.showChoices(this, "Leave Match?",
             "Pause to resume later, or leave to forfeit this game.",
@@ -119,6 +130,7 @@ class ConnectFourActivity : AppCompatActivity() {
     }
 
     private fun pauseMatchAndExit() {
+        stopAutomatedGameplay()
         PausedMatchStore.save(
             this,
             gameType = "CONNECT_FOUR",
@@ -221,7 +233,7 @@ Control the centre columns, build threats in more than one direction, and block 
     }
 
     private fun startGame(restoring: PausedMatchStore.Match? = null) {
-        showBoardAfterDialog()
+        showBoardAfterDialog(resumeAi = false)
         matchStarted = true
         resultRecorded = false
         interstitialAd = null
@@ -406,6 +418,9 @@ Control the centre columns, build threats in more than one direction, and block 
     }
 
     fun onMenuClicked() {
+        // In-app dialogs do not trigger onPause(), so cancel automated play
+        // before hiding the board behind the menu.
+        stopAutomatedGameplay()
         hideBoardWhileDialogIsOpen()
         val inProgress = gameState.status == GameStatus.IN_PROGRESS && moveHistory.isNotEmpty()
         val items = mutableListOf("New Game", "How to Play")
@@ -523,8 +538,9 @@ Control the centre columns, build threats in more than one direction, and block 
         gameRoot.visibility = View.INVISIBLE
     }
 
-    private fun showBoardAfterDialog() {
+    private fun showBoardAfterDialog(resumeAi: Boolean = true) {
         gameRoot.visibility = View.VISIBLE
+        if (resumeAi) resumeComputerTurnIfNeeded()
     }
 
     inner class ConnectBoardView(ctx: Context) : View(ctx) {
@@ -654,6 +670,18 @@ Control the centre columns, build threats in more than one direction, and block 
             fallingColor = null
             fallingProgress = 0f
             isLocked = false
+            invalidate()
+        }
+
+        fun cancelDropAnimation() {
+            // Clear the completion before canceling: ValueAnimator.cancel()
+            // still dispatches onAnimationEnd to its listeners.
+            dropAnimationCompletion = null
+            fallingAnimator?.cancel()
+            fallingAnimator = null
+            fallingIndex = null
+            fallingColor = null
+            fallingProgress = 0f
             invalidate()
         }
 

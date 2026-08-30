@@ -90,18 +90,29 @@ class TicTacToeActivity : AppCompatActivity() {
     }
     override fun onPause() {
         activityResumed = false
-        scope.coroutineContext.cancelChildren()
+        stopAutomatedGameplay()
         SoundPlayer.stopAll()
         super.onPause()
     }
     override fun onWindowFocusChanged(h: Boolean) { super.onWindowFocusChanged(h); if (h) makeFullscreen() }
-    override fun onDestroy() { super.onDestroy(); scope.cancel() }
+    override fun onDestroy() {
+        stopAutomatedGameplay()
+        super.onDestroy()
+        scope.cancel()
+    }
+
+    private fun stopAutomatedGameplay() {
+        scope.coroutineContext.cancelChildren()
+        if (::boardView.isInitialized) boardView.isLocked = false
+        if (::hudView.isInitialized) hudView.setThinking(false)
+    }
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         if (!matchStarted || gameState.status != GameStatus.IN_PROGRESS) {
             @Suppress("DEPRECATION") super.onBackPressed(); return
         }
+        stopAutomatedGameplay()
         hideBoardWhileDialogIsOpen()
         StyledDialogs.showChoices(this, "Leave Match?",
             "Pause to resume later, or leave to forfeit this game.",
@@ -124,6 +135,7 @@ class TicTacToeActivity : AppCompatActivity() {
     }
 
     private fun pauseMatchAndExit() {
+        stopAutomatedGameplay()
         PausedMatchStore.save(
             this,
             gameType = "TICTACTOE",
@@ -274,7 +286,7 @@ Strategy
     // ─── Game flow ────────────────────────────────────────────────────────────
 
     private fun startGame(restoring: PausedMatchStore.Match? = null) {
-        showBoardAfterDialog()
+        showBoardAfterDialog(resumeAi = false)
         matchStarted = true
         resultRecorded = false
         interstitialAd = null
@@ -458,6 +470,9 @@ Strategy
     }
 
     fun onMenuClicked() {
+        // In-app dialogs do not trigger onPause(), so cancel automated play
+        // before hiding the board behind the menu.
+        stopAutomatedGameplay()
         hideBoardWhileDialogIsOpen()
         val inProgress = gameState.status == GameStatus.IN_PROGRESS && moveHistory.isNotEmpty()
         val items = mutableListOf("New Game", "How to Play")
@@ -555,8 +570,9 @@ Strategy
         gameRoot.visibility = View.INVISIBLE
     }
 
-    private fun showBoardAfterDialog() {
+    private fun showBoardAfterDialog(resumeAi: Boolean = true) {
         gameRoot.visibility = View.VISIBLE
+        if (resumeAi) resumeComputerTurnIfNeeded()
     }
 
     private fun launchReplay(resultLabel: String) {
