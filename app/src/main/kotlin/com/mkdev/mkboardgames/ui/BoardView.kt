@@ -1352,11 +1352,11 @@ class BoardView(context: Context) : View(context) {
     private fun drawChessPiece(canvas: Canvas, piece: ChessPiece, cx: Float, cy: Float) {
         when (chessPieceStyle) {
             ChessPieceStyle.STAUNTON -> {
-                drawVectorStauntonChessPiece(canvas, piece, cx, cy)
+                drawReferenceStauntonChessPiece(canvas, piece, cx, cy)
                 return
             }
             ChessPieceStyle.ILLUSTRATED -> {
-                drawVectorIllustratedChessPiece(canvas, piece, cx, cy)
+                drawReferenceIllustratedChessPiece(canvas, piece, cx, cy)
                 return
             }
             ChessPieceStyle.UNICODE -> Unit
@@ -1396,6 +1396,504 @@ class BoardView(context: Context) : View(context) {
      * silhouette in code makes the outline thickness and board-size scaling
      * consistent on every device.
      */
+    private fun drawReferenceStauntonChessPiece(
+        canvas: Canvas,
+        piece: ChessPiece,
+        cx: Float,
+        cy: Float,
+    ) {
+        drawReferenceChessPiece(canvas, piece, cx, cy, illustrated = false)
+    }
+
+    private fun drawReferenceIllustratedChessPiece(
+        canvas: Canvas,
+        piece: ChessPiece,
+        cx: Float,
+        cy: Float,
+    ) {
+        drawReferenceChessPiece(canvas, piece, cx, cy, illustrated = true)
+    }
+
+    private fun drawReferenceChessPiece(
+        canvas: Canvas,
+        piece: ChessPiece,
+        cx: Float,
+        cy: Float,
+        illustrated: Boolean,
+    ) {
+        val scale = cellSize
+        val isWhite = piece.color == PieceColor.WHITE
+        val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.FILL
+            if (illustrated) {
+                shader = LinearGradient(
+                    cx - scale * 0.24f,
+                    cy - scale * 0.46f,
+                    cx + scale * 0.24f,
+                    cy + scale * 0.42f,
+                    if (isWhite) {
+                        intArrayOf(
+                            Color.parseColor("#FFFFFF"),
+                            Color.parseColor("#E8E1D8"),
+                            Color.parseColor("#9D9185"),
+                        )
+                    } else {
+                        intArrayOf(
+                            Color.parseColor("#555C68"),
+                            Color.parseColor("#2A303C"),
+                            Color.parseColor("#0B0E15"),
+                        )
+                    },
+                    null,
+                    Shader.TileMode.CLAMP,
+                )
+            } else {
+                color = if (isWhite) Color.parseColor("#FFF9EC")
+                else Color.parseColor("#202735")
+            }
+        }
+        val edge = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (isWhite) Color.parseColor("#312A29")
+            else Color.parseColor("#F1D7B9")
+            style = Paint.Style.STROKE
+            strokeWidth = maxOf(1.5f, scale * if (illustrated) 0.030f else 0.026f)
+            strokeJoin = Paint.Join.ROUND
+            strokeCap = Paint.Cap.ROUND
+        }
+        val detail = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (illustrated) {
+                if (isWhite) Color.argb(155, 255, 255, 255)
+                else Color.argb(175, 207, 216, 228)
+            } else {
+                if (isWhite) Color.parseColor("#8E8176")
+                else Color.parseColor("#786B68")
+            }
+            style = Paint.Style.STROKE
+            strokeWidth = maxOf(1f, scale * if (illustrated) 0.015f else 0.012f)
+            strokeCap = Paint.Cap.ROUND
+            strokeJoin = Paint.Join.ROUND
+        }
+
+        canvas.save()
+        if (rotateBlackPieces && piece.color == PieceColor.BLACK) {
+            canvas.rotate(180f, cx, cy)
+        }
+        canvas.drawOval(
+            cx - scale * 0.245f,
+            cy + scale * 0.355f,
+            cx + scale * 0.265f,
+            cy + scale * 0.465f,
+            shadowPaint,
+        )
+        when (piece.type) {
+            ChessPieceType.PAWN ->
+                drawReferencePawn(canvas, cx, cy, scale, fill, edge, detail)
+            ChessPieceType.ROOK ->
+                drawReferenceRook(canvas, cx, cy, scale, fill, edge, detail)
+            ChessPieceType.KNIGHT ->
+                drawReferenceKnight(canvas, cx, cy, scale, fill, edge, detail)
+            ChessPieceType.BISHOP ->
+                drawReferenceBishop(canvas, cx, cy, scale, fill, edge, detail)
+            ChessPieceType.QUEEN ->
+                drawReferenceQueen(canvas, cx, cy, scale, fill, edge, detail)
+            ChessPieceType.KING ->
+                drawReferenceKing(canvas, cx, cy, scale, fill, edge, detail)
+        }
+        canvas.restore()
+    }
+
+    private fun drawReferencePawn(
+        canvas: Canvas,
+        cx: Float,
+        cy: Float,
+        scale: Float,
+        fill: Paint,
+        edge: Paint,
+        detail: Paint,
+    ) {
+        val body = Path().apply {
+            moveTo(cx - scale * 0.095f, cy - scale * 0.17f)
+            cubicTo(
+                cx - scale * 0.105f, cy - scale * 0.06f,
+                cx - scale * 0.095f, cy + scale * 0.07f,
+                cx - scale * 0.145f, cy + scale * 0.18f,
+            )
+            cubicTo(
+                cx - scale * 0.17f, cy + scale * 0.235f,
+                cx - scale * 0.19f, cy + scale * 0.27f,
+                cx - scale * 0.20f, cy + scale * 0.30f,
+            )
+            lineTo(cx + scale * 0.20f, cy + scale * 0.30f)
+            cubicTo(
+                cx + scale * 0.19f, cy + scale * 0.27f,
+                cx + scale * 0.17f, cy + scale * 0.235f,
+                cx + scale * 0.145f, cy + scale * 0.18f,
+            )
+            cubicTo(
+                cx + scale * 0.095f, cy + scale * 0.07f,
+                cx + scale * 0.105f, cy - scale * 0.06f,
+                cx + scale * 0.095f, cy - scale * 0.17f,
+            )
+            close()
+        }
+        drawReferencePath(canvas, body, fill, edge)
+        canvas.drawOval(
+            cx - scale * 0.14f,
+            cy - scale * 0.215f,
+            cx + scale * 0.14f,
+            cy - scale * 0.125f,
+            fill,
+        )
+        canvas.drawOval(
+            cx - scale * 0.14f,
+            cy - scale * 0.215f,
+            cx + scale * 0.14f,
+            cy - scale * 0.125f,
+            edge,
+        )
+        canvas.drawCircle(cx, cy - scale * 0.30f, scale * 0.108f, fill)
+        canvas.drawCircle(cx, cy - scale * 0.30f, scale * 0.108f, edge)
+        canvas.drawLine(
+            cx - scale * 0.09f,
+            cy - scale * 0.315f,
+            cx + scale * 0.045f,
+            cy - scale * 0.355f,
+            detail,
+        )
+        drawReferenceBase(canvas, cx, cy, scale, fill, edge, detail)
+    }
+
+    private fun drawReferenceRook(
+        canvas: Canvas,
+        cx: Float,
+        cy: Float,
+        scale: Float,
+        fill: Paint,
+        edge: Paint,
+        detail: Paint,
+    ) {
+        val body = Path().apply {
+            moveTo(cx - scale * 0.165f, cy - scale * 0.27f)
+            cubicTo(
+                cx - scale * 0.15f, cy - scale * 0.14f,
+                cx - scale * 0.13f, cy + scale * 0.08f,
+                cx - scale * 0.17f, cy + scale * 0.30f,
+            )
+            lineTo(cx + scale * 0.17f, cy + scale * 0.30f)
+            cubicTo(
+                cx + scale * 0.13f, cy + scale * 0.08f,
+                cx + scale * 0.15f, cy - scale * 0.14f,
+                cx + scale * 0.165f, cy - scale * 0.27f,
+            )
+            close()
+        }
+        drawReferencePath(canvas, body, fill, edge)
+        val crown = Path().apply {
+            moveTo(cx - scale * 0.20f, cy - scale * 0.24f)
+            lineTo(cx - scale * 0.20f, cy - scale * 0.43f)
+            lineTo(cx - scale * 0.125f, cy - scale * 0.43f)
+            lineTo(cx - scale * 0.125f, cy - scale * 0.35f)
+            lineTo(cx - scale * 0.045f, cy - scale * 0.35f)
+            lineTo(cx - scale * 0.045f, cy - scale * 0.43f)
+            lineTo(cx + scale * 0.045f, cy - scale * 0.43f)
+            lineTo(cx + scale * 0.045f, cy - scale * 0.35f)
+            lineTo(cx + scale * 0.125f, cy - scale * 0.35f)
+            lineTo(cx + scale * 0.125f, cy - scale * 0.43f)
+            lineTo(cx + scale * 0.20f, cy - scale * 0.43f)
+            lineTo(cx + scale * 0.20f, cy - scale * 0.24f)
+            close()
+        }
+        drawReferencePath(canvas, crown, fill, edge)
+        drawReferenceBand(canvas, cx, cy - scale * 0.235f, scale * 0.18f, detail)
+        drawReferenceBase(canvas, cx, cy, scale, fill, edge, detail)
+    }
+
+    private fun drawReferenceKnight(
+        canvas: Canvas,
+        cx: Float,
+        cy: Float,
+        scale: Float,
+        fill: Paint,
+        edge: Paint,
+        detail: Paint,
+    ) {
+        val horse = Path().apply {
+            moveTo(cx - scale * 0.18f, cy + scale * 0.30f)
+            cubicTo(
+                cx - scale * 0.19f, cy + scale * 0.14f,
+                cx - scale * 0.205f, cy + scale * 0.025f,
+                cx - scale * 0.18f, cy - scale * 0.085f,
+            )
+            cubicTo(
+                cx - scale * 0.16f, cy - scale * 0.16f,
+                cx - scale * 0.20f, cy - scale * 0.22f,
+                cx - scale * 0.23f, cy - scale * 0.28f,
+            )
+            lineTo(cx - scale * 0.13f, cy - scale * 0.30f)
+            cubicTo(
+                cx - scale * 0.10f, cy - scale * 0.34f,
+                cx - scale * 0.105f, cy - scale * 0.405f,
+                cx - scale * 0.08f, cy - scale * 0.445f,
+            )
+            lineTo(cx - scale * 0.015f, cy - scale * 0.375f)
+            cubicTo(
+                cx + scale * 0.045f, cy - scale * 0.43f,
+                cx + scale * 0.12f, cy - scale * 0.43f,
+                cx + scale * 0.17f, cy - scale * 0.38f,
+            )
+            cubicTo(
+                cx + scale * 0.15f, cy - scale * 0.32f,
+                cx + scale * 0.20f, cy - scale * 0.27f,
+                cx + scale * 0.195f, cy - scale * 0.18f,
+            )
+            cubicTo(
+                cx + scale * 0.19f, cy - scale * 0.07f,
+                cx + scale * 0.13f, cy + scale * 0.08f,
+                cx + scale * 0.16f, cy + scale * 0.30f,
+            )
+            close()
+        }
+        drawReferencePath(canvas, horse, fill, edge)
+        canvas.drawLine(
+            cx - scale * 0.14f,
+            cy - scale * 0.30f,
+            cx + scale * 0.12f,
+            cy - scale * 0.35f,
+            detail,
+        )
+        canvas.drawLine(
+            cx - scale * 0.13f,
+            cy - scale * 0.10f,
+            cx + scale * 0.055f,
+            cy - scale * 0.16f,
+            detail,
+        )
+        drawReferenceBase(canvas, cx, cy, scale, fill, edge, detail)
+    }
+
+    private fun drawReferenceBishop(
+        canvas: Canvas,
+        cx: Float,
+        cy: Float,
+        scale: Float,
+        fill: Paint,
+        edge: Paint,
+        detail: Paint,
+    ) {
+        val body = Path().apply {
+            moveTo(cx - scale * 0.115f, cy - scale * 0.19f)
+            cubicTo(
+                cx - scale * 0.12f, cy - scale * 0.08f,
+                cx - scale * 0.13f, cy + scale * 0.09f,
+                cx - scale * 0.17f, cy + scale * 0.30f,
+            )
+            lineTo(cx + scale * 0.17f, cy + scale * 0.30f)
+            cubicTo(
+                cx + scale * 0.13f, cy + scale * 0.09f,
+                cx + scale * 0.12f, cy - scale * 0.08f,
+                cx + scale * 0.115f, cy - scale * 0.19f,
+            )
+            close()
+        }
+        drawReferencePath(canvas, body, fill, edge)
+        val mitre = Path().apply {
+            moveTo(cx, cy - scale * 0.47f)
+            cubicTo(
+                cx - scale * 0.11f, cy - scale * 0.40f,
+                cx - scale * 0.14f, cy - scale * 0.27f,
+                cx - scale * 0.10f, cy - scale * 0.19f,
+            )
+            lineTo(cx + scale * 0.10f, cy - scale * 0.19f)
+            cubicTo(
+                cx + scale * 0.14f, cy - scale * 0.27f,
+                cx + scale * 0.11f, cy - scale * 0.40f,
+                cx, cy - scale * 0.47f,
+            )
+            close()
+        }
+        drawReferencePath(canvas, mitre, fill, edge)
+        canvas.drawLine(
+            cx - scale * 0.04f,
+            cy - scale * 0.405f,
+            cx + scale * 0.045f,
+            cy - scale * 0.245f,
+            detail,
+        )
+        drawReferenceBand(canvas, cx, cy - scale * 0.18f, scale * 0.12f, detail)
+        drawReferenceBase(canvas, cx, cy, scale, fill, edge, detail)
+    }
+
+    private fun drawReferenceQueen(
+        canvas: Canvas,
+        cx: Float,
+        cy: Float,
+        scale: Float,
+        fill: Paint,
+        edge: Paint,
+        detail: Paint,
+    ) {
+        val body = Path().apply {
+            moveTo(cx - scale * 0.13f, cy - scale * 0.20f)
+            cubicTo(
+                cx - scale * 0.13f, cy - scale * 0.05f,
+                cx - scale * 0.12f, cy + scale * 0.10f,
+                cx - scale * 0.18f, cy + scale * 0.30f,
+            )
+            lineTo(cx + scale * 0.18f, cy + scale * 0.30f)
+            cubicTo(
+                cx + scale * 0.12f, cy + scale * 0.10f,
+                cx + scale * 0.13f, cy - scale * 0.05f,
+                cx + scale * 0.13f, cy - scale * 0.20f,
+            )
+            close()
+        }
+        drawReferencePath(canvas, body, fill, edge)
+        val crown = Path().apply {
+            moveTo(cx - scale * 0.205f, cy - scale * 0.20f)
+            lineTo(cx - scale * 0.17f, cy - scale * 0.40f)
+            cubicTo(
+                cx - scale * 0.13f, cy - scale * 0.34f,
+                cx - scale * 0.095f, cy - scale * 0.30f,
+                cx - scale * 0.055f, cy - scale * 0.39f,
+            )
+            lineTo(cx, cy - scale * 0.30f)
+            lineTo(cx + scale * 0.055f, cy - scale * 0.39f)
+            cubicTo(
+                cx + scale * 0.095f, cy - scale * 0.30f,
+                cx + scale * 0.13f, cy - scale * 0.34f,
+                cx + scale * 0.17f, cy - scale * 0.40f,
+            )
+            lineTo(cx + scale * 0.205f, cy - scale * 0.20f)
+            close()
+        }
+        drawReferencePath(canvas, crown, fill, edge)
+        drawReferenceBand(canvas, cx, cy - scale * 0.19f, scale * 0.18f, detail)
+        drawReferenceBase(canvas, cx, cy, scale, fill, edge, detail)
+    }
+
+    private fun drawReferenceKing(
+        canvas: Canvas,
+        cx: Float,
+        cy: Float,
+        scale: Float,
+        fill: Paint,
+        edge: Paint,
+        detail: Paint,
+    ) {
+        val body = Path().apply {
+            moveTo(cx - scale * 0.135f, cy - scale * 0.20f)
+            cubicTo(
+                cx - scale * 0.14f, cy - scale * 0.05f,
+                cx - scale * 0.13f, cy + scale * 0.10f,
+                cx - scale * 0.18f, cy + scale * 0.30f,
+            )
+            lineTo(cx + scale * 0.18f, cy + scale * 0.30f)
+            cubicTo(
+                cx + scale * 0.13f, cy + scale * 0.10f,
+                cx + scale * 0.14f, cy - scale * 0.05f,
+                cx + scale * 0.135f, cy - scale * 0.20f,
+            )
+            close()
+        }
+        drawReferencePath(canvas, body, fill, edge)
+        val crown = RectF(
+            cx - scale * 0.18f,
+            cy - scale * 0.35f,
+            cx + scale * 0.18f,
+            cy - scale * 0.18f,
+        )
+        canvas.drawRoundRect(crown, scale * 0.035f, scale * 0.035f, fill)
+        canvas.drawRoundRect(crown, scale * 0.035f, scale * 0.035f, edge)
+        canvas.drawRoundRect(
+            cx - scale * 0.026f,
+            cy - scale * 0.49f,
+            cx + scale * 0.026f,
+            cy - scale * 0.29f,
+            scale * 0.012f,
+            scale * 0.012f,
+            edge,
+        )
+        canvas.drawRoundRect(
+            cx - scale * 0.085f,
+            cy - scale * 0.425f,
+            cx + scale * 0.085f,
+            cy - scale * 0.375f,
+            scale * 0.012f,
+            scale * 0.012f,
+            edge,
+        )
+        drawReferenceBand(canvas, cx, cy - scale * 0.19f, scale * 0.18f, detail)
+        drawReferenceBase(canvas, cx, cy, scale, fill, edge, detail)
+    }
+
+    private fun drawReferenceBase(
+        canvas: Canvas,
+        cx: Float,
+        cy: Float,
+        scale: Float,
+        fill: Paint,
+        edge: Paint,
+        detail: Paint,
+    ) {
+        val upper = RectF(
+            cx - scale * 0.22f,
+            cy + scale * 0.21f,
+            cx + scale * 0.22f,
+            cy + scale * 0.34f,
+        )
+        canvas.drawRoundRect(upper, scale * 0.035f, scale * 0.035f, fill)
+        canvas.drawRoundRect(upper, scale * 0.035f, scale * 0.035f, edge)
+        val lower = RectF(
+            cx - scale * 0.275f,
+            cy + scale * 0.30f,
+            cx + scale * 0.275f,
+            cy + scale * 0.43f,
+        )
+        canvas.drawRoundRect(lower, scale * 0.055f, scale * 0.055f, fill)
+        canvas.drawRoundRect(lower, scale * 0.055f, scale * 0.055f, edge)
+        canvas.drawLine(
+            cx - scale * 0.20f,
+            cy + scale * 0.265f,
+            cx + scale * 0.20f,
+            cy + scale * 0.265f,
+            detail,
+        )
+        canvas.drawLine(
+            cx - scale * 0.245f,
+            cy + scale * 0.365f,
+            cx + scale * 0.245f,
+            cy + scale * 0.365f,
+            detail,
+        )
+    }
+
+    private fun drawReferenceBand(
+        canvas: Canvas,
+        cx: Float,
+        y: Float,
+        halfWidth: Float,
+        detail: Paint,
+    ) {
+        canvas.drawLine(cx - halfWidth, y, cx + halfWidth, y, detail)
+        canvas.drawLine(
+            cx - halfWidth * 0.82f,
+            y + cellSize * 0.025f,
+            cx + halfWidth * 0.82f,
+            y + cellSize * 0.025f,
+            detail,
+        )
+    }
+
+    private fun drawReferencePath(
+        canvas: Canvas,
+        path: Path,
+        fill: Paint,
+        edge: Paint,
+    ) {
+        canvas.drawPath(path, fill)
+        canvas.drawPath(path, edge)
+    }
+
     private fun drawVectorIllustratedChessPiece(
         canvas: Canvas,
         piece: ChessPiece,
