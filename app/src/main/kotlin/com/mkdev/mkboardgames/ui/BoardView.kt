@@ -374,7 +374,7 @@ class BoardView(context: Context) : View(context) {
                 ChessPieceType.KING to "${prefix}_black_king.png",
             ),
         )
-        names.flatMap { (color, types) ->
+        return names.flatMap { (color, types) ->
             types.map { (type, filename) -> (color to type) to filename }
         }.associate { (key, filename) ->
             key to context.assets.open(filename).use { stream ->
