@@ -66,12 +66,6 @@ class BoardView(context: Context) : View(context) {
             refreshBoardStyleGeometry()
             invalidate()
         }
-    var chessPieceStyle: ChessPieceStyle = ChessPieceStyle.UNICODE
-        set(value) {
-            if (field == value) return
-            field = value
-            invalidate()
-        }
     var draughtsBoardStyle: DraughtsBoardStyle = DraughtsBoardStyle.CANVAS
         set(value) {
             if (field == value) return
@@ -1350,17 +1344,6 @@ class BoardView(context: Context) : View(context) {
     }
 
     private fun drawChessPiece(canvas: Canvas, piece: ChessPiece, cx: Float, cy: Float) {
-        when (chessPieceStyle) {
-            ChessPieceStyle.STAUNTON -> {
-                drawReferenceStauntonChessPiece(canvas, piece, cx, cy)
-                return
-            }
-            ChessPieceStyle.ILLUSTRATED -> {
-                drawReferenceIllustratedChessPiece(canvas, piece, cx, cy)
-                return
-            }
-            ChessPieceStyle.UNICODE -> Unit
-        }
         val shouldRotate = rotateBlackPieces && piece.color == PieceColor.BLACK
         val symbol = piece.symbol()
         piecePaint.style = Paint.Style.FILL
