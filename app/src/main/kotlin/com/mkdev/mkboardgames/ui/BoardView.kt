@@ -15,6 +15,7 @@ import com.mkdev.mkboardgames.games.checkers.CheckersPiece
 import com.mkdev.mkboardgames.games.checkers.CheckersRuleEngine
 import com.mkdev.mkboardgames.games.checkers.InternationalDraughtsRuleEngine
 import com.mkdev.mkboardgames.games.chess.ChessPiece
+import com.mkdev.mkboardgames.games.chess.ChessPieceType
 import com.mkdev.mkboardgames.games.chess.ChessRuleEngine
 import com.mkdev.mkboardgames.games.foxandgeese.FoxAndGeeseSetup
 import com.mkdev.mkboardgames.games.foxandgeese.FoxAndGeesePiece
@@ -343,6 +344,37 @@ class BoardView(context: Context) : View(context) {
     }
     private val piecePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.CENTER; isFakeBoldText = true
+    }
+    private val stauntonPiecePaint = Paint(
+        Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG or Paint.DITHER_FLAG,
+    )
+    private val stauntonPieceBitmaps by lazy {
+        val names = mapOf(
+            PieceColor.WHITE to mapOf(
+                ChessPieceType.PAWN to "chess_piece_staunton_white_pawn.png",
+                ChessPieceType.ROOK to "chess_piece_staunton_white_rook.png",
+                ChessPieceType.KNIGHT to "chess_piece_staunton_white_knight.png",
+                ChessPieceType.BISHOP to "chess_piece_staunton_white_bishop.png",
+                ChessPieceType.QUEEN to "chess_piece_staunton_white_queen.png",
+                ChessPieceType.KING to "chess_piece_staunton_white_king.png",
+            ),
+            PieceColor.BLACK to mapOf(
+                ChessPieceType.PAWN to "chess_piece_staunton_black_pawn.png",
+                ChessPieceType.ROOK to "chess_piece_staunton_black_rook.png",
+                ChessPieceType.KNIGHT to "chess_piece_staunton_black_knight.png",
+                ChessPieceType.BISHOP to "chess_piece_staunton_black_bishop.png",
+                ChessPieceType.QUEEN to "chess_piece_staunton_black_queen.png",
+                ChessPieceType.KING to "chess_piece_staunton_black_king.png",
+            ),
+        )
+        names.flatMap { (color, types) ->
+            types.map { (type, filename) -> (color to type) to filename }
+        }.associate { (key, filename) ->
+            key to context.assets.open(filename).use { stream ->
+                BitmapFactory.decodeStream(stream)
+                    ?: error("Unable to decode Chess piece asset: $filename")
+            }
+        }
     }
     private val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(80, 0, 0, 0)
@@ -1350,7 +1382,7 @@ class BoardView(context: Context) : View(context) {
 
     private fun drawChessPiece(canvas: Canvas, piece: ChessPiece, cx: Float, cy: Float) {
         if (chessPieceStyle == ChessPieceStyle.STAUNTON) {
-            drawStauntonChessPiece(canvas, piece, cx, cy)
+            drawSuppliedStauntonChessPiece(canvas, piece, cx, cy)
             return
         }
         val shouldRotate = rotateBlackPieces && piece.color == PieceColor.BLACK
@@ -1383,13 +1415,41 @@ class BoardView(context: Context) : View(context) {
         if (shouldRotate) canvas.restore()
     }
 
+    private fun drawSuppliedStauntonChessPiece(
+        canvas: Canvas,
+        piece: ChessPiece,
+        cx: Float,
+        cy: Float,
+    ) {
+        val bitmap = stauntonPieceBitmaps[piece.color to piece.type]
+            ?: error("Missing Chess piece asset for ${piece.color} ${piece.type}")
+        val maxWidth = cellSize * 0.78f
+        val maxHeight = cellSize * 0.86f
+        val bitmapScale = minOf(
+            maxWidth / bitmap.width.toFloat(),
+            maxHeight / bitmap.height.toFloat(),
+        )
+        val drawWidth = bitmap.width * bitmapScale
+        val drawHeight = bitmap.height * bitmapScale
+        val destination = RectF(
+            cx - drawWidth / 2f,
+            cy - drawHeight / 2f,
+            cx + drawWidth / 2f,
+            cy + drawHeight / 2f,
+        )
+        canvas.save()
+        if (rotateBlackPieces && piece.color == PieceColor.BLACK) {
+            canvas.rotate(180f, cx, cy)
+        }
+        canvas.drawBitmap(bitmap, null, destination, stauntonPiecePaint)
+        canvas.restore()
+    }
+
     /**
-     * A compact, hand-drawn Staunton-style set based on the supplied reference:
-     * broad stepped bases, tapered bodies, and recognizable crowns/silhouettes.
-     * Drawing it here keeps it sharp at every board size and works on every
-     * board photograph without needing a separate sprite sheet.
+     * Legacy vector fallback retained for compatibility with older state
+     * snapshots; current Chess rendering uses the supplied bitmap set above.
      */
-    private fun drawStauntonChessPiece(canvas: Canvas, piece: ChessPiece, cx: Float, cy: Float) {
+    private fun drawVectorStauntonChessPiece(canvas: Canvas, piece: ChessPiece, cx: Float, cy: Float) {
         val shouldRotate = rotateBlackPieces && piece.color == PieceColor.BLACK
         val isWhite = piece.color == PieceColor.WHITE
         val scale = cellSize
