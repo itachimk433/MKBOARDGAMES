@@ -183,6 +183,12 @@ class BoardView(context: Context) : View(context) {
         500f / 1024f, 615f / 1024f, 730f / 1024f, 845f / 1024f,
         959f / 1024f,
     )
+    private val realisticChessGridX = floatArrayOf(
+        58f / 1024f, 171.5f / 1024f, 285f / 1024f, 398.5f / 1024f,
+        512f / 1024f, 625.5f / 1024f, 739f / 1024f, 852.5f / 1024f,
+        966f / 1024f,
+    )
+    private val realisticChessGridY = realisticChessGridX.copyOf()
 
     private val xiangqiBoardBitmap: Bitmap? = try {
         context.assets.open("xiangqi_board.webp").use { BitmapFactory.decodeStream(it) }
@@ -250,13 +256,6 @@ class BoardView(context: Context) : View(context) {
         }
         canvas.drawRoundRect(boardRect, 24f, 24f, bevelPaint)
 
-        val accentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(120, 255, 215, 120)
-            style = Paint.Style.STROKE
-            strokeWidth = 5f
-        }
-        val accentRect = RectF(boardRect).apply { inset(12f, 12f) }
-        canvas.drawRoundRect(accentRect, 18f, 18f, accentPaint)
         return bitmap
     }
 
@@ -1165,16 +1164,32 @@ class BoardView(context: Context) : View(context) {
 
     private fun drawChessPiece(canvas: Canvas, piece: ChessPiece, cx: Float, cy: Float) {
         val shouldRotate = rotateBlackPieces && piece.color == PieceColor.BLACK
+        val symbol = piece.symbol()
+        piecePaint.style = Paint.Style.FILL
+        piecePaint.strokeWidth = 0f
+        val glyphBounds = Rect()
+        piecePaint.getTextBounds(symbol, 0, symbol.length, glyphBounds)
+        val glyphDimension = maxOf(glyphBounds.width(), glyphBounds.height()).toFloat()
+        val targetDimension = cellSize * 0.60f
+        val glyphScale = if (glyphDimension > 0f) targetDimension / glyphDimension else 1f
+        val glyphBaseline = cy - (glyphBounds.top + glyphBounds.bottom) / 2f
+
+        // Unicode chess glyphs have different native bounds. Fit every glyph
+        // to the same square footprint so no piece looks taller or wider than
+        // the others, while keeping its silhouette proportions intact.
+        canvas.save()
         if (shouldRotate) { canvas.save(); canvas.rotate(180f, cx, cy) }
-        val glyphY = cy + piecePaint.textSize * 0.36f
-        piecePaint.style = Paint.Style.STROKE; piecePaint.strokeWidth = cellSize * 0.04f
+        canvas.scale(glyphScale, glyphScale, cx, cy)
+        piecePaint.style = Paint.Style.STROKE
+        piecePaint.strokeWidth = cellSize * 0.025f / glyphScale
         piecePaint.color = if (piece.color == PieceColor.WHITE) Color.parseColor("#757575")
                            else Color.parseColor("#EEEEEE")
-        canvas.drawText(piece.symbol(), cx, glyphY, piecePaint)
+        canvas.drawText(symbol, cx, glyphBaseline, piecePaint)
         piecePaint.style = Paint.Style.FILL
         piecePaint.color = if (piece.color == PieceColor.WHITE) Color.parseColor("#FFFDE7")
                            else Color.parseColor("#212121")
-        canvas.drawText(piece.symbol(), cx, glyphY, piecePaint)
+        canvas.drawText(symbol, cx, glyphBaseline, piecePaint)
+        canvas.restore()
         if (shouldRotate) canvas.restore()
     }
 
@@ -1384,14 +1399,14 @@ class BoardView(context: Context) : View(context) {
     private fun chessGridX(): FloatArray = when (chessBoardStyle) {
         ChessBoardStyle.SUPPLIED_WOOD -> suppliedChessGridX
         ChessBoardStyle.CLASSIC_WOOD -> classicChessGridX
-        ChessBoardStyle.REALISTIC_BLACK_WHITE -> classicChessGridX
+        ChessBoardStyle.REALISTIC_BLACK_WHITE -> realisticChessGridX
         ChessBoardStyle.CANVAS -> floatArrayOf()
     }
 
     private fun chessGridY(): FloatArray = when (chessBoardStyle) {
         ChessBoardStyle.SUPPLIED_WOOD -> suppliedChessGridY
         ChessBoardStyle.CLASSIC_WOOD -> classicChessGridY
-        ChessBoardStyle.REALISTIC_BLACK_WHITE -> classicChessGridY
+        ChessBoardStyle.REALISTIC_BLACK_WHITE -> realisticChessGridY
         ChessBoardStyle.CANVAS -> floatArrayOf()
     }
 

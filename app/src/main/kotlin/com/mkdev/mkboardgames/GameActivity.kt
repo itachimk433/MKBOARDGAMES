@@ -232,7 +232,9 @@ class GameActivity : AppCompatActivity() {
             boardView.isLocked = false
             boardView.cancelMoveAnimation()
         }
-        hudView.setThinking(false)
+        if (::hudView.isInitialized) {
+            hudView.setThinking(false)
+        }
         scope.coroutineContext.cancelChildren()
     }
 
@@ -247,13 +249,18 @@ class GameActivity : AppCompatActivity() {
         super.onWindowFocusChanged(hasFocus); if (hasFocus) makeFullscreen()
     }
 
-    override fun onDestroy() { super.onDestroy(); scope.cancel() }
+    override fun onDestroy() {
+        stopAutoplayAndAiThinking()
+        super.onDestroy()
+        scope.cancel()
+    }
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         if (!matchStarted || gameState.status != GameStatus.IN_PROGRESS) {
             @Suppress("DEPRECATION") super.onBackPressed(); return
         }
+        stopAutoplayAndAiThinking()
         if (isStyledBoardGame()) {
             showChessLeaveMatchDialog()
             return
@@ -272,6 +279,9 @@ class GameActivity : AppCompatActivity() {
     }
 
     private fun showChessLeaveMatchDialog() {
+        // Dialogs do not pause the Activity, so stop automated gameplay before
+        // hiding the board behind the leave-match screen.
+        stopAutoplayAndAiThinking()
         hideChessBoardWhileDialogIsOpen()
         val view = ChessChoiceView(
             this,
@@ -330,6 +340,7 @@ class GameActivity : AppCompatActivity() {
     }
 
     private fun pauseMatchAndExit() {
+        stopAutoplayAndAiThinking()
         PausedMatchStore.save(
             this,
             gameType = gameType,
@@ -1464,6 +1475,8 @@ Checkmate your opponent's King.
     }
 
     fun onMenuClicked() {
+        // The menu is an in-app dialog and does not trigger onPause().
+        stopAutoplayAndAiThinking()
         val inProgress = gameState.status == GameStatus.IN_PROGRESS && moveHistory.isNotEmpty()
         if (isStyledBoardGame()) {
             showChessGameplayMenu(inProgress)
