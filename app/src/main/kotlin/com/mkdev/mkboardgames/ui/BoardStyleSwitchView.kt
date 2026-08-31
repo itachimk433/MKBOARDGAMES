@@ -112,13 +112,10 @@ class BoardStyleSwitchView(context: Context) : View(context) {
             Color.parseColor("#D97A45"),
             Color.parseColor("#EAE7E2"),
             Color.parseColor("#FFFFFF"),
-            Color.parseColor("#9C6A45"),
-            Color.parseColor("#E5B77D"),
         )
         val stateColors = when (styleCount) {
             2 -> intArrayOf(chessPalette.first(), Color.parseColor("#FF3030"))
             6 -> draughtsPalette
-            8 -> draughtsPalette
             else -> chessPalette.copyOf(styleCount)
         }
 

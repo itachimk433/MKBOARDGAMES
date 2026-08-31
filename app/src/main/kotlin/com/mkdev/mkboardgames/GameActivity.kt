@@ -52,6 +52,10 @@ class GameActivity : AppCompatActivity() {
     private lateinit var engine:           RuleEngine
     private lateinit var gameType:         String
     private lateinit var gameContainer:    View
+    private val internationalDraughtsStyles = arrayOf(
+        DraughtsBoardStyle.INTERNATIONAL_DARK_WOOD,
+        DraughtsBoardStyle.INTERNATIONAL_LIGHT_WOOD,
+    )
 
     private var gameState: GameState = GameState(arrayOfNulls(64))
     private var vsAI = true
@@ -151,8 +155,13 @@ class GameActivity : AppCompatActivity() {
         boardStyleSwitch.onStyleChanged = { styleIndex ->
             when (gameType) {
                 "CHESS" -> boardView.chessBoardStyle = ChessBoardStyle.entries[styleIndex]
-                "CHECKERS", "INTERNATIONAL_DRAUGHTS" ->
+                "CHECKERS" ->
                     boardView.draughtsBoardStyle = DraughtsBoardStyle.entries[styleIndex]
+                "INTERNATIONAL_DRAUGHTS" ->
+                    boardView.draughtsBoardStyle =
+                        internationalDraughtsStyles.getOrElse(styleIndex) {
+                            internationalDraughtsStyles.first()
+                        }
             }
         }
         boardView.onEmptySpaceTapped = ::revealBoardStyleSwitch
@@ -184,16 +193,30 @@ class GameActivity : AppCompatActivity() {
         gameState = engine.initialState()
         boardView.ruleEngine = engine
         boardView.gameState = gameState
+        val isInternationalDraughts = gameType == "INTERNATIONAL_DRAUGHTS"
         val isDraughtsGame =
             gameType == "CHECKERS" || gameType == "INTERNATIONAL_DRAUGHTS"
+        if (isInternationalDraughts) {
+            boardView.draughtsBoardStyle = internationalDraughtsStyles.first()
+        }
         boardStyleSwitchEnabled = gameType == "CHESS" || isDraughtsGame
         boardStyleSwitch.setStyleCount(
-            if (isDraughtsGame) DraughtsBoardStyle.entries.size
-            else ChessBoardStyle.entries.size,
+            when {
+                gameType == "CHESS" -> ChessBoardStyle.entries.size
+                isInternationalDraughts -> internationalDraughtsStyles.size
+                isDraughtsGame -> DraughtsBoardStyle.entries.size - internationalDraughtsStyles.size
+                else -> ChessBoardStyle.entries.size
+            },
         )
+        val selectedBoardStyleIndex = when {
+            isInternationalDraughts ->
+                internationalDraughtsStyles.indexOf(boardView.draughtsBoardStyle)
+                    .coerceAtLeast(0)
+            isDraughtsGame -> boardView.draughtsBoardStyle.ordinal
+            else -> boardView.chessBoardStyle.ordinal
+        }
         boardStyleSwitch.setSelectedIndex(
-            if (isDraughtsGame) boardView.draughtsBoardStyle.ordinal
-            else boardView.chessBoardStyle.ordinal,
+            selectedBoardStyleIndex,
             animate = false,
         )
         autoplayButton.setAutoplayEnabled(false, animate = false)

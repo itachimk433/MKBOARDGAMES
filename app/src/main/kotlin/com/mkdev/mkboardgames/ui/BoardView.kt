@@ -232,24 +232,24 @@ class BoardView(context: Context) : View(context) {
     // The two uploaded International Draughts boards are optimized to 1024px.
     // Their playable grids are inset inside the photographed wooden frames.
     private val internationalDarkDraughtsGridX = floatArrayOf(
-        64f / 1024f, 204f / 1024f, 344f / 1024f, 484f / 1024f,
-        624f / 1024f, 764f / 1024f, 904f / 1024f, 1044f / 1024f,
-        1188f / 1024f,
+        64f / 1024f, 176f / 1024f, 288f / 1024f, 400f / 1024f,
+        512f / 1024f, 624f / 1024f, 736f / 1024f, 848f / 1024f,
+        960f / 1024f,
     )
     private val internationalDarkDraughtsGridY = floatArrayOf(
-        60f / 1024f, 201f / 1024f, 341f / 1024f, 482f / 1024f,
-        622f / 1024f, 763f / 1024f, 903f / 1024f, 1044f / 1024f,
-        1189f / 1024f,
+        60f / 1024f, 172f / 1024f, 284f / 1024f, 396f / 1024f,
+        508f / 1024f, 620f / 1024f, 732f / 1024f, 844f / 1024f,
+        956f / 1024f,
     )
     private val internationalLightDraughtsGridX = floatArrayOf(
-        56f / 1024f, 202f / 1024f, 348f / 1024f, 494f / 1024f,
-        640f / 1024f, 786f / 1024f, 932f / 1024f, 1078f / 1024f,
-        1222f / 1024f,
+        57f / 1024f, 171f / 1024f, 285f / 1024f, 399f / 1024f,
+        513f / 1024f, 627f / 1024f, 741f / 1024f, 855f / 1024f,
+        969f / 1024f,
     )
     private val internationalLightDraughtsGridY = floatArrayOf(
-        56f / 1024f, 199f / 1024f, 342f / 1024f, 485f / 1024f,
-        628f / 1024f, 771f / 1024f, 914f / 1024f, 1057f / 1024f,
-        1200f / 1024f,
+        57f / 1024f, 170f / 1024f, 283f / 1024f, 396f / 1024f,
+        509f / 1024f, 622f / 1024f, 735f / 1024f, 848f / 1024f,
+        961f / 1024f,
     )
 
     private val xiangqiBoardBitmap: Bitmap? = try {
