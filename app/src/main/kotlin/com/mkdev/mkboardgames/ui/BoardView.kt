@@ -23,6 +23,7 @@ import com.mkdev.mkboardgames.games.foxandgeese.FoxAndGeesePieceType
 import com.mkdev.mkboardgames.games.go.GoPiece
 import com.mkdev.mkboardgames.games.go.GoRuleEngine
 import com.mkdev.mkboardgames.games.othello.OthelloPiece
+import com.mkdev.mkboardgames.games.othello.OthelloRuleEngine
 import com.mkdev.mkboardgames.games.shogi.ShogiPiece
 import com.mkdev.mkboardgames.games.shogi.ShogiRuleEngine
 import com.mkdev.mkboardgames.games.shogi.ShogiSetup
@@ -67,6 +68,13 @@ class BoardView(context: Context) : View(context) {
             invalidate()
         }
     var draughtsBoardStyle: DraughtsBoardStyle = DraughtsBoardStyle.CANVAS
+        set(value) {
+            if (field == value) return
+            field = value
+            refreshBoardStyleGeometry()
+            invalidate()
+        }
+    var othelloBoardStyle: OthelloBoardStyle = OthelloBoardStyle.CANVAS
         set(value) {
             if (field == value) return
             field = value
@@ -162,6 +170,22 @@ class BoardView(context: Context) : View(context) {
     private val goGridY = floatArrayOf(
         0.079f, 0.145f, 0.211f, 0.275f, 0.341f, 0.406f, 0.472f,
         0.537f, 0.603f, 0.667f, 0.733f, 0.798f, 0.866f,
+    )
+    private var othelloImageRect = RectF()
+    private var othelloCellWidth = 0f
+    private var othelloCellHeight = 0f
+    // Measured playable bounds of the supplied 1272x1236 green-felt board.
+    // Keep each boundary so the slight perspective in the photograph is
+    // shared by discs, highlights, animations, and touch conversion.
+    private val othelloGridX = floatArrayOf(
+        66f / 1272f, 207f / 1272f, 350f / 1272f, 492f / 1272f,
+        638f / 1272f, 780f / 1272f, 925f / 1272f, 1070f / 1272f,
+        1205f / 1272f,
+    )
+    private val othelloGridY = floatArrayOf(
+        55f / 1236f, 200f / 1236f, 342f / 1236f, 485f / 1236f,
+        626f / 1236f, 770f / 1236f, 912f / 1236f, 1050f / 1236f,
+        1183f / 1236f,
     )
     private var chessImageRect = RectF()
     private var chessCellWidth = 0f
@@ -297,6 +321,12 @@ class BoardView(context: Context) : View(context) {
     }
     private val internationalLightDraughtsBoardBitmap: Bitmap? = try {
         context.assets.open("international_draughts_board_light.jpg")
+            .use { BitmapFactory.decodeStream(it) }
+    } catch (_: Throwable) {
+        null
+    }
+    private val othelloBoardBitmap: Bitmap? = try {
+        context.assets.open("othello_board_green.webp")
             .use { BitmapFactory.decodeStream(it) }
     } catch (_: Throwable) {
         null
@@ -480,6 +510,29 @@ class BoardView(context: Context) : View(context) {
                 )
                 val gridSize = imageWidth * 0.832f
                 cellSize = gridSize / 12f
+                piecePaint.textSize = cellSize * 0.60f
+                mustCapturePaint.strokeWidth = cellSize * 0.055f
+            }
+            return
+        }
+        if (isOthelloImageBoard()) {
+            val bitmap = othelloBoardBitmap
+            if (bitmap != null) {
+                val scale = minOf(
+                    width.toFloat() / bitmap.width,
+                    height.toFloat() / bitmap.height,
+                )
+                val imageWidth = bitmap.width * scale
+                val imageHeight = bitmap.height * scale
+                othelloImageRect.set(
+                    (width - imageWidth) / 2f,
+                    (height - imageHeight) / 2f,
+                    (width + imageWidth) / 2f,
+                    (height + imageHeight) / 2f,
+                )
+                othelloCellWidth = (othelloLineX(8) - othelloLineX(0)) / 8f
+                othelloCellHeight = (othelloLineY(8) - othelloLineY(0)) / 8f
+                cellSize = minOf(othelloCellWidth, othelloCellHeight)
                 piecePaint.textSize = cellSize * 0.60f
                 mustCapturePaint.strokeWidth = cellSize * 0.055f
             }
@@ -747,6 +800,7 @@ class BoardView(context: Context) : View(context) {
         if (isShogiBoard()) return shogiPoint(pos)
         if (isXiangqiBoard()) return xiangqiPoint(pos)
         if (isGoBoard()) return goPoint(pos)
+        if (isOthelloImageBoard()) return othelloPoint(pos)
         if (isChessBoard()) return chessPoint(pos)
         if (isDraughtsImageBoard()) return draughtsPoint(pos)
         val last = gameState.boardSize - 1
@@ -790,6 +844,12 @@ class BoardView(context: Context) : View(context) {
             }
             drawGoHighlights(canvas)
             drawGoPieces(canvas)
+            return
+        }
+        if (isOthelloImageBoard()) {
+            drawOthelloBoard(canvas)
+            drawOthelloHighlights(canvas)
+            drawOthelloPieces(canvas)
             return
         }
         drawBoard(canvas); drawLabels(canvas); drawHighlights(canvas); drawPieces(canvas)
@@ -1314,6 +1374,64 @@ class BoardView(context: Context) : View(context) {
         if (lastMove != null && lastMove.metadata["pass"] != true) {
             val point = goPoint(lastMove.to)
             canvas.drawCircle(point.x, point.y, cellSize * 0.16f, highlightGold)
+        }
+    }
+
+    private fun drawOthelloBoard(canvas: Canvas) {
+        canvas.drawColor(Color.rgb(20, 20, 20))
+        othelloBoardBitmap?.let {
+            canvas.drawBitmap(
+                it,
+                null,
+                othelloImageRect,
+                Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG),
+            )
+        }
+    }
+
+    private fun drawOthelloHighlights(canvas: Canvas) {
+        gameState.lastMove?.let { drawOthelloCell(canvas, it.to, highlightGold) }
+        selectedPos?.let { drawOthelloCell(canvas, it, highlightBlue) }
+
+        val showHints = directMoveMode || SettingsManager.getShowHints(context)
+        if (showHints) {
+            legalMoves.forEach { move ->
+                val point = othelloPoint(move.to)
+                canvas.drawCircle(point.x, point.y, cellSize * 0.17f, dotPaint)
+            }
+        }
+    }
+
+    private fun drawOthelloCell(canvas: Canvas, position: Position, paint: Paint) {
+        val displayedCol = if (isFlipped) 7 - position.col else position.col
+        val displayedRow = if (isFlipped) 7 - position.row else position.row
+        canvas.drawRect(
+            othelloLineX(displayedCol),
+            othelloLineY(displayedRow),
+            othelloLineX(displayedCol + 1),
+            othelloLineY(displayedRow + 1),
+            paint,
+        )
+    }
+
+    private fun drawOthelloPieces(canvas: Canvas) {
+        val skipPos = animFromPos
+        for (row in 0 until gameState.boardSize) {
+            for (col in 0 until gameState.boardSize) {
+                val position = Position(row, col)
+                if (position == skipPos) continue
+                val piece = gameState.get(position) ?: continue
+                val point = othelloPoint(position)
+                drawPieceAt(canvas, piece, point.x, point.y, position)
+            }
+        }
+        animPiece?.let {
+            drawPieceAt(
+                canvas,
+                it,
+                lerp(animFromPx.x, animToPx.x, animProgress),
+                lerp(animFromPx.y, animToPx.y, animProgress),
+            )
         }
     }
 
@@ -2512,6 +2630,30 @@ class BoardView(context: Context) : View(context) {
 
     private fun isGoBoard(): Boolean = ruleEngine is GoRuleEngine
 
+    private fun isOthelloBoard(): Boolean =
+        ruleEngine is OthelloRuleEngine || gameState.board.any { it is OthelloPiece }
+
+    private fun isOthelloImageBoard(): Boolean =
+        isOthelloBoard() && othelloBitmap() != null
+
+    private fun othelloBitmap(): Bitmap? =
+        if (othelloBoardStyle == OthelloBoardStyle.GREEN_FELT) othelloBoardBitmap else null
+
+    private fun othelloPoint(position: Position): PointF {
+        val displayedRow = if (isFlipped) 7 - position.row else position.row
+        val displayedCol = if (isFlipped) 7 - position.col else position.col
+        return PointF(
+            (othelloLineX(displayedCol) + othelloLineX(displayedCol + 1)) / 2f,
+            (othelloLineY(displayedRow) + othelloLineY(displayedRow + 1)) / 2f,
+        )
+    }
+
+    private fun othelloLineX(index: Int): Float =
+        othelloImageRect.left + othelloImageRect.width() * othelloGridX[index]
+
+    private fun othelloLineY(index: Int): Float =
+        othelloImageRect.top + othelloImageRect.height() * othelloGridY[index]
+
     private fun isChessBoard(): Boolean =
         ruleEngine is ChessRuleEngine || gameState.board.any { it is ChessPiece }
 
@@ -2738,6 +2880,19 @@ class BoardView(context: Context) : View(context) {
             return Position(
                 if (isFlipped) 12 - displayedRow else displayedRow,
                 if (isFlipped) 12 - displayedCol else displayedCol,
+            )
+        }
+        if (isOthelloImageBoard()) {
+            if (othelloCellWidth <= 0f || othelloCellHeight <= 0f) return null
+            val displayedCol = (0 until 8).firstOrNull {
+                x >= othelloLineX(it) && x < othelloLineX(it + 1)
+            } ?: return null
+            val displayedRow = (0 until 8).firstOrNull {
+                y >= othelloLineY(it) && y < othelloLineY(it + 1)
+            } ?: return null
+            return Position(
+                if (isFlipped) 7 - displayedRow else displayedRow,
+                if (isFlipped) 7 - displayedCol else displayedCol,
             )
         }
         val col = ((x - boardLeft) / cellSize).toInt()
