@@ -21,7 +21,10 @@ class MorabaraBoardView(context: Context) : View(context) {
         set(value) { field = value; refreshMoves(); invalidate() }
 
     var ruleEngine: MorabarabaRuleEngine? = null
-        set(value) { field = value; if (value != null) updateVariant() }
+        set(value) {
+            field = value
+            if (value != null) updateVariant()
+        }
 
     var onMoveMade: ((Move) -> Unit)? = null
     /** Called when the board is tapped and the game is already over. */
@@ -29,6 +32,17 @@ class MorabaraBoardView(context: Context) : View(context) {
     var isLocked: Boolean = false
     var playerColor: PieceColor = PieceColor.WHITE
     var vsAI: Boolean = false
+    var boardStyle: MorabarabaBoardStyle = MorabarabaBoardStyle.CANVAS
+        set(value) {
+            val safeValue = if (ruleEngine?.pieceCount == 6) {
+                MorabarabaBoardStyle.CANVAS
+            } else {
+                value
+            }
+            if (field == safeValue) return
+            field = safeValue
+            invalidate()
+        }
 
     // ─── Internal ─────────────────────────────────────────────────────────────
     private var legalMoves:   List<Move> = emptyList()
@@ -44,6 +58,7 @@ class MorabaraBoardView(context: Context) : View(context) {
 
     private fun updateVariant() {
         val eng = ruleEngine ?: return
+        if (eng.pieceCount == 6) boardStyle = MorabarabaBoardStyle.CANVAS
         activePosCount = eng.activePositions.size
         activeAdj      = eng.activeAdjacency
         activePosList  = eng.activePositions
@@ -77,6 +92,24 @@ class MorabaraBoardView(context: Context) : View(context) {
     private var boardLeft = 0f
     private var boardTop  = 0f
     private var cellSize  = 0f
+    private val realisticBoardRect = RectF()
+    private val realisticBoardPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+    private val realisticBoardBitmap: Bitmap? = try {
+        context.assets.open("morabaraba_board_wood.webp")
+            .use { BitmapFactory.decodeStream(it) }
+    } catch (_: Throwable) {
+        null
+    }
+    // Measured from the supplied 1254px square board. These are the centres
+    // of each playable coordinate in the photographed three-ring layout.
+    private val realisticGridX = floatArrayOf(
+        130f / 1254f, 249f / 1254f, 358f / 1254f, 511f / 1254f,
+        666f / 1254f, 774f / 1254f, 893f / 1254f,
+    )
+    private val realisticGridY = floatArrayOf(
+        120f / 1254f, 230f / 1254f, 350f / 1254f, 511f / 1254f,
+        679f / 1254f, 789f / 1254f, 901f / 1254f,
+    )
 
     // ─── Paints ───────────────────────────────────────────────────────────────
     private val bgPaint       = Paint().apply { color = Color.parseColor("#0E0E0E") }
@@ -136,6 +169,7 @@ class MorabaraBoardView(context: Context) : View(context) {
         cellSize  = size / 6f
         boardLeft = (w - size) / 2f
         boardTop  = (h - size) / 2f
+        realisticBoardRect.set(boardLeft, boardTop, boardLeft + size, boardTop + size)
         linePaint.strokeWidth      = cellSize * 0.04f
         nodeRingPaint.strokeWidth  = cellSize * 0.04f
         selectPaint.strokeWidth    = cellSize * 0.10f
@@ -147,6 +181,12 @@ class MorabaraBoardView(context: Context) : View(context) {
     // ─── Coordinate helpers ───────────────────────────────────────────────────
     private fun nodeCenter(idx: Int): PointF {
         val pos = activePosList[idx]
+        if (isRealisticBoard()) {
+            return PointF(
+                realisticBoardRect.left + realisticBoardRect.width() * realisticGridX[pos.col],
+                realisticBoardRect.top + realisticBoardRect.height() * realisticGridY[pos.row],
+            )
+        }
         return PointF(boardLeft + pos.col * cellSize, boardTop + pos.row * cellSize)
     }
 
@@ -227,7 +267,11 @@ class MorabaraBoardView(context: Context) : View(context) {
             animFrom = nodeCenter(fromIdx); animTo = nodeCenter(toIdx); animNode = fromIdx
         } else {
             if (toIdx < 0) { isLocked=false; onMoveMade?.invoke(move); return }
-            animFrom = PointF(boardLeft + 3*cellSize, boardTop + 3*cellSize)
+            animFrom = if (isRealisticBoard()) {
+                PointF(realisticBoardRect.centerX(), realisticBoardRect.centerY())
+            } else {
+                PointF(boardLeft + 3*cellSize, boardTop + 3*cellSize)
+            }
             animTo   = nodeCenter(toIdx); animNode = -2
         }
         animColor=color; animProgress=0f; pendingMove=move; isLocked=true
@@ -311,8 +355,18 @@ class MorabaraBoardView(context: Context) : View(context) {
     // ─── Drawing ─────────────────────────────────────────────────────────────
     override fun onDraw(canvas: Canvas) {
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
-        drawLines(canvas); drawHighlights(canvas); drawNodes(canvas)
+        drawBoard(canvas); drawHighlights(canvas); drawNodes(canvas)
         drawPieces(canvas); drawCaptureFlash(canvas); drawAnimPiece(canvas); drawMillBanner(canvas)
+    }
+
+    private fun drawBoard(canvas: Canvas) {
+        if (isRealisticBoard()) {
+            realisticBoardBitmap?.let {
+                canvas.drawBitmap(it, null, realisticBoardRect, realisticBoardPaint)
+            }
+            return
+        }
+        drawLines(canvas)
     }
 
     private fun drawLines(canvas: Canvas) {
@@ -342,6 +396,7 @@ class MorabaraBoardView(context: Context) : View(context) {
     }
 
     private fun drawNodes(canvas: Canvas) {
+        if (isRealisticBoard()) return
         for (i in 0 until activePosCount) {
             if (gameState.get(activePosList[i])==null && i!=animNode) {
                 val c=nodeCenter(i)
@@ -393,13 +448,59 @@ class MorabaraBoardView(context: Context) : View(context) {
         canvas.drawText(millBannerText, cx, cy, bannerTextPaint)
     }
 
+    private fun isRealisticBoard(): Boolean =
+        boardStyle == MorabarabaBoardStyle.REALISTIC_WOOD &&
+            activePosCount == MorabarabaBoard.POSITIONS.size &&
+            realisticBoardBitmap != null
+
     private fun drawDisc(canvas: Canvas, color: PieceColor, cx: Float, cy: Float) {
-        val r=cellSize*.36f
-        canvas.drawCircle(cx+1.5f, cy+2.5f, r, shadowPaint)
-        val fill=if (color==PieceColor.WHITE) whitePiecePaint else blackPiecePaint
+        val r = cellSize * if (isRealisticBoard()) .31f else .36f
+        canvas.drawCircle(cx + r * .08f, cy + r * .13f, r, shadowPaint)
+
+        val fill = if (color == PieceColor.WHITE) whitePiecePaint else blackPiecePaint
+        val colors = if (color == PieceColor.WHITE) {
+            intArrayOf(
+                Color.parseColor("#FFFDF7"),
+                Color.parseColor("#E7DED0"),
+                Color.parseColor("#A79A88"),
+            )
+        } else {
+            intArrayOf(
+                Color.parseColor("#5A514A"),
+                Color.parseColor("#221F1D"),
+                Color.parseColor("#050505"),
+            )
+        }
+        fill.shader = RadialGradient(
+            cx - r * .30f,
+            cy - r * .34f,
+            r * 1.34f,
+            colors,
+            floatArrayOf(0f, .52f, 1f),
+            Shader.TileMode.CLAMP,
+        )
         canvas.drawCircle(cx, cy, r, fill)
+        fill.shader = null
+
+        pieceRingPaint.color = if (color == PieceColor.WHITE) {
+            Color.parseColor("#8B7E6C")
+        } else {
+            Color.parseColor("#0A0908")
+        }
+        pieceRingPaint.strokeWidth = r * .075f
         canvas.drawCircle(cx, cy, r, pieceRingPaint)
-        canvas.drawCircle(cx, cy, r*.68f, pieceRingPaint)
+
+        val highlightPaint = if (color == PieceColor.WHITE) whitePiecePaint else blackPiecePaint
+        highlightPaint.shader = RadialGradient(
+            cx - r * .35f,
+            cy - r * .40f,
+            r * .58f,
+            Color.argb(125, 255, 255, 255),
+            Color.TRANSPARENT,
+            Shader.TileMode.CLAMP,
+        )
+        canvas.drawCircle(cx - r * .14f, cy - r * .16f, r * .34f, highlightPaint)
+        highlightPaint.shader = null
     }
 
     private fun lerp(a: Float, b: Float, t: Float) = a+(b-a)*t

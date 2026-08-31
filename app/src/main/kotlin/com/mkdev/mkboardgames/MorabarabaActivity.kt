@@ -15,7 +15,9 @@ import com.mkdev.mkboardgames.games.morabaraba.MorabarabaRuleEngine
 import com.mkdev.mkboardgames.ui.CaptureStripView
 import com.mkdev.mkboardgames.ui.ChessChoiceView
 import com.mkdev.mkboardgames.ui.ChessRulesView
+import com.mkdev.mkboardgames.ui.BoardStyleSwitchView
 import com.mkdev.mkboardgames.ui.MorabaraBoardView
+import com.mkdev.mkboardgames.ui.MorabarabaBoardStyle
 import com.mkdev.mkboardgames.ui.isFullScreenStyledGameLabel
 import kotlinx.coroutines.*
 
@@ -29,6 +31,7 @@ class MorabarabaActivity : AppCompatActivity() {
     private lateinit var hudView:           MorabarabaHudView
     private lateinit var topCaptureView:    CaptureStripView
     private lateinit var bottomCaptureView: CaptureStripView
+    private lateinit var boardStyleSwitch:  BoardStyleSwitchView
     private lateinit var gameRoot: View
     private var engine:                     MorabarabaRuleEngine = MorabarabaRuleEngine()
     private var gameState:                  GameState = GameState(arrayOfNulls(49), boardSize = 7)
@@ -37,6 +40,7 @@ class MorabarabaActivity : AppCompatActivity() {
     private var matchStarted                = false
     private var activityResumed             = false
     private var pieceCount                  = 12
+    private var boardStyleSwitchEnabled    = false
     private val scope                       = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private val moveHistory                 = ArrayDeque<GameState>()
     private var aiJob: Job?                 = null
@@ -69,15 +73,24 @@ class MorabarabaActivity : AppCompatActivity() {
         hudView          = MorabarabaHudView(this)
         topCaptureView   = CaptureStripView(this).also { it.dividerOnTop = false }
         boardView        = MorabaraBoardView(this)
+        boardStyleSwitch = BoardStyleSwitchView(this)
         bottomCaptureView = CaptureStripView(this).also { it.dividerOnTop = true }
 
         val hudH = (82 * dp).toInt()
         val capH = (36 * dp).toInt()
+        val boardStyleSwitchH = (44 * dp).toInt()
+
+        boardStyleSwitch.onStyleChanged = { styleIndex ->
+            boardView.boardStyle = MorabarabaBoardStyle.entries
+                .getOrElse(styleIndex) { MorabarabaBoardStyle.CANVAS }
+        }
 
         root.addView(hudView,          LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, hudH))
         root.addView(topCaptureView,   LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, capH))
+        root.addView(boardStyleSwitch, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, boardStyleSwitchH))
         root.addView(boardView,        LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0).apply { weight = 1f })
         root.addView(bottomCaptureView, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, capH))
+        boardStyleSwitch.visibility = View.GONE
 
         AdManager.attachBanner(root)
         gameRoot = root
@@ -290,6 +303,11 @@ class MorabarabaActivity : AppCompatActivity() {
         engine                 = MorabarabaRuleEngine(pieceCount)
         gameState              = engine.initialState()
         boardView.ruleEngine   = engine
+        boardStyleSwitchEnabled = pieceCount != 6
+        boardView.boardStyle = MorabarabaBoardStyle.CANVAS
+        boardStyleSwitch.visibility = if (boardStyleSwitchEnabled) View.VISIBLE else View.GONE
+        boardStyleSwitch.setStyleCount(MorabarabaBoardStyle.entries.size)
+        boardStyleSwitch.setSelectedIndex(boardView.boardStyle.ordinal, animate = false)
         boardView.gameState    = gameState
         boardView.playerColor  = playerColor
         boardView.vsAI         = vsAI
