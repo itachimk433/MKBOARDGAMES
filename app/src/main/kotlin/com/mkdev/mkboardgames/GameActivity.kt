@@ -53,6 +53,7 @@ class GameActivity : AppCompatActivity() {
     private lateinit var gameType:         String
     private lateinit var gameContainer:    View
     private val internationalDraughtsStyles = arrayOf(
+        DraughtsBoardStyle.CANVAS,
         DraughtsBoardStyle.INTERNATIONAL_DARK_WOOD,
         DraughtsBoardStyle.INTERNATIONAL_LIGHT_WOOD,
     )
@@ -204,7 +205,9 @@ class GameActivity : AppCompatActivity() {
             when {
                 gameType == "CHESS" -> ChessBoardStyle.entries.size
                 isInternationalDraughts -> internationalDraughtsStyles.size
-                isDraughtsGame -> DraughtsBoardStyle.entries.size - internationalDraughtsStyles.size
+                isDraughtsGame ->
+                    DraughtsBoardStyle.entries.size -
+                        internationalDraughtsStyles.count { it != DraughtsBoardStyle.CANVAS }
                 else -> ChessBoardStyle.entries.size
             },
         )
