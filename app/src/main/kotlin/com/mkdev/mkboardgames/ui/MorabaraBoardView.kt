@@ -41,6 +41,7 @@ class MorabaraBoardView(context: Context) : View(context) {
             }
             if (field == safeValue) return
             field = safeValue
+            if (width > 0 && height > 0) updateGeometry(width, height)
             invalidate()
         }
 
@@ -100,15 +101,16 @@ class MorabaraBoardView(context: Context) : View(context) {
     } catch (_: Throwable) {
         null
     }
-    // Measured from the supplied 1254px square board. These are the centres
-    // of each playable coordinate in the photographed three-ring layout.
+    // Measured from the supplied board after it is resized to the 1024px
+    // optimized asset. These are the centres of each playable coordinate in
+    // the photographed three-ring layout.
     private val realisticGridX = floatArrayOf(
-        130f / 1254f, 249f / 1254f, 358f / 1254f, 511f / 1254f,
-        666f / 1254f, 774f / 1254f, 893f / 1254f,
+        130f / 1024f, 249f / 1024f, 358f / 1024f, 511f / 1024f,
+        666f / 1024f, 774f / 1024f, 893f / 1024f,
     )
     private val realisticGridY = floatArrayOf(
-        120f / 1254f, 230f / 1254f, 350f / 1254f, 511f / 1254f,
-        679f / 1254f, 789f / 1254f, 901f / 1254f,
+        120f / 1024f, 230f / 1024f, 350f / 1024f, 511f / 1024f,
+        679f / 1024f, 789f / 1024f, 901f / 1024f,
     )
 
     // ─── Paints ───────────────────────────────────────────────────────────────
@@ -163,8 +165,12 @@ class MorabaraBoardView(context: Context) : View(context) {
 
     // ─── Size ────────────────────────────────────────────────────────────────
     override fun onSizeChanged(w: Int, h: Int, ow: Int, oh: Int) {
+        updateGeometry(w, h)
+    }
+
+    private fun updateGeometry(w: Int, h: Int) {
         val dp = resources.displayMetrics.density
-        val pad = 24f * dp
+        val pad = (if (isRealisticBoard()) 8f else 24f) * dp
         val size = minOf(w.toFloat() - pad * 2, h.toFloat() - pad * 2)
         cellSize  = size / 6f
         boardLeft = (w - size) / 2f
