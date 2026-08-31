@@ -151,7 +151,8 @@ class GameActivity : AppCompatActivity() {
         boardStyleSwitch.onStyleChanged = { styleIndex ->
             when (gameType) {
                 "CHESS" -> boardView.chessBoardStyle = ChessBoardStyle.entries[styleIndex]
-                "CHECKERS" -> boardView.draughtsBoardStyle = DraughtsBoardStyle.entries[styleIndex]
+                "CHECKERS", "INTERNATIONAL_DRAUGHTS" ->
+                    boardView.draughtsBoardStyle = DraughtsBoardStyle.entries[styleIndex]
             }
         }
         boardView.onEmptySpaceTapped = ::revealBoardStyleSwitch
@@ -183,13 +184,15 @@ class GameActivity : AppCompatActivity() {
         gameState = engine.initialState()
         boardView.ruleEngine = engine
         boardView.gameState = gameState
-        boardStyleSwitchEnabled = gameType == "CHESS" || gameType == "CHECKERS"
+        val isDraughtsGame =
+            gameType == "CHECKERS" || gameType == "INTERNATIONAL_DRAUGHTS"
+        boardStyleSwitchEnabled = gameType == "CHESS" || isDraughtsGame
         boardStyleSwitch.setStyleCount(
-            if (gameType == "CHECKERS") DraughtsBoardStyle.entries.size
+            if (isDraughtsGame) DraughtsBoardStyle.entries.size
             else ChessBoardStyle.entries.size,
         )
         boardStyleSwitch.setSelectedIndex(
-            if (gameType == "CHECKERS") boardView.draughtsBoardStyle.ordinal
+            if (isDraughtsGame) boardView.draughtsBoardStyle.ordinal
             else boardView.chessBoardStyle.ordinal,
             animate = false,
         )

@@ -229,6 +229,28 @@ class BoardView(context: Context) : View(context) {
         512f / 1024f, 625f / 1024f, 738f / 1024f, 851f / 1024f,
         964f / 1024f,
     )
+    // The two uploaded International Draughts boards are optimized to 1024px.
+    // Their playable grids are inset inside the photographed wooden frames.
+    private val internationalDarkDraughtsGridX = floatArrayOf(
+        64f / 1024f, 204f / 1024f, 344f / 1024f, 484f / 1024f,
+        624f / 1024f, 764f / 1024f, 904f / 1024f, 1044f / 1024f,
+        1188f / 1024f,
+    )
+    private val internationalDarkDraughtsGridY = floatArrayOf(
+        60f / 1024f, 201f / 1024f, 341f / 1024f, 482f / 1024f,
+        622f / 1024f, 763f / 1024f, 903f / 1024f, 1044f / 1024f,
+        1189f / 1024f,
+    )
+    private val internationalLightDraughtsGridX = floatArrayOf(
+        56f / 1024f, 202f / 1024f, 348f / 1024f, 494f / 1024f,
+        640f / 1024f, 786f / 1024f, 932f / 1024f, 1078f / 1024f,
+        1222f / 1024f,
+    )
+    private val internationalLightDraughtsGridY = floatArrayOf(
+        56f / 1024f, 199f / 1024f, 342f / 1024f, 485f / 1024f,
+        628f / 1024f, 771f / 1024f, 914f / 1024f, 1057f / 1024f,
+        1200f / 1024f,
+    )
 
     private val xiangqiBoardBitmap: Bitmap? = try {
         context.assets.open("xiangqi_board.webp").use { BitmapFactory.decodeStream(it) }
@@ -263,6 +285,18 @@ class BoardView(context: Context) : View(context) {
     }
     private val draughtsBoardBitmap: Bitmap? = try {
         context.assets.open("draughts_board_red_black.png").use { BitmapFactory.decodeStream(it) }
+    } catch (_: Throwable) {
+        null
+    }
+    private val internationalDarkDraughtsBoardBitmap: Bitmap? = try {
+        context.assets.open("international_draughts_board_dark.jpg")
+            .use { BitmapFactory.decodeStream(it) }
+    } catch (_: Throwable) {
+        null
+    }
+    private val internationalLightDraughtsBoardBitmap: Bitmap? = try {
+        context.assets.open("international_draughts_board_light.jpg")
+            .use { BitmapFactory.decodeStream(it) }
     } catch (_: Throwable) {
         null
     }
@@ -2493,6 +2527,8 @@ class BoardView(context: Context) : View(context) {
         DraughtsBoardStyle.SUPPLIED_WOOD -> suppliedChessBoardBitmap
         DraughtsBoardStyle.REALISTIC_BLACK_WHITE -> realisticChessBoardBitmap
         DraughtsBoardStyle.BLACK_WHITE -> blackWhiteChessBoardBitmap
+        DraughtsBoardStyle.INTERNATIONAL_DARK_WOOD -> internationalDarkDraughtsBoardBitmap
+        DraughtsBoardStyle.INTERNATIONAL_LIGHT_WOOD -> internationalLightDraughtsBoardBitmap
     }
 
     private fun draughtsGridX(): FloatArray = when (draughtsBoardStyle) {
@@ -2501,6 +2537,8 @@ class BoardView(context: Context) : View(context) {
         DraughtsBoardStyle.CLASSIC_WOOD -> classicChessGridX
         DraughtsBoardStyle.REALISTIC_BLACK_WHITE -> realisticChessGridX
         DraughtsBoardStyle.BLACK_WHITE -> blackWhiteChessGridX
+        DraughtsBoardStyle.INTERNATIONAL_DARK_WOOD -> internationalDarkDraughtsGridX
+        DraughtsBoardStyle.INTERNATIONAL_LIGHT_WOOD -> internationalLightDraughtsGridX
         DraughtsBoardStyle.CANVAS -> floatArrayOf()
     }
 
@@ -2510,6 +2548,8 @@ class BoardView(context: Context) : View(context) {
         DraughtsBoardStyle.CLASSIC_WOOD -> classicChessGridY
         DraughtsBoardStyle.REALISTIC_BLACK_WHITE -> realisticChessGridY
         DraughtsBoardStyle.BLACK_WHITE -> blackWhiteChessGridY
+        DraughtsBoardStyle.INTERNATIONAL_DARK_WOOD -> internationalDarkDraughtsGridY
+        DraughtsBoardStyle.INTERNATIONAL_LIGHT_WOOD -> internationalLightDraughtsGridY
         DraughtsBoardStyle.CANVAS -> floatArrayOf()
     }
 
