@@ -2622,10 +2622,18 @@ class BoardView(context: Context) : View(context) {
     }
 
     private fun draughtsLineX(index: Int): Float =
-        draughtsImageRect.left + draughtsImageRect.width() * draughtsGridX()[index]
+        if (isDraughtsImageBoard()) {
+            draughtsImageRect.left + draughtsImageRect.width() * draughtsGridX()[index]
+        } else {
+            boardLeft + index * cellSize
+        }
 
     private fun draughtsLineY(index: Int): Float =
-        draughtsImageRect.top + draughtsImageRect.height() * draughtsGridY()[index]
+        if (isDraughtsImageBoard()) {
+            draughtsImageRect.top + draughtsImageRect.height() * draughtsGridY()[index]
+        } else {
+            boardTop + index * cellSize
+        }
 
     private fun shogiPoint(position: Position): PointF {
         val displayedRow = if (isFlipped) 8 - position.row else position.row
