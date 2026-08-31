@@ -230,26 +230,27 @@ class BoardView(context: Context) : View(context) {
         964f / 1024f,
     )
     // The two uploaded International Draughts boards are optimized to 1024px.
-    // Their playable grids are inset inside the photographed wooden frames.
+    // Both photographs contain a 10x10 playable grid inset inside the wooden
+    // frame. Keep each board's measured boundaries separate.
     private val internationalDarkDraughtsGridX = floatArrayOf(
-        64f / 1024f, 176f / 1024f, 288f / 1024f, 400f / 1024f,
-        512f / 1024f, 624f / 1024f, 736f / 1024f, 848f / 1024f,
-        960f / 1024f,
+        64f / 1024f, 153f / 1024f, 243f / 1024f, 333f / 1024f,
+        423f / 1024f, 512f / 1024f, 601f / 1024f, 691f / 1024f,
+        781f / 1024f, 870f / 1024f, 960f / 1024f,
     )
     private val internationalDarkDraughtsGridY = floatArrayOf(
-        60f / 1024f, 172f / 1024f, 284f / 1024f, 396f / 1024f,
-        508f / 1024f, 620f / 1024f, 732f / 1024f, 844f / 1024f,
-        956f / 1024f,
+        60f / 1024f, 151f / 1024f, 241f / 1024f, 331f / 1024f,
+        421f / 1024f, 510f / 1024f, 599f / 1024f, 688f / 1024f,
+        777f / 1024f, 867f / 1024f, 956f / 1024f,
     )
     private val internationalLightDraughtsGridX = floatArrayOf(
-        57f / 1024f, 171f / 1024f, 285f / 1024f, 399f / 1024f,
-        513f / 1024f, 627f / 1024f, 741f / 1024f, 855f / 1024f,
-        969f / 1024f,
+        57f / 1024f, 145f / 1024f, 236f / 1024f, 328f / 1024f,
+        419f / 1024f, 510f / 1024f, 602f / 1024f, 694f / 1024f,
+        785f / 1024f, 877f / 1024f, 969f / 1024f,
     )
     private val internationalLightDraughtsGridY = floatArrayOf(
-        57f / 1024f, 170f / 1024f, 283f / 1024f, 396f / 1024f,
-        509f / 1024f, 622f / 1024f, 735f / 1024f, 848f / 1024f,
-        961f / 1024f,
+        57f / 1024f, 145f / 1024f, 235f / 1024f, 326f / 1024f,
+        417f / 1024f, 508f / 1024f, 599f / 1024f, 690f / 1024f,
+        780f / 1024f, 871f / 1024f, 961f / 1024f,
     )
 
     private val xiangqiBoardBitmap: Bitmap? = try {
@@ -540,10 +541,11 @@ class BoardView(context: Context) : View(context) {
                     (width + imageWidth) / 2f,
                     (height + imageHeight) / 2f,
                 )
+                val boardDimension = gameState.boardSize
                 draughtsCellWidth =
-                    (draughtsLineX(8) - draughtsLineX(0)) / 8f
+                    (draughtsLineX(boardDimension) - draughtsLineX(0)) / boardDimension
                 draughtsCellHeight =
-                    (draughtsLineY(8) - draughtsLineY(0)) / 8f
+                    (draughtsLineY(boardDimension) - draughtsLineY(0)) / boardDimension
                 cellSize = minOf(draughtsCellWidth, draughtsCellHeight)
                 piecePaint.textSize = cellSize * 0.60f
                 mustCapturePaint.strokeWidth = cellSize * 0.055f
@@ -944,8 +946,9 @@ class BoardView(context: Context) : View(context) {
     }
 
     private fun drawDraughtsCell(canvas: Canvas, position: Position, paint: Paint) {
-        val displayedCol = if (isFlipped) 7 - position.col else position.col
-        val displayedRow = if (isFlipped) 7 - position.row else position.row
+        val last = gameState.boardSize - 1
+        val displayedCol = if (isFlipped) last - position.col else position.col
+        val displayedRow = if (isFlipped) last - position.row else position.row
         canvas.drawRect(
             draughtsLineX(displayedCol),
             draughtsLineY(displayedRow),
@@ -2613,8 +2616,9 @@ class BoardView(context: Context) : View(context) {
         }
 
     private fun draughtsPoint(position: Position): PointF {
-        val displayedRow = if (isFlipped) 7 - position.row else position.row
-        val displayedCol = if (isFlipped) 7 - position.col else position.col
+        val last = gameState.boardSize - 1
+        val displayedRow = if (isFlipped) last - position.row else position.row
+        val displayedCol = if (isFlipped) last - position.col else position.col
         return PointF(
             (draughtsLineX(displayedCol) + draughtsLineX(displayedCol + 1)) / 2f,
             (draughtsLineY(displayedRow) + draughtsLineY(displayedRow + 1)) / 2f,
@@ -2675,15 +2679,17 @@ class BoardView(context: Context) : View(context) {
         }
         if (isDraughtsImageBoard()) {
             if (draughtsCellWidth <= 0f || draughtsCellHeight <= 0f) return null
-            val displayedCol = (0 until 8).firstOrNull {
+            val boardDimension = gameState.boardSize
+            val displayedCol = (0 until boardDimension).firstOrNull {
                 x >= draughtsLineX(it) && x < draughtsLineX(it + 1)
             } ?: return null
-            val displayedRow = (0 until 8).firstOrNull {
+            val displayedRow = (0 until boardDimension).firstOrNull {
                 y >= draughtsLineY(it) && y < draughtsLineY(it + 1)
             } ?: return null
+            val last = boardDimension - 1
             return Position(
-                if (isFlipped) 7 - displayedRow else displayedRow,
-                if (isFlipped) 7 - displayedCol else displayedCol,
+                if (isFlipped) last - displayedRow else displayedRow,
+                if (isFlipped) last - displayedCol else displayedCol,
             )
         }
         if (isShogiBoard()) {
