@@ -35,6 +35,7 @@ import com.mkdev.mkboardgames.ui.ChessBoardStyle
 import com.mkdev.mkboardgames.ui.DraughtsBoardStyle
 import com.mkdev.mkboardgames.ui.FoxAndGeeseBoardStyle
 import com.mkdev.mkboardgames.ui.OthelloBoardStyle
+import com.mkdev.mkboardgames.ui.ShogiBoardStyle
 import com.mkdev.mkboardgames.ui.StyledDialogs
 import com.mkdev.mkboardgames.ui.XiangqiBoardStyle
 import kotlinx.coroutines.*
@@ -185,6 +186,8 @@ class GameActivity : AppCompatActivity() {
                 "XIANGQI" ->
                     boardView.xiangqiBoardStyle =
                         xiangqiStyles.getOrElse(styleIndex) { xiangqiStyles.first() }
+                "SHOGI" ->
+                    boardView.shogiBoardStyle = ShogiBoardStyle.entries[styleIndex]
             }
         }
         boardView.onEmptySpaceTapped = ::revealBoardStyleSwitch
@@ -225,7 +228,7 @@ class GameActivity : AppCompatActivity() {
         boardStyleSwitchEnabled =
             gameType == "CHESS" || isDraughtsGame ||
                 gameType == "OTHELLO" || gameType == "FOX_AND_GEESE" ||
-                gameType == "XIANGQI"
+                gameType == "XIANGQI" || gameType == "SHOGI"
         boardStyleSwitch.setStyleCount(
             when {
                 gameType == "CHESS" -> ChessBoardStyle.entries.size
@@ -236,6 +239,7 @@ class GameActivity : AppCompatActivity() {
                 gameType == "OTHELLO" -> OthelloBoardStyle.entries.size
                 gameType == "FOX_AND_GEESE" -> foxAndGeeseStyles.size
                 gameType == "XIANGQI" -> xiangqiStyles.size
+                gameType == "SHOGI" -> ShogiBoardStyle.entries.size
                 else -> ChessBoardStyle.entries.size
             },
         )
@@ -249,6 +253,7 @@ class GameActivity : AppCompatActivity() {
                 foxAndGeeseStyles.indexOf(boardView.foxAndGeeseBoardStyle).coerceAtLeast(0)
             gameType == "XIANGQI" ->
                 xiangqiStyles.indexOf(boardView.xiangqiBoardStyle).coerceAtLeast(0)
+            gameType == "SHOGI" -> boardView.shogiBoardStyle.ordinal
             else -> boardView.chessBoardStyle.ordinal
         }
         boardStyleSwitch.setSelectedIndex(

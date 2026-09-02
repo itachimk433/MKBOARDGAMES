@@ -94,6 +94,13 @@ class BoardView(context: Context) : View(context) {
             refreshBoardStyleGeometry()
             invalidate()
         }
+    var shogiBoardStyle: ShogiBoardStyle = ShogiBoardStyle.CLASSIC
+        set(value) {
+            if (field == value) return
+            field = value
+            refreshBoardStyleGeometry()
+            invalidate()
+        }
     var onPromotionChoice: ((List<Move>) -> Unit)? = null
 
     // ─── Selection ───────────────────────────────────────────────────────────
@@ -161,13 +168,21 @@ class BoardView(context: Context) : View(context) {
     // its nine columns and rows are not perfectly uniform. Keep the measured
     // grid lines in image-relative coordinates so pieces sit in the visual
     // centre of each box instead of drifting across the board.
-    private val shogiGridX = floatArrayOf(
+    private val classicShogiGridX = floatArrayOf(
         35f / 1190f, 161f / 1190f, 290f / 1190f, 414f / 1190f, 540f / 1190f,
         668f / 1190f, 793f / 1190f, 917f / 1190f, 1041f / 1190f, 1162f / 1190f,
     )
-    private val shogiGridY = floatArrayOf(
+    private val classicShogiGridY = floatArrayOf(
         35f / 1322f, 178f / 1322f, 317f / 1322f, 456f / 1322f, 596f / 1322f,
         735f / 1322f, 876f / 1322f, 1015f / 1322f, 1154f / 1322f, 1290f / 1322f,
+    )
+    private val woodShogiGridX = floatArrayOf(
+        35f / 1191f, 161f / 1191f, 290f / 1191f, 414f / 1191f, 540f / 1191f,
+        668f / 1191f, 793f / 1191f, 917f / 1191f, 1041f / 1191f, 1162f / 1191f,
+    )
+    private val woodShogiGridY = floatArrayOf(
+        35f / 1321f, 178f / 1321f, 317f / 1321f, 456f / 1321f, 596f / 1321f,
+        735f / 1321f, 876f / 1321f, 1015f / 1321f, 1154f / 1321f, 1290f / 1321f,
     )
     private var xiangqiImageRect = RectF()
     private var xiangqiGridLeft = 0f
@@ -328,8 +343,13 @@ class BoardView(context: Context) : View(context) {
     } catch (_: Throwable) {
         null
     }
-    private val shogiBoardBitmap: Bitmap? = try {
+    private val classicShogiBoardBitmap: Bitmap? = try {
         context.assets.open("shogi_board.webp").use { BitmapFactory.decodeStream(it) }
+    } catch (_: Throwable) {
+        null
+    }
+    private val woodShogiBoardBitmap: Bitmap? = try {
+        context.assets.open("shogi_board_wood.webp").use { BitmapFactory.decodeStream(it) }
     } catch (_: Throwable) {
         null
     }
@@ -532,7 +552,7 @@ class BoardView(context: Context) : View(context) {
             return
         }
         if (isShogiBoard()) {
-            val bitmap = shogiBoardBitmap
+            val bitmap = shogiBitmap()
             if (bitmap != null) {
                 val scale = minOf(
                     width.toFloat() / bitmap.width,
@@ -1169,7 +1189,7 @@ class BoardView(context: Context) : View(context) {
 
     private fun drawShogiBoard(canvas: Canvas) {
         canvas.drawColor(Color.rgb(20, 20, 20))
-        shogiBoardBitmap?.let {
+        shogiBitmap()?.let {
             canvas.drawBitmap(it, null, shogiImageRect, Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
         }
     }
@@ -2865,6 +2885,21 @@ class BoardView(context: Context) : View(context) {
     private fun isShogiBoard(): Boolean =
         ruleEngine is ShogiRuleEngine || gameState.board.any { it is ShogiPiece }
 
+    private fun shogiBitmap(): Bitmap? = when (shogiBoardStyle) {
+        ShogiBoardStyle.CLASSIC -> classicShogiBoardBitmap
+        ShogiBoardStyle.WOOD -> woodShogiBoardBitmap
+    }
+
+    private fun shogiGridX(): FloatArray = when (shogiBoardStyle) {
+        ShogiBoardStyle.CLASSIC -> classicShogiGridX
+        ShogiBoardStyle.WOOD -> woodShogiGridX
+    }
+
+    private fun shogiGridY(): FloatArray = when (shogiBoardStyle) {
+        ShogiBoardStyle.CLASSIC -> classicShogiGridY
+        ShogiBoardStyle.WOOD -> woodShogiGridY
+    }
+
     private fun isGoBoard(): Boolean = ruleEngine is GoRuleEngine
 
     private fun isOthelloBoard(): Boolean =
@@ -3060,10 +3095,10 @@ class BoardView(context: Context) : View(context) {
     }
 
     private fun shogiLineX(index: Int): Float =
-        shogiImageRect.left + shogiImageRect.width() * shogiGridX[index]
+        shogiImageRect.left + shogiImageRect.width() * shogiGridX()[index]
 
     private fun shogiLineY(index: Int): Float =
-        shogiImageRect.top + shogiImageRect.height() * shogiGridY[index]
+        shogiImageRect.top + shogiImageRect.height() * shogiGridY()[index]
 
     private fun xiangqiPoint(position: Position): PointF {
         val displayedRow = if (isFlipped) 9 - position.row else position.row
