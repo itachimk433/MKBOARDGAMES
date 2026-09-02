@@ -1,3 +1,4 @@
+- [Android build environment](android-build-environment.md) — Android APK/AAB builds run in GitHub Actions; local Java/SDK installation is not expected.
 - [Ludo lifecycle cancellation](ludo-lifecycle-cancellation.md) — Android animator cancellation invokes end listeners, so invalidation generations must guard gameplay callbacks.
 - [Android checkout handling](android-checkout-handling.md) — when a repository is copied into the workspace, verify its Git root before fetching or resetting; the workspace root may be the actual checkout.
 - [GitHub repository auth](github-auth.md) — Git operations use GitHub’s standard basic-auth token header; never put the token in a remote URL or output.
