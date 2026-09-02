@@ -2640,7 +2640,9 @@ class BoardView(context: Context) : View(context) {
         val fox = piece.type == FoxAndGeesePieceType.FOX
         val bitmap = if (fox) foxAndGeeseFoxPieceBitmap else foxAndGeeseGoosePieceBitmap
         if (bitmap != null) {
-            val imageRadius = cellSize * 0.39f
+            // The photographed board has tighter visual spacing than the
+            // canvas version, so keep its supplied pieces slightly smaller.
+            val imageRadius = cellSize * 0.35f
             canvas.drawBitmap(
                 bitmap,
                 null,
