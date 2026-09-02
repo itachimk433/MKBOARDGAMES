@@ -134,6 +134,10 @@ class MorabaraBoardView(context: Context) : View(context) {
     }
     private val dotPaint    = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(140, 127, 200, 248) }
     private val millDotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(200, 255, 193, 7) }
+    private val innerRingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+    }
     private val lastMovePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(80, 255, 215, 0); style = Paint.Style.FILL
     }
@@ -178,7 +182,9 @@ class MorabaraBoardView(context: Context) : View(context) {
         realisticBoardRect.set(boardLeft, boardTop, boardLeft + size, boardTop + size)
         linePaint.strokeWidth      = cellSize * 0.04f
         nodeRingPaint.strokeWidth  = cellSize * 0.04f
-        selectPaint.strokeWidth    = cellSize * 0.10f
+        // Keep the selection indicator as a fine edge accent rather than a
+        // broad halo around the selected cow.
+        selectPaint.strokeWidth    = cellSize * 0.045f
         pieceRingPaint.strokeWidth = cellSize * 0.06f
         captureRingPaint.strokeWidth = cellSize * 0.10f
         bannerTextPaint.textSize   = cellSize * 0.38f
@@ -394,10 +400,22 @@ class MorabaraBoardView(context: Context) : View(context) {
             }
             val i=activeIndexOf(m.to); if (i>=0) { val c=nodeCenter(i); canvas.drawCircle(c.x,c.y,cellSize*.38f,lastMovePaint) }
         }
-        if (selectedNode>=0) { val c=nodeCenter(selectedNode); canvas.drawCircle(c.x,c.y,cellSize*.38f,selectPaint) }
+        if (selectedNode>=0) {
+            val c = nodeCenter(selectedNode)
+            // The ring is drawn before the piece, so its inner half tucks
+            // underneath the disc and its visible edge hugs the disc border.
+            canvas.drawCircle(
+                c.x,
+                c.y,
+                pieceRadius() + selectPaint.strokeWidth * 0.12f,
+                selectPaint,
+            )
+        }
         for (idx in validTargets) {
             val c=nodeCenter(idx)
-            canvas.drawCircle(c.x, c.y, cellSize*.14f, if (idx in millTargets) millDotPaint else dotPaint)
+            // Always use nodeCenter(), including for the photograph. This
+            // keeps every hint exactly on the measured hole in the board art.
+            canvas.drawCircle(c.x, c.y, movementDotRadius(), if (idx in millTargets) millDotPaint else dotPaint)
         }
     }
 
@@ -460,7 +478,7 @@ class MorabaraBoardView(context: Context) : View(context) {
             realisticBoardBitmap != null
 
     private fun drawDisc(canvas: Canvas, color: PieceColor, cx: Float, cy: Float) {
-        val r = cellSize * if (isRealisticBoard()) .31f else .36f
+        val r = pieceRadius()
         canvas.drawCircle(cx + r * .08f, cy + r * .13f, r, shadowPaint)
 
         val fill = if (color == PieceColor.WHITE) whitePiecePaint else blackPiecePaint
@@ -496,6 +514,23 @@ class MorabaraBoardView(context: Context) : View(context) {
         pieceRingPaint.strokeWidth = r * .075f
         canvas.drawCircle(cx, cy, r, pieceRingPaint)
 
+        // Two nested embossed rings give each cow a physical, double-inset
+        // face instead of a flat glossy disc.
+        innerRingPaint.strokeWidth = r * .035f
+        innerRingPaint.color = if (color == PieceColor.WHITE) {
+            Color.argb(125, 107, 94, 80)
+        } else {
+            Color.argb(190, 190, 181, 171)
+        }
+        canvas.drawCircle(cx, cy, r * .69f, innerRingPaint)
+        innerRingPaint.strokeWidth = r * .022f
+        innerRingPaint.color = if (color == PieceColor.WHITE) {
+            Color.argb(105, 255, 255, 255)
+        } else {
+            Color.argb(135, 15, 13, 12)
+        }
+        canvas.drawCircle(cx, cy, r * .53f, innerRingPaint)
+
         val highlightPaint = if (color == PieceColor.WHITE) whitePiecePaint else blackPiecePaint
         highlightPaint.shader = RadialGradient(
             cx - r * .35f,
@@ -508,6 +543,12 @@ class MorabaraBoardView(context: Context) : View(context) {
         canvas.drawCircle(cx - r * .14f, cy - r * .16f, r * .34f, highlightPaint)
         highlightPaint.shader = null
     }
+
+    private fun pieceRadius(): Float =
+        cellSize * (if (isRealisticBoard()) .31f else .36f) * 0.98f
+
+    private fun movementDotRadius(): Float =
+        cellSize * (if (isRealisticBoard()) .13f else .14f)
 
     private fun lerp(a: Float, b: Float, t: Float) = a+(b-a)*t
 }

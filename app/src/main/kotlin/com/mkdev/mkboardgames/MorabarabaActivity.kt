@@ -12,6 +12,7 @@ import androidx.appcompat.app.AppCompatActivity
 import com.mkdev.mkboardgames.engine.*
 import com.mkdev.mkboardgames.games.morabaraba.MorabarabaBoard
 import com.mkdev.mkboardgames.games.morabaraba.MorabarabaRuleEngine
+import com.mkdev.mkboardgames.ui.AutoplayButtonView
 import com.mkdev.mkboardgames.ui.CaptureStripView
 import com.mkdev.mkboardgames.ui.ChessChoiceView
 import com.mkdev.mkboardgames.ui.ChessRulesView
@@ -32,6 +33,7 @@ class MorabarabaActivity : AppCompatActivity() {
     private lateinit var topCaptureView:    CaptureStripView
     private lateinit var bottomCaptureView: CaptureStripView
     private lateinit var boardStyleSwitch:  BoardStyleSwitchView
+    private lateinit var autoplayButton:    AutoplayButtonView
     private lateinit var gameRoot: View
     private var engine:                     MorabarabaRuleEngine = MorabarabaRuleEngine()
     private var gameState:                  GameState = GameState(arrayOfNulls(49), boardSize = 7)
@@ -39,6 +41,8 @@ class MorabarabaActivity : AppCompatActivity() {
     private var playerColor                 = PieceColor.WHITE
     private var matchStarted                = false
     private var activityResumed             = false
+    private var autoplayEnabled             = false
+    private var autoplayMoveInProgress      = false
     private var pieceCount                  = 12
     private var boardStyleSwitchEnabled    = false
     private val scope                       = CoroutineScope(Dispatchers.Main + SupervisorJob())
@@ -74,21 +78,45 @@ class MorabarabaActivity : AppCompatActivity() {
         topCaptureView   = CaptureStripView(this).also { it.dividerOnTop = false }
         boardView        = MorabaraBoardView(this)
         boardStyleSwitch = BoardStyleSwitchView(this)
+        autoplayButton   = AutoplayButtonView(this)
         bottomCaptureView = CaptureStripView(this).also { it.dividerOnTop = true }
 
         val hudH = (82 * dp).toInt()
         val capH = (36 * dp).toInt()
         val boardStyleSwitchH = (44 * dp).toInt()
+        val autoplayButtonH = (76 * dp).toInt()
 
         boardStyleSwitch.onStyleChanged = { styleIndex ->
             boardView.boardStyle = MorabarabaBoardStyle.entries
                 .getOrElse(styleIndex) { MorabarabaBoardStyle.CANVAS }
+        }
+        autoplayButton.onAutoplayChanged = { enabled ->
+            if (vsAI) {
+                autoplayEnabled = enabled
+                if (!enabled && autoplayMoveInProgress) {
+                    autoplayMoveInProgress = false
+                    boardView.cancelAnim()
+                    hudView.setThinking(false)
+                }
+                if (enabled &&
+                    matchStarted &&
+                    gameState.status == GameStatus.IN_PROGRESS &&
+                    !boardView.isLocked &&
+                    aiControlsCurrentTurn()
+                ) {
+                    triggerAI()
+                }
+            }
         }
 
         root.addView(hudView,          LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, hudH))
         root.addView(topCaptureView,   LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, capH))
         root.addView(boardStyleSwitch, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, boardStyleSwitchH))
         root.addView(boardView,        LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0).apply { weight = 1f })
+        root.addView(autoplayButton,   LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, autoplayButtonH).apply {
+            gravity = Gravity.CENTER_HORIZONTAL
+            visibility = View.GONE
+        })
         root.addView(bottomCaptureView, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, capH))
         boardStyleSwitch.visibility = View.GONE
 
@@ -294,6 +322,10 @@ class MorabarabaActivity : AppCompatActivity() {
         redoGameStates.clear(); redoCaptures.clear(); redoMoves.clear(); redoCapSnaps.clear()
         AdManager.loadInterstitial(this) { interstitialAd = it }
         aiJob?.cancel(); aiJob = null
+        autoplayEnabled = false
+        autoplayMoveInProgress = false
+        autoplayButton.setAutoplayEnabled(false, animate = false)
+        autoplayButton.visibility = if (vsAI) View.VISIBLE else View.GONE
         moveHistory.clear()
         capturedByWhite.clear(); capturedByBlack.clear(); captureSnapshots.clear()
         if (restoring == null) clearPausedMatch()
@@ -331,7 +363,7 @@ class MorabarabaActivity : AppCompatActivity() {
         if (restoring != null) {
             restoreMoves(restoring.moves)
             clearPausedMatch()
-            if (vsAI && gameState.currentTurn != playerColor) triggerAI()
+            if (aiControlsCurrentTurn()) triggerAI()
         } else if (vsAI && gameState.currentTurn != playerColor) {
             triggerAI()
         }
@@ -370,6 +402,7 @@ class MorabarabaActivity : AppCompatActivity() {
 
     private fun handleMove(move: Move) {
         if (boardView.isLocked) return
+        autoplayMoveInProgress = false
         try {
             val prev       = gameState
             val moverColor = prev.currentTurn
@@ -439,25 +472,37 @@ class MorabarabaActivity : AppCompatActivity() {
     // ─── AI ───────────────────────────────────────────────────────────────────
 
     private fun stopAutomatedGameplay() {
+        autoplayEnabled = false
+        autoplayMoveInProgress = false
         aiJob?.cancel()
         aiJob = null
         scope.coroutineContext.cancelChildren()
+        if (::autoplayButton.isInitialized) {
+            autoplayButton.setAutoplayEnabled(false, animate = false)
+        }
         if (::boardView.isInitialized) boardView.cancelAnim()
         if (::hudView.isInitialized) hudView.setThinking(false)
     }
 
     private fun triggerAI() {
+        if (!activityResumed || !matchStarted || gameState.status != GameStatus.IN_PROGRESS) {
+            boardView.isLocked = false
+            hudView.setThinking(false)
+            return
+        }
         boardView.isLocked = true
         hudView.setThinking(true)
         aiJob?.cancel()
+        val thinkingState = gameState
+        val autoplayingPlayerTurn = thinkingState.currentTurn == playerColor
         aiJob = scope.launch {
             val depth  = SettingsManager.morabarabaAiDepth(this@MorabarabaActivity)
             val timeMs = SettingsManager.morabarabaAiTimeLimitMs(this@MorabarabaActivity)
             val ai = AIPlayer(engine, depth, timeMs)
             val move = withContext(Dispatchers.Default) {
-                val legal = engine.allLegalMoves(gameState, gameState.currentTurn)
+                val legal = engine.allLegalMoves(thinkingState, thinkingState.currentTurn)
                 try {
-                    val best = ai.bestMove(gameState)
+                    val best = ai.bestMove(thinkingState)
                     if (best != null && legal.any { it.from == best.from && it.to == best.to }) best
                     else legal.randomOrNull()
                 } catch (e: Throwable) {
@@ -466,10 +511,22 @@ class MorabarabaActivity : AppCompatActivity() {
             }
             if (!isActive || !activityResumed) return@launch
             hudView.setThinking(false)
-            if (move != null) boardView.animateExternalMove(move)
-            else boardView.isLocked = false
+            val stateIsStillCurrent =
+                gameState.currentTurn == thinkingState.currentTurn &&
+                    gameState.moveHistory.size == thinkingState.moveHistory.size &&
+                    gameState.status == thinkingState.status
+            val playerAutoplayStillEnabled = !autoplayingPlayerTurn || autoplayEnabled
+            if (move != null && stateIsStillCurrent && playerAutoplayStillEnabled) {
+                autoplayMoveInProgress = autoplayingPlayerTurn
+                boardView.animateExternalMove(move)
+            } else {
+                boardView.isLocked = false
+            }
         }
     }
+
+    private fun aiControlsCurrentTurn(): Boolean =
+        vsAI && (gameState.currentTurn != playerColor || autoplayEnabled)
 
     private fun resumeComputerTurnIfNeeded() {
         if (!activityResumed ||
@@ -477,7 +534,7 @@ class MorabarabaActivity : AppCompatActivity() {
             !matchStarted ||
             gameState.status != GameStatus.IN_PROGRESS ||
             !vsAI ||
-            gameState.currentTurn == playerColor
+            !aiControlsCurrentTurn()
         ) return
         triggerAI()
     }
