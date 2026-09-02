@@ -115,8 +115,8 @@ class MorabarabaActivity : AppCompatActivity() {
         root.addView(boardView,        LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0).apply { weight = 1f })
         root.addView(autoplayButton,   LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, autoplayButtonH).apply {
             gravity = Gravity.CENTER_HORIZONTAL
-            visibility = View.GONE
         })
+        autoplayButton.visibility = View.GONE
         root.addView(bottomCaptureView, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, capH))
         boardStyleSwitch.visibility = View.GONE
 
