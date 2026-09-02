@@ -235,8 +235,8 @@ class MorabarabaActivity : AppCompatActivity() {
         choices: List<ChessChoiceView.Choice>,
         actions: List<() -> Unit>,
         heightDp: Float,
-        onCancel: (() -> Unit)? = null,
         fullScreen: Boolean = true,
+        onCancel: (() -> Unit)? = null,
     ) {
         val view = ChessChoiceView(
             this,
