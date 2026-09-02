@@ -370,6 +370,18 @@ class BoardView(context: Context) : View(context) {
     } catch (_: Throwable) {
         null
     }
+    private val foxAndGeeseFoxPieceBitmap: Bitmap? = try {
+        context.assets.open("fox_and_geese_fox_piece.webp")
+            .use { BitmapFactory.decodeStream(it) }
+    } catch (_: Throwable) {
+        null
+    }
+    private val foxAndGeeseGoosePieceBitmap: Bitmap? = try {
+        context.assets.open("fox_and_geese_goose_piece.webp")
+            .use { BitmapFactory.decodeStream(it) }
+    } catch (_: Throwable) {
+        null
+    }
 
     private fun createRealisticChessBoardBitmap(): Bitmap {
         val size = 1024
@@ -443,6 +455,9 @@ class BoardView(context: Context) : View(context) {
     private val piecePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.CENTER; isFakeBoldText = true
     }
+    private val foxAndGeesePiecePaint = Paint(
+        Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG,
+    )
     private val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(80, 0, 0, 0)
         maskFilter = BlurMaskFilter(6f, BlurMaskFilter.Blur.NORMAL)
@@ -2623,6 +2638,22 @@ class BoardView(context: Context) : View(context) {
     ) {
         val radius = cellSize * 0.36f
         val fox = piece.type == FoxAndGeesePieceType.FOX
+        val bitmap = if (fox) foxAndGeeseFoxPieceBitmap else foxAndGeeseGoosePieceBitmap
+        if (bitmap != null) {
+            val imageRadius = cellSize * 0.39f
+            canvas.drawBitmap(
+                bitmap,
+                null,
+                RectF(
+                    cx - imageRadius,
+                    cy - imageRadius,
+                    cx + imageRadius,
+                    cy + imageRadius,
+                ),
+                foxAndGeesePiecePaint,
+            )
+            return
+        }
         val base = if (fox) Color.parseColor("#35B7A1") else Color.parseColor("#F2F2F2")
         val highlight = if (fox) Color.parseColor("#A8F1D7") else Color.WHITE
         val edge = if (fox) Color.parseColor("#126E69") else Color.parseColor("#858585")
