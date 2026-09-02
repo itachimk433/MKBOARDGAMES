@@ -240,8 +240,8 @@ class ConnectFourActivity : AppCompatActivity() {
             options.map { item ->
                 when (item) {
                     "Resume Match" -> StyledDialogs.choice(item, "Continue where you left off", "Ⅱ", "#E3B86A")
-                    "vs AI" -> StyledDialogs.choice(item, "Play against the computer", "●", "#8EC7B9")
-                    "2 Players" -> StyledDialogs.choice(item, "Share the board locally", "●", "#A9B6E8")
+                    "vs AI" -> StyledDialogs.choice(item, "Play against the computer", "", "#8EC7B9")
+                    "2 Players" -> StyledDialogs.choice(item, "Share the board locally", "", "#A9B6E8")
                     else -> StyledDialogs.choice(item, "Review the essentials", "?", "#E58A7A")
                 }
             }, 520f, "C O N N E C T · F O U R", onCancel = {
@@ -261,8 +261,8 @@ class ConnectFourActivity : AppCompatActivity() {
         hideBoardWhileDialogIsOpen()
         StyledDialogs.showChoices(this, "Play As", "Choose your side before the first move.",
             listOf(
-                StyledDialogs.choice("Red", "Moves first", "●", "#E3B86A"),
-                StyledDialogs.choice("Yellow", "Moves second", "●", "#A9B6E8"),
+                StyledDialogs.choice("Red", "Moves first", "", "#E3B86A"),
+                StyledDialogs.choice("Yellow", "Moves second", "", "#A9B6E8"),
             ), 420f, "C O N N E C T · F O U R", onCancel = { showModeDialog() }) { which, dialog ->
                 dialog.dismiss()
                 playerColor = if (which == 0) PieceColor.WHITE else PieceColor.BLACK
@@ -602,7 +602,7 @@ Control the centre columns, build threats in more than one direction, and block 
                 StyledDialogs.choice("Play Again", "Start a fresh game", "↻", "#E3B86A"),
                 StyledDialogs.choice("Main Menu", "Choose another match", "⌂", "#E58A7A"),
                 StyledDialogs.choice("Watch Replay", "Review the moves", "▶", "#A9B6E8"),
-            ), 520f, "C O N N E C T · F O U R", onCancel = { showBoardAfterDialog() }) { which, dialog ->
+            ), 520f, "C O N N E C T · F O U R", onCancel = { showBoardAfterDialog() }, fullScreen = false) { which, dialog ->
                 dialog.dismiss()
                 when (which) {
                     0 -> startGame()
@@ -996,7 +996,7 @@ Control the centre columns, build threats in more than one direction, and block 
         }
 
         private fun drawDisc(canvas: Canvas, cx: Float, cy: Float, radius: Float, color: PieceColor) {
-            val bitmap = if (color == PieceColor.WHITE) redPieceBitmap else yellowPieceBitmap
+            val bitmap = if (color == PieceColor.WHITE) yellowPieceBitmap else redPieceBitmap
             if (bitmap != null) {
                 // The source images are already trimmed to their visible
                 // artwork. Drawing into the measured hole bounds lets the

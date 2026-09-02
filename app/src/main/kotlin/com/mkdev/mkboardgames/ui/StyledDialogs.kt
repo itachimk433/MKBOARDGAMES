@@ -24,9 +24,18 @@ object StyledDialogs {
         gameLabel: String,
         headerSymbol: String = "●",
         onCancel: (() -> Unit)? = null,
+        fullScreen: Boolean = isFullScreenStyledGameLabel(gameLabel),
         onChoice: (Int, Dialog) -> Unit,
     ): Dialog {
-        val view = ChessChoiceView(context, title, subtitle, choices, gameLabel, headerSymbol)
+        val view = ChessChoiceView(
+            context,
+            title,
+            subtitle,
+            choices,
+            gameLabel,
+            headerSymbol,
+            fullScreenOverride = fullScreen,
+        )
         val dialog = Dialog(context)
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
         dialog.setContentView(view)
@@ -38,7 +47,7 @@ object StyledDialogs {
         dialog.setOnShowListener {
             val window = dialog.window ?: return@setOnShowListener
             val density = context.resources.displayMetrics.density
-            if (isFullScreenStyledGameLabel(gameLabel)) {
+            if (fullScreen) {
                 window.setBackgroundDrawable(ColorDrawable(Color.parseColor("#0B1D25")))
                 window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
                 window.setWindowAnimations(0)

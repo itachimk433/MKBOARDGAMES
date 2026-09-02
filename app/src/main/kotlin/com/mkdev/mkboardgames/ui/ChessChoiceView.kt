@@ -37,6 +37,7 @@ class ChessChoiceView(
     choices: List<Choice>,
     private val gameLabel: String = "C H E S S",
     private val headerSymbol: String = "●",
+    fullScreenOverride: Boolean? = null,
 ) : View(context) {
 
     data class Choice(
@@ -58,7 +59,7 @@ class ChessChoiceView(
     private val scaledDensity = resources.displayMetrics.scaledDensity
     private val unit = density.coerceAtLeast(1f)
     private val textScale = scaledDensity.coerceAtMost(2f)
-    private val fullScreen = isFullScreenStyledGameLabel(gameLabel)
+    private val fullScreen = fullScreenOverride ?: isFullScreenStyledGameLabel(gameLabel)
     private val surfacePaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val cardPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -218,11 +219,29 @@ class ChessChoiceView(
             8f * unit,
             borderPaint,
         )
-        iconPaint.color = hit.choice.accent
-        canvas.drawText(hit.choice.symbol, rect.centerX(), rect.top + 29f * unit, iconPaint)
-        canvas.drawText(hit.choice.label, rect.centerX(), rect.top + 56f * unit, labelPaint)
-        canvas.drawText(hit.choice.detail, rect.centerX(), rect.top + 74f * unit, detailPaint)
+        if (hit.choice.symbol.isNotBlank()) {
+            iconPaint.color = hit.choice.accent
+            canvas.drawText(hit.choice.symbol, rect.centerX(), rect.top + 29f * unit, iconPaint)
+            canvas.drawText(hit.choice.label, rect.centerX(), rect.top + 56f * unit, labelPaint)
+            canvas.drawText(hit.choice.detail, rect.centerX(), rect.top + 74f * unit, detailPaint)
+        } else {
+            drawCenteredChoiceText(canvas, rect, hit.choice)
+        }
         canvas.restore()
+    }
+
+    private fun drawCenteredChoiceText(canvas: Canvas, rect: RectF, choice: Choice) {
+        val labelMetrics = labelPaint.fontMetrics
+        val detailMetrics = detailPaint.fontMetrics
+        val labelHeight = labelMetrics.descent - labelMetrics.ascent
+        val detailHeight = detailMetrics.descent - detailMetrics.ascent
+        val gap = 3f * unit
+        val groupHeight = labelHeight + gap + detailHeight
+        val groupTop = rect.centerY() - groupHeight / 2f
+        val labelBaseline = groupTop - labelMetrics.ascent
+        val detailBaseline = groupTop + labelHeight + gap - detailMetrics.ascent
+        canvas.drawText(choice.label, rect.centerX(), labelBaseline, labelPaint)
+        canvas.drawText(choice.detail, rect.centerX(), detailBaseline, detailPaint)
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {

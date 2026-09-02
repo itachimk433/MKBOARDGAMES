@@ -640,7 +640,6 @@ class GameActivity : AppCompatActivity() {
 
     private fun showChessSidePicker() {
         hideChessBoardWhileDialogIsOpen()
-        val isDraughts = gameType == "CHECKERS" || gameType == "INTERNATIONAL_DRAUGHTS"
         val isFoxAndGeese = gameType == "FOX_AND_GEESE"
         val view = ChessChoiceView(
             this,
@@ -650,13 +649,13 @@ class GameActivity : AppCompatActivity() {
                 ChessChoiceView.Choice(
                     if (isFoxAndGeese) "Fox" else "White",
                     if (isFoxAndGeese) "Moves second" else "Moves first",
-                    if (isFoxAndGeese) "🦊" else if (isDraughts) "◉" else "♔",
+                    if (gameType == "CHESS") "♔" else "",
                     Color.parseColor("#E3B86A"),
                 ),
                 ChessChoiceView.Choice(
                     if (isFoxAndGeese) "Geese" else "Black",
                     if (isFoxAndGeese) "Moves first" else "Moves second",
-                    if (isFoxAndGeese) "🪿" else if (isDraughts) "●" else "♚",
+                    if (gameType == "CHESS") "♚" else "",
                     Color.parseColor("#A9B6E8"),
                 ),
             ),
@@ -2009,6 +2008,7 @@ Checkmate your opponent's King.
             subtitle = message,
             choices = choices,
             gameLabel = styledGameLabel(),
+            fullScreenOverride = false,
         )
         val dialog = Dialog(this)
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)

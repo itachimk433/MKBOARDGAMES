@@ -41,9 +41,7 @@ class ChessMenuView(
     private val unit = density.coerceAtLeast(1f)
     private val textScale = scaledDensity.coerceAtMost(2f)
     private val fullScreen = isFullScreenStyledGameLabel(gameLabel)
-    private val isConnectFour = gameLabel.replace(" ", "").contains("CONNECT", ignoreCase = true)
-    private val isFoxAndGeese = gameLabel.replace(" ", "").contains("FOX", ignoreCase = true)
-
+    private val isChess = gameLabel.replace(" ", "").equals("CHESS", ignoreCase = true)
     private val surfacePaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val panelPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val panelBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -139,10 +137,10 @@ class ChessMenuView(
             MenuAction(
                 label = "vs AI",
                 detail = "Challenge the board",
-                symbol = when {
-                    isConnectFour -> "●"
-                    isFoxAndGeese -> "🦊"
-                    else -> "♞"
+                symbol = if (isChess) {
+                    "♞"
+                } else {
+                    ""
                 },
                 accent = Color.parseColor("#E3B86A"),
                 action = { onVsAi?.invoke() },
@@ -150,11 +148,7 @@ class ChessMenuView(
             MenuAction(
                 label = "2 Players",
                 detail = "Play on one board",
-                symbol = when {
-                    isConnectFour -> "●"
-                    isFoxAndGeese -> "🪿"
-                    else -> "♙"
-                },
+                symbol = if (isChess) "♙" else "",
                 accent = Color.parseColor("#8EC7B9"),
                 action = { onTwoPlayers?.invoke() },
             ),
@@ -277,13 +271,32 @@ class ChessMenuView(
             panelBorderPaint,
         )
 
-        actionSymbolPaint.color = action.accent
-        actionSymbolPaint.textSize = 20f * textScale
-        canvas.drawText(action.symbol, rect.centerX(), rect.top + 25f * unit, actionSymbolPaint)
-        actionLabelPaint.color = Color.WHITE
-        canvas.drawText(action.label, rect.centerX(), rect.top + 52f * unit, actionLabelPaint)
-        canvas.drawText(action.detail, rect.centerX(), rect.top + 69f * unit, actionDetailPaint)
+        if (action.symbol.isNotBlank()) {
+            actionSymbolPaint.color = action.accent
+            actionSymbolPaint.textSize = 20f * textScale
+            canvas.drawText(action.symbol, rect.centerX(), rect.top + 25f * unit, actionSymbolPaint)
+            actionLabelPaint.color = Color.WHITE
+            canvas.drawText(action.label, rect.centerX(), rect.top + 52f * unit, actionLabelPaint)
+            canvas.drawText(action.detail, rect.centerX(), rect.top + 69f * unit, actionDetailPaint)
+        } else {
+            drawCenteredActionText(canvas, rect, action)
+        }
         canvas.restore()
+    }
+
+    private fun drawCenteredActionText(canvas: Canvas, rect: RectF, action: MenuAction) {
+        actionLabelPaint.color = Color.WHITE
+        val labelMetrics = actionLabelPaint.fontMetrics
+        val detailMetrics = actionDetailPaint.fontMetrics
+        val labelHeight = labelMetrics.descent - labelMetrics.ascent
+        val detailHeight = detailMetrics.descent - detailMetrics.ascent
+        val gap = 3f * unit
+        val groupHeight = labelHeight + gap + detailHeight
+        val groupTop = rect.centerY() - groupHeight / 2f
+        val labelBaseline = groupTop - labelMetrics.ascent
+        val detailBaseline = groupTop + labelHeight + gap - detailMetrics.ascent
+        canvas.drawText(action.label, rect.centerX(), labelBaseline, actionLabelPaint)
+        canvas.drawText(action.detail, rect.centerX(), detailBaseline, actionDetailPaint)
     }
 
     private fun drawResumeAction(canvas: Canvas, width: Float) {

@@ -385,10 +385,10 @@ class LudoActivity : AppCompatActivity() {
         val options = listOf("vs AI · Normal", "vs AI · Irregular", "4 Players", "How to Play")
         StyledDialogs.showChoices(this, "Ludo", "Choose how to begin.",
             listOf(
-                StyledDialogs.choice(options[0], "Classic computer match", "⚄", "#8EC7B9"),
-                StyledDialogs.choice(options[1], "Match with abilities and coins", "⚄", "#E3B86A"),
-                StyledDialogs.choice(options[2], "Play locally with four colours", "⚄", "#A9B6E8"),
-                StyledDialogs.choice(options[3], "Review the essentials", "⚄", "#E58A7A"),
+                StyledDialogs.choice(options[0], "Classic computer match", "", "#8EC7B9"),
+                StyledDialogs.choice(options[1], "Match with abilities and coins", "", "#E3B86A"),
+                StyledDialogs.choice(options[2], "Play locally with four colours", "", "#A9B6E8"),
+                StyledDialogs.choice(options[3], "Review the essentials", "", "#E58A7A"),
             ), 520f, "L U D O", headerSymbol = "●", onCancel = {
                 if (!matchStarted) finish() else showBoardAfterDialog()
             }) { which, dialog ->
@@ -423,7 +423,7 @@ class LudoActivity : AppCompatActivity() {
         hideBoardWhileDialogIsOpen()
         StyledDialogs.showChoices(this, "Play As", "Choose your colour before the first roll.",
             LudoSetup.PLAYER_NAMES.mapIndexed { index, name ->
-                StyledDialogs.choice(name, if (index == 0) "Moves first" else "Joins the match", listOf("●", "●", "●", "●")[index], listOf("#E3B86A", "#E58A7A", "#8EC7B9", "#A9B6E8")[index])
+                StyledDialogs.choice(name, if (index == 0) "Moves first" else "Joins the match", "", listOf("#E3B86A", "#E58A7A", "#8EC7B9", "#A9B6E8")[index])
             }, 520f, "L U D O", headerSymbol = "●", onCancel = { showModeDialog() }) { which, dialog ->
                 humanPlayer = which
                 dialog.dismiss()
@@ -1809,7 +1809,7 @@ class LudoActivity : AppCompatActivity() {
             listOf(
                 StyledDialogs.choice("New Match", "Roll into another game", "↻", "#E3B86A"),
                 StyledDialogs.choice("Main Menu", "Choose another game", "⌂", "#E58A7A"),
-            ), 620f, "L U D O", onCancel = { showBoardAfterDialog() }) { which, dialog ->
+            ), 620f, "L U D O", onCancel = { showBoardAfterDialog() }, fullScreen = false) { which, dialog ->
                 dialog.dismiss()
                 resultDialogVisible = false
                 when (which) {

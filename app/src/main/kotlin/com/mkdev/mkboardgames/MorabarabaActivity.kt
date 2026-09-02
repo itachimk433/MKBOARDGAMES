@@ -189,9 +189,9 @@ class MorabarabaActivity : AppCompatActivity() {
             choices += ChessChoiceView.Choice("Resume Match", "Continue where you left off", "Ⅱ", Color.parseColor("#E3B86A"))
             actions += { resumePausedMatch() }
         }
-        choices += ChessChoiceView.Choice("vs AI", "Play against the computer", "♞", Color.parseColor("#8EC7B9"))
+        choices += ChessChoiceView.Choice("vs AI", "Play against the computer", "", Color.parseColor("#8EC7B9"))
         actions += { showVariantDialog(isVsAI = true) }
-        choices += ChessChoiceView.Choice("2 Players", "Share the board locally", "♙", Color.parseColor("#A9B6E8"))
+        choices += ChessChoiceView.Choice("2 Players", "Share the board locally", "", Color.parseColor("#A9B6E8"))
         actions += { showVariantDialog(isVsAI = false) }
         choices += ChessChoiceView.Choice("How to Play", "Review the essentials", "?", Color.parseColor("#E58A7A"))
         actions += { showTutorial(showModeAfter = !matchStarted) }
@@ -220,8 +220,8 @@ class MorabarabaActivity : AppCompatActivity() {
 
     private fun showColorPickerDialog() {
         val choices = listOf(
-            ChessChoiceView.Choice("White", "Moves first", "●", Color.parseColor("#E3B86A")),
-            ChessChoiceView.Choice("Black", "Moves second", "●", Color.parseColor("#A9B6E8")),
+            ChessChoiceView.Choice("White", "Moves first", "", Color.parseColor("#E3B86A")),
+            ChessChoiceView.Choice("Black", "Moves second", "", Color.parseColor("#A9B6E8")),
         )
         showChoiceDialog("Play As", "Choose your side on the board.", choices, listOf(
             { playerColor = PieceColor.WHITE; startGame() },
@@ -236,6 +236,7 @@ class MorabarabaActivity : AppCompatActivity() {
         actions: List<() -> Unit>,
         heightDp: Float,
         onCancel: (() -> Unit)? = null,
+        fullScreen: Boolean = true,
     ) {
         val view = ChessChoiceView(
             this,
@@ -243,6 +244,7 @@ class MorabarabaActivity : AppCompatActivity() {
             subtitle = subtitle,
             choices = choices,
             gameLabel = "M O R A B A R A B A",
+            fullScreenOverride = fullScreen,
         )
         hideBoardWhileDialogIsOpen()
         val dialog = Dialog(this)
@@ -259,12 +261,12 @@ class MorabarabaActivity : AppCompatActivity() {
             actions.getOrNull(which)?.invoke()
         }
         dialog.show()
-        styleMorabarabaDialog(dialog, heightDp)
+        styleMorabarabaDialog(dialog, heightDp, fullScreen)
     }
 
-    private fun styleMorabarabaDialog(dialog: Dialog, heightDp: Float) {
+    private fun styleMorabarabaDialog(dialog: Dialog, heightDp: Float, fullScreen: Boolean = true) {
         val metrics = resources.displayMetrics
-        if (isFullScreenStyledGameLabel("M O R A B A R A B A")) {
+        if (fullScreen) {
             dialog.window?.let { window ->
                 window.setBackgroundDrawable(ColorDrawable(Color.parseColor("#0B1D25")))
                 window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
@@ -311,6 +313,7 @@ class MorabarabaActivity : AppCompatActivity() {
                 { showBoardAfterDialog() },
             ),
             520f,
+            fullScreen = false,
         )
     }
 

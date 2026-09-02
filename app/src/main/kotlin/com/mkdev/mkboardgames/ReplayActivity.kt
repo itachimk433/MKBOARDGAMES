@@ -983,7 +983,7 @@ class ReplayActivity : AppCompatActivity() {
         }
 
         private fun drawDisc(canvas: Canvas, cx: Float, cy: Float, radius: Float, color: PieceColor) {
-            val bitmap = if (color == PieceColor.WHITE) redPieceBitmap else yellowPieceBitmap
+            val bitmap = if (color == PieceColor.WHITE) yellowPieceBitmap else redPieceBitmap
             if (bitmap != null && isImageBoard()) {
                 canvas.drawBitmap(
                     bitmap,

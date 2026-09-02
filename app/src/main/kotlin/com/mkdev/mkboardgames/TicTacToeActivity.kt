@@ -207,8 +207,8 @@ class TicTacToeActivity : AppCompatActivity() {
             options.map { item ->
                 when (item) {
                     "Resume Match" -> StyledDialogs.choice(item, "Continue where you left off", "Ⅱ", "#E3B86A")
-                    "vs AI" -> StyledDialogs.choice(item, "Play against the computer", "♞", "#8EC7B9")
-                    "2 Players" -> StyledDialogs.choice(item, "Share the board locally", "♙", "#A9B6E8")
+                    "vs AI" -> StyledDialogs.choice(item, "Play against the computer", "", "#8EC7B9")
+                    "2 Players" -> StyledDialogs.choice(item, "Share the board locally", "", "#A9B6E8")
                     else -> StyledDialogs.choice(item, "Review the essentials", "?", "#E58A7A")
                 }
             }, 520f, "T I C · T A C · T O E", onCancel = {
@@ -255,8 +255,8 @@ class TicTacToeActivity : AppCompatActivity() {
         hideBoardWhileDialogIsOpen()
         StyledDialogs.showChoices(this, "Play As", "Choose your side before the first move.",
             listOf(
-                StyledDialogs.choice("X", "Goes first", "X", "#E3B86A"),
-                StyledDialogs.choice("O", "Goes second", "O", "#A9B6E8"),
+                StyledDialogs.choice("X", "Goes first", "", "#E3B86A"),
+                StyledDialogs.choice("O", "Goes second", "", "#A9B6E8"),
             ), 420f, "T I C · T A C · T O E", onCancel = { showBoardSizeDialog(fromMode = true) }) { which, dialog ->
                 dialog.dismiss()
                 playerColor = if (which == 0) PieceColor.WHITE else PieceColor.BLACK
@@ -598,7 +598,7 @@ Strategy
                 StyledDialogs.choice("Play Again", "Start a fresh game", "↻", "#E3B86A"),
                 StyledDialogs.choice("Main Menu", "Choose another match", "⌂", "#E58A7A"),
                 StyledDialogs.choice("Watch Replay", "Review the moves", "▶", "#A9B6E8"),
-            ), 520f, "T I C · T A C · T O E", onCancel = { showBoardAfterDialog() }) { which, dialog ->
+            ), 520f, "T I C · T A C · T O E", onCancel = { showBoardAfterDialog() }, fullScreen = false) { which, dialog ->
                 dialog.dismiss()
                 when (which) {
                     0 -> startGame()
