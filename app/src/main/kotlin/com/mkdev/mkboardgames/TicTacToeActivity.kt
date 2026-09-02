@@ -12,6 +12,7 @@ import androidx.appcompat.app.AppCompatActivity
 import com.mkdev.mkboardgames.engine.*
 import com.mkdev.mkboardgames.games.tictactoe.TicTacToePiece
 import com.mkdev.mkboardgames.games.tictactoe.TicTacToeRuleEngine
+import com.mkdev.mkboardgames.ui.AutoplayButtonView
 import com.mkdev.mkboardgames.ui.StyledDialogs
 import kotlinx.coroutines.*
 
@@ -42,7 +43,9 @@ class TicTacToeActivity : AppCompatActivity() {
     private lateinit var hudView:   HudView
     private lateinit var boardView: TicBoardView
     private lateinit var scoreView: ScoreView
+    private lateinit var autoplayButton: AutoplayButtonView
     private lateinit var gameRoot: View
+    private var autoplayEnabled = false
 
     // ─── Lifecycle ────────────────────────────────────────────────────────────
 
@@ -59,9 +62,30 @@ class TicTacToeActivity : AppCompatActivity() {
         hudView   = HudView(this)
         boardView = TicBoardView(this)
         scoreView = ScoreView(this)
+        autoplayButton = AutoplayButtonView(this)
+        autoplayButton.onAutoplayChanged = { enabled ->
+            if (vsAI) {
+                autoplayEnabled = enabled
+                if (enabled &&
+                    matchStarted &&
+                    gameState.status == GameStatus.IN_PROGRESS &&
+                    !boardView.isLocked &&
+                    aiControlsCurrentTurn()
+                ) {
+                    triggerAI()
+                }
+            }
+        }
 
         root.addView(hudView,   LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (60 * dp).toInt()))
         root.addView(boardView, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0).apply { weight = 1f })
+        root.addView(autoplayButton, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            (76 * dp).toInt(),
+        ).apply {
+            gravity = Gravity.CENTER_HORIZONTAL
+            visibility = View.GONE
+        })
         root.addView(scoreView, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (48 * dp).toInt()))
 
         AdManager.attachBanner(root)
@@ -102,9 +126,13 @@ class TicTacToeActivity : AppCompatActivity() {
     }
 
     private fun stopAutomatedGameplay() {
+        autoplayEnabled = false
         scope.coroutineContext.cancelChildren()
         if (::boardView.isInitialized) boardView.isLocked = false
         if (::hudView.isInitialized) hudView.setThinking(false)
+        if (::autoplayButton.isInitialized) {
+            autoplayButton.setAutoplayEnabled(false, animate = false)
+        }
     }
 
     @Deprecated("Deprecated in Java")
@@ -303,6 +331,9 @@ Strategy
         gameState = engine.initialState()
         moveHistory.clear()
         boardView.reset(gameState)
+        autoplayEnabled = false
+        autoplayButton.setAutoplayEnabled(false, animate = false)
+        autoplayButton.visibility = if (vsAI) View.VISIBLE else View.GONE
         // Re-show result dialog when board is tapped after game over
         boardView.onGameOverTapped = { showResultDialog() }
         scoreView.setLabels(boardSize)
@@ -351,6 +382,8 @@ Strategy
         boardView.setGameState(gameState, lastMove = move.to)
 
         if (gameState.status != GameStatus.IN_PROGRESS) {
+            autoplayEnabled = false
+            autoplayButton.setAutoplayEnabled(false, animate = false)
             boardView.isLocked = true
             when (gameState.status) {
                 GameStatus.WHITE_WINS -> { scoreX++; SoundPlayer.play("game_end") }
@@ -369,7 +402,7 @@ Strategy
         }
         if (moverWasX) SoundPlayer.playMovement("ttt_x") else SoundPlayer.playMovement("ttt_o")
         updateHud()
-        if (vsAI && gameState.currentTurn != playerColor) {
+        if (vsAI && aiControlsCurrentTurn()) {
             boardView.isLocked = true
             triggerAI()
         }
@@ -390,6 +423,8 @@ Strategy
     // ─── AI ───────────────────────────────────────────────────────────────────
 
     private fun triggerAI() {
+        if (!vsAI || !activityResumed || gameState.status != GameStatus.IN_PROGRESS) return
+        boardView.isLocked = true
         hudView.setThinking(true)
         scope.launch {
             val move = withContext(Dispatchers.Default) {
@@ -426,10 +461,13 @@ Strategy
             !matchStarted ||
             gameState.status != GameStatus.IN_PROGRESS ||
             !vsAI ||
-            gameState.currentTurn == playerColor
+            !aiControlsCurrentTurn()
         ) return
         triggerAI()
     }
+
+    private fun aiControlsCurrentTurn(): Boolean =
+        vsAI && (gameState.currentTurn != playerColor || autoplayEnabled)
 
     // ─── HUD / undo / menu ────────────────────────────────────────────────────
 

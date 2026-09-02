@@ -14,6 +14,7 @@ import androidx.appcompat.app.AppCompatActivity
 import com.mkdev.mkboardgames.engine.*
 import com.mkdev.mkboardgames.games.connectfour.ConnectFourPiece
 import com.mkdev.mkboardgames.games.connectfour.ConnectFourRuleEngine
+import com.mkdev.mkboardgames.ui.AutoplayButtonView
 import com.mkdev.mkboardgames.ui.BoardStyleSwitchView
 import com.mkdev.mkboardgames.ui.ConnectFourBoardStyle
 import com.mkdev.mkboardgames.ui.StyledDialogs
@@ -37,11 +38,13 @@ class ConnectFourActivity : AppCompatActivity() {
     private var resultRecorded = false
     private var interstitialAd: Any? = null
     private var boardStyleSwitchEnabled = true
+    private var autoplayEnabled = false
 
     private lateinit var hudView: HudView
     private lateinit var boardStyleSwitch: BoardStyleSwitchView
     private lateinit var boardView: ConnectBoardView
     private lateinit var scoreView: ScoreView
+    private lateinit var autoplayButton: AutoplayButtonView
     private lateinit var gameRoot: View
     private val boardStyleSwitchFadeRunnable = Runnable {
         if (!boardStyleSwitchEnabled || !::boardStyleSwitch.isInitialized) return@Runnable
@@ -68,6 +71,20 @@ class ConnectFourActivity : AppCompatActivity() {
         boardStyleSwitch = BoardStyleSwitchView(this)
         boardView = ConnectBoardView(this)
         scoreView = ScoreView(this)
+        autoplayButton = AutoplayButtonView(this)
+        autoplayButton.onAutoplayChanged = { enabled ->
+            if (vsAI) {
+                autoplayEnabled = enabled
+                if (enabled &&
+                    matchStarted &&
+                    gameState.status == GameStatus.IN_PROGRESS &&
+                    !boardView.isLocked &&
+                    aiControlsCurrentTurn()
+                ) {
+                    triggerAI()
+                }
+            }
+        }
 
         val boardStyleRow = LinearLayout(this).apply {
             gravity = Gravity.START
@@ -95,6 +112,13 @@ class ConnectFourActivity : AppCompatActivity() {
         root.addView(hudView, LinearLayout.LayoutParams(-1, (60 * dp).toInt()))
         root.addView(boardStyleRow, LinearLayout.LayoutParams(-1, (44 * dp).toInt()))
         root.addView(boardView, LinearLayout.LayoutParams(-1, 0).apply { weight = 1f })
+        root.addView(autoplayButton, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            (76 * dp).toInt(),
+        ).apply {
+            gravity = Gravity.CENTER_HORIZONTAL
+            visibility = View.GONE
+        })
         root.addView(scoreView, LinearLayout.LayoutParams(-1, (48 * dp).toInt()))
         AdManager.attachBanner(root)
         gameRoot = root
@@ -135,12 +159,16 @@ class ConnectFourActivity : AppCompatActivity() {
     }
 
     private fun stopAutomatedGameplay() {
+        autoplayEnabled = false
         scope.coroutineContext.cancelChildren()
         if (::boardView.isInitialized) {
             boardView.cancelDropAnimation()
             boardView.isLocked = false
         }
         if (::hudView.isInitialized) hudView.setThinking(false)
+        if (::autoplayButton.isInitialized) {
+            autoplayButton.setAutoplayEnabled(false, animate = false)
+        }
     }
 
     @Deprecated("Deprecated in Java")
@@ -293,6 +321,9 @@ Control the centre columns, build threats in more than one direction, and block 
         gameState = engine.initialState()
         moveHistory.clear()
         boardView.reset(gameState)
+        autoplayEnabled = false
+        autoplayButton.setAutoplayEnabled(false, animate = false)
+        autoplayButton.visibility = if (vsAI) View.VISIBLE else View.GONE
         boardView.onGameOverTapped = { showResultDialog() }
         scoreView.update(scoreRed, scoreDraws, scoreYellow)
         updateHud()
@@ -340,7 +371,7 @@ Control the centre columns, build threats in more than one direction, and block 
         val onDropAnimationFinished: (() -> Unit)? =
             if (gameState.status == GameStatus.IN_PROGRESS) {
                 {
-                    if (vsAI && gameState.currentTurn != playerColor) triggerAI()
+                    if (vsAI && aiControlsCurrentTurn()) triggerAI()
                     else boardView.isLocked = false
                 }
             } else {
@@ -352,6 +383,8 @@ Control the centre columns, build threats in more than one direction, and block 
             onDropAnimationFinished = onDropAnimationFinished
         )
         if (gameState.status != GameStatus.IN_PROGRESS) {
+            autoplayEnabled = false
+            autoplayButton.setAutoplayEnabled(false, animate = false)
             boardView.isLocked = true
             when (gameState.status) {
                 GameStatus.WHITE_WINS -> { scoreRed++; SoundPlayer.play("game_end") }
@@ -386,6 +419,8 @@ Control the centre columns, build threats in more than one direction, and block 
     }
 
     private fun triggerAI() {
+        if (!vsAI || !activityResumed || gameState.status != GameStatus.IN_PROGRESS) return
+        boardView.isLocked = true
         hudView.setThinking(true)
         scope.launch {
             val move = withContext(Dispatchers.Default) {
@@ -421,10 +456,13 @@ Control the centre columns, build threats in more than one direction, and block 
             !matchStarted ||
             gameState.status != GameStatus.IN_PROGRESS ||
             !vsAI ||
-            gameState.currentTurn == playerColor
+            !aiControlsCurrentTurn()
         ) return
         triggerAI()
     }
+
+    private fun aiControlsCurrentTurn(): Boolean =
+        vsAI && (gameState.currentTurn != playerColor || autoplayEnabled)
 
     private fun updateHud() {
         val redTurn = gameState.currentTurn == PieceColor.WHITE

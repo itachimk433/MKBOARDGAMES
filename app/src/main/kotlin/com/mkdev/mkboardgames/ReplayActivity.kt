@@ -34,8 +34,17 @@ import com.mkdev.mkboardgames.games.tictactoe.TicTacToePiece
 import com.mkdev.mkboardgames.games.tictactoe.TicTacToeRuleEngine
 import com.mkdev.mkboardgames.games.xiangqi.XiangqiRuleEngine
 import com.mkdev.mkboardgames.ui.BoardView
+import com.mkdev.mkboardgames.ui.BoardStyleSwitchView
+import com.mkdev.mkboardgames.ui.ChessBoardStyle
+import com.mkdev.mkboardgames.ui.ConnectFourBoardStyle
+import com.mkdev.mkboardgames.ui.DraughtsBoardStyle
+import com.mkdev.mkboardgames.ui.FoxAndGeeseBoardStyle
 import com.mkdev.mkboardgames.ui.LudoBoardView
+import com.mkdev.mkboardgames.ui.MorabarabaBoardStyle
 import com.mkdev.mkboardgames.ui.MorabaraBoardView
+import com.mkdev.mkboardgames.ui.OthelloBoardStyle
+import com.mkdev.mkboardgames.ui.ShogiBoardStyle
+import com.mkdev.mkboardgames.ui.XiangqiBoardStyle
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -125,6 +134,23 @@ class ReplayActivity : AppCompatActivity() {
     private lateinit var controlsView: ReplayControlsView
     private lateinit var infoView:     ReplayInfoView
     private lateinit var captureView:  ReplayCaptureView
+    private lateinit var boardStyleSwitch: BoardStyleSwitchView
+
+    private val internationalDraughtsStyles = arrayOf(
+        DraughtsBoardStyle.CANVAS,
+        DraughtsBoardStyle.INTERNATIONAL_DARK_WOOD,
+        DraughtsBoardStyle.INTERNATIONAL_LIGHT_WOOD,
+    )
+    private val foxAndGeeseStyles = arrayOf(
+        FoxAndGeeseBoardStyle.CANVAS,
+        FoxAndGeeseBoardStyle.LIGHT_WOOD,
+        FoxAndGeeseBoardStyle.CROSS_WOOD,
+    )
+    private val xiangqiStyles = arrayOf(
+        XiangqiBoardStyle.CLASSIC,
+        XiangqiBoardStyle.CHINESE,
+        XiangqiBoardStyle.ENGLISH,
+    )
 
     // ─── State ────────────────────────────────────────────────────────────────
 
@@ -185,6 +211,7 @@ class ReplayActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         makeFullscreen()
+        SoundPlayer.init(this)
 
         gameType          = intent.getStringExtra(EXTRA_GAME_TYPE)  ?: "CHESS"
         val movesJson     = intent.getStringExtra(EXTRA_MOVES_JSON) ?: "[]"
@@ -280,6 +307,16 @@ class ReplayActivity : AppCompatActivity() {
 
         infoView     = ReplayInfoView(this)
         captureView  = ReplayCaptureView(this, gameType)
+        boardStyleSwitch = BoardStyleSwitchView(this)
+        val boardStyleRow = LinearLayout(this).apply {
+            gravity = Gravity.START
+            setPadding((10 * dp).toInt(), 0, 0, 0)
+            setBackgroundColor(Color.parseColor("#121212"))
+        }
+        boardStyleRow.addView(
+            boardStyleSwitch,
+            LinearLayout.LayoutParams((118 * dp).toInt(), (44 * dp).toInt()),
+        )
         seekBar      = SeekBar(this).apply {
             max      = (states.size - 1).coerceAtLeast(1)
             progress = 0
@@ -291,6 +328,12 @@ class ReplayActivity : AppCompatActivity() {
         controlsView = ReplayControlsView(this)
 
         root.addView(infoView, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (60 * dp).toInt()))
+        if (supportsBoardStyleSwitch()) {
+            root.addView(boardStyleRow, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                (44 * dp).toInt(),
+            ))
+        }
 
         when {
             isTicTacToe -> {
@@ -333,6 +376,8 @@ class ReplayActivity : AppCompatActivity() {
             }
         }
 
+        configureBoardStyleSwitch()
+
         // Hide capture strip for TicTacToe (no captures) and Othello
         val showCaptures = hasCaptures
         captureView.visibility = if (showCaptures) View.VISIBLE else View.GONE
@@ -352,6 +397,82 @@ class ReplayActivity : AppCompatActivity() {
         })
 
         stepTo(0)
+    }
+
+    private fun supportsBoardStyleSwitch(): Boolean = when (gameType) {
+        "CHESS", "CHECKERS", "INTERNATIONAL_DRAUGHTS", "OTHELLO",
+        "FOX_AND_GEESE", "XIANGQI", "SHOGI", "CONNECTFOUR", "MORABARABA" -> true
+        else -> false
+    }
+
+    private fun configureBoardStyleSwitch() {
+        if (!supportsBoardStyleSwitch()) return
+
+        val styleCount = when (gameType) {
+            "CHESS" -> ChessBoardStyle.entries.size
+            "INTERNATIONAL_DRAUGHTS" -> internationalDraughtsStyles.size
+            "CHECKERS" ->
+                DraughtsBoardStyle.entries.size -
+                    internationalDraughtsStyles.count { it != DraughtsBoardStyle.CANVAS }
+            "OTHELLO" -> OthelloBoardStyle.entries.size
+            "FOX_AND_GEESE" -> foxAndGeeseStyles.size
+            "XIANGQI" -> xiangqiStyles.size
+            "SHOGI" -> ShogiBoardStyle.entries.size
+            "CONNECTFOUR" -> ConnectFourBoardStyle.entries.size
+            "MORABARABA" -> MorabarabaBoardStyle.entries.size
+            else -> 2
+        }
+        boardStyleSwitch.setStyleCount(styleCount)
+        boardStyleSwitch.setSelectedIndex(currentBoardStyleIndex(), animate = false)
+        boardStyleSwitch.onStyleChanged = ::applyBoardStyle
+    }
+
+    private fun currentBoardStyleIndex(): Int = when (gameType) {
+        "CHESS" -> boardView?.chessBoardStyle?.ordinal ?: 0
+        "CHECKERS", "INTERNATIONAL_DRAUGHTS" -> {
+            val style = boardView?.draughtsBoardStyle ?: DraughtsBoardStyle.CANVAS
+            if (gameType == "INTERNATIONAL_DRAUGHTS") {
+                internationalDraughtsStyles.indexOf(style).coerceAtLeast(0)
+            } else {
+                style.ordinal
+            }
+        }
+        "OTHELLO" -> boardView?.othelloBoardStyle?.ordinal ?: 0
+        "FOX_AND_GEESE" ->
+            foxAndGeeseStyles.indexOf(
+                boardView?.foxAndGeeseBoardStyle ?: FoxAndGeeseBoardStyle.CANVAS,
+            ).coerceAtLeast(0)
+        "XIANGQI" ->
+            xiangqiStyles.indexOf(
+                boardView?.xiangqiBoardStyle ?: XiangqiBoardStyle.CLASSIC,
+            ).coerceAtLeast(0)
+        "SHOGI" -> boardView?.shogiBoardStyle?.ordinal ?: 0
+        "CONNECTFOUR" -> connectBoardView?.boardStyle?.ordinal ?: 0
+        "MORABARABA" -> moraBoardView?.boardStyle?.ordinal ?: 0
+        else -> 0
+    }
+
+    private fun applyBoardStyle(index: Int) {
+        when (gameType) {
+            "CHESS" -> boardView?.chessBoardStyle =
+                ChessBoardStyle.entries.getOrElse(index) { ChessBoardStyle.CANVAS }
+            "CHECKERS" -> boardView?.draughtsBoardStyle =
+                DraughtsBoardStyle.entries.getOrElse(index) { DraughtsBoardStyle.CANVAS }
+            "INTERNATIONAL_DRAUGHTS" -> boardView?.draughtsBoardStyle =
+                internationalDraughtsStyles.getOrElse(index) { internationalDraughtsStyles.first() }
+            "OTHELLO" -> boardView?.othelloBoardStyle =
+                OthelloBoardStyle.entries.getOrElse(index) { OthelloBoardStyle.CANVAS }
+            "FOX_AND_GEESE" -> boardView?.foxAndGeeseBoardStyle =
+                foxAndGeeseStyles.getOrElse(index) { foxAndGeeseStyles.first() }
+            "XIANGQI" -> boardView?.xiangqiBoardStyle =
+                xiangqiStyles.getOrElse(index) { xiangqiStyles.first() }
+            "SHOGI" -> boardView?.shogiBoardStyle =
+                ShogiBoardStyle.entries.getOrElse(index) { ShogiBoardStyle.CLASSIC }
+            "CONNECTFOUR" -> connectBoardView?.boardStyle =
+                ConnectFourBoardStyle.entries.getOrElse(index) { ConnectFourBoardStyle.CANVAS }
+            "MORABARABA" -> moraBoardView?.boardStyle =
+                MorabarabaBoardStyle.entries.getOrElse(index) { MorabarabaBoardStyle.CANVAS }
+        }
     }
 
     // ─── Navigation ───────────────────────────────────────────────────────────
@@ -621,6 +742,43 @@ class ReplayActivity : AppCompatActivity() {
         private var boardLeft = 0f
         private var boardTop = 0f
         private var cellSize = 0f
+        private val boardImageRect = RectF()
+        private var imageCellWidth = 0f
+        private var imageCellHeight = 0f
+        var boardStyle: ConnectFourBoardStyle = ConnectFourBoardStyle.CANVAS
+            set(value) {
+                if (field == value) return
+                field = value
+                updateBoardGeometry()
+                winP.strokeWidth = cellSize * 0.065f
+                invalidate()
+            }
+
+        private val blueBoardBitmap: Bitmap? = try {
+            context.assets.open("connect_four_blue.webp").use { BitmapFactory.decodeStream(it) }
+        } catch (_: Throwable) {
+            null
+        }
+        private val redPieceBitmap: Bitmap? = try {
+            context.assets.open("connect_four_red_piece.webp").use { BitmapFactory.decodeStream(it) }
+        } catch (_: Throwable) {
+            null
+        }
+        private val yellowPieceBitmap: Bitmap? = try {
+            context.assets.open("connect_four_yellow_piece.webp").use { BitmapFactory.decodeStream(it) }
+        } catch (_: Throwable) {
+            null
+        }
+        private val pieceBitmapPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+        private val imageGridX = floatArrayOf(
+            207f / 1261f, 349f / 1261f, 490.5f / 1261f,
+            633f / 1261f, 774f / 1261f, 915f / 1261f,
+            1057f / 1261f,
+        )
+        private val imageGridY = floatArrayOf(
+            128.5f / 1002f, 263.5f / 1002f, 399f / 1002f,
+            535.5f / 1002f, 671f / 1002f, 807f / 1002f,
+        )
 
         private val bgP = Paint().apply { color = Color.parseColor("#121212") }
         private val boardP = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#24527A") }
@@ -636,15 +794,52 @@ class ReplayActivity : AppCompatActivity() {
 
         override fun onSizeChanged(w: Int, h: Int, ow: Int, oh: Int) {
             if (w <= 0 || h <= 0) return
+            updateBoardGeometry()
+            winP.strokeWidth = cellSize * 0.065f
+        }
+
+        private fun updateBoardGeometry() {
+            if (width <= 0 || height <= 0) return
+            val bitmap = boardBitmap()
+            if (bitmap != null) {
+                val scale = minOf(width.toFloat() / bitmap.width, height.toFloat() / bitmap.height)
+                val imageWidth = bitmap.width * scale
+                val imageHeight = bitmap.height * scale
+                boardImageRect.set(
+                    (width - imageWidth) / 2f,
+                    (height - imageHeight) / 2f,
+                    (width + imageWidth) / 2f,
+                    (height + imageHeight) / 2f,
+                )
+                imageCellWidth = (imageGridX.last() - imageGridX.first()) *
+                    boardImageRect.width() / (ConnectFourRuleEngine.COLUMNS - 1)
+                imageCellHeight = (imageGridY.last() - imageGridY.first()) *
+                    boardImageRect.height() / (ConnectFourRuleEngine.ROWS - 1)
+                cellSize = minOf(imageCellWidth, imageCellHeight)
+                return
+            }
+
             val pad = 20f * dp
             cellSize = minOf(
                 (w - pad * 2) / ConnectFourRuleEngine.COLUMNS,
                 (h - pad * 2) / ConnectFourRuleEngine.ROWS
             )
-            boardLeft = (w - cellSize * ConnectFourRuleEngine.COLUMNS) / 2f
-            boardTop = (h - cellSize * ConnectFourRuleEngine.ROWS) / 2f
-            winP.strokeWidth = cellSize * 0.065f
+            boardLeft = (width - cellSize * ConnectFourRuleEngine.COLUMNS) / 2f
+            boardTop = (height - cellSize * ConnectFourRuleEngine.ROWS) / 2f
         }
+
+        private fun boardBitmap(): Bitmap? = when (boardStyle) {
+            ConnectFourBoardStyle.CANVAS -> null
+            ConnectFourBoardStyle.BLUE -> blueBoardBitmap
+        }
+
+        private fun isImageBoard() = boardBitmap() != null
+
+        private fun imageColumnCenter(column: Int): Float =
+            boardImageRect.left + boardImageRect.width() * imageGridX[column]
+
+        private fun imageRowCenter(row: Int): Float =
+            boardImageRect.top + boardImageRect.height() * imageGridY[row]
 
         fun showState(newState: GameState, animate: Boolean = false) {
             animationGeneration++
@@ -698,32 +893,54 @@ class ReplayActivity : AppCompatActivity() {
             if (cellSize <= 0f) return
             val right = boardLeft + ConnectFourRuleEngine.COLUMNS * cellSize
             val bottom = boardTop + ConnectFourRuleEngine.ROWS * cellSize
+            val imageBoard = isImageBoard()
             val fallingRow = fallingIndex?.div(ConnectFourRuleEngine.COLUMNS)
             val fallingCol = fallingIndex?.rem(ConnectFourRuleEngine.COLUMNS)
-            val fallingX = fallingCol?.let { boardLeft + it * cellSize + cellSize / 2f }
-            val fallingTargetY = fallingRow?.let { boardTop + it * cellSize + cellSize / 2f }
-            val fallingStartY = boardTop - cellSize * 0.85f
+            val fallingX = fallingCol?.let {
+                if (imageBoard) imageColumnCenter(it)
+                else boardLeft + it * cellSize + cellSize / 2f
+            }
+            val fallingTargetY = fallingRow?.let {
+                if (imageBoard) imageRowCenter(it)
+                else boardTop + it * cellSize + cellSize / 2f
+            }
+            val boardStartY = if (imageBoard) boardImageRect.top else boardTop
+            val fallingStartY = boardStartY - cellSize * 0.85f
             val fallingY = fallingTargetY?.let {
                 fallingStartY + (it - fallingStartY) * fallingProgress
             }
-            val fallingRadius = cellSize * 0.31f
+            val fallingRadius = cellSize * if (imageBoard) 0.37f else 0.31f
 
-            if (fallingX != null && fallingY != null && fallingColor != null && fallingY < boardTop) {
+            if (fallingX != null && fallingY != null && fallingColor != null && fallingY < boardStartY) {
                 drawDisc(canvas, fallingX, fallingY, fallingRadius, fallingColor!!)
             }
 
-            canvas.drawRoundRect(
-                boardLeft, boardTop, right, bottom, cellSize * .14f, cellSize * .14f, boardP
-            )
+            if (imageBoard) {
+                boardBitmap()?.let {
+                    canvas.drawBitmap(
+                        it,
+                        null,
+                        boardImageRect,
+                        Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG),
+                    )
+                }
+            } else {
+                canvas.drawRoundRect(
+                    boardLeft, boardTop, right, bottom, cellSize * .14f, cellSize * .14f, boardP
+                )
+            }
             val holePath = Path()
             for (row in 0 until ConnectFourRuleEngine.ROWS) for (col in 0 until ConnectFourRuleEngine.COLUMNS) {
-                val cx = boardLeft + col * cellSize + cellSize / 2f
-                val cy = boardTop + row * cellSize + cellSize / 2f
-                canvas.drawCircle(cx, cy, cellSize * .36f, holeP)
-                holePath.addCircle(cx, cy, cellSize * .36f, Path.Direction.CW)
+                val cx = if (imageBoard) imageColumnCenter(col)
+                else boardLeft + col * cellSize + cellSize / 2f
+                val cy = if (imageBoard) imageRowCenter(row)
+                else boardTop + row * cellSize + cellSize / 2f
+                val holeRadius = cellSize * if (imageBoard) 0.37f else 0.36f
+                if (!imageBoard) canvas.drawCircle(cx, cy, holeRadius, holeP)
+                holePath.addCircle(cx, cy, holeRadius, Path.Direction.CW)
             }
 
-            if (fallingX != null && fallingY != null && fallingColor != null && fallingY >= boardTop) {
+            if (fallingX != null && fallingY != null && fallingColor != null && fallingY >= boardStartY) {
                 canvas.save()
                 canvas.clipPath(holePath)
                 drawDisc(canvas, fallingX, fallingY, fallingRadius, fallingColor!!)
@@ -731,8 +948,10 @@ class ReplayActivity : AppCompatActivity() {
             }
 
             state.lastMove?.let { move ->
-                val cx = boardLeft + move.to.col * cellSize + cellSize / 2f
-                val cy = boardTop + move.to.row * cellSize + cellSize / 2f
+                val cx = if (imageBoard) imageColumnCenter(move.to.col)
+                else boardLeft + move.to.col * cellSize + cellSize / 2f
+                val cy = if (imageBoard) imageRowCenter(move.to.row)
+                else boardTop + move.to.row * cellSize + cellSize / 2f
                 canvas.drawCircle(cx, cy, cellSize * 0.43f, highlightP)
             }
 
@@ -740,36 +959,49 @@ class ReplayActivity : AppCompatActivity() {
                 val piece = state.get(row, col) as? ConnectFourPiece ?: continue
                 val idx = row * ConnectFourRuleEngine.COLUMNS + col
                 if (idx == fallingIndex) continue
-                val cx = boardLeft + col * cellSize + cellSize / 2f
-                val cy = boardTop + row * cellSize + cellSize / 2f
-                drawDisc(canvas, cx, cy, cellSize * 0.31f, piece.color)
+                val cx = if (imageBoard) imageColumnCenter(col)
+                else boardLeft + col * cellSize + cellSize / 2f
+                val cy = if (imageBoard) imageRowCenter(row)
+                else boardTop + row * cellSize + cellSize / 2f
+                drawDisc(canvas, cx, cy, cellSize * if (imageBoard) 0.37f else 0.31f, piece.color)
             }
             winLine?.takeIf { it.size >= 2 }?.let { line ->
                 val first = line.first()
                 val last = line.last()
                 canvas.drawLine(
-                    boardLeft + (first % ConnectFourRuleEngine.COLUMNS) * cellSize + cellSize / 2f,
-                    boardTop + (first / ConnectFourRuleEngine.COLUMNS) * cellSize + cellSize / 2f,
-                    boardLeft + (last % ConnectFourRuleEngine.COLUMNS) * cellSize + cellSize / 2f,
-                    boardTop + (last / ConnectFourRuleEngine.COLUMNS) * cellSize + cellSize / 2f,
+                    if (imageBoard) imageColumnCenter(first % ConnectFourRuleEngine.COLUMNS)
+                    else boardLeft + (first % ConnectFourRuleEngine.COLUMNS) * cellSize + cellSize / 2f,
+                    if (imageBoard) imageRowCenter(first / ConnectFourRuleEngine.COLUMNS)
+                    else boardTop + (first / ConnectFourRuleEngine.COLUMNS) * cellSize + cellSize / 2f,
+                    if (imageBoard) imageColumnCenter(last % ConnectFourRuleEngine.COLUMNS)
+                    else boardLeft + (last % ConnectFourRuleEngine.COLUMNS) * cellSize + cellSize / 2f,
+                    if (imageBoard) imageRowCenter(last / ConnectFourRuleEngine.COLUMNS)
+                    else boardTop + (last / ConnectFourRuleEngine.COLUMNS) * cellSize + cellSize / 2f,
                     winP
                 )
             }
         }
 
         private fun drawDisc(canvas: Canvas, cx: Float, cy: Float, radius: Float, color: PieceColor) {
-            canvas.drawCircle(
-                cx,
-                cy,
-                radius,
-                if (color == PieceColor.WHITE) redP else yellowP
-            )
-            canvas.drawCircle(
-                cx - radius * 0.22f,
-                cy - radius * 0.25f,
-                radius * 0.15f,
-                Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = Color.argb(70, 255, 255, 255) }
-            )
+            val bitmap = if (color == PieceColor.WHITE) redPieceBitmap else yellowPieceBitmap
+            if (bitmap != null && isImageBoard()) {
+                canvas.drawBitmap(
+                    bitmap,
+                    null,
+                    RectF(cx - radius, cy - radius, cx + radius, cy + radius),
+                    pieceBitmapPaint,
+                )
+            } else {
+                canvas.drawCircle(cx, cy, radius, if (color == PieceColor.WHITE) redP else yellowP)
+                canvas.drawCircle(
+                    cx - radius * 0.22f,
+                    cy - radius * 0.25f,
+                    radius * 0.15f,
+                    Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        this.color = Color.argb(70, 255, 255, 255)
+                    },
+                )
+            }
         }
     }
 
