@@ -81,6 +81,13 @@ class BoardView(context: Context) : View(context) {
             refreshBoardStyleGeometry()
             invalidate()
         }
+    var foxAndGeeseBoardStyle: FoxAndGeeseBoardStyle = FoxAndGeeseBoardStyle.CANVAS
+        set(value) {
+            if (field == value) return
+            field = value
+            refreshBoardStyleGeometry()
+            invalidate()
+        }
     var onPromotionChoice: ((List<Move>) -> Unit)? = null
 
     // ─── Selection ───────────────────────────────────────────────────────────
@@ -174,6 +181,26 @@ class BoardView(context: Context) : View(context) {
     private var othelloImageRect = RectF()
     private var othelloCellWidth = 0f
     private var othelloCellHeight = 0f
+    private var foxAndGeeseImageRect = RectF()
+    // Measured centres of the 7x7 lattice in each supplied board image. The
+    // transparent cross is not a square grid, so the point centres are used
+    // directly by drawing, animation, and touch conversion.
+    private val foxAndGeeseDarkWoodGridX = floatArrayOf(
+        57f / 1024f, 207f / 1024f, 359f / 1024f, 512f / 1024f,
+        665f / 1024f, 817f / 1024f, 967f / 1024f,
+    )
+    private val foxAndGeeseDarkWoodGridY = floatArrayOf(
+        40f / 906f, 182f / 906f, 320f / 906f, 456f / 906f,
+        590f / 906f, 730f / 906f, 864f / 906f,
+    )
+    private val foxAndGeeseLightWoodGridX = floatArrayOf(
+        76f / 1024f, 221f / 1024f, 367f / 1024f, 512f / 1024f,
+        657f / 1024f, 801f / 1024f, 947f / 1024f,
+    )
+    private val foxAndGeeseLightWoodGridY = floatArrayOf(
+        72f / 985f, 206f / 985f, 344f / 985f, 486f / 985f,
+        628f / 985f, 771f / 985f, 914f / 985f,
+    )
     // Measured playable bounds of the supplied 1272x1236 green-felt board.
     // Keep each boundary so the slight perspective in the photograph is
     // shared by discs, highlights, animations, and touch conversion.
@@ -331,6 +358,18 @@ class BoardView(context: Context) : View(context) {
     } catch (_: Throwable) {
         null
     }
+    private val foxAndGeeseDarkWoodBoardBitmap: Bitmap? = try {
+        context.assets.open("fox_and_geese_board_wood.webp")
+            .use { BitmapFactory.decodeStream(it) }
+    } catch (_: Throwable) {
+        null
+    }
+    private val foxAndGeeseLightWoodBoardBitmap: Bitmap? = try {
+        context.assets.open("fox_and_geese_board_light.webp")
+            .use { BitmapFactory.decodeStream(it) }
+    } catch (_: Throwable) {
+        null
+    }
 
     private fun createRealisticChessBoardBitmap(): Bitmap {
         val size = 1024
@@ -433,6 +472,31 @@ class BoardView(context: Context) : View(context) {
 
     private fun updateBoardGeometry() {
         if (width <= 0 || height <= 0) return
+        if (isFoxAndGeeseImageBoard()) {
+            val bitmap = foxAndGeeseBitmap()
+            if (bitmap != null) {
+                val scale = minOf(
+                    width.toFloat() / bitmap.width,
+                    height.toFloat() / bitmap.height,
+                )
+                val imageWidth = bitmap.width * scale
+                val imageHeight = bitmap.height * scale
+                foxAndGeeseImageRect.set(
+                    (width - imageWidth) / 2f,
+                    (height - imageHeight) / 2f,
+                    (width + imageWidth) / 2f,
+                    (height + imageHeight) / 2f,
+                )
+                val gridX = foxAndGeeseGridX()
+                val gridY = foxAndGeeseGridY()
+                val averageX = (gridX.last() - gridX.first()) * imageWidth / 6f
+                val averageY = (gridY.last() - gridY.first()) * imageHeight / 6f
+                cellSize = minOf(averageX, averageY)
+                piecePaint.textSize = cellSize * 0.60f
+                mustCapturePaint.strokeWidth = cellSize * 0.055f
+            }
+            return
+        }
         if (isShogiBoard()) {
             val bitmap = shogiBoardBitmap
             if (bitmap != null) {
@@ -801,6 +865,7 @@ class BoardView(context: Context) : View(context) {
         if (isXiangqiBoard()) return xiangqiPoint(pos)
         if (isGoBoard()) return goPoint(pos)
         if (isOthelloImageBoard()) return othelloPoint(pos)
+        if (isFoxAndGeeseImageBoard()) return foxAndGeesePoint(pos)
         if (isChessBoard()) return chessPoint(pos)
         if (isDraughtsImageBoard()) return draughtsPoint(pos)
         val last = gameState.boardSize - 1
@@ -812,6 +877,12 @@ class BoardView(context: Context) : View(context) {
 
     // ─── Drawing ─────────────────────────────────────────────────────────────
     override fun onDraw(canvas: Canvas) {
+        if (isFoxAndGeeseImageBoard()) {
+            drawFoxAndGeeseImageBoard(canvas)
+            drawFoxAndGeeseHighlights(canvas)
+            drawFoxAndGeesePieces(canvas)
+            return
+        }
         if (isChessBoard()) {
             if (isChessImageBoard()) drawChessBoard(canvas) else drawBoard(canvas)
             drawChessHighlights(canvas)
@@ -1385,6 +1456,67 @@ class BoardView(context: Context) : View(context) {
                 null,
                 othelloImageRect,
                 Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG),
+            )
+        }
+    }
+
+    private fun drawFoxAndGeeseImageBoard(canvas: Canvas) {
+        canvas.drawColor(Color.rgb(20, 20, 20))
+        foxAndGeeseBitmap()?.let {
+            canvas.drawBitmap(
+                it,
+                null,
+                foxAndGeeseImageRect,
+                Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG),
+            )
+        }
+    }
+
+    private fun drawFoxAndGeeseHighlights(canvas: Canvas) {
+        gameState.lastMove?.let {
+            drawFoxAndGeesePoint(canvas, it.from, highlightGold)
+            drawFoxAndGeesePoint(canvas, it.to, highlightGold)
+        }
+        selectedPos?.let { drawFoxAndGeesePoint(canvas, it, highlightBlue) }
+
+        val showHints = directMoveMode || SettingsManager.getShowHints(context)
+        if (showHints) {
+            legalMoves.forEach { move ->
+                val point = foxAndGeesePoint(move.to)
+                if (!directMoveMode && move.isCapture) {
+                    canvas.drawCircle(point.x, point.y, cellSize * 0.44f, ringPaint)
+                } else {
+                    canvas.drawCircle(point.x, point.y, cellSize * 0.17f, dotPaint)
+                }
+            }
+        }
+    }
+
+    private fun drawFoxAndGeesePoint(canvas: Canvas, position: Position, paint: Paint) {
+        val point = foxAndGeesePoint(position)
+        canvas.drawCircle(point.x, point.y, cellSize * 0.38f, paint)
+    }
+
+    private fun drawFoxAndGeesePieces(canvas: Canvas) {
+        val skipPos = animFromPos
+        for (row in 0 until gameState.boardSize) {
+            for (col in 0 until gameState.boardSize) {
+                val position = Position(row, col)
+                if (position == skipPos) continue
+                val piece = gameState.get(position) ?: continue
+                val point = foxAndGeesePoint(position)
+                if (showMustCaptureHints && position in mustCapturePieces) {
+                    canvas.drawCircle(point.x, point.y, cellSize * 0.42f, mustCapturePaint)
+                }
+                drawPieceAt(canvas, piece, point.x, point.y, position)
+            }
+        }
+        animPiece?.let {
+            drawPieceAt(
+                canvas,
+                it,
+                lerp(animFromPx.x, animToPx.x, animProgress),
+                lerp(animFromPx.y, animToPx.y, animProgress),
             )
         }
     }
@@ -2639,6 +2771,27 @@ class BoardView(context: Context) : View(context) {
     private fun othelloBitmap(): Bitmap? =
         if (othelloBoardStyle == OthelloBoardStyle.GREEN_FELT) othelloBoardBitmap else null
 
+    private fun isFoxAndGeeseImageBoard(): Boolean =
+        isFoxAndGeeseBoard() && foxAndGeeseBitmap() != null
+
+    private fun foxAndGeeseBitmap(): Bitmap? = when (foxAndGeeseBoardStyle) {
+        FoxAndGeeseBoardStyle.CANVAS -> null
+        FoxAndGeeseBoardStyle.DARK_WOOD -> foxAndGeeseDarkWoodBoardBitmap
+        FoxAndGeeseBoardStyle.LIGHT_WOOD -> foxAndGeeseLightWoodBoardBitmap
+    }
+
+    private fun foxAndGeeseGridX(): FloatArray = when (foxAndGeeseBoardStyle) {
+        FoxAndGeeseBoardStyle.CANVAS -> floatArrayOf()
+        FoxAndGeeseBoardStyle.DARK_WOOD -> foxAndGeeseDarkWoodGridX
+        FoxAndGeeseBoardStyle.LIGHT_WOOD -> foxAndGeeseLightWoodGridX
+    }
+
+    private fun foxAndGeeseGridY(): FloatArray = when (foxAndGeeseBoardStyle) {
+        FoxAndGeeseBoardStyle.CANVAS -> floatArrayOf()
+        FoxAndGeeseBoardStyle.DARK_WOOD -> foxAndGeeseDarkWoodGridY
+        FoxAndGeeseBoardStyle.LIGHT_WOOD -> foxAndGeeseLightWoodGridY
+    }
+
     private fun othelloPoint(position: Position): PointF {
         val displayedRow = if (isFlipped) 7 - position.row else position.row
         val displayedCol = if (isFlipped) 7 - position.col else position.col
@@ -2653,6 +2806,17 @@ class BoardView(context: Context) : View(context) {
 
     private fun othelloLineY(index: Int): Float =
         othelloImageRect.top + othelloImageRect.height() * othelloGridY[index]
+
+    private fun foxAndGeesePoint(position: Position): PointF {
+        val displayedRow = if (isFlipped) FoxAndGeeseSetup.BOARD_SIZE - 1 - position.row else position.row
+        val displayedCol = if (isFlipped) FoxAndGeeseSetup.BOARD_SIZE - 1 - position.col else position.col
+        val gridX = foxAndGeeseGridX()
+        val gridY = foxAndGeeseGridY()
+        return PointF(
+            foxAndGeeseImageRect.left + foxAndGeeseImageRect.width() * gridX[displayedCol],
+            foxAndGeeseImageRect.top + foxAndGeeseImageRect.height() * gridY[displayedRow],
+        )
+    }
 
     private fun isChessBoard(): Boolean =
         ruleEngine is ChessRuleEngine || gameState.board.any { it is ChessPiece }
@@ -2894,6 +3058,32 @@ class BoardView(context: Context) : View(context) {
                 if (isFlipped) 7 - displayedRow else displayedRow,
                 if (isFlipped) 7 - displayedCol else displayedCol,
             )
+        }
+        if (isFoxAndGeeseImageBoard()) {
+            val gridX = foxAndGeeseGridX()
+            val gridY = foxAndGeeseGridY()
+            if (gridX.isEmpty() || gridY.isEmpty()) return null
+            val displayedCol = gridX.indices.minByOrNull { index ->
+                kotlin.math.abs(x - (foxAndGeeseImageRect.left + foxAndGeeseImageRect.width() * gridX[index]))
+            } ?: return null
+            val displayedRow = gridY.indices.minByOrNull { index ->
+                kotlin.math.abs(y - (foxAndGeeseImageRect.top + foxAndGeeseImageRect.height() * gridY[index]))
+            } ?: return null
+            val nearest = foxAndGeesePoint(
+                Position(
+                    if (isFlipped) FoxAndGeeseSetup.BOARD_SIZE - 1 - displayedRow else displayedRow,
+                    if (isFlipped) FoxAndGeeseSetup.BOARD_SIZE - 1 - displayedCol else displayedCol,
+                ),
+            )
+            if (kotlin.math.abs(x - nearest.x) > cellSize * 0.54f ||
+                kotlin.math.abs(y - nearest.y) > cellSize * 0.54f
+            ) return null
+            val logicRow =
+                if (isFlipped) FoxAndGeeseSetup.BOARD_SIZE - 1 - displayedRow else displayedRow
+            val logicCol =
+                if (isFlipped) FoxAndGeeseSetup.BOARD_SIZE - 1 - displayedCol else displayedCol
+            val position = Position(logicRow, logicCol)
+            return if (FoxAndGeeseSetup.isPlayable(position)) position else null
         }
         val col = ((x - boardLeft) / cellSize).toInt()
         val row = ((y - boardTop)  / cellSize).toInt()
