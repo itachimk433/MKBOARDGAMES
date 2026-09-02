@@ -14,6 +14,8 @@ import androidx.appcompat.app.AppCompatActivity
 import com.mkdev.mkboardgames.engine.*
 import com.mkdev.mkboardgames.games.connectfour.ConnectFourPiece
 import com.mkdev.mkboardgames.games.connectfour.ConnectFourRuleEngine
+import com.mkdev.mkboardgames.ui.BoardStyleSwitchView
+import com.mkdev.mkboardgames.ui.ConnectFourBoardStyle
 import com.mkdev.mkboardgames.ui.StyledDialogs
 import kotlinx.coroutines.*
 
@@ -36,6 +38,7 @@ class ConnectFourActivity : AppCompatActivity() {
     private var interstitialAd: Any? = null
 
     private lateinit var hudView: HudView
+    private lateinit var boardStyleSwitch: BoardStyleSwitchView
     private lateinit var boardView: ConnectBoardView
     private lateinit var scoreView: ScoreView
     private lateinit var gameRoot: View
@@ -49,9 +52,35 @@ class ConnectFourActivity : AppCompatActivity() {
             setBackgroundColor(Color.parseColor("#121212"))
         }
         hudView = HudView(this)
+        boardStyleSwitch = BoardStyleSwitchView(this)
         boardView = ConnectBoardView(this)
         scoreView = ScoreView(this)
+
+        val boardStyleRow = LinearLayout(this).apply {
+            gravity = Gravity.START
+            setPadding((10 * dp).toInt(), 0, 0, 0)
+            setBackgroundColor(Color.parseColor("#121212"))
+            isClickable = true
+        }
+        boardStyleRow.setOnTouchListener { _, event ->
+            if (event.action == MotionEvent.ACTION_UP) boardStyleSwitch.performClick()
+            true
+        }
+        boardStyleSwitch.setStyleCount(ConnectFourBoardStyle.entries.size)
+        boardStyleSwitch.setSelectedIndex(
+            ConnectFourBoardStyle.CANVAS.ordinal,
+            animate = false,
+        )
+        boardStyleSwitch.onStyleChanged = { styleIndex ->
+            boardView.boardStyle = ConnectFourBoardStyle.entries[styleIndex]
+        }
+        boardStyleRow.addView(
+            boardStyleSwitch,
+            LinearLayout.LayoutParams((118 * dp).toInt(), (44 * dp).toInt()),
+        )
+
         root.addView(hudView, LinearLayout.LayoutParams(-1, (60 * dp).toInt()))
+        root.addView(boardStyleRow, LinearLayout.LayoutParams(-1, (44 * dp).toInt()))
         root.addView(boardView, LinearLayout.LayoutParams(-1, 0).apply { weight = 1f })
         root.addView(scoreView, LinearLayout.LayoutParams(-1, (48 * dp).toInt()))
         AdManager.attachBanner(root)
@@ -560,6 +589,43 @@ Control the centre columns, build threats in more than one direction, and block 
         private var dropAnimationCompletion: (() -> Unit)? = null
         private val dp = resources.displayMetrics.density
         private var boardLeft = 0f; private var boardTop = 0f; private var cellSize = 0f
+        private val boardImageRect = RectF()
+        private var imageCellWidth = 0f
+        private var imageCellHeight = 0f
+        var boardStyle: ConnectFourBoardStyle = ConnectFourBoardStyle.CANVAS
+            set(value) {
+                if (field == value) return
+                field = value
+                updateBoardGeometry()
+                winP.strokeWidth = cellSize * 0.065f
+                invalidate()
+            }
+        private val redBoardBitmap: Bitmap? = try {
+            context.assets.open("connect_four_red.webp").use { BitmapFactory.decodeStream(it) }
+        } catch (_: Throwable) {
+            null
+        }
+        private val blueBoardBitmap: Bitmap? = try {
+            context.assets.open("connect_four_blue.webp").use { BitmapFactory.decodeStream(it) }
+        } catch (_: Throwable) {
+            null
+        }
+        private val greenBoardBitmap: Bitmap? = try {
+            context.assets.open("connect_four_green.webp").use { BitmapFactory.decodeStream(it) }
+        } catch (_: Throwable) {
+            null
+        }
+        // The uploaded boards share the same 1536×1024 composition. These
+        // measured hole centres keep the pieces centred on the photographed
+        // openings after the asset is scaled to any device.
+        private val imageGridX = floatArrayOf(
+            409f / 1536f, 593f / 1536f, 778f / 1536f,
+            962f / 1536f, 1147f / 1536f, 1331f / 1536f,
+        )
+        private val imageGridY = floatArrayOf(
+            132f / 1024f, 274f / 1024f, 416f / 1024f,
+            558f / 1024f, 700f / 1024f, 842f / 1024f,
+        )
         private var boardColor = Color.parseColor("#24527A")
         private var accent = Color.parseColor("#7FC8F8")
         private val bgP = Paint().apply { color = Color.parseColor("#121212") }
@@ -583,11 +649,66 @@ Control the centre columns, build threats in more than one direction, and block 
         }
 
         override fun onSizeChanged(w: Int, h: Int, ow: Int, oh: Int) {
-            val pad = 20f * dp
-            cellSize = minOf((w - pad * 2) / ConnectFourRuleEngine.COLUMNS, (h - pad * 2) / ConnectFourRuleEngine.ROWS)
-            boardLeft = (w - cellSize * ConnectFourRuleEngine.COLUMNS) / 2f
-            boardTop = (h - cellSize * ConnectFourRuleEngine.ROWS) / 2f
+            updateBoardGeometry()
             winP.strokeWidth = cellSize * 0.065f
+        }
+
+        private fun updateBoardGeometry() {
+            if (width <= 0 || height <= 0) return
+            val bitmap = boardBitmap()
+            if (bitmap != null) {
+                val scale = minOf(width.toFloat() / bitmap.width, height.toFloat() / bitmap.height)
+                val imageWidth = bitmap.width * scale
+                val imageHeight = bitmap.height * scale
+                boardImageRect.set(
+                    (width - imageWidth) / 2f,
+                    (height - imageHeight) / 2f,
+                    (width + imageWidth) / 2f,
+                    (height + imageHeight) / 2f,
+                )
+                imageCellWidth = (imageGridX.last() - imageGridX.first()) *
+                    boardImageRect.width() / (ConnectFourRuleEngine.COLUMNS - 1)
+                imageCellHeight = (imageGridY.last() - imageGridY.first()) *
+                    boardImageRect.height() / (ConnectFourRuleEngine.ROWS - 1)
+                cellSize = minOf(imageCellWidth, imageCellHeight)
+                return
+            }
+
+            val pad = 20f * dp
+            cellSize = minOf(
+                (width - pad * 2) / ConnectFourRuleEngine.COLUMNS,
+                (height - pad * 2) / ConnectFourRuleEngine.ROWS,
+            )
+            boardLeft = (width - cellSize * ConnectFourRuleEngine.COLUMNS) / 2f
+            boardTop = (height - cellSize * ConnectFourRuleEngine.ROWS) / 2f
+        }
+
+        private fun boardBitmap(): Bitmap? = when (boardStyle) {
+            ConnectFourBoardStyle.CANVAS -> null
+            ConnectFourBoardStyle.RED -> redBoardBitmap
+            ConnectFourBoardStyle.BLUE -> blueBoardBitmap
+            ConnectFourBoardStyle.GREEN -> greenBoardBitmap
+        }
+
+        private fun isImageBoard() = boardBitmap() != null
+
+        private fun imageColumnCenter(column: Int): Float =
+            boardImageRect.left + boardImageRect.width() * imageGridX[column]
+
+        private fun imageRowCenter(row: Int): Float =
+            boardImageRect.top + boardImageRect.height() * imageGridY[row]
+
+        private fun imageColumnForX(x: Float): Int? {
+            val boundaries = FloatArray(ConnectFourRuleEngine.COLUMNS + 1) { index ->
+                when (index) {
+                    0 -> boardImageRect.left
+                    ConnectFourRuleEngine.COLUMNS -> boardImageRect.right
+                    else -> (imageColumnCenter(index - 1) + imageColumnCenter(index)) / 2f
+                }
+            }
+            return (0 until ConnectFourRuleEngine.COLUMNS).firstOrNull {
+                x >= boundaries[it] && x < boundaries[it + 1]
+            }
         }
 
         override fun onTouchEvent(event: MotionEvent): Boolean {
@@ -597,8 +718,13 @@ Control the centre columns, build threats in more than one direction, and block 
                     return true
                 }
                 if (!isLocked && cellSize > 0f) {
-                    val col = ((event.x - boardLeft) / cellSize).toInt()
-                    if (col in 0 until ConnectFourRuleEngine.COLUMNS && engine.landingRow(state, col) != null) {
+                    val col = if (isImageBoard()) {
+                        imageColumnForX(event.x)
+                    } else {
+                        ((event.x - boardLeft) / cellSize).toInt()
+                            .takeIf { it in 0 until ConnectFourRuleEngine.COLUMNS }
+                    }
+                    if (col != null && engine.landingRow(state, col) != null) {
                         handleMove(Move(ConnectFourRuleEngine.DROP, Position(0, col)))
                     }
                 }
@@ -696,9 +822,20 @@ Control the centre columns, build threats in more than one direction, and block 
             val bottom = boardTop + ConnectFourRuleEngine.ROWS * cellSize
             val fallingRow = fallingIndex?.div(ConnectFourRuleEngine.COLUMNS)
             val fallingCol = fallingIndex?.rem(ConnectFourRuleEngine.COLUMNS)
-            val fallingX = fallingCol?.let { boardLeft + it * cellSize + cellSize / 2f }
-            val fallingTargetY = fallingRow?.let { boardTop + it * cellSize + cellSize / 2f }
-            val fallingStartY = boardTop - cellSize * 0.85f
+            val fallingX = fallingCol?.let {
+                if (isImageBoard()) imageColumnCenter(it)
+                else boardLeft + it * cellSize + cellSize / 2f
+            }
+            val fallingTargetY = fallingRow?.let {
+                if (isImageBoard()) imageRowCenter(it)
+                else boardTop + it * cellSize + cellSize / 2f
+            }
+            val fallingStartY = if (isImageBoard()) {
+                boardImageRect.top - cellSize * 0.85f
+            } else {
+                boardTop - cellSize * 0.85f
+            }
+            val boardStartY = if (isImageBoard()) boardImageRect.top else boardTop
             val fallingY = fallingTargetY?.let {
                 fallingStartY + (it - fallingStartY) * fallingProgress
             }
@@ -707,37 +844,56 @@ Control the centre columns, build threats in more than one direction, and block 
             // Draw the part above the board first. Once it reaches the board,
             // the board face is drawn over it and only the circular openings
             // reveal the disc below, so it can never paint over the frame.
-            if (fallingX != null && fallingY != null && fallingColor != null && fallingY < boardTop) {
+            if (fallingX != null && fallingY != null && fallingColor != null && fallingY < boardStartY) {
                 drawDisc(canvas, fallingX, fallingY, fallingRadius, fallingColor!!)
             }
 
-            boardP.color = boardColor
-            canvas.drawRoundRect(boardLeft, boardTop, right, bottom, cellSize * 0.14f, cellSize * 0.14f, boardP)
+            if (isImageBoard()) {
+                canvas.drawColor(Color.rgb(16, 20, 24))
+                boardBitmap()?.let {
+                    canvas.drawBitmap(
+                        it,
+                        null,
+                        boardImageRect,
+                        Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG),
+                    )
+                }
+            } else {
+                boardP.color = boardColor
+                canvas.drawRoundRect(boardLeft, boardTop, right, bottom, cellSize * 0.14f, cellSize * 0.14f, boardP)
+            }
             val holePath = Path()
             for (row in 0 until ConnectFourRuleEngine.ROWS) for (col in 0 until ConnectFourRuleEngine.COLUMNS) {
-                val cx = boardLeft + col * cellSize + cellSize / 2f
-                val cy = boardTop + row * cellSize + cellSize / 2f
-                canvas.drawCircle(cx, cy, cellSize * 0.36f, holeP)
-                holePath.addCircle(cx, cy, cellSize * 0.36f, Path.Direction.CW)
+                val cx = if (isImageBoard()) imageColumnCenter(col)
+                else boardLeft + col * cellSize + cellSize / 2f
+                val cy = if (isImageBoard()) imageRowCenter(row)
+                else boardTop + row * cellSize + cellSize / 2f
+                val holeRadius = if (isImageBoard()) cellSize * 0.37f else cellSize * 0.36f
+                if (!isImageBoard()) canvas.drawCircle(cx, cy, holeRadius, holeP)
+                holePath.addCircle(cx, cy, holeRadius, Path.Direction.CW)
             }
 
-            if (fallingX != null && fallingY != null && fallingColor != null && fallingY >= boardTop) {
+            if (fallingX != null && fallingY != null && fallingColor != null && fallingY >= boardStartY) {
                 canvas.save()
                 canvas.clipPath(holePath)
                 drawDisc(canvas, fallingX, fallingY, fallingRadius, fallingColor!!)
                 canvas.restore()
             }
             lastMove?.let {
-                val cx = boardLeft + it.col * cellSize + cellSize / 2f
-                val cy = boardTop + it.row * cellSize + cellSize / 2f
+                val cx = if (isImageBoard()) imageColumnCenter(it.col)
+                else boardLeft + it.col * cellSize + cellSize / 2f
+                val cy = if (isImageBoard()) imageRowCenter(it.row)
+                else boardTop + it.row * cellSize + cellSize / 2f
                 canvas.drawCircle(cx, cy, cellSize * 0.43f, highlightP)
             }
             for (row in 0 until ConnectFourRuleEngine.ROWS) for (col in 0 until ConnectFourRuleEngine.COLUMNS) {
                 val piece = state.get(row, col) as? ConnectFourPiece ?: continue
                 val idx = row * ConnectFourRuleEngine.COLUMNS + col
                 if (idx == fallingIndex) continue
-                val cx = boardLeft + col * cellSize + cellSize / 2f
-                val cy = boardTop + row * cellSize + cellSize / 2f
+                val cx = if (isImageBoard()) imageColumnCenter(col)
+                else boardLeft + col * cellSize + cellSize / 2f
+                val cy = if (isImageBoard()) imageRowCenter(row)
+                else boardTop + row * cellSize + cellSize / 2f
                 drawDisc(canvas, cx, cy, cellSize * 0.31f, piece.color)
             }
             winLine?.takeIf { it.size >= 2 }?.let {
