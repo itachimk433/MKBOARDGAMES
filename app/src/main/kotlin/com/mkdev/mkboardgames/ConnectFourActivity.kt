@@ -615,18 +615,17 @@ Control the centre columns, build threats in more than one direction, and block 
         } catch (_: Throwable) {
             null
         }
-        // The uploaded boards share the same 1024×683 composition. The
-        // supplied artwork has six visible openings, while the game engine
-        // has seven playable columns, so the seven game columns are fitted
-        // evenly across the board's measured inner span.
+        // The uploaded boards share the same 1024×683 composition. These
+        // measured hole centres keep pieces, highlights, animations, and
+        // touch columns aligned with the corrected seven-column artwork.
         private val imageGridX = floatArrayOf(
-            271.5f / 1024f, 351.7f / 1024f, 431.8f / 1024f,
-            512f / 1024f, 592.2f / 1024f, 672.3f / 1024f,
-            752.5f / 1024f,
+            244.5f / 1024f, 339f / 1024f, 433.5f / 1024f,
+            528.5f / 1024f, 622.5f / 1024f, 717f / 1024f,
+            811f / 1024f,
         )
         private val imageGridY = floatArrayOf(
-            92.5f / 683f, 183.5f / 683f, 273.5f / 683f,
-            364f / 683f, 455.5f / 683f, 546f / 683f,
+            92f / 683f, 182f / 683f, 272.5f / 683f,
+            362.5f / 683f, 453.5f / 683f, 544f / 683f,
         )
         private var boardColor = Color.parseColor("#24527A")
         private var accent = Color.parseColor("#7FC8F8")
