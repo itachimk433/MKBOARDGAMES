@@ -117,8 +117,8 @@ class ConnectFourActivity : AppCompatActivity() {
             (76 * dp).toInt(),
         ).apply {
             gravity = Gravity.CENTER_HORIZONTAL
-            visibility = View.GONE
         })
+        autoplayButton.visibility = View.GONE
         root.addView(scoreView, LinearLayout.LayoutParams(-1, (48 * dp).toInt()))
         AdManager.attachBanner(root)
         gameRoot = root

@@ -821,8 +821,8 @@ class ReplayActivity : AppCompatActivity() {
 
             val pad = 20f * dp
             cellSize = minOf(
-                (w - pad * 2) / ConnectFourRuleEngine.COLUMNS,
-                (h - pad * 2) / ConnectFourRuleEngine.ROWS
+                (width - pad * 2) / ConnectFourRuleEngine.COLUMNS,
+                (height - pad * 2) / ConnectFourRuleEngine.ROWS
             )
             boardLeft = (width - cellSize * ConnectFourRuleEngine.COLUMNS) / 2f
             boardTop = (height - cellSize * ConnectFourRuleEngine.ROWS) / 2f
