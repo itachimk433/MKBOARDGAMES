@@ -30,7 +30,6 @@ import com.mkdev.mkboardgames.games.shogi.ShogiSetup
 import com.mkdev.mkboardgames.games.shogi.ShogiPieceType
 import com.mkdev.mkboardgames.games.xiangqi.XiangqiPiece
 import com.mkdev.mkboardgames.games.xiangqi.XiangqiRuleEngine
-import kotlin.math.roundToInt
 
 class BoardView(context: Context) : View(context) {
 
@@ -82,6 +81,13 @@ class BoardView(context: Context) : View(context) {
             invalidate()
         }
     var foxAndGeeseBoardStyle: FoxAndGeeseBoardStyle = FoxAndGeeseBoardStyle.CANVAS
+        set(value) {
+            if (field == value) return
+            field = value
+            refreshBoardStyleGeometry()
+            invalidate()
+        }
+    var xiangqiBoardStyle: XiangqiBoardStyle = XiangqiBoardStyle.CLASSIC
         set(value) {
             if (field == value) return
             field = value
@@ -167,6 +173,7 @@ class BoardView(context: Context) : View(context) {
     private var xiangqiGridLeft = 0f
     private var xiangqiGridRight = 0f
     private var xiangqiGridTop = 0f
+    private var xiangqiGridBottom = 0f
     private var xiangqiCellWidth = 0f
     private var xiangqiCellHeight = 0f
     private var goImageRect = RectF()
@@ -306,6 +313,18 @@ class BoardView(context: Context) : View(context) {
 
     private val xiangqiBoardBitmap: Bitmap? = try {
         context.assets.open("xiangqi_board.webp").use { BitmapFactory.decodeStream(it) }
+    } catch (_: Throwable) {
+        null
+    }
+    private val xiangqiChineseBoardBitmap: Bitmap? = try {
+        context.assets.open("xiangqi_board_chinese.webp")
+            .use { BitmapFactory.decodeStream(it) }
+    } catch (_: Throwable) {
+        null
+    }
+    private val xiangqiEnglishBoardBitmap: Bitmap? = try {
+        context.assets.open("xiangqi_board_english.webp")
+            .use { BitmapFactory.decodeStream(it) }
     } catch (_: Throwable) {
         null
     }
@@ -544,7 +563,7 @@ class BoardView(context: Context) : View(context) {
             return
         }
         if (isXiangqiBoard()) {
-            val bitmap = xiangqiBoardBitmap
+            val bitmap = xiangqiBitmap()
             if (bitmap != null) {
                 val scale = minOf(
                     width.toFloat() / bitmap.width,
@@ -558,14 +577,14 @@ class BoardView(context: Context) : View(context) {
                     (width + imageWidth) / 2f,
                     (height + imageHeight) / 2f,
                 )
-                // Coordinates of the nine-by-ten intersection grid in the
-                // supplied reference image, including its printed labels.
-                xiangqiGridLeft = xiangqiImageRect.left + imageWidth * 0.052f
-                xiangqiGridRight = xiangqiImageRect.left + imageWidth * 0.951f
-                xiangqiGridTop = xiangqiImageRect.top + imageHeight * 0.113f
-                val gridBottom = xiangqiImageRect.top + imageHeight * 0.898f
+                val gridX = xiangqiGridX()
+                val gridY = xiangqiGridY()
+                xiangqiGridLeft = xiangqiImageRect.left + imageWidth * gridX.first()
+                xiangqiGridRight = xiangqiImageRect.left + imageWidth * gridX.last()
+                xiangqiGridTop = xiangqiImageRect.top + imageHeight * gridY.first()
+                xiangqiGridBottom = xiangqiImageRect.top + imageHeight * gridY.last()
                 xiangqiCellWidth = (xiangqiGridRight - xiangqiGridLeft) / 8f
-                xiangqiCellHeight = (gridBottom - xiangqiGridTop) / 9f
+                xiangqiCellHeight = (xiangqiGridBottom - xiangqiGridTop) / 9f
                 cellSize = minOf(xiangqiCellWidth, xiangqiCellHeight)
                 piecePaint.textSize = cellSize * 0.72f
                 mustCapturePaint.strokeWidth = cellSize * 0.055f
@@ -1130,7 +1149,14 @@ class BoardView(context: Context) : View(context) {
 
     private fun drawXiangqiBoard(canvas: Canvas) {
         canvas.drawColor(Color.rgb(20, 20, 20))
-        xiangqiBoardBitmap?.let { canvas.drawBitmap(it, null, xiangqiImageRect, Paint(Paint.ANTI_ALIAS_FLAG)) }
+        xiangqiBitmap()?.let {
+            canvas.drawBitmap(
+                it,
+                null,
+                xiangqiImageRect,
+                Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG),
+            )
+        }
     }
 
     private fun drawShogiBoard(canvas: Canvas) {
@@ -2790,6 +2816,44 @@ class BoardView(context: Context) : View(context) {
     private fun isXiangqiBoard(): Boolean =
         ruleEngine is XiangqiRuleEngine || gameState.board.any { it is XiangqiPiece }
 
+    private fun xiangqiBitmap(): Bitmap? = when (xiangqiBoardStyle) {
+        XiangqiBoardStyle.CLASSIC -> xiangqiBoardBitmap
+        XiangqiBoardStyle.CHINESE -> xiangqiChineseBoardBitmap
+        XiangqiBoardStyle.ENGLISH -> xiangqiEnglishBoardBitmap
+    }
+
+    private fun xiangqiGridX(): FloatArray = when (xiangqiBoardStyle) {
+        XiangqiBoardStyle.CLASSIC -> floatArrayOf(
+            0.052f, 0.164375f, 0.27675f, 0.389125f, 0.5015f,
+            0.613875f, 0.72625f, 0.838625f, 0.951f,
+        )
+        XiangqiBoardStyle.CHINESE,
+        XiangqiBoardStyle.ENGLISH -> floatArrayOf(
+            100f / 1024f, 205f / 1024f, 308f / 1024f, 410f / 1024f,
+            514f / 1024f, 617f / 1024f, 719f / 1024f, 821f / 1024f,
+            923f / 1024f,
+        )
+    }
+
+    private fun xiangqiGridY(): FloatArray = when (xiangqiBoardStyle) {
+        XiangqiBoardStyle.CLASSIC -> floatArrayOf(
+            0.113f, 0.200222f, 0.287444f, 0.374667f, 0.461889f,
+            0.549111f, 0.636333f, 0.723556f, 0.810778f, 0.898f,
+        )
+        XiangqiBoardStyle.CHINESE,
+        XiangqiBoardStyle.ENGLISH -> floatArrayOf(
+            230f / 1536f, 340f / 1536f, 452f / 1536f, 563f / 1536f,
+            677f / 1536f, 815f / 1536f, 928f / 1536f, 1038f / 1536f,
+            1151f / 1536f, 1261f / 1536f,
+        )
+    }
+
+    private fun xiangqiLineX(index: Int): Float =
+        xiangqiImageRect.left + xiangqiImageRect.width() * xiangqiGridX()[index]
+
+    private fun xiangqiLineY(index: Int): Float =
+        xiangqiImageRect.top + xiangqiImageRect.height() * xiangqiGridY()[index]
+
     private fun isShogiBoard(): Boolean =
         ruleEngine is ShogiRuleEngine || gameState.board.any { it is ShogiPiece }
 
@@ -2997,8 +3061,8 @@ class BoardView(context: Context) : View(context) {
         val displayedRow = if (isFlipped) 9 - position.row else position.row
         val displayedCol = if (isFlipped) 8 - position.col else position.col
         return PointF(
-            xiangqiGridLeft + displayedCol * xiangqiCellWidth,
-            xiangqiGridTop + displayedRow * xiangqiCellHeight,
+            xiangqiLineX(displayedCol),
+            xiangqiLineY(displayedRow),
         )
     }
 
@@ -3044,11 +3108,14 @@ class BoardView(context: Context) : View(context) {
         }
         if (isXiangqiBoard()) {
             if (xiangqiCellWidth <= 0f || xiangqiCellHeight <= 0f) return null
-            val displayedCol = ((x - xiangqiGridLeft) / xiangqiCellWidth).roundToInt()
-            val displayedRow = ((y - xiangqiGridTop) / xiangqiCellHeight).roundToInt()
-            if (displayedCol !in 0..8 || displayedRow !in 0..9) return null
-            val nearestX = xiangqiGridLeft + displayedCol * xiangqiCellWidth
-            val nearestY = xiangqiGridTop + displayedRow * xiangqiCellHeight
+            val displayedCol = xiangqiGridX().indices.minByOrNull { index ->
+                kotlin.math.abs(x - xiangqiLineX(index))
+            } ?: return null
+            val displayedRow = xiangqiGridY().indices.minByOrNull { index ->
+                kotlin.math.abs(y - xiangqiLineY(index))
+            } ?: return null
+            val nearestX = xiangqiLineX(displayedCol)
+            val nearestY = xiangqiLineY(displayedRow)
             if (kotlin.math.abs(x - nearestX) > xiangqiCellWidth * 0.48f ||
                 kotlin.math.abs(y - nearestY) > xiangqiCellHeight * 0.48f
             ) return null

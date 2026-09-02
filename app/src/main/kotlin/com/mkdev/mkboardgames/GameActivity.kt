@@ -36,6 +36,7 @@ import com.mkdev.mkboardgames.ui.DraughtsBoardStyle
 import com.mkdev.mkboardgames.ui.FoxAndGeeseBoardStyle
 import com.mkdev.mkboardgames.ui.OthelloBoardStyle
 import com.mkdev.mkboardgames.ui.StyledDialogs
+import com.mkdev.mkboardgames.ui.XiangqiBoardStyle
 import kotlinx.coroutines.*
 
 class GameActivity : AppCompatActivity() {
@@ -63,6 +64,11 @@ class GameActivity : AppCompatActivity() {
         FoxAndGeeseBoardStyle.CANVAS,
         FoxAndGeeseBoardStyle.LIGHT_WOOD,
         FoxAndGeeseBoardStyle.CROSS_WOOD,
+    )
+    private val xiangqiStyles = arrayOf(
+        XiangqiBoardStyle.CLASSIC,
+        XiangqiBoardStyle.CHINESE,
+        XiangqiBoardStyle.ENGLISH,
     )
 
     private var gameState: GameState = GameState(arrayOfNulls(64))
@@ -176,6 +182,9 @@ class GameActivity : AppCompatActivity() {
                 "FOX_AND_GEESE" ->
                     boardView.foxAndGeeseBoardStyle =
                         foxAndGeeseStyles.getOrElse(styleIndex) { foxAndGeeseStyles.first() }
+                "XIANGQI" ->
+                    boardView.xiangqiBoardStyle =
+                        xiangqiStyles.getOrElse(styleIndex) { xiangqiStyles.first() }
             }
         }
         boardView.onEmptySpaceTapped = ::revealBoardStyleSwitch
@@ -215,7 +224,8 @@ class GameActivity : AppCompatActivity() {
         }
         boardStyleSwitchEnabled =
             gameType == "CHESS" || isDraughtsGame ||
-                gameType == "OTHELLO" || gameType == "FOX_AND_GEESE"
+                gameType == "OTHELLO" || gameType == "FOX_AND_GEESE" ||
+                gameType == "XIANGQI"
         boardStyleSwitch.setStyleCount(
             when {
                 gameType == "CHESS" -> ChessBoardStyle.entries.size
@@ -225,6 +235,7 @@ class GameActivity : AppCompatActivity() {
                         internationalDraughtsStyles.count { it != DraughtsBoardStyle.CANVAS }
                 gameType == "OTHELLO" -> OthelloBoardStyle.entries.size
                 gameType == "FOX_AND_GEESE" -> foxAndGeeseStyles.size
+                gameType == "XIANGQI" -> xiangqiStyles.size
                 else -> ChessBoardStyle.entries.size
             },
         )
@@ -236,6 +247,8 @@ class GameActivity : AppCompatActivity() {
             gameType == "OTHELLO" -> boardView.othelloBoardStyle.ordinal
             gameType == "FOX_AND_GEESE" ->
                 foxAndGeeseStyles.indexOf(boardView.foxAndGeeseBoardStyle).coerceAtLeast(0)
+            gameType == "XIANGQI" ->
+                xiangqiStyles.indexOf(boardView.xiangqiBoardStyle).coerceAtLeast(0)
             else -> boardView.chessBoardStyle.ordinal
         }
         boardStyleSwitch.setSelectedIndex(
