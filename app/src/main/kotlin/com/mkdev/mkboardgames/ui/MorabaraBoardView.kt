@@ -506,30 +506,41 @@ class MorabaraBoardView(context: Context) : View(context) {
         canvas.drawCircle(cx, cy, r, fill)
         fill.shader = null
 
-        pieceRingPaint.color = if (color == PieceColor.WHITE) {
+        val outlineColor = if (color == PieceColor.WHITE) Color.BLACK else Color.WHITE
+        pieceRingPaint.color = if (isRealisticBoard()) {
+            outlineColor
+        } else if (color == PieceColor.WHITE) {
             Color.parseColor("#8B7E6C")
         } else {
             Color.parseColor("#0A0908")
         }
-        pieceRingPaint.strokeWidth = r * .075f
+        pieceRingPaint.strokeWidth = if (isRealisticBoard()) r * .045f else r * .075f
         canvas.drawCircle(cx, cy, r, pieceRingPaint)
 
-        // Two nested embossed rings give each cow a physical, double-inset
-        // face instead of a flat glossy disc.
-        innerRingPaint.strokeWidth = r * .035f
-        innerRingPaint.color = if (color == PieceColor.WHITE) {
-            Color.argb(125, 107, 94, 80)
+        if (isRealisticBoard()) {
+            // The second board uses a matched pair of crisp, inverted
+            // outlines: one exactly at the edge and one just inside it.
+            innerRingPaint.strokeWidth = r * .03f
+            innerRingPaint.color = outlineColor
+            canvas.drawCircle(cx, cy, r * .90f, innerRingPaint)
         } else {
-            Color.argb(190, 190, 181, 171)
+            // Two nested embossed rings give each cow a physical, double-inset
+            // face instead of a flat glossy disc.
+            innerRingPaint.strokeWidth = r * .035f
+            innerRingPaint.color = if (color == PieceColor.WHITE) {
+                Color.argb(125, 107, 94, 80)
+            } else {
+                Color.argb(190, 190, 181, 171)
+            }
+            canvas.drawCircle(cx, cy, r * .69f, innerRingPaint)
+            innerRingPaint.strokeWidth = r * .022f
+            innerRingPaint.color = if (color == PieceColor.WHITE) {
+                Color.argb(105, 255, 255, 255)
+            } else {
+                Color.argb(135, 15, 13, 12)
+            }
+            canvas.drawCircle(cx, cy, r * .53f, innerRingPaint)
         }
-        canvas.drawCircle(cx, cy, r * .69f, innerRingPaint)
-        innerRingPaint.strokeWidth = r * .022f
-        innerRingPaint.color = if (color == PieceColor.WHITE) {
-            Color.argb(105, 255, 255, 255)
-        } else {
-            Color.argb(135, 15, 13, 12)
-        }
-        canvas.drawCircle(cx, cy, r * .53f, innerRingPaint)
 
         val highlightPaint = if (color == PieceColor.WHITE) whitePiecePaint else blackPiecePaint
         highlightPaint.shader = RadialGradient(
@@ -545,7 +556,7 @@ class MorabaraBoardView(context: Context) : View(context) {
     }
 
     private fun pieceRadius(): Float =
-        cellSize * (if (isRealisticBoard()) .31f else .36f) * 0.98f
+        cellSize * if (isRealisticBoard()) .31f * 0.98f else .36f
 
     private fun movementDotRadius(): Float =
         cellSize * (if (isRealisticBoard()) .13f else .14f)

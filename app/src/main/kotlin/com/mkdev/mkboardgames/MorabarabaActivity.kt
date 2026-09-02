@@ -429,7 +429,11 @@ class MorabarabaActivity : AppCompatActivity() {
                 showResult()
                 return
             }
-            if (vsAI && gameState.currentTurn != playerColor) triggerAI()
+            // Autoplay must also continue when the turn comes back to the
+            // player. The enabled state makes both sides computer-controlled;
+            // without it, the first AI move leaves the game waiting on the
+            // player's turn after a single autoplay cycle.
+            if (vsAI && aiControlsCurrentTurn()) triggerAI()
         } catch (e: Exception) {
             boardView.isLocked = false
         }
