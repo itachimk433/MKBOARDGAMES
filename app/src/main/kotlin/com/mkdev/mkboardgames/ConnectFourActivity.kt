@@ -615,17 +615,17 @@ Control the centre columns, build threats in more than one direction, and block 
         } catch (_: Throwable) {
             null
         }
-        // The uploaded boards share the same 1024×683 composition. These
-        // measured hole centres keep pieces, highlights, animations, and
-        // touch columns aligned with the corrected seven-column artwork.
+        // The transparent boards are trimmed from the same 1536×1024
+        // composition. These measured hole centres keep pieces, highlights,
+        // animations, and touch columns aligned with the seven-column artwork.
         private val imageGridX = floatArrayOf(
-            244.5f / 1024f, 339f / 1024f, 433.5f / 1024f,
-            528.5f / 1024f, 622.5f / 1024f, 717f / 1024f,
-            811f / 1024f,
+            207f / 1261f, 349f / 1261f, 490.5f / 1261f,
+            633f / 1261f, 774f / 1261f, 915f / 1261f,
+            1057f / 1261f,
         )
         private val imageGridY = floatArrayOf(
-            92f / 683f, 182f / 683f, 272.5f / 683f,
-            362.5f / 683f, 453.5f / 683f, 544f / 683f,
+            128.5f / 1002f, 263.5f / 1002f, 399f / 1002f,
+            535.5f / 1002f, 671f / 1002f, 807f / 1002f,
         )
         private var boardColor = Color.parseColor("#24527A")
         private var accent = Color.parseColor("#7FC8F8")
@@ -850,7 +850,6 @@ Control the centre columns, build threats in more than one direction, and block 
             }
 
             if (isImageBoard()) {
-                canvas.drawColor(Color.rgb(16, 20, 24))
                 boardBitmap()?.let {
                     canvas.drawBitmap(
                         it,
