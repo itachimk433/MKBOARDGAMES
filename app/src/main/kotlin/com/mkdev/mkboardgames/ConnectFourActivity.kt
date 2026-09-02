@@ -36,12 +36,25 @@ class ConnectFourActivity : AppCompatActivity() {
     private var scoreDraws = 0
     private var resultRecorded = false
     private var interstitialAd: Any? = null
+    private var boardStyleSwitchEnabled = true
 
     private lateinit var hudView: HudView
     private lateinit var boardStyleSwitch: BoardStyleSwitchView
     private lateinit var boardView: ConnectBoardView
     private lateinit var scoreView: ScoreView
     private lateinit var gameRoot: View
+    private val boardStyleSwitchFadeRunnable = Runnable {
+        if (!boardStyleSwitchEnabled || !::boardStyleSwitch.isInitialized) return@Runnable
+        boardStyleSwitch.animate()
+            .alpha(0f)
+            .setDuration(900L)
+            .withEndAction {
+                if (boardStyleSwitch.alpha <= 0.01f) {
+                    boardStyleSwitch.visibility = View.INVISIBLE
+                }
+            }
+            .start()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -63,7 +76,7 @@ class ConnectFourActivity : AppCompatActivity() {
             isClickable = true
         }
         boardStyleRow.setOnTouchListener { _, event ->
-            if (event.action == MotionEvent.ACTION_UP) boardStyleSwitch.performClick()
+            if (event.action == MotionEvent.ACTION_UP) revealBoardStyleSwitch()
             true
         }
         boardStyleSwitch.setStyleCount(ConnectFourBoardStyle.entries.size)
@@ -283,6 +296,7 @@ Control the centre columns, build threats in more than one direction, and block 
         boardView.onGameOverTapped = { showResultDialog() }
         scoreView.update(scoreRed, scoreDraws, scoreYellow)
         updateHud()
+        scheduleBoardStyleSwitchFade()
         if (restoring != null) {
             restoreMoves(restoring.moves)
             clearPausedMatch()
@@ -568,12 +582,39 @@ Control the centre columns, build threats in more than one direction, and block 
     }
 
     private fun hideBoardWhileDialogIsOpen() {
+        boardStyleSwitch.removeCallbacks(boardStyleSwitchFadeRunnable)
+        boardStyleSwitch.animate().cancel()
         gameRoot.visibility = View.INVISIBLE
     }
 
     private fun showBoardAfterDialog(resumeAi: Boolean = true) {
         gameRoot.visibility = View.VISIBLE
+        scheduleBoardStyleSwitchFade()
         if (resumeAi) resumeComputerTurnIfNeeded()
+    }
+
+    private fun scheduleBoardStyleSwitchFade() {
+        if (!boardStyleSwitchEnabled || !::boardStyleSwitch.isInitialized) return
+        boardStyleSwitch.removeCallbacks(boardStyleSwitchFadeRunnable)
+        boardStyleSwitch.animate().cancel()
+        boardStyleSwitch.alpha = 1f
+        boardStyleSwitch.visibility = View.VISIBLE
+        boardStyleSwitch.postDelayed(boardStyleSwitchFadeRunnable, 5_000L)
+    }
+
+    private fun revealBoardStyleSwitch() {
+        if (!boardStyleSwitchEnabled || !::boardStyleSwitch.isInitialized) return
+        boardStyleSwitch.removeCallbacks(boardStyleSwitchFadeRunnable)
+        boardStyleSwitch.animate().cancel()
+        if (boardStyleSwitch.visibility != View.VISIBLE) {
+            boardStyleSwitch.visibility = View.VISIBLE
+            boardStyleSwitch.alpha = 0f
+        }
+        boardStyleSwitch.animate()
+            .alpha(1f)
+            .setDuration(220L)
+            .start()
+        boardStyleSwitch.postDelayed(boardStyleSwitchFadeRunnable, 5_000L)
     }
 
     inner class ConnectBoardView(ctx: Context) : View(ctx) {
@@ -600,18 +641,18 @@ Control the centre columns, build threats in more than one direction, and block 
                 winP.strokeWidth = cellSize * 0.065f
                 invalidate()
             }
-        private val redBoardBitmap: Bitmap? = try {
-            context.assets.open("connect_four_red.webp").use { BitmapFactory.decodeStream(it) }
-        } catch (_: Throwable) {
-            null
-        }
         private val blueBoardBitmap: Bitmap? = try {
             context.assets.open("connect_four_blue.webp").use { BitmapFactory.decodeStream(it) }
         } catch (_: Throwable) {
             null
         }
-        private val greenBoardBitmap: Bitmap? = try {
-            context.assets.open("connect_four_green.webp").use { BitmapFactory.decodeStream(it) }
+        private val redPieceBitmap: Bitmap? = try {
+            context.assets.open("connect_four_red_piece.webp").use { BitmapFactory.decodeStream(it) }
+        } catch (_: Throwable) {
+            null
+        }
+        private val yellowPieceBitmap: Bitmap? = try {
+            context.assets.open("connect_four_yellow_piece.webp").use { BitmapFactory.decodeStream(it) }
         } catch (_: Throwable) {
             null
         }
@@ -634,6 +675,7 @@ Control the centre columns, build threats in more than one direction, and block 
         private val holeP = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#101820") }
         private val redP = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#EF5350") }
         private val yellowP = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#FFD54F") }
+        private val pieceBitmapPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
         private val highlightP = Paint(Paint.ANTI_ALIAS_FLAG)
         private val winP = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND }
 
@@ -686,9 +728,7 @@ Control the centre columns, build threats in more than one direction, and block 
 
         private fun boardBitmap(): Bitmap? = when (boardStyle) {
             ConnectFourBoardStyle.CANVAS -> null
-            ConnectFourBoardStyle.RED -> redBoardBitmap
             ConnectFourBoardStyle.BLUE -> blueBoardBitmap
-            ConnectFourBoardStyle.GREEN -> greenBoardBitmap
         }
 
         private fun isImageBoard() = boardBitmap() != null
@@ -840,7 +880,7 @@ Control the centre columns, build threats in more than one direction, and block 
             val fallingY = fallingTargetY?.let {
                 fallingStartY + (it - fallingStartY) * fallingProgress
             }
-            val fallingRadius = cellSize * 0.31f
+            val fallingRadius = cellSize * 0.37f
 
             // Draw the part above the board first. Once it reaches the board,
             // the board face is drawn over it and only the circular openings
@@ -894,7 +934,7 @@ Control the centre columns, build threats in more than one direction, and block 
                 else boardLeft + col * cellSize + cellSize / 2f
                 val cy = if (isImageBoard()) imageRowCenter(row)
                 else boardTop + row * cellSize + cellSize / 2f
-                drawDisc(canvas, cx, cy, cellSize * 0.31f, piece.color)
+                drawDisc(canvas, cx, cy, cellSize * 0.37f, piece.color)
             }
             winLine?.takeIf { it.size >= 2 }?.let {
                 winP.color = Color.argb(230, 255, 255, 255)
@@ -918,13 +958,21 @@ Control the centre columns, build threats in more than one direction, and block 
         }
 
         private fun drawDisc(canvas: Canvas, cx: Float, cy: Float, radius: Float, color: PieceColor) {
-            canvas.drawCircle(cx, cy, radius, if (color == PieceColor.WHITE) redP else yellowP)
-            canvas.drawCircle(
-                cx - radius * 0.22f,
-                cy - radius * 0.25f,
-                radius * 0.15f,
-                Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = Color.argb(70, 255, 255, 255) }
-            )
+            val bitmap = if (color == PieceColor.WHITE) redPieceBitmap else yellowPieceBitmap
+            if (bitmap != null) {
+                // The source images are already trimmed to their visible
+                // artwork. Drawing into the measured hole bounds lets the
+                // transparent edge meet the slot edge without changing the
+                // board's perspective or the touch geometry.
+                canvas.drawBitmap(
+                    bitmap,
+                    null,
+                    RectF(cx - radius, cy - radius, cx + radius, cy + radius),
+                    pieceBitmapPaint,
+                )
+            } else {
+                canvas.drawCircle(cx, cy, radius, if (color == PieceColor.WHITE) redP else yellowP)
+            }
         }
     }
 
