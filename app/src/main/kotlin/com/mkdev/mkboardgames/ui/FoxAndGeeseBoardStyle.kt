@@ -8,6 +8,6 @@ package com.mkdev.mkboardgames.ui
  */
 enum class FoxAndGeeseBoardStyle {
     CANVAS,
-    DARK_WOOD,
     LIGHT_WOOD,
+    CROSS_WOOD,
 }

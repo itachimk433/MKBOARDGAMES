@@ -185,14 +185,6 @@ class BoardView(context: Context) : View(context) {
     // Measured centres of the 7x7 lattice in each supplied board image. The
     // transparent cross is not a square grid, so the point centres are used
     // directly by drawing, animation, and touch conversion.
-    private val foxAndGeeseDarkWoodGridX = floatArrayOf(
-        57f / 1024f, 207f / 1024f, 359f / 1024f, 512f / 1024f,
-        665f / 1024f, 817f / 1024f, 967f / 1024f,
-    )
-    private val foxAndGeeseDarkWoodGridY = floatArrayOf(
-        40f / 906f, 182f / 906f, 320f / 906f, 456f / 906f,
-        590f / 906f, 730f / 906f, 864f / 906f,
-    )
     private val foxAndGeeseLightWoodGridX = floatArrayOf(
         76f / 1024f, 221f / 1024f, 367f / 1024f, 512f / 1024f,
         657f / 1024f, 801f / 1024f, 947f / 1024f,
@@ -200,6 +192,14 @@ class BoardView(context: Context) : View(context) {
     private val foxAndGeeseLightWoodGridY = floatArrayOf(
         72f / 985f, 206f / 985f, 344f / 985f, 486f / 985f,
         628f / 985f, 771f / 985f, 914f / 985f,
+    )
+    private val foxAndGeeseCrossWoodGridX = floatArrayOf(
+        76f / 1024f, 221f / 1024f, 367f / 1024f, 512f / 1024f,
+        657f / 1024f, 801f / 1024f, 947f / 1024f,
+    )
+    private val foxAndGeeseCrossWoodGridY = floatArrayOf(
+        69f / 949f, 199f / 949f, 332f / 949f, 468f / 949f,
+        604f / 949f, 743f / 949f, 880f / 949f,
     )
     // Measured playable bounds of the supplied 1272x1236 green-felt board.
     // Keep each boundary so the slight perspective in the photograph is
@@ -358,14 +358,14 @@ class BoardView(context: Context) : View(context) {
     } catch (_: Throwable) {
         null
     }
-    private val foxAndGeeseDarkWoodBoardBitmap: Bitmap? = try {
-        context.assets.open("fox_and_geese_board_wood.webp")
+    private val foxAndGeeseLightWoodBoardBitmap: Bitmap? = try {
+        context.assets.open("fox_and_geese_board_light.webp")
             .use { BitmapFactory.decodeStream(it) }
     } catch (_: Throwable) {
         null
     }
-    private val foxAndGeeseLightWoodBoardBitmap: Bitmap? = try {
-        context.assets.open("fox_and_geese_board_light.webp")
+    private val foxAndGeeseCrossWoodBoardBitmap: Bitmap? = try {
+        context.assets.open("fox_and_geese_board_cross.webp")
             .use { BitmapFactory.decodeStream(it) }
     } catch (_: Throwable) {
         null
@@ -2809,20 +2809,20 @@ class BoardView(context: Context) : View(context) {
 
     private fun foxAndGeeseBitmap(): Bitmap? = when (foxAndGeeseBoardStyle) {
         FoxAndGeeseBoardStyle.CANVAS -> null
-        FoxAndGeeseBoardStyle.DARK_WOOD -> foxAndGeeseDarkWoodBoardBitmap
         FoxAndGeeseBoardStyle.LIGHT_WOOD -> foxAndGeeseLightWoodBoardBitmap
+        FoxAndGeeseBoardStyle.CROSS_WOOD -> foxAndGeeseCrossWoodBoardBitmap
     }
 
     private fun foxAndGeeseGridX(): FloatArray = when (foxAndGeeseBoardStyle) {
         FoxAndGeeseBoardStyle.CANVAS -> floatArrayOf()
-        FoxAndGeeseBoardStyle.DARK_WOOD -> foxAndGeeseDarkWoodGridX
         FoxAndGeeseBoardStyle.LIGHT_WOOD -> foxAndGeeseLightWoodGridX
+        FoxAndGeeseBoardStyle.CROSS_WOOD -> foxAndGeeseCrossWoodGridX
     }
 
     private fun foxAndGeeseGridY(): FloatArray = when (foxAndGeeseBoardStyle) {
         FoxAndGeeseBoardStyle.CANVAS -> floatArrayOf()
-        FoxAndGeeseBoardStyle.DARK_WOOD -> foxAndGeeseDarkWoodGridY
         FoxAndGeeseBoardStyle.LIGHT_WOOD -> foxAndGeeseLightWoodGridY
+        FoxAndGeeseBoardStyle.CROSS_WOOD -> foxAndGeeseCrossWoodGridY
     }
 
     private fun othelloPoint(position: Position): PointF {

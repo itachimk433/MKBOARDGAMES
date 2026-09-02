@@ -61,8 +61,8 @@ class GameActivity : AppCompatActivity() {
     )
     private val foxAndGeeseStyles = arrayOf(
         FoxAndGeeseBoardStyle.CANVAS,
-        FoxAndGeeseBoardStyle.DARK_WOOD,
         FoxAndGeeseBoardStyle.LIGHT_WOOD,
+        FoxAndGeeseBoardStyle.CROSS_WOOD,
     )
 
     private var gameState: GameState = GameState(arrayOfNulls(64))
