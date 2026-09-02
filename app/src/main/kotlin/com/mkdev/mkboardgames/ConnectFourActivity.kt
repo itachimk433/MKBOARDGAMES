@@ -615,16 +615,18 @@ Control the centre columns, build threats in more than one direction, and block 
         } catch (_: Throwable) {
             null
         }
-        // The uploaded boards share the same 1536×1024 composition. These
-        // measured hole centres keep the pieces centred on the photographed
-        // openings after the asset is scaled to any device.
+        // The uploaded boards share the same 1024×683 composition. The
+        // supplied artwork has six visible openings, while the game engine
+        // has seven playable columns, so the seven game columns are fitted
+        // evenly across the board's measured inner span.
         private val imageGridX = floatArrayOf(
-            409f / 1536f, 593f / 1536f, 778f / 1536f,
-            962f / 1536f, 1147f / 1536f, 1331f / 1536f,
+            271.5f / 1024f, 351.7f / 1024f, 431.8f / 1024f,
+            512f / 1024f, 592.2f / 1024f, 672.3f / 1024f,
+            752.5f / 1024f,
         )
         private val imageGridY = floatArrayOf(
-            132f / 1024f, 274f / 1024f, 416f / 1024f,
-            558f / 1024f, 700f / 1024f, 842f / 1024f,
+            92.5f / 683f, 183.5f / 683f, 273.5f / 683f,
+            364f / 683f, 455.5f / 683f, 546f / 683f,
         )
         private var boardColor = Color.parseColor("#24527A")
         private var accent = Color.parseColor("#7FC8F8")
@@ -899,11 +901,19 @@ Control the centre columns, build threats in more than one direction, and block 
             winLine?.takeIf { it.size >= 2 }?.let {
                 winP.color = Color.argb(230, 255, 255, 255)
                 val first = it.first(); val last = it.last()
+                val firstX = if (isImageBoard()) imageColumnCenter(first % ConnectFourRuleEngine.COLUMNS)
+                else boardLeft + (first % ConnectFourRuleEngine.COLUMNS) * cellSize + cellSize / 2f
+                val firstY = if (isImageBoard()) imageRowCenter(first / ConnectFourRuleEngine.COLUMNS)
+                else boardTop + (first / ConnectFourRuleEngine.COLUMNS) * cellSize + cellSize / 2f
+                val lastX = if (isImageBoard()) imageColumnCenter(last % ConnectFourRuleEngine.COLUMNS)
+                else boardLeft + (last % ConnectFourRuleEngine.COLUMNS) * cellSize + cellSize / 2f
+                val lastY = if (isImageBoard()) imageRowCenter(last / ConnectFourRuleEngine.COLUMNS)
+                else boardTop + (last / ConnectFourRuleEngine.COLUMNS) * cellSize + cellSize / 2f
                 canvas.drawLine(
-                    boardLeft + (first % ConnectFourRuleEngine.COLUMNS) * cellSize + cellSize / 2f,
-                    boardTop + (first / ConnectFourRuleEngine.COLUMNS) * cellSize + cellSize / 2f,
-                    boardLeft + (last % ConnectFourRuleEngine.COLUMNS) * cellSize + cellSize / 2f,
-                    boardTop + (last / ConnectFourRuleEngine.COLUMNS) * cellSize + cellSize / 2f,
+                    firstX,
+                    firstY,
+                    lastX,
+                    lastY,
                     winP
                 )
             }
