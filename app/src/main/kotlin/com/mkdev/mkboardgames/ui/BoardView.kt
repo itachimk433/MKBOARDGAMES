@@ -565,10 +565,18 @@ class BoardView(context: Context) : View(context) {
         if (isXiangqiBoard()) {
             val bitmap = xiangqiBitmap()
             if (bitmap != null) {
-                val scale = minOf(
-                    width.toFloat() / bitmap.width,
-                    height.toFloat() / bitmap.height,
-                )
+                // The supplied 2:3 boards are taller than the playable area.
+                // Scale them to the view width and let the view crop the
+                // image's excess top/bottom margin rather than leaving side
+                // letterboxing around the board.
+                val scale = if (xiangqiBoardStyle == XiangqiBoardStyle.CLASSIC) {
+                    minOf(
+                        width.toFloat() / bitmap.width,
+                        height.toFloat() / bitmap.height,
+                    )
+                } else {
+                    width.toFloat() / bitmap.width
+                }
                 val imageWidth = bitmap.width * scale
                 val imageHeight = bitmap.height * scale
                 xiangqiImageRect.set(
