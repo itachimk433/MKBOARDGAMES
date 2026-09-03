@@ -721,7 +721,7 @@ class MancalaActivity : AppCompatActivity() {
         }
 
         private fun drawPits(canvas: Canvas) {
-            val holeRadius = boardRect.width() * 0.151f
+            val holeRadius = boardRect.width() * 0.143f
             val stoneSpreadRadius = boardRect.width() * 0.078f
             val chipRadius = boardRect.width() * 0.022f
             val counts = moveAnimation?.let { visibleCounts(it) } ?: countsOf(state)
@@ -980,10 +980,10 @@ class MancalaActivity : AppCompatActivity() {
                 index == MancalaRuleEngine.SOUTH_STORE ->
                     PointF(boardRect.centerX(), boardRect.top + boardRect.height() * 0.897f)
                 index in 0 until MancalaRuleEngine.PITS_PER_SIDE ->
-                    PointF(boardRect.left + boardRect.width() * 0.307f, yStart + index * yStep)
+                    PointF(boardRect.left + boardRect.width() * 0.31f, yStart + index * yStep)
                 else -> {
                     val row = 12 - index
-                    PointF(boardRect.left + boardRect.width() * 0.693f, yStart + row * yStep)
+                    PointF(boardRect.left + boardRect.width() * 0.69f, yStart + row * yStep)
                 }
             }
         }
