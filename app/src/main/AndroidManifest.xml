@@ -88,6 +88,12 @@
             android:screenOrientation="unspecified"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize" />
 
+        <activity
+            android:name=".MancalaActivity"
+            android:exported="false"
+            android:screenOrientation="unspecified"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize" />
+
         <!-- Xiangqi uses the shared game and replay activities. -->
 
     </application>

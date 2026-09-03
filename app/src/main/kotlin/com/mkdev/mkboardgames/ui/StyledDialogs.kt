@@ -90,6 +90,7 @@ object StyledDialogs {
         val normalizedLabel = gameLabel.replace(" ", "")
         val headerSymbol = when {
             normalizedLabel.contains("CONNECT") -> "●"
+            normalizedLabel.contains("MANCALA") -> "●"
             normalizedLabel.contains("FOX") -> "🦊"
             gameLabel == "L U D O" -> "⚄"
             else -> "♛"

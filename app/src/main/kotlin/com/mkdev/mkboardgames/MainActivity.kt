@@ -39,6 +39,8 @@ class MainActivity : AppCompatActivity() {
                     startActivity(Intent(this, ConnectFourActivity::class.java))
                 MenuView.GameType.LUDO ->
                     startActivity(Intent(this, LudoActivity::class.java))
+                MenuView.GameType.MANCALA ->
+                    startActivity(Intent(this, MancalaActivity::class.java))
                 else ->
                     startActivity(Intent(this, GameActivity::class.java).apply {
                         putExtra(GameActivity.EXTRA_GAME, type.name)
