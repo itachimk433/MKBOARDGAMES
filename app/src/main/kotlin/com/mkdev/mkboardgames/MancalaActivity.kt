@@ -666,7 +666,7 @@ class MancalaActivity : AppCompatActivity() {
             color = Color.parseColor("#42A5F5")
             style = Paint.Style.STROKE
             strokeCap = Paint.Cap.ROUND
-            strokeWidth = 5f * resources.displayMetrics.density
+            strokeWidth = 2f * resources.displayMetrics.density
         }
         private var highlightAnimator: ValueAnimator? = null
         private var highlightProgress = 0f

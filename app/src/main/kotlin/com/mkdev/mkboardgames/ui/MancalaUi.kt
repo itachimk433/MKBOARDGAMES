@@ -476,7 +476,14 @@ open class MancalaChoiceOverlayView(
         textPaint.typeface = Typeface.DEFAULT
         textPaint.color = Color.parseColor("#C8E8E9")
         textPaint.textSize = min(dp(context, 15f), panelWidth * 0.047f)
-        canvas.drawText(subtitle, panel.centerX(), panel.top + dp(context, 91f), textPaint)
+        drawWrappedCenteredText(
+            canvas = canvas,
+            text = subtitle,
+            centerX = panel.centerX(),
+            centerY = panel.top + dp(context, 91f),
+            maxWidth = panelWidth - dp(context, 52f),
+            lineSpacing = dp(context, 18f),
+        )
 
         hits.clear()
         val buttonHeight = min(
@@ -492,6 +499,37 @@ open class MancalaChoiceOverlayView(
         textPaint.color = Color.argb(180, 214, 239, 238)
         textPaint.textSize = dp(context, 12f)
         canvas.drawText("Tap an option to continue", panel.centerX(), panel.bottom - dp(context, 24f), textPaint)
+    }
+
+    private fun drawWrappedCenteredText(
+        canvas: Canvas,
+        text: String,
+        centerX: Float,
+        centerY: Float,
+        maxWidth: Float,
+        lineSpacing: Float,
+    ) {
+        val lines = wrapText(text, maxWidth)
+        val firstBaseline = centerY - (lines.size - 1) * lineSpacing / 2f
+        lines.forEachIndexed { index, line ->
+            canvas.drawText(line, centerX, firstBaseline + index * lineSpacing, textPaint)
+        }
+    }
+
+    private fun wrapText(text: String, maxWidth: Float): List<String> {
+        val lines = mutableListOf<String>()
+        var current = ""
+        text.trim().split(Regex("\\s+")).filter(String::isNotEmpty).forEach { word ->
+            val candidate = if (current.isEmpty()) word else "$current $word"
+            if (current.isNotEmpty() && textPaint.measureText(candidate) > maxWidth) {
+                lines += current
+                current = word
+            } else {
+                current = candidate
+            }
+        }
+        if (current.isNotEmpty()) lines += current
+        return lines.ifEmpty { listOf("") }
     }
 
     private fun drawCloseButton(canvas: Canvas, rect: RectF) {
