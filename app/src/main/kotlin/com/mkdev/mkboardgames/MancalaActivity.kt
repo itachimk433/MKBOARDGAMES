@@ -821,7 +821,7 @@ class MancalaActivity : AppCompatActivity() {
 
         private fun drawPits(canvas: Canvas) {
             val stoneSpreadRadius = boardRect.width() * 0.078f
-            val chipRadius = boardRect.width() * 0.022f * 5f
+            val chipRadius = boardRect.width() * 0.022f * 2.5f
             val counts = moveAnimation?.let { visibleCounts(it) } ?: countsOf(state)
             for (index in 0 until MancalaRuleEngine.BOARD_CELLS) {
                 val point = centerFor(index)
@@ -922,7 +922,7 @@ class MancalaActivity : AppCompatActivity() {
             val elapsed = animationProgress * animation.totalDuration
             val from = centerFor(animation.from)
             val travelRadius = boardRect.width() * 0.105f
-            val chipRadius = boardRect.width() * 0.022f * 5f
+            val chipRadius = boardRect.width() * 0.022f * 2.5f
             val placed = if (elapsed < animation.pickupDuration) {
                 0
             } else {
