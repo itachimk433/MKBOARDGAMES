@@ -626,6 +626,29 @@ class MancalaActivity : AppCompatActivity() {
             -0.30f to 0.30f, 0f to 0.30f, 0.30f to 0.30f,
             -0.14f to -0.14f, 0.14f to -0.14f, 0f to 0.16f,
         )
+        private data class HoleMeasurement(
+            val x: Float,
+            val y: Float,
+            val radius: Float,
+        )
+
+        // Measured in source-image pixels from mancala_board.webp (768 x 2048).
+        private val leftHoles = arrayOf(
+            HoleMeasurement(239f, 410f, 110f),
+            HoleMeasurement(239f, 640f, 110f),
+            HoleMeasurement(239f, 869f, 110f),
+            HoleMeasurement(237f, 1098f, 110f),
+            HoleMeasurement(237f, 1325f, 110f),
+            HoleMeasurement(237f, 1561f, 112f),
+        )
+        private val rightHoles = arrayOf(
+            HoleMeasurement(521f, 410f, 108f),
+            HoleMeasurement(521f, 640f, 110f),
+            HoleMeasurement(521f, 869f, 108f),
+            HoleMeasurement(521f, 1100f, 110f),
+            HoleMeasurement(521f, 1327f, 110f),
+            HoleMeasurement(521f, 1563f, 112f),
+        )
 
         fun setGameState(newState: GameState, animate: Boolean = true) {
             animationGeneration++
@@ -721,16 +744,16 @@ class MancalaActivity : AppCompatActivity() {
         }
 
         private fun drawPits(canvas: Canvas) {
-            val holeRadius = boardRect.width() * 0.143f
             val stoneSpreadRadius = boardRect.width() * 0.078f
             val chipRadius = boardRect.width() * 0.022f
             val counts = moveAnimation?.let { visibleCounts(it) } ?: countsOf(state)
             for (index in 0 until MancalaRuleEngine.BOARD_CELLS) {
                 val point = centerFor(index)
+                val hole = holeMeasurementFor(index)
                 val count = counts[index]
                 val isStore = index == MancalaRuleEngine.SOUTH_STORE || index == MancalaRuleEngine.NORTH_STORE
                 if (!isStore && isSelectable(index)) {
-                    canvas.drawCircle(point.x, point.y, holeRadius, highlightPaint)
+                    canvas.drawCircle(point.x, point.y, radiusFor(hole), highlightPaint)
                 }
                 if (count == 0) continue
                 val owner = if (index <= MancalaRuleEngine.SOUTH_STORE) PieceColor.WHITE else PieceColor.BLACK
@@ -808,7 +831,6 @@ class MancalaActivity : AppCompatActivity() {
             val animation = moveAnimation ?: return
             val elapsed = animationProgress * animation.totalDuration
             val from = centerFor(animation.from)
-            val holeRadius = boardRect.width() * 0.151f
             val travelRadius = boardRect.width() * 0.105f
             val chipRadius = boardRect.width() * 0.022f
             val placed = if (elapsed < animation.pickupDuration) {
@@ -848,13 +870,24 @@ class MancalaActivity : AppCompatActivity() {
                     animation.color,
                     elevation = travelRadius * 0.18f,
                 )
-                drawLandingRipple(canvas, start, holeRadius, 1f - local)
+                drawLandingRipple(
+                    canvas,
+                    start,
+                    radiusFor(holeMeasurementFor(animation.from)),
+                    1f - local,
+                )
             } else if (placed > 0) {
-                val landing = centerFor(animation.path[placed - 1])
+                val landingIndex = animation.path[placed - 1]
+                val landing = centerFor(landingIndex)
                 val settle = ((elapsed - animation.pickupDuration -
                     animation.path.size * animation.placementDuration) /
                     animation.settleDuration).coerceIn(0f, 1f)
-                drawLandingRipple(canvas, landing, holeRadius, 1f - settle)
+                drawLandingRipple(
+                    canvas,
+                    landing,
+                    radiusFor(holeMeasurementFor(landingIndex)),
+                    1f - settle,
+                )
             }
         }
 
@@ -971,20 +1004,31 @@ class MancalaActivity : AppCompatActivity() {
                 MancalaRuleEngine.ownsPit(state.currentTurn, index) &&
                 engine.stones(state, index) > 0
 
+        private fun holeMeasurementFor(index: Int): HoleMeasurement? =
+            when {
+                index in 0 until MancalaRuleEngine.PITS_PER_SIDE -> leftHoles[index]
+                index in (MancalaRuleEngine.PITS_PER_SIDE + 1 until MancalaRuleEngine.NORTH_STORE) ->
+                    rightHoles[MancalaRuleEngine.NORTH_STORE - index - 1]
+                else -> null
+            }
+
+        private fun radiusFor(hole: HoleMeasurement?): Float =
+            (hole?.radius ?: 110f) / 768f * boardRect.width()
+
         private fun centerFor(index: Int): PointF {
-            val yStart = boardRect.top + boardRect.height() * 0.204f
-            val yStep = boardRect.height() * 0.1092f
-            return when {
-                index == MancalaRuleEngine.NORTH_STORE ->
+            val hole = holeMeasurementFor(index)
+            if (hole != null) {
+                return PointF(
+                    boardRect.left + boardRect.width() * hole.x / 768f,
+                    boardRect.top + boardRect.height() * hole.y / 2048f,
+                )
+            }
+            return when (index) {
+                MancalaRuleEngine.NORTH_STORE ->
                     PointF(boardRect.centerX(), boardRect.top + boardRect.height() * 0.098f)
-                index == MancalaRuleEngine.SOUTH_STORE ->
+                MancalaRuleEngine.SOUTH_STORE ->
                     PointF(boardRect.centerX(), boardRect.top + boardRect.height() * 0.897f)
-                index in 0 until MancalaRuleEngine.PITS_PER_SIDE ->
-                    PointF(boardRect.left + boardRect.width() * 0.31f, yStart + index * yStep)
-                else -> {
-                    val row = 12 - index
-                    PointF(boardRect.left + boardRect.width() * 0.69f, yStart + row * yStep)
-                }
+                else -> PointF(boardRect.centerX(), boardRect.centerY())
             }
         }
 
@@ -994,10 +1038,10 @@ class MancalaActivity : AppCompatActivity() {
                 onGameOverTapped?.invoke()
                 return true
             }
-            val pitRadius = boardRect.width() * 0.17f
             for (index in 0 until MancalaRuleEngine.BOARD_CELLS) {
                 if (index == MancalaRuleEngine.SOUTH_STORE || index == MancalaRuleEngine.NORTH_STORE) continue
                 val point = centerFor(index)
+                val pitRadius = radiusFor(holeMeasurementFor(index)) * 1.16f
                 val dx = event.x - point.x
                 val dy = event.y - point.y
                 if (dx * dx + dy * dy <= pitRadius * pitRadius) {
