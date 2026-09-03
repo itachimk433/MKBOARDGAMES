@@ -646,6 +646,12 @@ class MancalaActivity : AppCompatActivity() {
         } catch (_: Throwable) {
             null
         }
+        private val stoneBitmaps = arrayOf(
+            BitmapFactory.decodeResource(resources, R.drawable.mancala_stone_blue),
+            BitmapFactory.decodeResource(resources, R.drawable.mancala_stone_white),
+            BitmapFactory.decodeResource(resources, R.drawable.mancala_stone_black),
+            BitmapFactory.decodeResource(resources, R.drawable.mancala_stone_green),
+        )
         private val bitmapPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
         private val stonePaint = Paint(Paint.ANTI_ALIAS_FLAG)
         private val stoneRimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -821,7 +827,7 @@ class MancalaActivity : AppCompatActivity() {
 
         private fun drawPits(canvas: Canvas) {
             val stoneSpreadRadius = boardRect.width() * 0.078f
-            val chipRadius = boardRect.width() * 0.022f * 2.5f
+            val chipRadius = boardRect.width() * 0.022f * 2.25f
             val counts = moveAnimation?.let { visibleCounts(it) } ?: countsOf(state)
             for (index in 0 until MancalaRuleEngine.BOARD_CELLS) {
                 val point = centerFor(index)
@@ -854,13 +860,14 @@ class MancalaActivity : AppCompatActivity() {
                     canvas.drawText(count.toString(), point.x, point.y + countPaint.textSize * 0.35f, countPaint)
                     continue
                 }
-                chipOffsets.take(min(count, chipOffsets.size)).forEach { (dx, dy) ->
+                chipOffsets.take(min(count, chipOffsets.size)).forEachIndexed { stackIndex, (dx, dy) ->
                     drawStone(
                         canvas,
                         point.x + dx * stoneSpreadRadius,
                         point.y + dy * stoneSpreadRadius,
                         chipRadius,
                         owner,
+                        stoneVariation = index + stackIndex,
                     )
                 }
                 if (count > chipOffsets.size) {
@@ -890,6 +897,7 @@ class MancalaActivity : AppCompatActivity() {
                     center.y + (row - 1f) * ySpacing,
                     radius * 0.9f,
                     owner,
+                    stoneVariation = index,
                 )
             }
         }
@@ -922,7 +930,7 @@ class MancalaActivity : AppCompatActivity() {
             val elapsed = animationProgress * animation.totalDuration
             val from = centerFor(animation.from)
             val travelRadius = boardRect.width() * 0.105f
-            val chipRadius = boardRect.width() * 0.022f * 2.5f
+            val chipRadius = boardRect.width() * 0.022f * 2.25f
             val placed = if (elapsed < animation.pickupDuration) {
                 0
             } else {
@@ -962,6 +970,7 @@ class MancalaActivity : AppCompatActivity() {
                     chipRadius * (1f + 0.13f * sin(local * PI).toFloat()),
                     animation.color,
                     elevation = travelRadius * 0.18f,
+                    stoneVariation = index,
                 )
                 drawLandingRipple(
                     canvas,
@@ -998,7 +1007,7 @@ class MancalaActivity : AppCompatActivity() {
                 radius * 2.4f
             }
             val visible = min(count, chipOffsets.size)
-            chipOffsets.take(visible).forEach { (dx, dy) ->
+            chipOffsets.take(visible).forEachIndexed { stackIndex, (dx, dy) ->
                 drawStone(
                     canvas,
                     center.x + dx * radius * 1.8f,
@@ -1006,6 +1015,7 @@ class MancalaActivity : AppCompatActivity() {
                     radius * 0.92f,
                     color,
                     elevation = radius * 1.2f,
+                    stoneVariation = stackIndex,
                 )
             }
             if (count > visible) {
@@ -1043,6 +1053,7 @@ class MancalaActivity : AppCompatActivity() {
             radius: Float,
             owner: PieceColor,
             elevation: Float = 0f,
+            stoneVariation: Int = 0,
         ) {
             val lift = (elevation / radius.coerceAtLeast(1f)).coerceIn(0f, 3f)
             val shadowRadius = radius * (1.03f + lift * 0.08f)
@@ -1070,6 +1081,16 @@ class MancalaActivity : AppCompatActivity() {
                 stoneShadowPaint,
             )
             stoneShadowPaint.shader = null
+
+            stoneBitmapFor(owner, stoneVariation)?.let { bitmap ->
+                canvas.drawBitmap(
+                    bitmap,
+                    null,
+                    RectF(x - radius, y - radius, x + radius, y + radius),
+                    bitmapPaint,
+                )
+                return
+            }
 
             val colors = if (owner == PieceColor.WHITE) {
                 intArrayOf(
@@ -1167,6 +1188,13 @@ class MancalaActivity : AppCompatActivity() {
                 ),
                 stoneSpecularPaint,
             )
+        }
+
+        private fun stoneBitmapFor(owner: PieceColor, variation: Int): Bitmap? {
+            // Keep each side visually distinct while using both supplied variants
+            // for that side: South uses blue/white, North uses black/green.
+            val paletteOffset = if (owner == PieceColor.WHITE) 0 else 2
+            return stoneBitmaps[paletteOffset + (variation and 1)]
         }
 
         private fun isSelectable(index: Int): Boolean =
