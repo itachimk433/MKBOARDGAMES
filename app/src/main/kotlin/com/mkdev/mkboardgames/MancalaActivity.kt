@@ -526,12 +526,17 @@ class MancalaActivity : AppCompatActivity() {
             val previousState = state
             state = newState
             val move = newState.moveHistory.lastOrNull()
-            val path = if (animate && move != null) {
-                engine.sowingPath(previousState, move)
-            } else {
-                emptyList()
+            if (!animate || move == null) {
+                moveAnimation = null
+                animationProgress = 1f
+                isLocked = false
+                invalidate()
+                onMoveAnimationFinished?.invoke()
+                onMoveAnimationFinished = null
+                return
             }
-            if (!animate || path.isEmpty()) {
+            val path = engine.sowingPath(previousState, move)
+            if (path.isEmpty()) {
                 moveAnimation = null
                 animationProgress = 1f
                 isLocked = false
@@ -575,7 +580,6 @@ class MancalaActivity : AppCompatActivity() {
 
         private fun countsOf(snapshot: GameState): IntArray =
             IntArray(MancalaRuleEngine.BOARD_CELLS) { index -> engine.stones(snapshot, index) }
-        }
 
         override fun onDraw(canvas: Canvas) {
             canvas.drawColor(Color.parseColor("#1B100C"))
