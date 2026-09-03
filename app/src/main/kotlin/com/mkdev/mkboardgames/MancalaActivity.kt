@@ -52,6 +52,12 @@ class MancalaActivity : AppCompatActivity() {
             pickupDuration + path.size * placementDuration + settleDuration
     }
 
+    private data class HoleMeasurement(
+        val x: Float,
+        val y: Float,
+        val radius: Float,
+    )
+
     private lateinit var gameRoot: View
     private lateinit var screenRoot: FrameLayout
     private lateinit var homeView: MancalaHomeView
@@ -626,12 +632,6 @@ class MancalaActivity : AppCompatActivity() {
             -0.30f to 0.30f, 0f to 0.30f, 0.30f to 0.30f,
             -0.14f to -0.14f, 0.14f to -0.14f, 0f to 0.16f,
         )
-        private data class HoleMeasurement(
-            val x: Float,
-            val y: Float,
-            val radius: Float,
-        )
-
         // Measured in source-image pixels from mancala_board.webp (768 x 2048).
         private val leftHoles = arrayOf(
             HoleMeasurement(239f, 410f, 110f),
