@@ -721,7 +721,8 @@ class MancalaActivity : AppCompatActivity() {
         }
 
         private fun drawPits(canvas: Canvas) {
-            val pitRadius = boardRect.width() * 0.078f
+            val holeRadius = boardRect.width() * 0.151f
+            val stoneSpreadRadius = boardRect.width() * 0.078f
             val chipRadius = boardRect.width() * 0.022f
             val counts = moveAnimation?.let { visibleCounts(it) } ?: countsOf(state)
             for (index in 0 until MancalaRuleEngine.BOARD_CELLS) {
@@ -729,7 +730,7 @@ class MancalaActivity : AppCompatActivity() {
                 val count = counts[index]
                 val isStore = index == MancalaRuleEngine.SOUTH_STORE || index == MancalaRuleEngine.NORTH_STORE
                 if (!isStore && isSelectable(index)) {
-                    canvas.drawCircle(point.x, point.y, pitRadius, highlightPaint)
+                    canvas.drawCircle(point.x, point.y, holeRadius, highlightPaint)
                 }
                 if (count == 0) continue
                 val owner = if (index <= MancalaRuleEngine.SOUTH_STORE) PieceColor.WHITE else PieceColor.BLACK
@@ -743,8 +744,8 @@ class MancalaActivity : AppCompatActivity() {
                 chipOffsets.take(min(count, chipOffsets.size)).forEach { (dx, dy) ->
                     drawStone(
                         canvas,
-                        point.x + dx * pitRadius,
-                        point.y + dy * pitRadius,
+                        point.x + dx * stoneSpreadRadius,
+                        point.y + dy * stoneSpreadRadius,
                         chipRadius,
                         owner,
                     )
@@ -807,7 +808,8 @@ class MancalaActivity : AppCompatActivity() {
             val animation = moveAnimation ?: return
             val elapsed = animationProgress * animation.totalDuration
             val from = centerFor(animation.from)
-            val pitRadius = boardRect.width() * 0.105f
+            val holeRadius = boardRect.width() * 0.151f
+            val travelRadius = boardRect.width() * 0.105f
             val chipRadius = boardRect.width() * 0.022f
             val placed = if (elapsed < animation.pickupDuration) {
                 0
@@ -837,22 +839,22 @@ class MancalaActivity : AppCompatActivity() {
                     animation.placementDuration) / animation.placementDuration
                 val x = start.x + (end.x - start.x) * local
                 val y = start.y + (end.y - start.y) * local -
-                    sin(local * PI).toFloat() * pitRadius * 1.25f
+                    sin(local * PI).toFloat() * travelRadius * 1.25f
                 drawStone(
                     canvas,
                     x,
                     y,
                     chipRadius * (1f + 0.13f * sin(local * PI).toFloat()),
                     animation.color,
-                    elevation = pitRadius * 0.18f,
+                    elevation = travelRadius * 0.18f,
                 )
-                drawLandingRipple(canvas, start, pitRadius, 1f - local)
+                drawLandingRipple(canvas, start, holeRadius, 1f - local)
             } else if (placed > 0) {
                 val landing = centerFor(animation.path[placed - 1])
                 val settle = ((elapsed - animation.pickupDuration -
                     animation.path.size * animation.placementDuration) /
                     animation.settleDuration).coerceIn(0f, 1f)
-                drawLandingRipple(canvas, landing, pitRadius, 1f - settle)
+                drawLandingRipple(canvas, landing, holeRadius, 1f - settle)
             }
         }
 
@@ -992,7 +994,7 @@ class MancalaActivity : AppCompatActivity() {
                 onGameOverTapped?.invoke()
                 return true
             }
-            val pitRadius = boardRect.width() * 0.095f
+            val pitRadius = boardRect.width() * 0.17f
             for (index in 0 until MancalaRuleEngine.BOARD_CELLS) {
                 if (index == MancalaRuleEngine.SOUTH_STORE || index == MancalaRuleEngine.NORTH_STORE) continue
                 val point = centerFor(index)
