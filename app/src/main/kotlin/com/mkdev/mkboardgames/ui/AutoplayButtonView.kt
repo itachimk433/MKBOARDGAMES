@@ -8,6 +8,7 @@ import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PathMeasure
+import android.graphics.RadialGradient
 import android.graphics.RectF
 import android.graphics.Shader
 import android.view.HapticFeedbackConstants
@@ -18,12 +19,16 @@ import com.mkdev.mkboardgames.SoundPlayer
 import kotlin.math.min
 
 /**
- * A tactile Mancala autoplay control.
+ * A tactile autoplay control shared by the board games.
  *
- * The button uses the same rounded wood treatment as the Mancala action
- * buttons. A moving blue border marks the active autoplay state.
+ * Non-Mancala games use the compact circular treatment from the game boards.
+ * Mancala opts into its existing wood treatment. A moving blue border marks
+ * the active autoplay state.
  */
-class AutoplayButtonView(context: Context) : View(context) {
+class AutoplayButtonView(
+    context: Context,
+    private val circularStyle: Boolean = true,
+) : View(context) {
 
     var onAutoplayChanged: ((enabled: Boolean) -> Unit)? = null
 
@@ -66,11 +71,11 @@ class AutoplayButtonView(context: Context) : View(context) {
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        val desiredWidth = (150f * density).toInt()
-        val desiredHeight = (46f * density).toInt()
+        val desiredWidth = (if (circularStyle) 78f else 150f) * density
+        val desiredHeight = (if (circularStyle) 78f else 46f) * density
         setMeasuredDimension(
-            resolveSize(desiredWidth, widthMeasureSpec),
-            resolveSize(desiredHeight, heightMeasureSpec),
+            resolveSize(desiredWidth.toInt(), widthMeasureSpec),
+            resolveSize(desiredHeight.toInt(), heightMeasureSpec),
         )
     }
 
@@ -114,6 +119,16 @@ class AutoplayButtonView(context: Context) : View(context) {
     }
 
     private fun buttonBounds(): RectF {
+        if (circularStyle) {
+            val diameter = (min(width, height).toFloat() - 8f * density).coerceAtLeast(1f)
+            val lift = if (pressed) 2f * density else 0f
+            return RectF(
+                (width - diameter) / 2f,
+                (height - diameter) / 2f + lift,
+                (width + diameter) / 2f,
+                (height + diameter) / 2f + lift,
+            )
+        }
         val inset = 3f * density
         val lift = if (pressed) 2f * density else 0f
         return RectF(
@@ -166,51 +181,103 @@ class AutoplayButtonView(context: Context) : View(context) {
         super.onDraw(canvas)
 
         buttonRect.set(buttonBounds())
-        val radius = min(buttonRect.height(), buttonRect.width()) * 0.18f
-        val colors = intArrayOf(
-            Color.parseColor("#F7D99B"),
-            Color.parseColor("#C8894C"),
-            Color.parseColor("#85502D"),
-        )
-        fillPaint.shader = LinearGradient(
-            buttonRect.left,
-            buttonRect.top,
-            buttonRect.left,
-            buttonRect.bottom,
-            colors,
-            floatArrayOf(0f, 0.5f, 1f),
-            Shader.TileMode.CLAMP,
-        )
-        fillPaint.setShadowLayer(
-            density * if (pressed) 1f else 4f,
-            0f,
-            density * if (pressed) 1f else 3f,
-            Color.argb(170, 25, 9, 5),
-        )
-        canvas.drawRoundRect(buttonRect, radius, radius, fillPaint)
-        fillPaint.clearShadowLayer()
-        fillPaint.shader = null
+        val radius = if (circularStyle) {
+            buttonRect.width() * 0.5f
+        } else {
+            min(buttonRect.height(), buttonRect.width()) * 0.18f
+        }
+        if (circularStyle) {
+            val centerX = buttonRect.centerX()
+            val centerY = buttonRect.centerY()
+            val circleRadius = buttonRect.width() * 0.5f
+            val circleColors = intArrayOf(
+                Color.parseColor("#27333F"),
+                Color.parseColor("#19232D"),
+                Color.parseColor("#10161C"),
+            )
+            fillPaint.shader = RadialGradient(
+                centerX - circleRadius * 0.28f,
+                centerY - circleRadius * 0.35f,
+                circleRadius * 1.15f,
+                circleColors,
+                floatArrayOf(0f, 0.55f, 1f),
+                Shader.TileMode.CLAMP,
+            )
+            fillPaint.setShadowLayer(
+                density * if (pressed) 2f else 7f,
+                0f,
+                density * if (pressed) 1f else 4f,
+                Color.argb(190, 0, 0, 0),
+            )
+            canvas.drawCircle(centerX, centerY, circleRadius, fillPaint)
+            fillPaint.clearShadowLayer()
+            fillPaint.shader = null
 
-        borderPaint.color = colors[2]
-        canvas.drawRoundRect(buttonRect, radius, radius, borderPaint)
-        val inner = RectF(
-            buttonRect.left + 3f * density,
-            buttonRect.top + 3f * density,
-            buttonRect.right - 3f * density,
-            buttonRect.bottom - 3f * density,
-        )
-        canvas.drawRoundRect(inner, radius * 0.78f, radius * 0.78f, highlightPaint)
+            borderPaint.color = Color.parseColor("#4A5968")
+            canvas.drawCircle(centerX, centerY, circleRadius, borderPaint)
+            highlightPaint.color = Color.argb(135, 133, 155, 177)
+            canvas.drawCircle(
+                centerX,
+                centerY,
+                circleRadius - 3f * density,
+                highlightPaint,
+            )
+        } else {
+            val woodColors = intArrayOf(
+                Color.parseColor("#F7D99B"),
+                Color.parseColor("#C8894C"),
+                Color.parseColor("#85502D"),
+            )
+            fillPaint.shader = LinearGradient(
+                buttonRect.left,
+                buttonRect.top,
+                buttonRect.left,
+                buttonRect.bottom,
+                woodColors,
+                floatArrayOf(0f, 0.5f, 1f),
+                Shader.TileMode.CLAMP,
+            )
+            fillPaint.setShadowLayer(
+                density * if (pressed) 1f else 4f,
+                0f,
+                density * if (pressed) 1f else 3f,
+                Color.argb(170, 25, 9, 5),
+            )
+            canvas.drawRoundRect(buttonRect, radius, radius, fillPaint)
+            fillPaint.clearShadowLayer()
+            fillPaint.shader = null
+
+            borderPaint.color = woodColors[2]
+            canvas.drawRoundRect(buttonRect, radius, radius, borderPaint)
+            val inner = RectF(
+                buttonRect.left + 3f * density,
+                buttonRect.top + 3f * density,
+                buttonRect.right - 3f * density,
+                buttonRect.bottom - 3f * density,
+            )
+            highlightPaint.color = Color.argb(175, 255, 246, 220)
+            canvas.drawRoundRect(inner, radius * 0.78f, radius * 0.78f, highlightPaint)
+        }
 
         if (enabled) {
-            movingBorderPaint.color = Color.parseColor("#42A5F5")
+            movingBorderPaint.color = if (circularStyle) {
+                Color.parseColor("#83B7E3")
+            } else {
+                Color.parseColor("#42A5F5")
+            }
             val movingRect = RectF(buttonRect).apply {
                 inset(1.5f * density, 1.5f * density)
+            }
+            val movingRadius = if (circularStyle) {
+                movingRect.height() * 0.5f
+            } else {
+                radius
             }
             movingBorderPath.reset()
             movingBorderPath.addRoundRect(
                 movingRect,
-                radius,
-                radius,
+                movingRadius,
+                movingRadius,
                 Path.Direction.CW,
             )
             val pathMeasure = PathMeasure(movingBorderPath, false)
@@ -237,6 +304,11 @@ class AutoplayButtonView(context: Context) : View(context) {
             canvas.drawPath(movingBorderSegment, movingBorderPaint)
         }
 
+        labelPaint.color = if (circularStyle) {
+            Color.parseColor("#E5ECF3")
+        } else {
+            Color.parseColor("#4A1714")
+        }
         labelPaint.textSize = min(width * 0.16f, height * 0.4f)
             .coerceAtLeast(12f * density)
         val autoplayLabel = if (enabled) "Autoplay On" else "Autoplay Off"

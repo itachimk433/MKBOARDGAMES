@@ -106,7 +106,7 @@ class MancalaActivity : AppCompatActivity() {
             gravity = Gravity.CENTER
             setPadding(8 * dp.toInt(), 3 * dp.toInt(), 8 * dp.toInt(), 5 * dp.toInt())
         }
-        autoplayButton = AutoplayButtonView(this)
+        autoplayButton = AutoplayButtonView(this, circularStyle = false)
         autoplayButton.onAutoplayChanged = { enabled ->
             if (vsAI) {
                 autoplayEnabled = enabled
