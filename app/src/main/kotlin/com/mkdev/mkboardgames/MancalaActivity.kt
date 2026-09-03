@@ -972,7 +972,7 @@ class MancalaActivity : AppCompatActivity() {
                 engine.stones(state, index) > 0
 
         private fun centerFor(index: Int): PointF {
-            val yStart = boardRect.top + boardRect.height() * 0.187f
+            val yStart = boardRect.top + boardRect.height() * 0.204f
             val yStep = boardRect.height() * 0.1092f
             return when {
                 index == MancalaRuleEngine.NORTH_STORE ->
