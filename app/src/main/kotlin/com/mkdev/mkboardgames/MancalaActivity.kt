@@ -24,6 +24,7 @@ import com.mkdev.mkboardgames.ui.MancalaGameOverView
 import com.mkdev.mkboardgames.ui.MancalaHomeView
 import com.mkdev.mkboardgames.ui.MancalaRulesView
 import com.mkdev.mkboardgames.ui.MancalaWoodButton
+import com.mkdev.mkboardgames.ui.AutoplayButtonView
 import kotlinx.coroutines.*
 import kotlin.math.*
 
@@ -35,6 +36,7 @@ class MancalaActivity : AppCompatActivity() {
     private var matchStarted = false
     private var activityResumed = false
     private var resultRecorded = false
+    private var autoplayEnabled = false
     private val previousStates = ArrayDeque<GameState>()
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
@@ -63,6 +65,7 @@ class MancalaActivity : AppCompatActivity() {
     private lateinit var homeView: MancalaHomeView
     private lateinit var boardView: MancalaBoardView
     private lateinit var statusView: TextView
+    private lateinit var autoplayButton: AutoplayButtonView
     private var activeMancalaOverlay: View? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -103,16 +106,31 @@ class MancalaActivity : AppCompatActivity() {
             gravity = Gravity.CENTER
             setPadding(8 * dp.toInt(), 3 * dp.toInt(), 8 * dp.toInt(), 5 * dp.toInt())
         }
-        val undo = actionButton("Undo")
+        autoplayButton = AutoplayButtonView(this)
+        autoplayButton.onAutoplayChanged = { enabled ->
+            if (vsAI) {
+                autoplayEnabled = enabled
+                if (enabled &&
+                    matchStarted &&
+                    gameState.status == GameStatus.IN_PROGRESS &&
+                    !boardView.isLocked &&
+                    aiControlsCurrentTurn()
+                ) {
+                    triggerAI()
+                }
+            }
+        }
         val menu = actionButton("Menu")
-        undo.setOnClickListener { undoMove() }
         menu.setOnClickListener { showMenu() }
-        controls.addView(undo, LinearLayout.LayoutParams(0, 46 * dp.toInt(), 1f))
+        controls.addView(
+            autoplayButton,
+            LinearLayout.LayoutParams(0, 76 * dp.toInt(), 1f),
+        )
         controls.addView(menu, LinearLayout.LayoutParams(0, 46 * dp.toInt(), 1f))
 
         gameLayout.addView(header, LinearLayout.LayoutParams(-1, 58 * dp.toInt()))
         gameLayout.addView(boardView, LinearLayout.LayoutParams(-1, 0).apply { weight = 1f })
-        gameLayout.addView(controls, LinearLayout.LayoutParams(-1, 56 * dp.toInt()))
+        gameLayout.addView(controls, LinearLayout.LayoutParams(-1, 84 * dp.toInt()))
         gameRoot = gameLayout
 
         screenRoot = FrameLayout(this)
@@ -161,12 +179,12 @@ class MancalaActivity : AppCompatActivity() {
 
     override fun onPause() {
         activityResumed = false
-        scope.coroutineContext.cancelChildren()
-        if (::boardView.isInitialized) boardView.isLocked = false
+        if (::boardView.isInitialized) stopAutomatedGameplay()
         super.onPause()
     }
 
     override fun onDestroy() {
+        if (::boardView.isInitialized) stopAutomatedGameplay()
         scope.cancel()
         super.onDestroy()
     }
@@ -294,6 +312,7 @@ class MancalaActivity : AppCompatActivity() {
     }
 
     private fun showMenu() {
+        stopAutomatedGameplay()
         boardView.isLocked = true
         showChoiceOverlay(
             "Game Menu",
@@ -406,6 +425,9 @@ class MancalaActivity : AppCompatActivity() {
     private fun startGame(restoring: PausedMatchStore.Match? = null) {
         matchStarted = true
         resultRecorded = false
+        autoplayEnabled = false
+        autoplayButton.setAutoplayEnabled(false, animate = false)
+        autoplayButton.visibility = if (vsAI) View.VISIBLE else View.GONE
         previousStates.clear()
         PausedMatchStore.clear(this, "MANCALA")
         SettingsManager.activateGameTheme(this, "mancala")
@@ -424,7 +446,7 @@ class MancalaActivity : AppCompatActivity() {
         }
         updateHud()
         if (vsAI && gameState.status == GameStatus.IN_PROGRESS &&
-            gameState.currentTurn != playerColor
+            aiControlsCurrentTurn()
         ) triggerAI()
     }
 
@@ -444,7 +466,7 @@ class MancalaActivity : AppCompatActivity() {
             if (gameState.status != GameStatus.IN_PROGRESS) showResultDialog()
             return
         }
-        if (vsAI && gameState.currentTurn != playerColor) return
+        if (vsAI && aiControlsCurrentTurn()) return
         val move = engine.legalMovesFrom(gameState, Position(0, index)).firstOrNull() ?: return
         playMove(move)
     }
@@ -455,12 +477,14 @@ class MancalaActivity : AppCompatActivity() {
         if (gameState.status == GameStatus.IN_PROGRESS) {
             boardView.onMoveAnimationFinished = {
                 boardView.isLocked = false
-                if (vsAI && gameState.currentTurn != playerColor) triggerAI()
+                if (vsAI && aiControlsCurrentTurn()) triggerAI()
             }
         }
         boardView.setGameState(gameState)
         updateHud()
         if (gameState.status != GameStatus.IN_PROGRESS) {
+            autoplayEnabled = false
+            autoplayButton.setAutoplayEnabled(false, animate = false)
             boardView.isLocked = true
             recordResult()
             SoundPlayer.play(if (gameState.status == GameStatus.DRAW) "game_draw" else "game_end")
@@ -472,8 +496,8 @@ class MancalaActivity : AppCompatActivity() {
     }
 
     private fun triggerAI() {
-        if (!vsAI || !activityResumed || gameState.status != GameStatus.IN_PROGRESS ||
-            gameState.currentTurn == playerColor
+        if (!activityResumed || gameState.status != GameStatus.IN_PROGRESS ||
+            !aiControlsCurrentTurn()
         ) return
         boardView.isLocked = true
         statusView.text = "Computer is thinking…"
@@ -482,7 +506,13 @@ class MancalaActivity : AppCompatActivity() {
             val move = withContext(Dispatchers.Default) {
                 MancalaAIPlayer(engine, SettingsManager.mancalaAiDepth(this@MancalaActivity)).bestMove(snapshot)
             }
-            if (!activityResumed || snapshot != gameState) return@launch
+            val autoplayStillControlsTurn =
+                snapshot.currentTurn != playerColor || autoplayEnabled
+            if (!activityResumed || snapshot != gameState || !autoplayStillControlsTurn) {
+                boardView.isLocked = false
+                updateHud()
+                return@launch
+            }
             boardView.isLocked = false
             if (move != null) playMove(move)
         }
@@ -492,8 +522,23 @@ class MancalaActivity : AppCompatActivity() {
         if (::boardView.isInitialized && matchStarted && vsAI &&
             activeMancalaOverlay == null &&
             gameState.status == GameStatus.IN_PROGRESS &&
-            gameState.currentTurn != playerColor
+            aiControlsCurrentTurn()
         ) triggerAI()
+    }
+
+    private fun aiControlsCurrentTurn(): Boolean =
+        vsAI && (gameState.currentTurn != playerColor || autoplayEnabled)
+
+    private fun stopAutomatedGameplay() {
+        autoplayEnabled = false
+        scope.coroutineContext.cancelChildren()
+        if (::boardView.isInitialized) {
+            boardView.isLocked = false
+            boardView.onMoveAnimationFinished = null
+        }
+        if (::autoplayButton.isInitialized) {
+            autoplayButton.setAutoplayEnabled(false, animate = false)
+        }
     }
 
     private fun undoMove() {
@@ -519,6 +564,7 @@ class MancalaActivity : AppCompatActivity() {
             else -> return
         }
         val overlay = MancalaGameOverView(this, message)
+        overlay.onClose = { onBackPressed() }
         overlay.onChoice = { which ->
             dismissMancalaOverlay()
             if (which == 0) {
@@ -612,10 +658,18 @@ class MancalaActivity : AppCompatActivity() {
             strokeWidth = 2f * resources.displayMetrics.density
         }
         private val highlightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#E7C995")
+            color = Color.argb(105, 66, 165, 245)
             style = Paint.Style.STROKE
             strokeWidth = 3f * resources.displayMetrics.density
         }
+        private val movingHighlightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#42A5F5")
+            style = Paint.Style.STROKE
+            strokeCap = Paint.Cap.ROUND
+            strokeWidth = 5f * resources.displayMetrics.density
+        }
+        private var highlightAnimator: ValueAnimator? = null
+        private var highlightProgress = 0f
         private val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.argb(190, 255, 246, 226)
             textAlign = Paint.Align.CENTER
@@ -649,6 +703,23 @@ class MancalaActivity : AppCompatActivity() {
             HoleMeasurement(521f, 1327f, 110f),
             HoleMeasurement(521f, 1563f, 112f),
         )
+
+        init {
+            startHighlightAnimation()
+        }
+
+        private fun startHighlightAnimation() {
+            highlightAnimator = ValueAnimator.ofFloat(0f, 360f).apply {
+                duration = 1500L
+                repeatCount = ValueAnimator.INFINITE
+                interpolator = android.view.animation.LinearInterpolator()
+                addUpdateListener {
+                    highlightProgress = it.animatedValue as Float
+                    invalidate()
+                }
+                start()
+            }
+        }
 
         fun setGameState(newState: GameState, animate: Boolean = true) {
             animationGeneration++
@@ -753,7 +824,21 @@ class MancalaActivity : AppCompatActivity() {
                 val count = counts[index]
                 val isStore = index == MancalaRuleEngine.SOUTH_STORE || index == MancalaRuleEngine.NORTH_STORE
                 if (!isStore && isSelectable(index)) {
-                    canvas.drawCircle(point.x, point.y, radiusFor(hole), highlightPaint)
+                    val pitRadius = radiusFor(hole)
+                    canvas.drawCircle(point.x, point.y, pitRadius, highlightPaint)
+                    val highlightRect = RectF(
+                        point.x - pitRadius,
+                        point.y - pitRadius,
+                        point.x + pitRadius,
+                        point.y + pitRadius,
+                    )
+                    canvas.drawArc(
+                        highlightRect,
+                        highlightProgress - 45f,
+                        105f,
+                        false,
+                        movingHighlightPaint,
+                    )
                 }
                 if (count == 0) continue
                 val owner = if (index <= MancalaRuleEngine.SOUTH_STORE) PieceColor.WHITE else PieceColor.BLACK
@@ -1050,6 +1135,12 @@ class MancalaActivity : AppCompatActivity() {
                 }
             }
             return true
+        }
+
+        override fun onDetachedFromWindow() {
+            highlightAnimator?.cancel()
+            highlightAnimator = null
+            super.onDetachedFromWindow()
         }
     }
 }

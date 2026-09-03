@@ -412,8 +412,10 @@ open class MancalaChoiceOverlayView(
     private val options: List<String>,
 ) : View(context) {
     var onChoice: ((Int) -> Unit)? = null
+    var onClose: (() -> Unit)? = null
     private val density = resources.displayMetrics.density
     private val hits = mutableListOf<RectF>()
+    private val closeRect = RectF()
     private var pressedIndex = -1
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
 
@@ -456,6 +458,17 @@ open class MancalaChoiceOverlayView(
         }
         canvas.drawRoundRect(panel, dp(context, 25f), dp(context, 25f), panelPaint)
         panelPaint.clearShadowLayer()
+        if (onClose != null) {
+            closeRect.set(
+                panel.right - dp(context, 54f),
+                panel.top + dp(context, 18f),
+                panel.right - dp(context, 18f),
+                panel.top + dp(context, 54f),
+            )
+            drawCloseButton(canvas, closeRect)
+        } else {
+            closeRect.setEmpty()
+        }
         textPaint.color = Color.WHITE
         textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         textPaint.textSize = min(dp(context, 29f), panelWidth * 0.09f)
@@ -479,6 +492,22 @@ open class MancalaChoiceOverlayView(
         textPaint.color = Color.argb(180, 214, 239, 238)
         textPaint.textSize = dp(context, 12f)
         canvas.drawText("Tap an option to continue", panel.centerX(), panel.bottom - dp(context, 24f), textPaint)
+    }
+
+    private fun drawCloseButton(canvas: Canvas, rect: RectF) {
+        val buttonPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(110, 0, 20, 30)
+            setShadowLayer(dp(context, 4f), 0f, dp(context, 2f), Color.argb(100, 0, 0, 0))
+        }
+        canvas.drawCircle(rect.centerX(), rect.centerY(), rect.width() * 0.5f, buttonPaint)
+        buttonPaint.clearShadowLayer()
+        buttonPaint.style = Paint.Style.STROKE
+        buttonPaint.strokeWidth = dp(context, 2f)
+        buttonPaint.strokeCap = Paint.Cap.ROUND
+        buttonPaint.color = Color.argb(225, 235, 249, 248)
+        val inset = dp(context, 11f)
+        canvas.drawLine(rect.left + inset, rect.top + inset, rect.right - inset, rect.bottom - inset, buttonPaint)
+        canvas.drawLine(rect.right - inset, rect.top + inset, rect.left + inset, rect.bottom - inset, buttonPaint)
     }
 
     private fun drawChoiceButton(canvas: Canvas, rect: RectF, label: String, pressed: Boolean) {
@@ -528,6 +557,12 @@ open class MancalaChoiceOverlayView(
                 return true
             }
             MotionEvent.ACTION_UP -> {
+                if (closeRect.contains(event.x, event.y) && onClose != null) {
+                    performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                    SoundPlayer.play("ui_click")
+                    onClose?.invoke()
+                    return true
+                }
                 val selected = pressedIndex
                 val valid = selected >= 0 && selected < hits.size && hits[selected].contains(event.x, event.y)
                 pressedIndex = -1
