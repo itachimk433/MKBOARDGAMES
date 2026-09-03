@@ -653,6 +653,9 @@ class MancalaActivity : AppCompatActivity() {
         private val stoneShadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.argb(125, 20, 8, 3)
         }
+        private val stoneShadePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        private val stoneGlintPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        private val stoneSpecularPaint = Paint(Paint.ANTI_ALIAS_FLAG)
         private val ripplePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
             strokeWidth = 2f * resources.displayMetrics.density
@@ -666,7 +669,7 @@ class MancalaActivity : AppCompatActivity() {
             color = Color.parseColor("#42A5F5")
             style = Paint.Style.STROKE
             strokeCap = Paint.Cap.ROUND
-            strokeWidth = 2f * resources.displayMetrics.density
+            strokeWidth = 1.6f * resources.displayMetrics.density
         }
         private var highlightAnimator: ValueAnimator? = null
         private var highlightProgress = 0f
@@ -1036,50 +1039,128 @@ class MancalaActivity : AppCompatActivity() {
             owner: PieceColor,
             elevation: Float = 0f,
         ) {
-            val shadowRadius = radius * (1.02f + elevation / radius * 0.10f)
+            val lift = (elevation / radius.coerceAtLeast(1f)).coerceIn(0f, 3f)
+            val shadowRadius = radius * (1.03f + lift * 0.08f)
+            val shadowOffset = radius * (0.38f + lift * 0.13f)
+            val shadowAlpha = (125f - lift * 18f).roundToInt().coerceIn(70, 125)
+            stoneShadowPaint.shader = RadialGradient(
+                x + radius * 0.10f,
+                y + shadowOffset,
+                shadowRadius * 1.08f,
+                intArrayOf(
+                    Color.argb(shadowAlpha, 20, 8, 3),
+                    Color.argb((shadowAlpha * 0.35f).roundToInt(), 20, 8, 3),
+                    Color.TRANSPARENT,
+                ),
+                floatArrayOf(0f, 0.45f, 1f),
+                Shader.TileMode.CLAMP,
+            )
             canvas.drawOval(
                 RectF(
                     x - shadowRadius,
-                    y + radius * 0.36f,
+                    y + shadowOffset * 0.72f,
                     x + shadowRadius,
-                    y + radius * 0.78f,
+                    y + shadowOffset + radius * 0.22f,
                 ),
                 stoneShadowPaint,
             )
+            stoneShadowPaint.shader = null
+
             val colors = if (owner == PieceColor.WHITE) {
                 intArrayOf(
-                    Color.rgb(255, 227, 151),
-                    Color.rgb(213, 133, 49),
-                    Color.rgb(111, 50, 18),
+                    Color.rgb(255, 247, 224),
+                    Color.rgb(246, 202, 124),
+                    Color.rgb(178, 98, 35),
+                    Color.rgb(72, 27, 12),
                 )
             } else {
                 intArrayOf(
-                    Color.rgb(196, 236, 241),
-                    Color.rgb(53, 137, 153),
-                    Color.rgb(19, 52, 69),
+                    Color.rgb(225, 249, 251),
+                    Color.rgb(111, 201, 212),
+                    Color.rgb(37, 111, 130),
+                    Color.rgb(10, 29, 40),
                 )
             }
             stonePaint.shader = RadialGradient(
-                x - radius * 0.32f,
-                y - radius * 0.42f,
-                radius * 1.18f,
+                x - radius * 0.36f,
+                y - radius * 0.44f,
+                radius * 1.20f,
                 colors,
-                floatArrayOf(0f, 0.48f, 1f),
+                floatArrayOf(0f, 0.22f, 0.62f, 1f),
                 Shader.TileMode.CLAMP,
             )
             canvas.drawCircle(x, y, radius, stonePaint)
             stonePaint.shader = null
-            stoneRimPaint.color = Color.argb(155, 255, 241, 207)
-            canvas.drawCircle(x, y, radius * 0.94f, stoneRimPaint)
-            stonePaint.color = Color.argb(125, 255, 255, 255)
+
+            // A translucent lower wash makes the round piece read as a solid object,
+            // instead of a flat radial-gradient disc.
+            stoneShadePaint.shader = LinearGradient(
+                x,
+                y - radius,
+                x,
+                y + radius,
+                intArrayOf(
+                    Color.TRANSPARENT,
+                    Color.TRANSPARENT,
+                    Color.argb(68, 0, 0, 0),
+                ),
+                floatArrayOf(0f, 0.48f, 1f),
+                Shader.TileMode.CLAMP,
+            )
+            canvas.drawCircle(x, y, radius * 0.995f, stoneShadePaint)
+            stoneShadePaint.shader = null
+
+            stoneRimPaint.strokeWidth = max(0.8f * resources.displayMetrics.density, radius * 0.035f)
+            stoneRimPaint.shader = LinearGradient(
+                x - radius,
+                y - radius,
+                x + radius,
+                y + radius,
+                intArrayOf(
+                    Color.argb(175, 255, 249, 226),
+                    Color.argb(70, 255, 241, 207),
+                    Color.argb(180, 35, 15, 9),
+                ),
+                floatArrayOf(0f, 0.48f, 1f),
+                Shader.TileMode.CLAMP,
+            )
+            canvas.drawCircle(x, y, radius * 0.955f, stoneRimPaint)
+            stoneRimPaint.shader = null
+
+            // Soft reflected light plus a tight specular point provide the glossy
+            // highlight visible on real glass/stone game pieces.
+            stoneGlintPaint.shader = RadialGradient(
+                x - radius * 0.38f,
+                y - radius * 0.46f,
+                radius * 0.58f,
+                intArrayOf(
+                    Color.argb(135, 255, 255, 255),
+                    Color.argb(44, 255, 255, 255),
+                    Color.TRANSPARENT,
+                ),
+                floatArrayOf(0f, 0.42f, 1f),
+                Shader.TileMode.CLAMP,
+            )
             canvas.drawOval(
                 RectF(
-                    x - radius * 0.48f,
-                    y - radius * 0.58f,
-                    x - radius * 0.05f,
+                    x - radius * 0.72f,
+                    y - radius * 0.78f,
+                    x - radius * 0.02f,
                     y - radius * 0.18f,
                 ),
-                stonePaint,
+                stoneGlintPaint,
+            )
+            stoneGlintPaint.shader = null
+
+            stoneSpecularPaint.color = Color.argb(205, 255, 255, 255)
+            canvas.drawOval(
+                RectF(
+                    x - radius * 0.50f,
+                    y - radius * 0.64f,
+                    x - radius * 0.22f,
+                    y - radius * 0.39f,
+                ),
+                stoneSpecularPaint,
             )
         }
 
