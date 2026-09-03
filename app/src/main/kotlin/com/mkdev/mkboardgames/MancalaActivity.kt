@@ -7,7 +7,7 @@ import android.content.Context
 import android.graphics.*
 import android.os.Bundle
 import android.view.*
-import android.view.animation.DecelerateInterpolator
+import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -47,9 +47,11 @@ class MancalaActivity : AppCompatActivity() {
         val after: IntArray,
         val color: PieceColor,
     ) {
-        val pickupDuration = 170f
-        val placementDuration = 88f
-        val settleDuration = 250f
+        // Longer phases keep each stone readable while preserving a continuous,
+        // handoff-like rhythm from one pit to the next.
+        val pickupDuration = 300f
+        val placementDuration = 180f
+        val settleDuration = 400f
         val totalDuration =
             pickupDuration + path.size * placementDuration + settleDuration
     }
@@ -763,7 +765,7 @@ class MancalaActivity : AppCompatActivity() {
             isLocked = true
             moveAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
                 duration = moveAnimation!!.totalDuration.toLong()
-                interpolator = DecelerateInterpolator()
+                interpolator = AccelerateDecelerateInterpolator()
                 addUpdateListener {
                     animationProgress = it.animatedValue as Float
                     invalidate()
@@ -819,7 +821,7 @@ class MancalaActivity : AppCompatActivity() {
 
         private fun drawPits(canvas: Canvas) {
             val stoneSpreadRadius = boardRect.width() * 0.078f
-            val chipRadius = boardRect.width() * 0.022f
+            val chipRadius = boardRect.width() * 0.022f * 5f
             val counts = moveAnimation?.let { visibleCounts(it) } ?: countsOf(state)
             for (index in 0 until MancalaRuleEngine.BOARD_CELLS) {
                 val point = centerFor(index)
@@ -920,7 +922,7 @@ class MancalaActivity : AppCompatActivity() {
             val elapsed = animationProgress * animation.totalDuration
             val from = centerFor(animation.from)
             val travelRadius = boardRect.width() * 0.105f
-            val chipRadius = boardRect.width() * 0.022f
+            val chipRadius = boardRect.width() * 0.022f * 5f
             val placed = if (elapsed < animation.pickupDuration) {
                 0
             } else {
@@ -945,8 +947,11 @@ class MancalaActivity : AppCompatActivity() {
                 val index = placed
                 val start = if (index == 0) from else centerFor(animation.path[index - 1])
                 val end = centerFor(animation.path[index])
-                val local = ((elapsed - animation.pickupDuration) %
+                val rawLocal = ((elapsed - animation.pickupDuration) %
                     animation.placementDuration) / animation.placementDuration
+                // Smoothstep gives each hop a gentle takeoff and arrival rather
+                // than snapping between pits at a constant speed.
+                val local = rawLocal * rawLocal * (3f - 2f * rawLocal)
                 val x = start.x + (end.x - start.x) * local
                 val y = start.y + (end.y - start.y) * local -
                     sin(local * PI).toFloat() * travelRadius * 1.25f
