@@ -20,11 +20,10 @@ import com.mkdev.mkboardgames.engine.Position
 import com.mkdev.mkboardgames.games.mancala.MancalaAIPlayer
 import com.mkdev.mkboardgames.games.mancala.MancalaRuleEngine
 import com.mkdev.mkboardgames.ui.MancalaChoiceOverlayView
+import com.mkdev.mkboardgames.ui.MancalaGameOverView
 import com.mkdev.mkboardgames.ui.MancalaHomeView
-import com.mkdev.mkboardgames.ui.MancalaPauseView
-import com.mkdev.mkboardgames.ui.MancalaRewardsView
+import com.mkdev.mkboardgames.ui.MancalaRulesView
 import com.mkdev.mkboardgames.ui.MancalaWoodButton
-import com.mkdev.mkboardgames.ui.StyledDialogs
 import kotlinx.coroutines.*
 import kotlin.math.*
 
@@ -114,14 +113,7 @@ class MancalaActivity : AppCompatActivity() {
         homeView = MancalaHomeView(this).apply {
             onPlay = { showModeDialog() }
             onHowToPlay = { showRules(showModeAfter = false) }
-            onRewards = { showRewardsOverlay() }
-            onSettings = { showMancalaSettings() }
-            onSound = {
-                val enabled = !SettingsManager.isMovementSoundsEnabled(this@MancalaActivity)
-                SettingsManager.setMovementSoundsEnabled(this@MancalaActivity, enabled)
-                SoundPlayer.movementSoundsEnabled = enabled
-            }
-            onMusic = { SoundPlayer.play("ui_click") }
+            onMore = { showHomeMenu() }
         }
         gameLayout.visibility = View.GONE
         screenRoot.addView(
@@ -253,34 +245,20 @@ class MancalaActivity : AppCompatActivity() {
         showMancalaOverlay(overlay, onCancel)
     }
 
-    private fun showMancalaSettings() {
-        val sound = if (SettingsManager.isMovementSoundsEnabled(this)) "Sound: On" else "Sound: Off"
+    private fun showHomeMenu() {
         showChoiceOverlay(
-            "Mancala Settings",
-            "Tune the board before your next match.",
-            listOf(sound, "How to Play", "Close"),
+            "Mancala",
+            "Choose an option.",
+            listOf("New Game", "How to Play", "AI Difficulty", "Back"),
             onCancel = { showHome() },
         ) { which ->
             when (which) {
-                0 -> {
-                    val enabled = !SettingsManager.isMovementSoundsEnabled(this)
-                    SettingsManager.setMovementSoundsEnabled(this, enabled)
-                    SoundPlayer.movementSoundsEnabled = enabled
-                    showMancalaSettings()
-                }
+                0 -> showModeDialog()
                 1 -> showRules(false)
+                2 -> showDifficultyMenu(returnToHome = true)
                 else -> showHome()
             }
         }
-    }
-
-    private fun showRewardsOverlay() {
-        val overlay = MancalaRewardsView(this)
-        overlay.onClaim = {
-            dismissMancalaOverlay()
-            android.widget.Toast.makeText(this, "Daily reward claimed", android.widget.Toast.LENGTH_SHORT).show()
-        }
-        showMancalaOverlay(overlay) { showHome() }
     }
 
     private fun showMancalaOverlay(view: View, onCancel: () -> Unit) {
@@ -309,49 +287,54 @@ class MancalaActivity : AppCompatActivity() {
         callback?.invoke()
     }
 
-    private fun showPauseOverlay() {
-        val overlay = MancalaPauseView(this)
-        overlay.onChoice = { which ->
-            dismissMancalaOverlay()
-            when (which) {
-                0 -> showBoardAfterDialog()
-                1 -> startGame()
-                else -> pauseMatchAndExit()
-            }
-        }
-        showMancalaOverlay(overlay) { showBoardAfterDialog() }
-    }
-
     private fun showMenu() {
         boardView.isLocked = true
-        showPauseOverlay()
+        showChoiceOverlay(
+            "Game Menu",
+            "What would you like to do?",
+            listOf("New Game / Restart", "How To Play", "AI Difficulty", "Back"),
+            onCancel = { showBoardAfterDialog() },
+        ) { which ->
+            when (which) {
+                0 -> startGame()
+                1 -> showRules(false)
+                2 -> showDifficultyMenu(returnToHome = false)
+                else -> showBoardAfterDialog()
+            }
+        }
+    }
+
+    private fun showDifficultyMenu(returnToHome: Boolean) {
+        val current = SettingsManager.getMancalaDifficulty(this)
+        val options = listOf(
+            "Easy${if (current == 0) "  ✓" else ""}",
+            "Medium${if (current == 1) "  ✓" else ""}",
+            "Hard${if (current == 2) "  ✓" else ""}",
+            "Back",
+        )
+        showChoiceOverlay(
+            "AI Difficulty",
+            "Choose the computer’s strength.",
+            options,
+            onCancel = { if (returnToHome) showHome() else showMenu() },
+        ) { which ->
+            if (which < 3) {
+                SettingsManager.setMancalaDifficulty(this, which)
+                if (returnToHome) showHome() else showMenu()
+            } else if (returnToHome) {
+                showHome()
+            } else {
+                showMenu()
+            }
+        }
     }
 
     private fun showRules(showModeAfter: Boolean) {
-        val rules = """
-            MANCALA — Kalah rules
-
-            Setup
-            Each player owns six pits and the store at their end of the board. Begin with four stones in every pit. South moves first.
-
-            Sowing
-            Choose a pit on your side. Pick up every stone and place them one at a time into the following pits, moving around the board. Skip your opponent's store.
-
-            Extra turns
-            If your last stone lands in your own store, take another turn.
-
-            Captures
-            If your last stone lands in an empty pit on your side, capture that stone and all stones in the directly opposite pit. Put them in your store.
-
-            Ending the game
-            When one side has no stones left in its six pits, the other side's remaining stones move to its store. The higher store total wins.
-        """.trimIndent()
-        StyledDialogs.showRules(
-            this,
-            "Mancala",
+        val rules = MancalaRulesView(this)
+        rules.onBack = { cancelMancalaOverlay() }
+        showMancalaOverlay(
             rules,
-            "M A N C A L A",
-            onDone = { if (showModeAfter) showModeDialog() else showHomeOrBoard() },
+            onCancel = { if (showModeAfter) showModeDialog() else showHomeOrBoard() },
         )
     }
 
@@ -442,7 +425,7 @@ class MancalaActivity : AppCompatActivity() {
         val snapshot = gameState
         scope.launch {
             val move = withContext(Dispatchers.Default) {
-                MancalaAIPlayer(engine).bestMove(snapshot)
+                MancalaAIPlayer(engine, SettingsManager.mancalaAiDepth(this@MancalaActivity)).bestMove(snapshot)
             }
             if (!activityResumed || snapshot != gameState) return@launch
             boardView.isLocked = false
@@ -472,32 +455,23 @@ class MancalaActivity : AppCompatActivity() {
 
     private fun showResultDialog() {
         if (gameState.status == GameStatus.IN_PROGRESS) return
-        hideBoardWhileDialogIsOpen()
         val message = when (gameState.status) {
             GameStatus.WHITE_WINS -> if (vsAI && playerColor == PieceColor.WHITE) "You win!" else "South wins!"
             GameStatus.BLACK_WINS -> if (vsAI && playerColor == PieceColor.BLACK) "You win!" else "North wins!"
             GameStatus.DRAW -> "It's a draw!"
             else -> return
         }
-        StyledDialogs.showChoices(
-            this,
-            "Game Over",
-            message,
-            listOf(
-                StyledDialogs.choice("Play Again", "Start a fresh match", "↻", "#E3B86A"),
-                StyledDialogs.choice("Main Menu", "Choose another match", "⌂", "#E58A7A"),
-            ),
-            420f,
-            "M A N C A L A",
-            onCancel = { showBoardAfterDialog() },
-            fullScreen = false,
-        ) { which, dialog ->
-            dialog.dismiss()
-            if (which == 0) startGame() else {
+        val overlay = MancalaGameOverView(this, message)
+        overlay.onChoice = { which ->
+            dismissMancalaOverlay()
+            if (which == 0) {
+                startGame()
+            } else {
                 clearPausedMatch()
                 finish()
             }
         }
+        showMancalaOverlay(overlay) { showBoardAfterDialog() }
     }
 
     private fun recordResult() {
@@ -515,29 +489,13 @@ class MancalaActivity : AppCompatActivity() {
         }
     }
 
-    private fun pauseMatchAndExit() {
-        if (gameState.moveHistory.isNotEmpty() && gameState.status == GameStatus.IN_PROGRESS) {
-            PausedMatchStore.save(
-                this,
-                "MANCALA",
-                vsAI,
-                playerColor.name,
-                gameState.moveHistory,
-            )
-        }
-        finish()
-    }
-
     private fun clearPausedMatch() = PausedMatchStore.clear(this, "MANCALA")
-
-    private fun hideBoardWhileDialogIsOpen() {
-        if (::gameRoot.isInitialized) gameRoot.visibility = View.INVISIBLE
-    }
 
     private fun showBoardAfterDialog(resumeAi: Boolean = true) {
         dismissMancalaOverlay()
         if (::gameRoot.isInitialized) gameRoot.visibility = View.VISIBLE
         if (::homeView.isInitialized) homeView.visibility = View.GONE
+        boardView.isLocked = gameState.status != GameStatus.IN_PROGRESS
         if (resumeAi) resumeComputerTurnIfNeeded()
     }
 

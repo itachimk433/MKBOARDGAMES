@@ -16,6 +16,7 @@ object SettingsManager {
     private const val KEY_LUDO_DIFFICULTY = "ludo_ai_difficulty"
     private const val KEY_SHOGI_DIFFICULTY = "shogi_ai_difficulty"
     private const val KEY_GO_DIFFICULTY = "go_ai_difficulty"
+    private const val KEY_MANCALA_DIFFICULTY = "mancala_ai_difficulty"
 
     // ── Hints keys ───────────────────────────────────────────────────────────
     private const val KEY_CHESS_HINTS    = "chess_show_hints"
@@ -162,6 +163,19 @@ object SettingsManager {
         0 -> 650L
         2 -> 1350L
         else -> 950L
+    }
+
+    // ── Mancala ───────────────────────────────────────────────────────────────
+    fun getMancalaDifficulty(ctx: Context) =
+        prefs(ctx).getInt(KEY_MANCALA_DIFFICULTY, 1).coerceIn(0, 2)
+
+    fun setMancalaDifficulty(ctx: Context, v: Int) =
+        prefs(ctx).edit().putInt(KEY_MANCALA_DIFFICULTY, v.coerceIn(0, 2)).apply()
+
+    fun mancalaAiDepth(ctx: Context) = when (getMancalaDifficulty(ctx)) {
+        0 -> 2
+        2 -> 7
+        else -> 5
     }
 
     // ── Tic-Tac-Toe ──────────────────────────────────────────────────────────

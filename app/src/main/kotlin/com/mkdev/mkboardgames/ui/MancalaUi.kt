@@ -139,8 +139,7 @@ class MancalaWoodButton(
                 pressed = false
                 invalidate()
                 if (shouldClick) {
-                    SoundPlayer.play("ui_click")
-                    onClick?.invoke()
+                    performClick()
                 }
                 return true
             }
@@ -152,6 +151,13 @@ class MancalaWoodButton(
         }
         return true
     }
+
+    override fun performClick(): Boolean {
+        super.performClick()
+        SoundPlayer.play("ui_click")
+        onClick?.invoke()
+        return true
+    }
 }
 
 /**
@@ -161,10 +167,7 @@ class MancalaWoodButton(
 class MancalaHomeView(context: Context) : View(context) {
     var onPlay: (() -> Unit)? = null
     var onHowToPlay: (() -> Unit)? = null
-    var onRewards: (() -> Unit)? = null
-    var onSettings: (() -> Unit)? = null
-    var onSound: (() -> Unit)? = null
-    var onMusic: (() -> Unit)? = null
+    var onMore: (() -> Unit)? = null
 
     private val boardBitmap = try {
         context.assets.open("mancala_board.webp").use { BitmapFactory.decodeStream(it) }
@@ -218,11 +221,6 @@ class MancalaHomeView(context: Context) : View(context) {
         drawTitle(canvas, w, h)
 
         buttonRects.clear()
-        val compact = w < dp(context, 620f)
-        val topSize = min(dp(context, if (compact) 47f else 56f), h * 0.13f)
-        drawIconButton(canvas, "sound", RectF(w - topSize * 2.35f, dp(context, 12f), w - topSize * 1.25f, dp(context, 12f) + topSize), "◖")
-        drawIconButton(canvas, "music", RectF(w - topSize * 1.15f, dp(context, 12f), w - dp(context, 12f), dp(context, 12f) + topSize), "♪")
-
         val mainWidth = min(w * 0.42f, dp(context, 250f))
         val mainHeight = min(dp(context, 58f), h * 0.13f)
         val mainLeft = (w - mainWidth) / 2f
@@ -233,8 +231,6 @@ class MancalaHomeView(context: Context) : View(context) {
 
         val bottomY = h - min(dp(context, 62f), h * 0.14f)
         val iconSize = min(dp(context, 52f), h * 0.12f)
-        drawIconButton(canvas, "rewards", RectF(dp(context, 14f), bottomY, dp(context, 14f) + iconSize, bottomY + iconSize), "★")
-        drawIconButton(canvas, "settings", RectF(w - iconSize * 2.2f, bottomY, w - iconSize * 1.2f, bottomY + iconSize), "⚙")
         drawIconButton(canvas, "more", RectF(w - iconSize * 1.1f, bottomY, w - dp(context, 14f), bottomY + iconSize), "⋮")
     }
 
@@ -395,10 +391,7 @@ class MancalaHomeView(context: Context) : View(context) {
                 when (key) {
                     "play" -> onPlay?.invoke()
                     "rules" -> onHowToPlay?.invoke()
-                    "rewards" -> onRewards?.invoke()
-                    "settings", "more" -> onSettings?.invoke()
-                    "sound" -> onSound?.invoke()
-                    "music" -> onMusic?.invoke()
+                    "more" -> onMore?.invoke()
                 }
                 return true
             }
@@ -547,171 +540,162 @@ open class MancalaChoiceOverlayView(
     }
 }
 
-class MancalaPauseView(context: Context) : MancalaChoiceOverlayView(
+class MancalaGameOverView(
+    context: Context,
+    message: String,
+) : MancalaChoiceOverlayView(
     context,
-    "Game Paused",
-    "Your match is safe. What would you like to do?",
-    listOf("Resume", "Restart", "Quit"),
+    "GAME OVER",
+    message,
+    listOf("Play Again", "Main Menu"),
 )
 
-class MancalaRewardsView(context: Context) : View(context) {
-    var onClaim: (() -> Unit)? = null
-    private val density = resources.displayMetrics.density
-    private val claimRect = RectF()
-    private var pressed = false
-    private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
+class MancalaRulesView(context: Context) : View(context) {
+    var onBack: (() -> Unit)? = null
+    private val backRect = RectF()
+    private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val headingPaint = Paint(Paint.ANTI_ALIAS_FLAG)
 
     init {
         isClickable = true
         isFocusable = true
-        contentDescription = "Daily rewards"
+        contentDescription = "Mancala how to play"
+        setLayerType(View.LAYER_TYPE_SOFTWARE, null)
     }
 
     override fun onDraw(canvas: Canvas) {
         val w = width.toFloat()
         val h = height.toFloat()
         canvas.drawColor(Color.argb(205, 0, 6, 14))
-        val panelWidth = min(w * 0.9f, dp(context, 760f))
-        val panelHeight = min(h * 0.72f, dp(context, 340f))
+
+        val panelWidth = min(w * 0.9f, dp(context, 610f))
+        val panelHeight = min(h * 0.9f, dp(context, 700f))
         val panel = RectF(
             (w - panelWidth) / 2f,
             (h - panelHeight) / 2f,
             (w + panelWidth) / 2f,
             (h + panelHeight) / 2f,
         )
-        canvas.drawRoundRect(
-            panel,
-            dp(context, 28f),
-            dp(context, 28f),
-            Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.parseColor("#176A86")
-                setShadowLayer(dp(context, 18f), 0f, dp(context, 8f), Color.BLACK)
-            },
-        )
-        val header = RectF(panel.left, panel.top, panel.right, panel.top + dp(context, 52f))
-        canvas.drawRect(header, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#F6F1E9") })
-        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        textPaint.color = Color.parseColor("#421917")
-        textPaint.textSize = min(dp(context, 22f), panelWidth * 0.05f)
-        canvas.drawText("DAILY REWARDS", panel.centerX(), panel.top + dp(context, 34f), textPaint)
-        textPaint.color = Color.parseColor("#FFE20A")
-        textPaint.textSize = min(dp(context, 23f), panelWidth * 0.05f)
-        canvas.drawText("CONGRATULATIONS", panel.centerX(), panel.top + dp(context, 91f), textPaint)
+        val panelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = LinearGradient(
+                0f,
+                panel.top,
+                0f,
+                panel.bottom,
+                Color.parseColor("#17677F"),
+                Color.parseColor("#0C3344"),
+                Shader.TileMode.CLAMP,
+            )
+            setShadowLayer(dp(context, 18f), 0f, dp(context, 8f), Color.BLACK)
+        }
+        canvas.drawRoundRect(panel, dp(context, 26f), dp(context, 26f), panelPaint)
+        panelPaint.clearShadowLayer()
 
-        val rewards = listOf("20", "40", "80", "150", "200", "50")
-        val columns = if (panelWidth < dp(context, 560f)) 3 else 6
-        val rows = (rewards.size + columns - 1) / columns
-        val cardGap = dp(context, 8f)
-        val cardTop = panel.top + dp(context, 112f)
-        val availableWidth = panel.width() - dp(context, 56f) - cardGap * (columns - 1)
-        val cardWidth = (availableWidth / columns).coerceAtLeast(dp(context, 48f))
-        val cardHeight = min(
-            dp(context, if (rows == 1) 132f else 104f),
-            (panel.height() - dp(context, 186f) - cardGap * (rows - 1)) / rows,
+        textPaint.textAlign = Paint.Align.CENTER
+        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        textPaint.color = Color.WHITE
+        textPaint.textSize = min(dp(context, 28f), panelWidth * 0.08f)
+        canvas.drawText("MANCALA", panel.centerX(), panel.top + dp(context, 52f), textPaint)
+        textPaint.color = Color.parseColor("#FFE09C")
+        textPaint.textSize = min(dp(context, 22f), panelWidth * 0.065f)
+        canvas.drawText("HOW TO PLAY", panel.centerX(), panel.top + dp(context, 84f), textPaint)
+
+        val contentLeft = panel.left + dp(context, 28f)
+        val contentWidth = panel.width() - dp(context, 56f)
+        var y = panel.top + dp(context, 122f)
+        val lineHeight = dp(context, 18f)
+        val sections = listOf(
+            "SETUP" to "Each player owns six pits and the store at their end. Begin with four stones in every pit. South moves first.",
+            "SOWING" to "Choose a pit on your side, pick up every stone, and place them one at a time into the following pits. Skip the opponent’s store.",
+            "EXTRA TURNS" to "If your last stone lands in your own store, take another turn.",
+            "CAPTURES" to "If your last stone lands in an empty pit on your side, capture that stone and all stones in the directly opposite pit.",
+            "ENDING THE GAME" to "When one side has no stones left in its six pits, the other side’s remaining stones move to its store. The higher total wins.",
         )
-        rewards.forEachIndexed { index, reward ->
-            val column = index % columns
-            val row = index / columns
-            val left = panel.left + dp(context, 28f) + column * (cardWidth + cardGap)
-            val top = cardTop + row * (cardHeight + cardGap)
-            val card = RectF(left, top, left + cardWidth, top + cardHeight)
-            drawRewardCard(canvas, card, reward, index + 1)
+        sections.forEach { (heading, body) ->
+            headingPaint.color = Color.parseColor("#FFE09C")
+            headingPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            headingPaint.textSize = min(dp(context, 15f), contentWidth * 0.045f)
+            canvas.drawText(heading, contentLeft, y, headingPaint)
+            y += lineHeight
+            textPaint.textAlign = Paint.Align.LEFT
+            textPaint.typeface = Typeface.DEFAULT
+            textPaint.color = Color.parseColor("#E4F1F0")
+            textPaint.textSize = min(dp(context, 14f), contentWidth * 0.042f)
+            y = drawWrapped(canvas, body, contentLeft, contentWidth, y, lineHeight, textPaint)
+            y += dp(context, 12f)
         }
 
-        val buttonWidth = min(panel.width() * 0.36f, dp(context, 220f))
-        claimRect.set(
+        val buttonWidth = min(panel.width() * 0.42f, dp(context, 210f))
+        backRect.set(
             panel.centerX() - buttonWidth / 2f,
             panel.bottom - dp(context, 62f),
             panel.centerX() + buttonWidth / 2f,
             panel.bottom - dp(context, 14f),
         )
-        drawClaimButton(canvas, claimRect, pressed)
+        drawBackButton(canvas, backRect)
     }
 
-    private fun drawRewardCard(canvas: Canvas, rect: RectF, reward: String, day: Int) {
+    private fun drawWrapped(
+        canvas: Canvas,
+        value: String,
+        left: Float,
+        maxWidth: Float,
+        startY: Float,
+        lineHeight: Float,
+        paint: Paint,
+    ): Float {
+        var y = startY
+        var line = ""
+        value.split(" ").forEach { word ->
+            val candidate = if (line.isEmpty()) word else "$line $word"
+            if (line.isNotEmpty() && paint.measureText(candidate) > maxWidth) {
+                canvas.drawText(line, left, y, paint)
+                y += lineHeight
+                line = word
+            } else {
+                line = candidate
+            }
+        }
+        if (line.isNotEmpty()) {
+            canvas.drawText(line, left, y, paint)
+            y += lineHeight
+        }
+        return y
+    }
+
+    private fun drawBackButton(canvas: Canvas, rect: RectF) {
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = LinearGradient(
                 0f,
                 rect.top,
                 0f,
                 rect.bottom,
-                Color.parseColor("#E5A447"),
-                Color.parseColor("#955528"),
-                Shader.TileMode.CLAMP,
-            )
-        }
-        canvas.drawRoundRect(rect, dp(context, 10f), dp(context, 10f), paint)
-        paint.shader = null
-        paint.style = Paint.Style.STROKE
-        paint.strokeWidth = dp(context, 1.3f)
-        paint.color = Color.parseColor("#5F301B")
-        canvas.drawRoundRect(rect, dp(context, 10f), dp(context, 10f), paint)
-        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        textPaint.color = Color.parseColor("#411717")
-        textPaint.textSize = min(dp(context, 18f), rect.width() * 0.35f)
-        canvas.drawText("$reward  ●", rect.centerX(), rect.top + rect.height() * 0.28f, textPaint)
-        textPaint.color = Color.WHITE
-        textPaint.textSize = min(dp(context, 16f), rect.width() * 0.32f)
-        canvas.drawText("Day $day", rect.centerX(), rect.bottom - rect.height() * 0.12f, textPaint)
-        textPaint.color = Color.argb(130, 255, 242, 190)
-        textPaint.textSize = rect.width() * 0.42f
-        canvas.drawText("●", rect.centerX(), rect.centerY() + rect.height() * 0.08f, textPaint)
-    }
-
-    private fun drawClaimButton(canvas: Canvas, rect: RectF, isPressed: Boolean) {
-        val offset = if (isPressed) dp(context, 2f) else 0f
-        val drawn = RectF(rect.left, rect.top + offset, rect.right, rect.bottom + offset)
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            shader = LinearGradient(
-                0f,
-                drawn.top,
-                0f,
-                drawn.bottom,
                 Color.parseColor("#F5D49A"),
                 Color.parseColor("#A76438"),
                 Shader.TileMode.CLAMP,
             )
+            setShadowLayer(dp(context, 5f), 0f, dp(context, 3f), Color.BLACK)
         }
-        canvas.drawRoundRect(drawn, dp(context, 13f), dp(context, 13f), paint)
-        textPaint.color = Color.parseColor("#4A1714")
-        textPaint.textSize = min(dp(context, 20f), rect.height() * 0.4f)
+        canvas.drawRoundRect(rect, dp(context, 14f), dp(context, 14f), paint)
+        paint.clearShadowLayer()
+        paint.shader = null
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = dp(context, 1.5f)
+        paint.color = Color.parseColor("#733A25")
+        canvas.drawRoundRect(rect, dp(context, 14f), dp(context, 14f), paint)
+        textPaint.textAlign = Paint.Align.CENTER
         textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        textPaint.color = Color.parseColor("#4A1714")
+        textPaint.textSize = min(dp(context, 19f), rect.height() * 0.4f)
         val metrics = textPaint.fontMetrics
-        canvas.drawText("Claim", drawn.centerX(), drawn.centerY() - (metrics.ascent + metrics.descent) / 2f, textPaint)
+        canvas.drawText("Back", rect.centerX(), rect.centerY() - (metrics.ascent + metrics.descent) / 2f, textPaint)
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        when (event.actionMasked) {
-            MotionEvent.ACTION_DOWN -> {
-                pressed = claimRect.contains(event.x, event.y)
-                if (pressed) {
-                    performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-                    invalidate()
-                }
-                return true
-            }
-            MotionEvent.ACTION_MOVE -> {
-                if (pressed && !claimRect.contains(event.x, event.y)) {
-                    pressed = false
-                    invalidate()
-                }
-                return true
-            }
-            MotionEvent.ACTION_UP -> {
-                val shouldClaim = pressed && claimRect.contains(event.x, event.y)
-                pressed = false
-                invalidate()
-                if (shouldClaim) {
-                    SoundPlayer.play("ui_click")
-                    onClaim?.invoke()
-                }
-                return true
-            }
-            MotionEvent.ACTION_CANCEL -> {
-                pressed = false
-                invalidate()
-                return true
-            }
+        if (event.actionMasked == MotionEvent.ACTION_UP && backRect.contains(event.x, event.y)) {
+            performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+            SoundPlayer.play("ui_click")
+            onBack?.invoke()
         }
         return true
     }
