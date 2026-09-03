@@ -292,14 +292,43 @@ class MancalaActivity : AppCompatActivity() {
         showChoiceOverlay(
             "Game Menu",
             "What would you like to do?",
-            listOf("New Game / Restart", "How To Play", "AI Difficulty", "Back"),
+            listOf("New Game / Restart", "How To Play", "AI Difficulty", "Back", "Home"),
             onCancel = { showBoardAfterDialog() },
         ) { which ->
             when (which) {
-                0 -> startGame()
+                0 -> showRestartConfirmation()
                 1 -> showRules(false)
                 2 -> showDifficultyMenu(returnToHome = false)
-                else -> showBoardAfterDialog()
+                3 -> showBoardAfterDialog()
+                else -> showHomeConfirmation()
+            }
+        }
+    }
+
+    private fun showRestartConfirmation() {
+        showChoiceOverlay(
+            "Restart this game?",
+            "Your current progress will be lost.",
+            listOf("Restart", "Cancel"),
+            onCancel = { showMenu() },
+        ) { which ->
+            if (which == 0) startGame() else showMenu()
+        }
+    }
+
+    private fun showHomeConfirmation() {
+        showChoiceOverlay(
+            "Go to home screen?",
+            "Your current match will be saved so you can resume it later.",
+            listOf("Go Home", "Stay in Game"),
+            onCancel = { showMenu() },
+        ) { which ->
+            if (which == 0) {
+                savePausedMatch()
+                matchStarted = false
+                showHome()
+            } else {
+                showMenu()
             }
         }
     }
@@ -319,10 +348,30 @@ class MancalaActivity : AppCompatActivity() {
             onCancel = { if (returnToHome) showHome() else showMenu() },
         ) { which ->
             if (which < 3) {
-                SettingsManager.setMancalaDifficulty(this, which)
-                if (returnToHome) showHome() else showMenu()
+                if (!returnToHome && which != current) {
+                    showDifficultyConfirmation(which)
+                } else {
+                    SettingsManager.setMancalaDifficulty(this, which)
+                    if (returnToHome) showHome() else showMenu()
+                }
             } else if (returnToHome) {
                 showHome()
+            } else {
+                showMenu()
+            }
+        }
+    }
+
+    private fun showDifficultyConfirmation(level: Int) {
+        showChoiceOverlay(
+            "Change AI difficulty?",
+            "Changing difficulty will start a new game.",
+            listOf("Change & Restart", "Cancel"),
+            onCancel = { showMenu() },
+        ) { which ->
+            if (which == 0) {
+                SettingsManager.setMancalaDifficulty(this, level)
+                startGame()
             } else {
                 showMenu()
             }
@@ -448,9 +497,11 @@ class MancalaActivity : AppCompatActivity() {
         repeat(steps) {
             if (previousStates.isNotEmpty()) gameState = previousStates.removeLast()
         }
+        boardView.onMoveAnimationFinished = null
         boardView.isLocked = false
         boardView.setGameState(gameState, animate = false)
         updateHud()
+        resumeComputerTurnIfNeeded()
     }
 
     private fun showResultDialog() {
@@ -490,6 +541,18 @@ class MancalaActivity : AppCompatActivity() {
     }
 
     private fun clearPausedMatch() = PausedMatchStore.clear(this, "MANCALA")
+
+    private fun savePausedMatch() {
+        if (gameState.moveHistory.isNotEmpty() && gameState.status == GameStatus.IN_PROGRESS) {
+            PausedMatchStore.save(
+                this,
+                "MANCALA",
+                vsAI,
+                playerColor.name,
+                gameState.moveHistory,
+            )
+        }
+    }
 
     private fun showBoardAfterDialog(resumeAi: Boolean = true) {
         dismissMancalaOverlay()
@@ -658,7 +721,7 @@ class MancalaActivity : AppCompatActivity() {
         }
 
         private fun drawPits(canvas: Canvas) {
-            val pitRadius = boardRect.width() * 0.105f
+            val pitRadius = boardRect.width() * 0.078f
             val chipRadius = boardRect.width() * 0.022f
             val counts = moveAnimation?.let { visibleCounts(it) } ?: countsOf(state)
             for (index in 0 until MancalaRuleEngine.BOARD_CELLS) {
@@ -671,6 +734,7 @@ class MancalaActivity : AppCompatActivity() {
                 if (count == 0) continue
                 val owner = if (index <= MancalaRuleEngine.SOUTH_STORE) PieceColor.WHITE else PieceColor.BLACK
                 if (isStore) {
+                    drawStoreStones(canvas, point, count, chipRadius, owner)
                     countPaint.textSize = boardRect.width() * 0.10f
                     countPaint.color = Color.argb(235, 255, 244, 221)
                     canvas.drawText(count.toString(), point.x, point.y + countPaint.textSize * 0.35f, countPaint)
@@ -690,6 +754,29 @@ class MancalaActivity : AppCompatActivity() {
                     countPaint.color = Color.argb(235, 255, 244, 221)
                     canvas.drawText(count.toString(), point.x, point.y + countPaint.textSize * 0.35f, countPaint)
                 }
+            }
+        }
+
+        private fun drawStoreStones(
+            canvas: Canvas,
+            center: PointF,
+            count: Int,
+            radius: Float,
+            owner: PieceColor,
+        ) {
+            val visible = min(count, 18)
+            val xSpacing = boardRect.width() * 0.075f
+            val ySpacing = boardRect.height() * 0.026f
+            repeat(visible) { index ->
+                val column = index % 6
+                val row = index / 6
+                drawStone(
+                    canvas,
+                    center.x + (column - 2.5f) * xSpacing,
+                    center.y + (row - 1f) * ySpacing,
+                    radius * 0.9f,
+                    owner,
+                )
             }
         }
 
@@ -883,18 +970,18 @@ class MancalaActivity : AppCompatActivity() {
                 engine.stones(state, index) > 0
 
         private fun centerFor(index: Int): PointF {
-            val yStart = boardRect.top + boardRect.height() * 0.238f
-            val yStep = boardRect.height() * 0.1094f
+            val yStart = boardRect.top + boardRect.height() * 0.187f
+            val yStep = boardRect.height() * 0.1092f
             return when {
                 index == MancalaRuleEngine.NORTH_STORE ->
-                    PointF(boardRect.centerX(), boardRect.top + boardRect.height() * 0.129f)
+                    PointF(boardRect.centerX(), boardRect.top + boardRect.height() * 0.098f)
                 index == MancalaRuleEngine.SOUTH_STORE ->
-                    PointF(boardRect.centerX(), boardRect.top + boardRect.height() * 0.938f)
+                    PointF(boardRect.centerX(), boardRect.top + boardRect.height() * 0.897f)
                 index in 0 until MancalaRuleEngine.PITS_PER_SIDE ->
-                    PointF(boardRect.left + boardRect.width() * 0.354f, yStart + index * yStep)
+                    PointF(boardRect.left + boardRect.width() * 0.307f, yStart + index * yStep)
                 else -> {
                     val row = 12 - index
-                    PointF(boardRect.left + boardRect.width() * 0.729f, yStart + row * yStep)
+                    PointF(boardRect.left + boardRect.width() * 0.693f, yStart + row * yStep)
                 }
             }
         }
@@ -905,7 +992,7 @@ class MancalaActivity : AppCompatActivity() {
                 onGameOverTapped?.invoke()
                 return true
             }
-            val pitRadius = boardRect.width() * 0.14f
+            val pitRadius = boardRect.width() * 0.095f
             for (index in 0 until MancalaRuleEngine.BOARD_CELLS) {
                 if (index == MancalaRuleEngine.SOUTH_STORE || index == MancalaRuleEngine.NORTH_STORE) continue
                 val point = centerFor(index)

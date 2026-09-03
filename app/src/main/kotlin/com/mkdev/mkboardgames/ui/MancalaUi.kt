@@ -429,7 +429,13 @@ open class MancalaChoiceOverlayView(
         val h = height.toFloat()
         canvas.drawColor(Color.argb(190, 0, 6, 12))
         val panelWidth = min(w * 0.88f, dp(context, 520f))
-        val panelHeight = min(h * 0.82f, dp(context, 510f))
+        val optionCount = options.size.coerceAtLeast(1)
+        val gap = dp(context, 14f)
+        val compactHeight = dp(context, 150f) +
+            optionCount * dp(context, 58f) +
+            (optionCount - 1) * gap +
+            dp(context, 45f)
+        val panelHeight = min(h * 0.82f, compactHeight)
         val panel = RectF(
             (w - panelWidth) / 2f,
             (h - panelHeight) / 2f,
@@ -460,8 +466,10 @@ open class MancalaChoiceOverlayView(
         canvas.drawText(subtitle, panel.centerX(), panel.top + dp(context, 91f), textPaint)
 
         hits.clear()
-        val gap = dp(context, 14f)
-        val buttonHeight = min(dp(context, 58f), (panel.height() - dp(context, 138f) - gap * (options.size - 1)) / options.size)
+        val buttonHeight = min(
+            dp(context, 58f),
+            (panel.height() - dp(context, 138f) - gap * (optionCount - 1)) / optionCount,
+        )
         options.forEachIndexed { index, option ->
             val top = panel.top + dp(context, 116f) + index * (buttonHeight + gap)
             val rect = RectF(panel.left + panelWidth * 0.13f, top, panel.right - panelWidth * 0.13f, top + buttonHeight)
