@@ -1,9 +1,13 @@
 package com.mkdev.mkboardgames
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
+import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.*
 import android.os.Bundle
 import android.view.*
+import android.view.animation.DecelerateInterpolator
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -17,7 +21,7 @@ import com.mkdev.mkboardgames.games.mancala.MancalaAIPlayer
 import com.mkdev.mkboardgames.games.mancala.MancalaRuleEngine
 import com.mkdev.mkboardgames.ui.StyledDialogs
 import kotlinx.coroutines.*
-import kotlin.math.min
+import kotlin.math.*
 
 class MancalaActivity : AppCompatActivity() {
     private val engine = MancalaRuleEngine()
@@ -238,7 +242,7 @@ class MancalaActivity : AppCompatActivity() {
         SettingsManager.activateGameTheme(this, "mancala")
         if (vsAI) SettingsManager.setActiveGame(this, "mancala")
         gameState = engine.initialState()
-        boardView.setGameState(gameState)
+        boardView.setGameState(gameState, animate = false)
         showBoardAfterDialog(resumeAi = false)
 
         restoring?.moves?.forEach { move ->
@@ -246,7 +250,7 @@ class MancalaActivity : AppCompatActivity() {
             gameState = engine.applyMove(gameState, move)
         }
         if (restoring != null) {
-            boardView.setGameState(gameState)
+            boardView.setGameState(gameState, animate = false)
             PausedMatchStore.clear(this, "MANCALA")
         }
         updateHud()
@@ -279,6 +283,12 @@ class MancalaActivity : AppCompatActivity() {
     private fun playMove(move: Move) {
         previousStates.add(gameState)
         gameState = engine.applyMove(gameState, move)
+        if (gameState.status == GameStatus.IN_PROGRESS) {
+            boardView.onMoveAnimationFinished = {
+                boardView.isLocked = false
+                if (vsAI && gameState.currentTurn != playerColor) triggerAI()
+            }
+        }
         boardView.setGameState(gameState)
         updateHud()
         if (gameState.status != GameStatus.IN_PROGRESS) {
@@ -289,8 +299,6 @@ class MancalaActivity : AppCompatActivity() {
                 delay(850)
                 if (activityResumed) showResultDialog()
             }
-        } else if (vsAI && gameState.currentTurn != playerColor) {
-            triggerAI()
         }
     }
 
@@ -326,7 +334,7 @@ class MancalaActivity : AppCompatActivity() {
             if (previousStates.isNotEmpty()) gameState = previousStates.removeLast()
         }
         boardView.isLocked = false
-        boardView.setGameState(gameState)
+        boardView.setGameState(gameState, animate = false)
         updateHud()
     }
 
@@ -449,9 +457,14 @@ class MancalaActivity : AppCompatActivity() {
         var isLocked = false
         var onPitTapped: ((Int) -> Unit)? = null
         var onGameOverTapped: (() -> Unit)? = null
+        var onMoveAnimationFinished: (() -> Unit)? = null
 
         private var state = engine.initialState()
         private var boardRect = RectF()
+        private var moveAnimator: ValueAnimator? = null
+        private var moveAnimation: MoveAnimation? = null
+        private var animationProgress = 1f
+        private var animationGeneration = 0
         private val boardBitmap = try {
             context.assets.open("mancala_board.webp").use { BitmapFactory.decodeStream(it) }
         } catch (_: Throwable) {
@@ -459,6 +472,17 @@ class MancalaActivity : AppCompatActivity() {
         }
         private val bitmapPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
         private val stonePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        private val stoneRimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = 0.9f * resources.displayMetrics.density
+        }
+        private val stoneShadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(125, 20, 8, 3)
+        }
+        private val ripplePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = 2f * resources.displayMetrics.density
+        }
         private val highlightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.parseColor("#E7C995")
             style = Paint.Style.STROKE
@@ -481,14 +505,81 @@ class MancalaActivity : AppCompatActivity() {
             -0.14f to -0.14f, 0.14f to -0.14f, 0f to 0.16f,
         )
 
-        fun setGameState(newState: GameState) {
+        private data class MoveAnimation(
+            val from: Int,
+            val path: List<Int>,
+            val before: IntArray,
+            val after: IntArray,
+            val color: PieceColor,
+        ) {
+            val pickupDuration = 170f
+            val placementDuration = 88f
+            val settleDuration = 250f
+            val totalDuration =
+                pickupDuration + path.size * placementDuration + settleDuration
+        }
+
+        fun setGameState(newState: GameState, animate: Boolean = true) {
+            animationGeneration++
+            moveAnimator?.cancel()
+            moveAnimator = null
+            val previousState = state
             state = newState
-            invalidate()
+            val move = newState.moveHistory.lastOrNull()
+            val path = if (animate && move != null) {
+                engine.sowingPath(previousState, move)
+            } else {
+                emptyList()
+            }
+            if (!animate || path.isEmpty()) {
+                moveAnimation = null
+                animationProgress = 1f
+                isLocked = false
+                invalidate()
+                onMoveAnimationFinished?.invoke()
+                onMoveAnimationFinished = null
+                return
+            }
+
+            val generation = animationGeneration
+            moveAnimation = MoveAnimation(
+                from = move.from.col,
+                path = path,
+                before = countsOf(previousState),
+                after = countsOf(newState),
+                color = previousState.currentTurn,
+            )
+            animationProgress = 0f
+            isLocked = true
+            moveAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
+                duration = moveAnimation!!.totalDuration.toLong()
+                interpolator = DecelerateInterpolator()
+                addUpdateListener {
+                    animationProgress = it.animatedValue as Float
+                    invalidate()
+                }
+                addListener(object : AnimatorListenerAdapter() {
+                    override fun onAnimationEnd(animation: Animator) {
+                        if (generation != animationGeneration) return
+                        moveAnimator = null
+                        moveAnimation = null
+                        animationProgress = 1f
+                        invalidate()
+                        onMoveAnimationFinished?.invoke()
+                        onMoveAnimationFinished = null
+                    }
+                })
+                start()
+            }
+        }
+
+        private fun countsOf(snapshot: GameState): IntArray =
+            IntArray(MancalaRuleEngine.BOARD_CELLS) { index -> engine.stones(snapshot, index) }
         }
 
         override fun onDraw(canvas: Canvas) {
-            canvas.drawColor(Color.parseColor("#120D0B"))
-            val aspect = 724f / 2172f
+            canvas.drawColor(Color.parseColor("#1B100C"))
+            val aspect = 768f / 2048f
             val boardHeight = min(height * 0.98f, width / aspect)
             val boardWidth = boardHeight * aspect
             boardRect.set(
@@ -501,6 +592,7 @@ class MancalaActivity : AppCompatActivity() {
                 ?: drawFallbackBoard(canvas)
             drawLabels(canvas)
             drawPits(canvas)
+            drawMoveAnimation(canvas)
         }
 
         private fun drawFallbackBoard(canvas: Canvas) {
@@ -518,39 +610,221 @@ class MancalaActivity : AppCompatActivity() {
 
         private fun drawPits(canvas: Canvas) {
             val pitRadius = boardRect.width() * 0.105f
-            val chipRadius = boardRect.width() * 0.018f
+            val chipRadius = boardRect.width() * 0.022f
+            val counts = moveAnimation?.let { visibleCounts(it) } ?: countsOf(state)
             for (index in 0 until MancalaRuleEngine.BOARD_CELLS) {
                 val point = centerFor(index)
-                val count = engine.stones(state, index)
+                val count = counts[index]
                 val isStore = index == MancalaRuleEngine.SOUTH_STORE || index == MancalaRuleEngine.NORTH_STORE
                 if (!isStore && isSelectable(index)) {
                     canvas.drawCircle(point.x, point.y, pitRadius, highlightPaint)
                 }
                 if (count == 0) continue
                 val owner = if (index <= MancalaRuleEngine.SOUTH_STORE) PieceColor.WHITE else PieceColor.BLACK
-                stonePaint.color = if (owner == PieceColor.WHITE) {
-                    Color.parseColor("#E7C995")
-                } else {
-                    Color.parseColor("#79B4D8")
-                }
                 if (isStore) {
                     countPaint.textSize = boardRect.width() * 0.10f
+                    countPaint.color = Color.argb(235, 255, 244, 221)
                     canvas.drawText(count.toString(), point.x, point.y + countPaint.textSize * 0.35f, countPaint)
                     continue
                 }
                 chipOffsets.take(min(count, chipOffsets.size)).forEach { (dx, dy) ->
-                    canvas.drawCircle(
+                    drawStone(
+                        canvas,
                         point.x + dx * pitRadius,
                         point.y + dy * pitRadius,
                         chipRadius,
-                        stonePaint,
+                        owner,
                     )
                 }
                 if (count > chipOffsets.size) {
                     countPaint.textSize = boardRect.width() * 0.055f
+                    countPaint.color = Color.argb(235, 255, 244, 221)
                     canvas.drawText(count.toString(), point.x, point.y + countPaint.textSize * 0.35f, countPaint)
                 }
             }
+        }
+
+        private fun visibleCounts(animation: MoveAnimation): IntArray {
+            val counts = animation.before.copyOf()
+            val elapsed = animationProgress * animation.totalDuration
+            if (elapsed < animation.pickupDuration) {
+                val pickup = (elapsed / animation.pickupDuration).coerceIn(0f, 1f)
+                counts[animation.from] =
+                    (animation.before[animation.from] * (1f - pickup)).roundToInt()
+                return counts
+            }
+
+            counts[animation.from] = 0
+            val sowingElapsed = elapsed - animation.pickupDuration
+            val landed = floor(sowingElapsed / animation.placementDuration)
+                .toInt()
+                .coerceIn(0, animation.path.size)
+            repeat(landed) { counts[animation.path[it]]++ }
+            return if (sowingElapsed >= animation.path.size * animation.placementDuration) {
+                animation.after.copyOf()
+            } else {
+                counts
+            }
+        }
+
+        private fun drawMoveAnimation(canvas: Canvas) {
+            val animation = moveAnimation ?: return
+            val elapsed = animationProgress * animation.totalDuration
+            val from = centerFor(animation.from)
+            val pitRadius = boardRect.width() * 0.105f
+            val chipRadius = boardRect.width() * 0.022f
+            val placed = if (elapsed < animation.pickupDuration) {
+                0
+            } else {
+                floor((elapsed - animation.pickupDuration) / animation.placementDuration)
+                    .toInt()
+                    .coerceIn(0, animation.path.size)
+            }
+            val moving = if (elapsed >= animation.pickupDuration &&
+                placed < animation.path.size
+            ) 1 else 0
+            val held = if (elapsed < animation.pickupDuration) {
+                (animation.before[animation.from] *
+                    (elapsed / animation.pickupDuration).coerceIn(0f, 1f)).roundToInt()
+            } else {
+                (animation.path.size - placed - moving).coerceAtLeast(0)
+            }
+            if (held > 0) {
+                drawHeldStones(canvas, from, held, chipRadius, animation.color, elapsed)
+            }
+
+            if (moving == 1) {
+                val index = placed
+                val start = if (index == 0) from else centerFor(animation.path[index - 1])
+                val end = centerFor(animation.path[index])
+                val local = ((elapsed - animation.pickupDuration) %
+                    animation.placementDuration) / animation.placementDuration
+                val x = start.x + (end.x - start.x) * local
+                val y = start.y + (end.y - start.y) * local -
+                    sin(local * PI).toFloat() * pitRadius * 1.25f
+                drawStone(
+                    canvas,
+                    x,
+                    y,
+                    chipRadius * (1f + 0.13f * sin(local * PI).toFloat()),
+                    animation.color,
+                    elevation = pitRadius * 0.18f,
+                )
+                drawLandingRipple(canvas, start, pitRadius, 1f - local)
+            } else if (placed > 0) {
+                val landing = centerFor(animation.path[placed - 1])
+                val settle = ((elapsed - animation.pickupDuration -
+                    animation.path.size * animation.placementDuration) /
+                    animation.settleDuration).coerceIn(0f, 1f)
+                drawLandingRipple(canvas, landing, pitRadius, 1f - settle)
+            }
+        }
+
+        private fun drawHeldStones(
+            canvas: Canvas,
+            center: PointF,
+            count: Int,
+            radius: Float,
+            color: PieceColor,
+            elapsed: Float,
+        ) {
+            val lift = if (elapsed < 170f) {
+                sin((elapsed / 170f).coerceIn(0f, 1f) * PI).toFloat() * radius * 2.4f
+            } else {
+                radius * 2.4f
+            }
+            val visible = min(count, chipOffsets.size)
+            chipOffsets.take(visible).forEach { (dx, dy) ->
+                drawStone(
+                    canvas,
+                    center.x + dx * radius * 1.8f,
+                    center.y + dy * radius * 1.8f - lift,
+                    radius * 0.92f,
+                    color,
+                    elevation = radius * 1.2f,
+                )
+            }
+            if (count > visible) {
+                countPaint.textSize = boardRect.width() * 0.046f
+                countPaint.color = Color.argb(240, 255, 244, 221)
+                canvas.drawText(
+                    count.toString(),
+                    center.x,
+                    center.y - lift + countPaint.textSize * 0.35f,
+                    countPaint,
+                )
+            }
+        }
+
+        private fun drawLandingRipple(
+            canvas: Canvas,
+            center: PointF,
+            pitRadius: Float,
+            intensity: Float,
+        ) {
+            val strength = intensity.coerceIn(0f, 1f)
+            ripplePaint.color = Color.argb((110f * strength).roundToInt(), 255, 237, 190)
+            canvas.drawCircle(
+                center.x,
+                center.y,
+                pitRadius * (0.45f + 0.45f * (1f - strength)),
+                ripplePaint,
+            )
+        }
+
+        private fun drawStone(
+            canvas: Canvas,
+            x: Float,
+            y: Float,
+            radius: Float,
+            owner: PieceColor,
+            elevation: Float = 0f,
+        ) {
+            val shadowRadius = radius * (1.02f + elevation / radius * 0.10f)
+            canvas.drawOval(
+                RectF(
+                    x - shadowRadius,
+                    y + radius * 0.36f,
+                    x + shadowRadius,
+                    y + radius * 0.78f,
+                ),
+                stoneShadowPaint,
+            )
+            val colors = if (owner == PieceColor.WHITE) {
+                intArrayOf(
+                    Color.rgb(255, 227, 151),
+                    Color.rgb(213, 133, 49),
+                    Color.rgb(111, 50, 18),
+                )
+            } else {
+                intArrayOf(
+                    Color.rgb(196, 236, 241),
+                    Color.rgb(53, 137, 153),
+                    Color.rgb(19, 52, 69),
+                )
+            }
+            stonePaint.shader = RadialGradient(
+                x - radius * 0.32f,
+                y - radius * 0.42f,
+                radius * 1.18f,
+                colors,
+                floatArrayOf(0f, 0.48f, 1f),
+                Shader.TileMode.CLAMP,
+            )
+            canvas.drawCircle(x, y, radius, stonePaint)
+            stonePaint.shader = null
+            stoneRimPaint.color = Color.argb(155, 255, 241, 207)
+            canvas.drawCircle(x, y, radius * 0.94f, stoneRimPaint)
+            stonePaint.color = Color.argb(125, 255, 255, 255)
+            canvas.drawOval(
+                RectF(
+                    x - radius * 0.48f,
+                    y - radius * 0.58f,
+                    x - radius * 0.05f,
+                    y - radius * 0.18f,
+                ),
+                stonePaint,
+            )
         }
 
         private fun isSelectable(index: Int): Boolean =
@@ -560,18 +834,18 @@ class MancalaActivity : AppCompatActivity() {
                 engine.stones(state, index) > 0
 
         private fun centerFor(index: Int): PointF {
-            val yStart = boardRect.top + boardRect.height() * 0.245f
-            val yStep = boardRect.height() * 0.105f
+            val yStart = boardRect.top + boardRect.height() * 0.238f
+            val yStep = boardRect.height() * 0.1094f
             return when {
                 index == MancalaRuleEngine.NORTH_STORE ->
-                    PointF(boardRect.centerX(), boardRect.top + boardRect.height() * 0.125f)
+                    PointF(boardRect.centerX(), boardRect.top + boardRect.height() * 0.129f)
                 index == MancalaRuleEngine.SOUTH_STORE ->
-                    PointF(boardRect.centerX(), boardRect.top + boardRect.height() * 0.875f)
+                    PointF(boardRect.centerX(), boardRect.top + boardRect.height() * 0.938f)
                 index in 0 until MancalaRuleEngine.PITS_PER_SIDE ->
-                    PointF(boardRect.left + boardRect.width() * 0.31f, yStart + index * yStep)
+                    PointF(boardRect.left + boardRect.width() * 0.354f, yStart + index * yStep)
                 else -> {
                     val row = 12 - index
-                    PointF(boardRect.left + boardRect.width() * 0.69f, yStart + row * yStep)
+                    PointF(boardRect.left + boardRect.width() * 0.729f, yStart + row * yStep)
                 }
             }
         }

@@ -139,6 +139,25 @@ class MancalaRuleEngine : RuleEngine {
     fun landing(state: GameState): Int? =
         (state.metadata["lastLanding"] as? Int)
 
+    /** Returns each pit/store visited by the stones from [move], in order. */
+    fun sowingPath(state: GameState, move: Move): List<Int> {
+        val from = move.from.col
+        if (move.from.row != 0 || from !in 0 until BOARD_CELLS) return emptyList()
+        var hand = stones(state, from)
+        if (!ownsPit(state.currentTurn, from) || hand == 0) return emptyList()
+
+        val skippedStore = storeFor(state.currentTurn.opponent())
+        var cursor = from
+        val path = ArrayList<Int>(hand)
+        while (hand > 0) {
+            cursor = (cursor + 1) % BOARD_CELLS
+            if (cursor == skippedStore) continue
+            path += cursor
+            hand--
+        }
+        return path
+    }
+
     private fun counts(state: GameState) = IntArray(BOARD_CELLS) { stones(state, it) }
 
     private fun stateFrom(counts: IntArray, turn: PieceColor): GameState =
