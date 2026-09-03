@@ -242,7 +242,7 @@ class MancalaActivity : AppCompatActivity() {
         showBoardAfterDialog(resumeAi = false)
 
         restoring?.moves?.forEach { move ->
-            previousStates.addLast(gameState)
+            previousStates.add(gameState)
             gameState = engine.applyMove(gameState, move)
         }
         if (restoring != null) {
@@ -277,7 +277,7 @@ class MancalaActivity : AppCompatActivity() {
     }
 
     private fun playMove(move: Move) {
-        previousStates.addLast(gameState)
+        previousStates.add(gameState)
         gameState = engine.applyMove(gameState, move)
         boardView.setGameState(gameState)
         updateHud()
