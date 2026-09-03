@@ -124,13 +124,13 @@ class MancalaActivity : AppCompatActivity() {
         menu.setOnClickListener { showMenu() }
         controls.addView(
             autoplayButton,
-            LinearLayout.LayoutParams(0, 76 * dp.toInt(), 1f),
+            LinearLayout.LayoutParams(0, 46 * dp.toInt(), 1f),
         )
         controls.addView(menu, LinearLayout.LayoutParams(0, 46 * dp.toInt(), 1f))
 
         gameLayout.addView(header, LinearLayout.LayoutParams(-1, 58 * dp.toInt()))
         gameLayout.addView(boardView, LinearLayout.LayoutParams(-1, 0).apply { weight = 1f })
-        gameLayout.addView(controls, LinearLayout.LayoutParams(-1, 84 * dp.toInt()))
+        gameLayout.addView(controls, LinearLayout.LayoutParams(-1, 56 * dp.toInt()))
         gameRoot = gameLayout
 
         screenRoot = FrameLayout(this)

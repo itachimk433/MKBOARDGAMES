@@ -1,69 +1,73 @@
 package com.mkdev.mkboardgames.ui
 
-import android.animation.ArgbEvaluator
 import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.LinearGradient
 import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.PathMeasure
 import android.graphics.RectF
+import android.graphics.Shader
+import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
-import android.view.animation.AccelerateDecelerateInterpolator
 import android.view.animation.LinearInterpolator
-import android.view.animation.OvershootInterpolator
 import com.mkdev.mkboardgames.SoundPlayer
+import kotlin.math.min
 
 /**
- * A tactile Chess autoplay control.
+ * A tactile Mancala autoplay control.
  *
- * The button stays neutral while the player's pieces remain under manual
- * control. A moving blue border marks the active autoplay state.
+ * The button uses the same rounded wood treatment as the Mancala action
+ * buttons. A moving blue border marks the active autoplay state.
  */
 class AutoplayButtonView(context: Context) : View(context) {
 
     var onAutoplayChanged: ((enabled: Boolean) -> Unit)? = null
 
-    private val dp = resources.displayMetrics.density
+    private val density = resources.displayMetrics.density
     private val buttonRect = RectF()
     private var enabled = false
-    private var stateProgress = 0f
-    private var pressScale = 1f
-    private var stateAnimator: ValueAnimator? = null
-    private var pressAnimator: ValueAnimator? = null
+    private var pressed = false
     private var borderAnimator: ValueAnimator? = null
     private var borderProgress = 0f
 
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val edgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
-        strokeWidth = 1.8f * dp
+        strokeWidth = 1.5f * density
+    }
+    private val highlightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 1f * density
+        color = Color.argb(175, 255, 246, 220)
     }
     private val movingBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
-        strokeWidth = 3.2f * dp
+        strokeWidth = 3f * density
     }
-    private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    private val movingBorderPath = Path()
+    private val movingBorderSegment = Path()
+    private val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#4A1714")
         textAlign = Paint.Align.CENTER
-        typeface = android.graphics.Typeface.create(
-            android.graphics.Typeface.DEFAULT,
-            android.graphics.Typeface.BOLD,
-        )
-        textSize = 13f * resources.displayMetrics.scaledDensity.coerceAtMost(3f)
+        typeface = android.graphics.Typeface.DEFAULT_BOLD
     }
 
     init {
         isClickable = true
         isFocusable = true
+        setLayerType(View.LAYER_TYPE_SOFTWARE, null)
         updateContentDescription()
         setOnClickListener { toggleAutoplay() }
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        val desiredWidth = (150f * dp).toInt()
-        val desiredHeight = (76f * dp).toInt()
+        val desiredWidth = (150f * density).toInt()
+        val desiredHeight = (46f * density).toInt()
         setMeasuredDimension(
             resolveSize(desiredWidth, widthMeasureSpec),
             resolveSize(desiredHeight, heightMeasureSpec),
@@ -74,29 +78,13 @@ class AutoplayButtonView(context: Context) : View(context) {
         enabled = value
         updateContentDescription()
         if (value) startBorderAnimation() else stopBorderAnimation()
-        val target = if (value) 1f else 0f
-        stateAnimator?.cancel()
-        if (!animate) {
-            stateProgress = target
-            invalidate()
-            return
-        }
-        stateAnimator = ValueAnimator.ofFloat(stateProgress, target).apply {
-            duration = 240L
-            interpolator = AccelerateDecelerateInterpolator()
-            addUpdateListener {
-                stateProgress = it.animatedValue as Float
-                invalidate()
-            }
-            start()
-        }
+        if (!animate) invalidate()
     }
 
     private fun toggleAutoplay() {
         SoundPlayer.play("ui_click")
         val next = !enabled
         setAutoplayEnabled(next)
-        runClickAnimation()
         onAutoplayChanged?.invoke(next)
     }
 
@@ -125,64 +113,51 @@ class AutoplayButtonView(context: Context) : View(context) {
         invalidate()
     }
 
-    private fun runClickAnimation() {
-        pressAnimator?.cancel()
-        pressAnimator = ValueAnimator.ofFloat(1f, 0.91f, 1.04f, 1f).apply {
-            duration = 360L
-            interpolator = OvershootInterpolator(1.1f)
-            addUpdateListener {
-                pressScale = it.animatedValue as Float
-                invalidate()
-            }
-            start()
-        }
+    private fun buttonBounds(): RectF {
+        val inset = 3f * density
+        val lift = if (pressed) 2f * density else 0f
+        return RectF(
+            inset,
+            inset + lift,
+            width - inset,
+            height - inset + lift,
+        )
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        val buttonDiameter = minOf(width.toFloat(), height.toFloat()) - 12f * dp
-        val buttonRect = RectF(
-            (width - buttonDiameter) / 2f,
-            (height - buttonDiameter) / 2f,
-            (width + buttonDiameter) / 2f,
-            (height + buttonDiameter) / 2f,
-        )
-        val radius = buttonDiameter / 2f
-        val withinCircle = kotlin.math.hypot(
-            event.x - buttonRect.centerX(),
-            event.y - buttonRect.centerY(),
-        ) <= radius
-
         when (event.actionMasked) {
-            MotionEvent.ACTION_DOWN -> return if (withinCircle) {
-                isPressed = true
-                true
-            } else {
-                false
+            MotionEvent.ACTION_DOWN -> {
+                pressed = true
+                performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                invalidate()
+                return true
             }
-            MotionEvent.ACTION_MOVE -> return withinCircle && isPressed
-            MotionEvent.ACTION_UP -> {
-                if (!withinCircle || !isPressed) {
-                    isPressed = false
-                    return false
+            MotionEvent.ACTION_MOVE -> {
+                val withinButton = buttonRect.contains(event.x, event.y)
+                if (pressed != withinButton) {
+                    pressed = withinButton
+                    invalidate()
                 }
-                isPressed = false
-                performClick()
+                return true
+            }
+            MotionEvent.ACTION_UP -> {
+                val shouldClick = pressed
+                pressed = false
+                invalidate()
+                if (shouldClick) performClick()
                 return true
             }
             MotionEvent.ACTION_CANCEL -> {
-                isPressed = false
-                return false
+                pressed = false
+                invalidate()
+                return true
             }
         }
         return super.onTouchEvent(event)
     }
 
     override fun onDetachedFromWindow() {
-        stateAnimator?.cancel()
-        pressAnimator?.cancel()
         borderAnimator?.cancel()
-        stateAnimator = null
-        pressAnimator = null
         borderAnimator = null
         super.onDetachedFromWindow()
     }
@@ -190,55 +165,91 @@ class AutoplayButtonView(context: Context) : View(context) {
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
-        val buttonDiameter = minOf(width.toFloat(), height.toFloat()) - 12f * dp
-        buttonRect.set(
-            (width - buttonDiameter) / 2f,
-            (height - buttonDiameter) / 2f,
-            (width + buttonDiameter) / 2f,
-            (height + buttonDiameter) / 2f,
+        buttonRect.set(buttonBounds())
+        val radius = min(buttonRect.height(), buttonRect.width()) * 0.18f
+        val colors = intArrayOf(
+            Color.parseColor("#F7D99B"),
+            Color.parseColor("#C8894C"),
+            Color.parseColor("#85502D"),
         )
+        fillPaint.shader = LinearGradient(
+            buttonRect.left,
+            buttonRect.top,
+            buttonRect.left,
+            buttonRect.bottom,
+            colors,
+            floatArrayOf(0f, 0.5f, 1f),
+            Shader.TileMode.CLAMP,
+        )
+        fillPaint.setShadowLayer(
+            density * if (pressed) 1f else 4f,
+            0f,
+            density * if (pressed) 1f else 3f,
+            Color.argb(170, 25, 9, 5),
+        )
+        canvas.drawRoundRect(buttonRect, radius, radius, fillPaint)
+        fillPaint.clearShadowLayer()
+        fillPaint.shader = null
 
-        val offAccent = Color.parseColor("#6B7785")
-        val blueAccent = Color.parseColor("#42A5F5")
-        val accent = ArgbEvaluator().evaluate(stateProgress, offAccent, blueAccent) as Int
-        val radius = buttonDiameter / 2f
-
-        canvas.save()
-        canvas.scale(pressScale, pressScale, buttonRect.centerX(), buttonRect.centerY())
-
-        // Layered translucent edges create a soft light around the button
-        // without requiring a software blur layer on older Android versions.
-        glowPaint.color = Color.argb(24, Color.red(accent), Color.green(accent), Color.blue(accent))
-        canvas.drawCircle(buttonRect.centerX(), buttonRect.centerY(), radius + 4f * dp, glowPaint)
-        glowPaint.color = Color.argb(44, Color.red(accent), Color.green(accent), Color.blue(accent))
-        canvas.drawCircle(buttonRect.centerX(), buttonRect.centerY(), radius + 1.5f * dp, glowPaint)
-
-        fillPaint.color = Color.parseColor("#1E252C")
-        canvas.drawCircle(buttonRect.centerX(), buttonRect.centerY(), radius, fillPaint)
-        edgePaint.color = accent
-        canvas.drawCircle(buttonRect.centerX(), buttonRect.centerY(), radius, edgePaint)
+        borderPaint.color = colors[2]
+        canvas.drawRoundRect(buttonRect, radius, radius, borderPaint)
+        val inner = RectF(
+            buttonRect.left + 3f * density,
+            buttonRect.top + 3f * density,
+            buttonRect.right - 3f * density,
+            buttonRect.bottom - 3f * density,
+        )
+        canvas.drawRoundRect(inner, radius * 0.78f, radius * 0.78f, highlightPaint)
 
         if (enabled) {
-            movingBorderPaint.color = blueAccent
-            val movingRect = RectF(buttonRect).apply { inset(1.5f * dp, 1.5f * dp) }
-            canvas.drawArc(movingRect, borderProgress - 42f, 112f, false, movingBorderPaint)
+            movingBorderPaint.color = Color.parseColor("#42A5F5")
+            val movingRect = RectF(buttonRect).apply {
+                inset(1.5f * density, 1.5f * density)
+            }
+            movingBorderPath.reset()
+            movingBorderPath.addRoundRect(
+                movingRect,
+                radius,
+                radius,
+                Path.Direction.CW,
+            )
+            val pathMeasure = PathMeasure(movingBorderPath, false)
+            val pathLength = pathMeasure.length
+            val segmentLength = pathLength * 0.22f
+            val segmentStart = pathLength * borderProgress / 360f
+            movingBorderSegment.reset()
+            if (segmentStart + segmentLength <= pathLength) {
+                pathMeasure.getSegment(
+                    segmentStart,
+                    segmentStart + segmentLength,
+                    movingBorderSegment,
+                    true,
+                )
+            } else {
+                pathMeasure.getSegment(segmentStart, pathLength, movingBorderSegment, true)
+                pathMeasure.getSegment(
+                    0f,
+                    segmentStart + segmentLength - pathLength,
+                    movingBorderSegment,
+                    true,
+                )
+            }
+            canvas.drawPath(movingBorderSegment, movingBorderPaint)
         }
 
-        textPaint.color = Color.WHITE
-        textPaint.textSize = minOf(
-            11f * resources.displayMetrics.scaledDensity.coerceAtMost(3f),
-            buttonDiameter * 0.14f,
-        )
+        labelPaint.textSize = min(width * 0.16f, height * 0.4f)
+            .coerceAtLeast(12f * density)
         val autoplayLabel = if (enabled) "Autoplay On" else "Autoplay Off"
-        if (textPaint.measureText(autoplayLabel) > buttonDiameter - 8f * dp) {
-            textPaint.textSize *= (buttonDiameter - 8f * dp) / textPaint.measureText(autoplayLabel)
+        if (labelPaint.measureText(autoplayLabel) > buttonRect.width() - 8f * density) {
+            labelPaint.textSize *=
+                (buttonRect.width() - 8f * density) / labelPaint.measureText(autoplayLabel)
         }
+        val metrics = labelPaint.fontMetrics
         canvas.drawText(
             autoplayLabel,
             buttonRect.centerX(),
-            buttonRect.centerY() - (textPaint.ascent() + textPaint.descent()) / 2f,
-            textPaint,
+            buttonRect.centerY() - (metrics.ascent + metrics.descent) / 2f,
+            labelPaint,
         )
-        canvas.restore()
     }
 }
