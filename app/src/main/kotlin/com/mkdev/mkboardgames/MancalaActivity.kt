@@ -34,6 +34,20 @@ class MancalaActivity : AppCompatActivity() {
     private val previousStates = ArrayDeque<GameState>()
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
+    private data class MoveAnimation(
+        val from: Int,
+        val path: List<Int>,
+        val before: IntArray,
+        val after: IntArray,
+        val color: PieceColor,
+    ) {
+        val pickupDuration = 170f
+        val placementDuration = 88f
+        val settleDuration = 250f
+        val totalDuration =
+            pickupDuration + path.size * placementDuration + settleDuration
+    }
+
     private lateinit var gameRoot: View
     private lateinit var boardView: MancalaBoardView
     private lateinit var statusView: TextView
@@ -504,20 +518,6 @@ class MancalaActivity : AppCompatActivity() {
             -0.30f to 0.30f, 0f to 0.30f, 0.30f to 0.30f,
             -0.14f to -0.14f, 0.14f to -0.14f, 0f to 0.16f,
         )
-
-        private data class MoveAnimation(
-            val from: Int,
-            val path: List<Int>,
-            val before: IntArray,
-            val after: IntArray,
-            val color: PieceColor,
-        ) {
-            val pickupDuration = 170f
-            val placementDuration = 88f
-            val settleDuration = 250f
-            val totalDuration =
-                pickupDuration + path.size * placementDuration + settleDuration
-        }
 
         fun setGameState(newState: GameState, animate: Boolean = true) {
             animationGeneration++
