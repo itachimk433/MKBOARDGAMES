@@ -41,16 +41,23 @@ class MancalaActivity : AppCompatActivity() {
     private val previousStates = ArrayDeque<GameState>()
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
+    private data class StoneAppearance(
+        val id: Int,
+        val color: PieceColor,
+        val variation: Int,
+    )
+
     private data class MoveAnimation(
         val from: Int,
         val path: List<Int>,
         val before: IntArray,
         val after: IntArray,
-        val color: PieceColor,
-        val stoneVariation: Int,
+        val beforeStyles: Array<List<StoneAppearance>>,
+        val afterStyles: Array<List<StoneAppearance>>,
+        val movedStones: List<StoneAppearance>,
     ) {
-        // Give each handoff time to read clearly, especially on smaller screens.
-        val pickupDuration = 500f
+        // Each stone leaves its original position without a pickup-stack phase.
+        val pickupDuration = 0f
         val placementDuration = 320f
         val settleDuration = 600f
         val totalDuration =
@@ -637,6 +644,9 @@ class MancalaActivity : AppCompatActivity() {
         var onMoveAnimationFinished: (() -> Unit)? = null
 
         private var state = engine.initialState()
+        private var stoneStyles = Array(MancalaRuleEngine.BOARD_CELLS) {
+            mutableListOf<StoneAppearance>()
+        }
         private var boardRect = RectF()
         private var moveAnimator: ValueAnimator? = null
         private var moveAnimation: MoveAnimation? = null
@@ -732,9 +742,10 @@ class MancalaActivity : AppCompatActivity() {
             moveAnimator?.cancel()
             moveAnimator = null
             val previousState = state
-            state = newState
             val move = newState.moveHistory.lastOrNull()
             if (!animate || move == null) {
+                state = newState
+                resetStoneStyles(newState)
                 moveAnimation = null
                 animationProgress = 1f
                 isLocked = false
@@ -745,6 +756,8 @@ class MancalaActivity : AppCompatActivity() {
             }
             val path = engine.sowingPath(previousState, move)
             if (path.isEmpty()) {
+                state = newState
+                resetStoneStyles(newState)
                 moveAnimation = null
                 animationProgress = 1f
                 isLocked = false
@@ -754,14 +767,27 @@ class MancalaActivity : AppCompatActivity() {
                 return
             }
 
+            val beforeStyles = copyStoneStyles()
+            val movedStones = beforeStyles[move.from.col].toList()
+            val afterStyles = stylesAfterMove(
+                previousState,
+                newState,
+                move.from.col,
+                path,
+                beforeStyles,
+                movedStones,
+            )
+            state = newState
+            stoneStyles = afterStyles.map { it.toMutableList() }.toTypedArray()
             val generation = animationGeneration
             moveAnimation = MoveAnimation(
                 from = move.from.col,
                 path = path,
                 before = countsOf(previousState),
                 after = countsOf(newState),
-                color = previousState.currentTurn,
-                stoneVariation = move.from.col,
+                beforeStyles = beforeStyles,
+                afterStyles = afterStyles,
+                movedStones = movedStones,
             )
             animationProgress = 0f
             isLocked = true
@@ -789,6 +815,78 @@ class MancalaActivity : AppCompatActivity() {
 
         private fun countsOf(snapshot: GameState): IntArray =
             IntArray(MancalaRuleEngine.BOARD_CELLS) { index -> engine.stones(snapshot, index) }
+
+        private fun copyStoneStyles(): Array<List<StoneAppearance>> =
+            Array(MancalaRuleEngine.BOARD_CELLS) { index -> stoneStyles[index].toList() }
+
+        private fun resetStoneStyles(snapshot: GameState) {
+            stoneStyles = Array(MancalaRuleEngine.BOARD_CELLS) { index ->
+                val color = colorForCell(index)
+                MutableList(engine.stones(snapshot, index)) { stoneIndex ->
+                    StoneAppearance(
+                        id = index * 1000 + stoneIndex,
+                        color = color,
+                        variation = stoneIndex,
+                    )
+                }
+            }
+        }
+
+        private fun colorForCell(index: Int): PieceColor =
+            if (index <= MancalaRuleEngine.SOUTH_STORE) PieceColor.WHITE else PieceColor.BLACK
+
+        private fun stylesAfterMove(
+            previousState: GameState,
+            newState: GameState,
+            from: Int,
+            path: List<Int>,
+            beforeStyles: Array<List<StoneAppearance>>,
+            movedStones: List<StoneAppearance>,
+        ): Array<List<StoneAppearance>> {
+            val working = Array(MancalaRuleEngine.BOARD_CELLS) { index ->
+                beforeStyles[index].toMutableList()
+            }
+            working[from].clear()
+            path.forEachIndexed { pathIndex, destination ->
+                working[destination] += movedStones[pathIndex]
+            }
+
+            val captured = (newState.metadata["captured"] as? Int) ?: 0
+            val landing = engine.landing(newState)
+            if (captured > 0 && landing != null) {
+                val capturedStones = working[landing].toList() +
+                    working[12 - landing].toList()
+                working[landing].clear()
+                working[12 - landing].clear()
+                working[MancalaRuleEngine.storeFor(previousState.currentTurn)] += capturedStones
+            }
+
+            val southEnded = (0 until MancalaRuleEngine.PITS_PER_SIDE)
+                .all { engine.stones(newState, it) == 0 }
+            val northEnded = (MancalaRuleEngine.SOUTH_STORE + 1 until MancalaRuleEngine.NORTH_STORE)
+                .all { engine.stones(newState, it) == 0 }
+            if (southEnded) {
+                (0 until MancalaRuleEngine.PITS_PER_SIDE).forEach {
+                    working[MancalaRuleEngine.SOUTH_STORE] += working[it]
+                    working[it].clear()
+                }
+            }
+            if (northEnded) {
+                (MancalaRuleEngine.SOUTH_STORE + 1 until MancalaRuleEngine.NORTH_STORE).forEach {
+                    working[MancalaRuleEngine.NORTH_STORE] += working[it]
+                    working[it].clear()
+                }
+            }
+
+            return Array(MancalaRuleEngine.BOARD_CELLS) { index ->
+                val expected = engine.stones(newState, index)
+                if (working[index].size == expected) {
+                    working[index].toList()
+                } else {
+                    working[index].take(expected).toList()
+                }
+            }
+        }
 
         override fun onDraw(canvas: Canvas) {
             canvas.drawColor(Color.parseColor("#1B100C"))
@@ -844,11 +942,11 @@ class MancalaActivity : AppCompatActivity() {
 
         private fun drawPits(canvas: Canvas) {
             val chipRadius = boardRect.width() * 0.022f * 2.25f
-            val counts = moveAnimation?.let { visibleCounts(it) } ?: countsOf(state)
+            val animation = moveAnimation
+            val placed = animation?.let { placedCount(it) } ?: 0
             for (index in 0 until MancalaRuleEngine.BOARD_CELLS) {
                 val point = centerFor(index)
                 val hole = holeMeasurementFor(index)
-                val count = counts[index]
                 val isStore = index == MancalaRuleEngine.SOUTH_STORE || index == MancalaRuleEngine.NORTH_STORE
                 if (!isStore && isSelectable(index)) {
                     val pitRadius = radiusFor(hole)
@@ -867,34 +965,39 @@ class MancalaActivity : AppCompatActivity() {
                         movingHighlightPaint,
                     )
                 }
-                if (count == 0) continue
-                val owner = if (index <= MancalaRuleEngine.SOUTH_STORE) PieceColor.WHITE else PieceColor.BLACK
+
+                val styles = if (animation == null) {
+                    stoneStyles[index]
+                } else {
+                    val visibleStyles = animation.beforeStyles[index].toMutableList()
+                    if (index == animation.from) visibleStyles.clear()
+                    animation.path.take(placed).forEachIndexed { pathIndex, destination ->
+                        if (destination == index) {
+                            visibleStyles += animation.movedStones[pathIndex]
+                        }
+                    }
+                    visibleStyles
+                }
+                if (styles.isEmpty()) continue
                 if (isStore) {
-                    drawStoreStones(canvas, point, count, chipRadius, owner)
+                    drawStoreStones(canvas, point, styles, chipRadius, index)
                     continue
                 }
                 val pitRadius = radiusFor(hole)
-                val visible = min(count, 12)
-                val randomOffsets = randomCircularOffsets(
-                    count = visible,
-                    seed = index * 977 + 53,
-                    maxDistance = (pitRadius - chipRadius * 1.28f).coerceAtLeast(0f),
-                    minimumSeparation = chipRadius * 0.62f,
-                )
-                randomOffsets.forEachIndexed { stackIndex, offset ->
+                styles.forEach { style ->
+                    val offset = stableCircularOffset(
+                        style,
+                        index,
+                        (pitRadius - chipRadius * 1.28f).coerceAtLeast(0f),
+                    )
                     drawStone(
                         canvas,
                         point.x + offset.x,
                         point.y + offset.y,
-                        stoneRadius(chipRadius, owner, index + stackIndex),
-                        owner,
-                        stoneVariation = index + stackIndex,
+                        stoneRadius(chipRadius, style.color, style.variation),
+                        style.color,
+                        stoneVariation = style.variation,
                     )
-                }
-                if (count > visible) {
-                    countPaint.textSize = boardRect.width() * 0.055f
-                    countPaint.color = Color.argb(235, 255, 244, 221)
-                    canvas.drawText(count.toString(), point.x, point.y + countPaint.textSize * 0.35f, countPaint)
                 }
             }
         }
@@ -902,106 +1005,55 @@ class MancalaActivity : AppCompatActivity() {
         private fun drawStoreStones(
             canvas: Canvas,
             center: PointF,
-            count: Int,
+            styles: List<StoneAppearance>,
             radius: Float,
-            owner: PieceColor,
+            storeIndex: Int,
         ) {
-            val randomOffsets = randomRectOffsets(
-                count = count,
-                seed = if (owner == PieceColor.WHITE) 17 else 53,
-                maxX = (boardRect.width() * 0.24f - radius * 1.28f).coerceAtLeast(0f),
-                maxY = (boardRect.height() * 0.045f - radius * 1.28f).coerceAtLeast(0f),
-                minimumSeparation = radius * 0.52f,
-            )
-            randomOffsets.forEachIndexed { index, offset ->
+            val maxX = (boardRect.width() * 0.24f - radius * 1.28f).coerceAtLeast(0f)
+            val maxY = (boardRect.height() * 0.045f - radius * 1.28f).coerceAtLeast(0f)
+            styles.forEach { style ->
+                val offset = stableRectOffset(style, storeIndex, maxX, maxY)
                 drawStone(
                     canvas,
                     center.x + offset.x,
                     center.y + offset.y,
-                    stoneRadius(radius, owner, index),
-                    owner,
-                    stoneVariation = index,
+                    stoneRadius(radius, style.color, style.variation),
+                    style.color,
+                    stoneVariation = style.variation,
                 )
             }
         }
 
-        private fun randomCircularOffsets(
-            count: Int,
-            seed: Int,
-            maxDistance: Float,
-            minimumSeparation: Float,
-        ): List<PointF> {
-            if (count <= 0) return emptyList()
-            val random = Random(seed)
-            val positions = ArrayList<PointF>(count)
-            repeat(count) {
-                var best = PointF(0f, 0f)
-                var bestClearance = -Float.MAX_VALUE
-                for (attempt in 0 until 32) {
-                    val angle = random.nextFloat() * (2f * PI.toFloat())
-                    val distance = sqrt(random.nextFloat()) * maxDistance
-                    val candidate = PointF(
-                        cos(angle) * distance,
-                        sin(angle) * distance,
-                    )
-                    var clearance = Float.POSITIVE_INFINITY
-                    positions.forEach { placed ->
-                        clearance = min(
-                            clearance,
-                            sqrt(
-                                (candidate.x - placed.x) * (candidate.x - placed.x) +
-                                    (candidate.y - placed.y) * (candidate.y - placed.y),
-                            ),
-                        )
-                    }
-                    if (clearance > bestClearance) {
-                        best = candidate
-                        bestClearance = clearance
-                    }
-                    if (clearance >= minimumSeparation) break
-                }
-                positions += best
-            }
-            return positions
+        private fun placedCount(animation: MoveAnimation): Int {
+            if (animation.placementDuration <= 0f) return animation.path.size
+            val elapsed = animationProgress * animation.totalDuration
+            return floor((elapsed - animation.pickupDuration) / animation.placementDuration)
+                .toInt()
+                .coerceIn(0, animation.path.size)
         }
 
-        private fun randomRectOffsets(
-            count: Int,
-            seed: Int,
+        private fun stableCircularOffset(
+            style: StoneAppearance,
+            pitIndex: Int,
+            maxDistance: Float,
+        ): PointF {
+            val random = Random(style.id * 7919 + pitIndex * 977 + 53)
+            val angle = random.nextFloat() * (2f * PI.toFloat())
+            val distance = sqrt(random.nextFloat()) * maxDistance
+            return PointF(cos(angle) * distance, sin(angle) * distance)
+        }
+
+        private fun stableRectOffset(
+            style: StoneAppearance,
+            containerIndex: Int,
             maxX: Float,
             maxY: Float,
-            minimumSeparation: Float,
-        ): List<PointF> {
-            if (count <= 0) return emptyList()
-            val random = Random(seed)
-            val positions = ArrayList<PointF>(count)
-            repeat(count) {
-                var best = PointF(0f, 0f)
-                var bestClearance = -Float.MAX_VALUE
-                for (attempt in 0 until 40) {
-                    val candidate = PointF(
-                        (random.nextFloat() * 2f - 1f) * maxX,
-                        (random.nextFloat() * 2f - 1f) * maxY,
-                    )
-                    var clearance = Float.POSITIVE_INFINITY
-                    positions.forEach { placed ->
-                        clearance = min(
-                            clearance,
-                            sqrt(
-                                (candidate.x - placed.x) * (candidate.x - placed.x) +
-                                    (candidate.y - placed.y) * (candidate.y - placed.y),
-                            ),
-                        )
-                    }
-                    if (clearance > bestClearance) {
-                        best = candidate
-                        bestClearance = clearance
-                    }
-                    if (clearance >= minimumSeparation) break
-                }
-                positions += best
-            }
-            return positions
+        ): PointF {
+            val random = Random(style.id * 7919 + containerIndex * 977 + 149)
+            return PointF(
+                (random.nextFloat() * 2f - 1f) * maxX,
+                (random.nextFloat() * 2f - 1f) * maxY,
+            )
         }
 
         private fun visibleCounts(animation: MoveAnimation): IntArray {
@@ -1031,61 +1083,30 @@ class MancalaActivity : AppCompatActivity() {
             val animation = moveAnimation ?: return
             val elapsed = animationProgress * animation.totalDuration
             val from = centerFor(animation.from)
-            val travelRadius = boardRect.width() * 0.105f
             val chipRadius = boardRect.width() * 0.022f * 2.25f
-            val placed = if (elapsed < animation.pickupDuration) {
-                0
-            } else {
-                floor((elapsed - animation.pickupDuration) / animation.placementDuration)
-                    .toInt()
-                    .coerceIn(0, animation.path.size)
-            }
-            val moving = if (elapsed >= animation.pickupDuration &&
-                placed < animation.path.size
-            ) 1 else 0
-            val held = if (elapsed < animation.pickupDuration) {
-                (animation.before[animation.from] *
-                    (elapsed / animation.pickupDuration).coerceIn(0f, 1f)).roundToInt()
-            } else {
-                (animation.path.size - placed - moving).coerceAtLeast(0)
-            }
-            if (held > 0) {
-                drawHeldStones(
-                    canvas,
-                    from,
-                    held,
-                    chipRadius,
-                    animation.color,
-                    elapsed,
-                    animation.pickupDuration,
-                    animation.stoneVariation,
-                )
-            }
-
-            if (moving == 1) {
+            val placed = placedCount(animation)
+            if (placed < animation.path.size) {
                 val index = placed
-                val start = if (index == 0) from else centerFor(animation.path[index - 1])
+                val sourceHole = holeMeasurementFor(animation.from)
+                val sourceOffset = stableCircularOffset(
+                    animation.movedStones[index],
+                    animation.from,
+                    (radiusFor(sourceHole) - chipRadius * 1.28f).coerceAtLeast(0f),
+                )
+                val start = PointF(from.x + sourceOffset.x, from.y + sourceOffset.y)
                 val end = centerFor(animation.path[index])
-                val rawLocal = ((elapsed - animation.pickupDuration) %
+                val local = ((elapsed - animation.pickupDuration) %
                     animation.placementDuration) / animation.placementDuration
-                // Smoothstep gives each hop a gentle takeoff and arrival rather
-                // than snapping between pits at a constant speed.
-                val local = rawLocal * rawLocal * (3f - 2f * rawLocal)
+                val stone = animation.movedStones[index]
                 val x = start.x + (end.x - start.x) * local
-                val y = start.y + (end.y - start.y) * local -
-                    sin(local * PI).toFloat() * travelRadius * 1.25f
+                val y = start.y + (end.y - start.y) * local
                 drawStone(
                     canvas,
                     x,
                     y,
-                    stoneRadius(
-                        chipRadius * (1f + 0.13f * sin(local * PI).toFloat()),
-                        animation.color,
-                        animation.stoneVariation,
-                    ),
-                    animation.color,
-                    elevation = travelRadius * 0.18f,
-                    stoneVariation = animation.stoneVariation,
+                    stoneRadius(chipRadius, stone.color, stone.variation),
+                    stone.color,
+                    stoneVariation = stone.variation,
                 )
                 drawLandingRipple(
                     canvas,
@@ -1104,51 +1125,6 @@ class MancalaActivity : AppCompatActivity() {
                     landing,
                     radiusFor(holeMeasurementFor(landingIndex)),
                     1f - settle,
-                )
-            }
-        }
-
-        private fun drawHeldStones(
-            canvas: Canvas,
-            center: PointF,
-            count: Int,
-            radius: Float,
-            color: PieceColor,
-            elapsed: Float,
-            pickupDuration: Float,
-            stoneVariation: Int,
-        ) {
-            val lift = if (elapsed < pickupDuration) {
-                sin((elapsed / pickupDuration).coerceIn(0f, 1f) * PI).toFloat() * radius * 2.4f
-            } else {
-                radius * 2.4f
-            }
-            val visible = min(count, 12)
-            val randomOffsets = randomCircularOffsets(
-                count = visible,
-                seed = stoneVariation * 149 + count * 17,
-                maxDistance = radius * 1.35f,
-                minimumSeparation = radius * 0.56f,
-            )
-            randomOffsets.forEachIndexed { stackIndex, offset ->
-                drawStone(
-                    canvas,
-                    center.x + offset.x,
-                    center.y + offset.y - lift,
-                    stoneRadius(radius * 0.92f, color, stoneVariation + stackIndex),
-                    color,
-                    elevation = radius * 1.2f,
-                    stoneVariation = stoneVariation + stackIndex,
-                )
-            }
-            if (count > visible) {
-                countPaint.textSize = boardRect.width() * 0.046f
-                countPaint.color = Color.argb(240, 255, 244, 221)
-                canvas.drawText(
-                    count.toString(),
-                    center.x,
-                    center.y - lift + countPaint.textSize * 0.35f,
-                    countPaint,
                 )
             }
         }
