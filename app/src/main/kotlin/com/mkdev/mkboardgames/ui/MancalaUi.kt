@@ -176,7 +176,10 @@ class MancalaHomeView(context: Context) : View(context) {
     }
     private val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.CENTER
-        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        typeface = Typeface.create("sans-serif-condensed", Typeface.BOLD_ITALIC)
+        setLetterSpacing(0.045f)
+        strokeJoin = Paint.Join.ROUND
+        strokeCap = Paint.Cap.ROUND
     }
     private val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.CENTER
@@ -199,24 +202,7 @@ class MancalaHomeView(context: Context) : View(context) {
     override fun onDraw(canvas: Canvas) {
         val w = width.toFloat()
         val h = height.toFloat()
-        canvas.drawRect(
-            0f,
-            0f,
-            w,
-            h,
-            Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                shader = LinearGradient(
-                    0f,
-                    0f,
-                    0f,
-                    h,
-                    Color.parseColor("#176A9B"),
-                    Color.parseColor("#061727"),
-                    Shader.TileMode.CLAMP,
-                )
-            },
-        )
-        drawStars(canvas, w, h)
+        drawBackdrop(canvas, w, h)
         drawBoard(canvas, w, h)
         drawTitle(canvas, w, h)
 
@@ -234,19 +220,104 @@ class MancalaHomeView(context: Context) : View(context) {
         drawIconButton(canvas, "more", RectF(w - iconSize * 1.1f, bottomY, w - dp(context, 14f), bottomY + iconSize), "⋮")
     }
 
+    private fun drawBackdrop(canvas: Canvas, w: Float, h: Float) {
+        val background = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = LinearGradient(
+                0f,
+                0f,
+                w * 0.9f,
+                h,
+                intArrayOf(
+                    Color.parseColor("#112C68"),
+                    Color.parseColor("#173C78"),
+                    Color.parseColor("#102951"),
+                    Color.parseColor("#061321"),
+                ),
+                floatArrayOf(0f, 0.32f, 0.68f, 1f),
+                Shader.TileMode.CLAMP,
+            )
+        }
+        canvas.drawRect(0f, 0f, w, h, background)
+
+        // Large, soft pools of colour make the space backdrop feel atmospheric
+        // without competing with the board or the controls.
+        drawGlow(
+            canvas,
+            w * 0.12f,
+            h * 0.18f,
+            min(w, h) * 0.58f,
+            Color.rgb(53, 137, 220),
+        )
+        drawGlow(
+            canvas,
+            w * 0.9f,
+            h * 0.64f,
+            min(w, h) * 0.5f,
+            Color.rgb(22, 194, 190),
+        )
+        drawGlow(
+            canvas,
+            w * 0.46f,
+            h * 1.02f,
+            min(w, h) * 0.68f,
+            Color.rgb(71, 37, 134),
+        )
+
+        val horizon = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = LinearGradient(
+                0f,
+                h * 0.48f,
+                w,
+                h * 0.58f,
+                Color.argb(0, 104, 194, 255),
+                Color.argb(54, 77, 158, 232),
+                Color.argb(0, 104, 194, 255),
+                Shader.TileMode.CLAMP,
+            )
+        }
+        canvas.drawRect(0f, h * 0.4f, w, h * 0.65f, horizon)
+
+        drawStars(canvas, w, h)
+    }
+
+    private fun drawGlow(canvas: Canvas, x: Float, y: Float, radius: Float, color: Int) {
+        val glow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = RadialGradient(
+                x,
+                y,
+                radius,
+                intArrayOf(
+                    Color.argb(88, Color.red(color), Color.green(color), Color.blue(color)),
+                    Color.argb(24, Color.red(color), Color.green(color), Color.blue(color)),
+                    Color.TRANSPARENT,
+                ),
+                floatArrayOf(0f, 0.52f, 1f),
+                Shader.TileMode.CLAMP,
+            )
+        }
+        canvas.drawCircle(x, y, radius, glow)
+    }
+
     private fun drawStars(canvas: Canvas, w: Float, h: Float) {
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-        for (i in 0 until 48) {
+        for (i in 0 until 62) {
             val x = ((i * 83 + 37) % 1000) / 1000f * w
             val y = ((i * 47 + 23) % 920) / 1000f * h
-            val radius = dp(context, 0.7f + (i % 3) * 0.55f)
-            paint.color = Color.argb(75 + (i % 4) * 35, 225, 245, 255)
+            val radius = dp(context, 0.55f + (i % 4) * 0.45f)
+            paint.color = Color.argb(70 + (i % 5) * 28, 220, 241, 255)
             canvas.drawCircle(x, y, radius, paint)
+            if (i % 11 == 0) {
+                paint.color = Color.argb(130, 178, 224, 255)
+                canvas.drawCircle(x, y, radius * 2.4f, paint)
+            }
         }
-        paint.color = Color.argb(70, 83, 210, 241)
-        canvas.drawCircle(w * 0.16f, h * 0.68f, min(w, h) * 0.22f, paint)
-        paint.color = Color.argb(42, 255, 224, 147)
-        canvas.drawCircle(w * 0.82f, h * 0.36f, min(w, h) * 0.2f, paint)
+
+        // A couple of low-contrast planetary silhouettes keep the screen
+        // playful while leaving the warm Mancala board as the focal point.
+        paint.color = Color.argb(34, 88, 207, 220)
+        canvas.drawCircle(w * 0.08f, h * 0.72f, min(w, h) * 0.18f, paint)
+        paint.color = Color.argb(25, 150, 109, 226)
+        canvas.drawCircle(w * 0.88f, h * 0.3f, min(w, h) * 0.2f, paint)
     }
 
     private fun drawBoard(canvas: Canvas, w: Float, h: Float) {
@@ -277,20 +348,33 @@ class MancalaHomeView(context: Context) : View(context) {
     }
 
     private fun drawTitle(canvas: Canvas, w: Float, h: Float) {
-        titlePaint.textSize = min(w * 0.115f, h * 0.17f).coerceAtLeast(dp(context, 32f))
-        titlePaint.setShadowLayer(dp(context, 5f), 0f, dp(context, 6f), Color.argb(200, 24, 15, 12))
+        titlePaint.textSize = min(w * 0.145f, h * 0.2f).coerceAtLeast(dp(context, 36f))
+        titlePaint.style = Paint.Style.STROKE
+        titlePaint.strokeWidth = dp(context, 3.5f)
+        titlePaint.color = Color.argb(220, 49, 20, 56)
+        titlePaint.shader = null
+        titlePaint.setShadowLayer(dp(context, 7f), 0f, dp(context, 7f), Color.argb(190, 3, 8, 26))
+        canvas.drawText("MANCALA", w / 2f, h * 0.245f, titlePaint)
+
+        titlePaint.style = Paint.Style.FILL
         titlePaint.shader = LinearGradient(
             0f,
             h * 0.08f,
             0f,
-            h * 0.25f,
-            Color.parseColor("#FFE09C"),
-            Color.parseColor("#E66D2F"),
+            h * 0.26f,
+            intArrayOf(
+                Color.parseColor("#FFF1B6"),
+                Color.parseColor("#FFB45E"),
+                Color.parseColor("#F07843"),
+            ),
+            floatArrayOf(0f, 0.55f, 1f),
             Shader.TileMode.CLAMP,
         )
-        canvas.drawText("MANCALA", w / 2f, h * 0.25f, titlePaint)
+        titlePaint.setShadowLayer(dp(context, 4f), 0f, dp(context, 4f), Color.argb(180, 226, 76, 43))
+        canvas.drawText("MANCALA", w / 2f, h * 0.245f, titlePaint)
         titlePaint.shader = null
         titlePaint.clearShadowLayer()
+        titlePaint.strokeWidth = 0f
     }
 
     private fun drawWoodButton(canvas: Canvas, key: String, rect: RectF, label: String) {
