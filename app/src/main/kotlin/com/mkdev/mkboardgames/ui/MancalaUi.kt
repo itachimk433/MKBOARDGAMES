@@ -269,9 +269,12 @@ class MancalaHomeView(context: Context) : View(context) {
                 h * 0.48f,
                 w,
                 h * 0.58f,
-                Color.argb(0, 104, 194, 255),
-                Color.argb(54, 77, 158, 232),
-                Color.argb(0, 104, 194, 255),
+                intArrayOf(
+                    Color.argb(0, 104, 194, 255),
+                    Color.argb(54, 77, 158, 232),
+                    Color.argb(0, 104, 194, 255),
+                ),
+                floatArrayOf(0f, 0.5f, 1f),
                 Shader.TileMode.CLAMP,
             )
         }
