@@ -802,6 +802,11 @@ class MancalaActivity : AppCompatActivity() {
             textAlign = Paint.Align.CENTER
             typeface = Typeface.DEFAULT_BOLD
         }
+        private val pitCountPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            textAlign = Paint.Align.CENTER
+            typeface = Typeface.create("sans-serif-condensed", Typeface.BOLD)
+        }
         // Measured in source-image pixels from mancala_board.webp (768 x 2048).
         private val leftHoles = arrayOf(
             HoleMeasurement(239f, 410f, 110f),
@@ -1124,9 +1129,11 @@ class MancalaActivity : AppCompatActivity() {
             )
             boardBitmap?.let { canvas.drawBitmap(it, null, boardRect, bitmapPaint) }
                 ?: drawFallbackBoard(canvas)
-            drawLabels(canvas)
+            val counts = moveAnimation?.let { visibleCounts(it) } ?: countsOf(state)
+            drawLabels(canvas, counts)
             drawPits(canvas)
             drawMoveAnimation(canvas)
+            drawPitCounts(canvas, counts)
             drawCaptureFeedback(canvas)
         }
 
@@ -1135,8 +1142,7 @@ class MancalaActivity : AppCompatActivity() {
             canvas.drawRoundRect(boardRect, boardRect.width() * 0.15f, boardRect.width() * 0.15f, paint)
         }
 
-        private fun drawLabels(canvas: Canvas) {
-            val counts = moveAnimation?.let { visibleCounts(it) } ?: countsOf(state)
+        private fun drawLabels(canvas: Canvas, counts: IntArray) {
             val top = centerFor(MancalaRuleEngine.NORTH_STORE)
             val bottom = centerFor(MancalaRuleEngine.SOUTH_STORE)
             val labelSize = boardRect.width() * 0.052f
@@ -1242,6 +1248,33 @@ class MancalaActivity : AppCompatActivity() {
                     )
                 }
             }
+        }
+
+        private fun drawPitCounts(canvas: Canvas, counts: IntArray) {
+            val textSize = (boardRect.width() * 0.047f).coerceAtLeast(
+                10f * resources.displayMetrics.density,
+            )
+            pitCountPaint.textSize = textSize
+            pitCountPaint.color = Color.WHITE
+            pitCountPaint.setShadowLayer(
+                textSize * 0.16f,
+                0f,
+                textSize * 0.08f,
+                Color.argb(220, 0, 0, 0),
+            )
+
+            for (index in 0 until MancalaRuleEngine.BOARD_CELLS) {
+                if (index == MancalaRuleEngine.SOUTH_STORE ||
+                    index == MancalaRuleEngine.NORTH_STORE
+                ) {
+                    continue
+                }
+                val center = centerFor(index)
+                val metrics = pitCountPaint.fontMetrics
+                val baseline = center.y - (metrics.ascent + metrics.descent) / 2f
+                canvas.drawText(counts[index].toString(), center.x, baseline, pitCountPaint)
+            }
+            pitCountPaint.clearShadowLayer()
         }
 
         private fun drawStoreStones(
