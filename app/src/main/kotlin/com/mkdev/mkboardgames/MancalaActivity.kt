@@ -60,6 +60,11 @@ class MancalaActivity : AppCompatActivity() {
         val settlementTransfers: List<SettlementTransfer>,
     )
 
+    private data class CaptureFeedback(
+        val stones: Int,
+        val mover: PieceColor,
+    )
+
     private data class MoveAnimation(
         val from: Int,
         val path: List<Int>,
@@ -677,6 +682,10 @@ class MancalaActivity : AppCompatActivity() {
         private var moveAnimation: MoveAnimation? = null
         private var animationProgress = 1f
         private var animationGeneration = 0
+        private var captureFeedback: CaptureFeedback? = null
+        private var captureFeedbackAnimator: ValueAnimator? = null
+        private var captureFeedbackProgress = 0f
+        private var captureFeedbackGeneration = 0
         private val boardBitmap = try {
             context.assets.open("mancala_board.webp").use { BitmapFactory.decodeStream(it) }
         } catch (_: Throwable) {
@@ -714,6 +723,28 @@ class MancalaActivity : AppCompatActivity() {
             style = Paint.Style.STROKE
             strokeCap = Paint.Cap.ROUND
             strokeWidth = 1.6f * resources.displayMetrics.density
+        }
+        private val captureBurstPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#FFE09C")
+            style = Paint.Style.STROKE
+            strokeCap = Paint.Cap.ROUND
+        }
+        private val capturePanelPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        private val capturePanelStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+        }
+        private val captureTitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            textAlign = Paint.Align.CENTER
+            typeface = Typeface.create("sans-serif-black", Typeface.BOLD)
+        }
+        private val captureTitleStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            textAlign = Paint.Align.CENTER
+            typeface = Typeface.create("sans-serif-black", Typeface.BOLD)
+            style = Paint.Style.STROKE
+        }
+        private val captureSubtitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            textAlign = Paint.Align.CENTER
+            typeface = Typeface.create("sans-serif-condensed", Typeface.BOLD)
         }
         private var highlightAnimator: ValueAnimator? = null
         private var highlightProgress = 0f
@@ -769,6 +800,7 @@ class MancalaActivity : AppCompatActivity() {
             val previousState = state
             val move = newState.moveHistory.lastOrNull()
             if (!animate || move == null) {
+                clearCaptureFeedback()
                 state = newState
                 resetStoneStyles(newState)
                 moveAnimation = null
@@ -781,6 +813,7 @@ class MancalaActivity : AppCompatActivity() {
             }
             val path = engine.sowingPath(previousState, move)
             if (path.isEmpty()) {
+                clearCaptureFeedback()
                 state = newState
                 resetStoneStyles(newState)
                 moveAnimation = null
@@ -817,6 +850,12 @@ class MancalaActivity : AppCompatActivity() {
             )
             state = newState
             stoneStyles = transition.afterStyles.map { it.toMutableList() }.toTypedArray()
+            val captured = (newState.metadata["captured"] as? Int) ?: 0
+            if (captured > 0) {
+                startCaptureFeedback(captured, previousState.currentTurn)
+            } else {
+                clearCaptureFeedback()
+            }
             val generation = animationGeneration
             moveAnimation = MoveAnimation(
                 from = move.from.col,
@@ -852,6 +891,41 @@ class MancalaActivity : AppCompatActivity() {
                 })
                 start()
             }
+        }
+
+        private fun startCaptureFeedback(stones: Int, mover: PieceColor) {
+            captureFeedbackAnimator?.cancel()
+            captureFeedbackAnimator = null
+            captureFeedbackProgress = 0f
+            val generation = ++captureFeedbackGeneration
+            captureFeedback = CaptureFeedback(stones, mover)
+            captureFeedbackAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
+                duration = 2_850L
+                startDelay = 40L
+                interpolator = android.view.animation.LinearInterpolator()
+                addUpdateListener {
+                    captureFeedbackProgress = it.animatedValue as Float
+                    invalidate()
+                }
+                addListener(object : AnimatorListenerAdapter() {
+                    override fun onAnimationEnd(animation: Animator) {
+                        if (generation != captureFeedbackGeneration) return
+                        captureFeedbackAnimator = null
+                        captureFeedback = null
+                        captureFeedbackProgress = 0f
+                        invalidate()
+                    }
+                })
+                start()
+            }
+        }
+
+        private fun clearCaptureFeedback() {
+            captureFeedbackGeneration++
+            captureFeedbackAnimator?.cancel()
+            captureFeedbackAnimator = null
+            captureFeedback = null
+            captureFeedbackProgress = 0f
         }
 
         private fun countsOf(snapshot: GameState): IntArray =
@@ -1008,6 +1082,7 @@ class MancalaActivity : AppCompatActivity() {
             drawLabels(canvas)
             drawPits(canvas)
             drawMoveAnimation(canvas)
+            drawCaptureFeedback(canvas)
         }
 
         private fun drawFallbackBoard(canvas: Canvas) {
@@ -1368,6 +1443,113 @@ class MancalaActivity : AppCompatActivity() {
             }
         }
 
+        private fun drawCaptureFeedback(canvas: Canvas) {
+            val feedback = captureFeedback ?: return
+            val progress = captureFeedbackProgress.coerceIn(0f, 1f)
+            val intro = (progress / 0.18f).coerceIn(0f, 1f)
+            val outro = ((progress - 0.72f) / 0.28f).coerceIn(0f, 1f)
+            val alpha = (255f * intro * (1f - outro)).roundToInt().coerceIn(0, 255)
+            if (alpha == 0) return
+
+            val introScale = 0.72f + 0.40f * android.view.animation.OvershootInterpolator(1.25f)
+                .getInterpolation(intro)
+            val outroScale = 1f + 0.06f * outro
+            val scale = introScale * outroScale
+            val bannerWidth = min(boardRect.width() * 0.82f, dp(this@MancalaActivity, 340f))
+            val bannerHeight = min(boardRect.width() * 0.23f, dp(this@MancalaActivity, 96f))
+            val centerX = boardRect.centerX()
+            val centerY = boardRect.top + boardRect.height() * 0.505f
+            val rect = RectF(
+                -bannerWidth / 2f,
+                -bannerHeight / 2f,
+                bannerWidth / 2f,
+                bannerHeight / 2f,
+            )
+
+            canvas.save()
+            canvas.translate(centerX, centerY)
+            canvas.scale(scale, scale)
+
+            captureBurstPaint.alpha = (alpha * (1f - intro)).roundToInt().coerceIn(0, 255)
+            captureBurstPaint.strokeWidth = bannerHeight * 0.035f
+            val burstInner = bannerWidth * 0.46f
+            val burstOuter = bannerWidth * 0.60f
+            for (ray in 0 until 12) {
+                val angle = ray * (2f * PI.toFloat() / 12f)
+                canvas.drawLine(
+                    cos(angle) * burstInner,
+                    sin(angle) * burstInner * 0.42f,
+                    cos(angle) * burstOuter,
+                    sin(angle) * burstOuter * 0.42f,
+                    captureBurstPaint,
+                )
+            }
+
+            capturePanelPaint.shader = LinearGradient(
+                0f,
+                rect.top,
+                0f,
+                rect.bottom,
+                Color.parseColor("#8B3C22"),
+                Color.parseColor("#3D1518"),
+                Shader.TileMode.CLAMP,
+            )
+            capturePanelPaint.alpha = alpha
+            capturePanelPaint.setShadowLayer(
+                bannerHeight * 0.16f,
+                0f,
+                bannerHeight * 0.08f,
+                Color.argb((alpha * 0.75f).roundToInt(), 0, 0, 0),
+            )
+            canvas.drawRoundRect(rect, bannerHeight * 0.25f, bannerHeight * 0.25f, capturePanelPaint)
+            capturePanelPaint.clearShadowLayer()
+            capturePanelPaint.shader = null
+
+            capturePanelStrokePaint.alpha = alpha
+            capturePanelStrokePaint.color = Color.parseColor("#FFE09C")
+            capturePanelStrokePaint.strokeWidth = bannerHeight * 0.025f
+            canvas.drawRoundRect(
+                RectF(
+                    rect.left + bannerHeight * 0.045f,
+                    rect.top + bannerHeight * 0.045f,
+                    rect.right - bannerHeight * 0.045f,
+                    rect.bottom - bannerHeight * 0.045f,
+                ),
+                bannerHeight * 0.21f,
+                bannerHeight * 0.21f,
+                capturePanelStrokePaint,
+            )
+
+            captureTitlePaint.textSize = bannerHeight * 0.30f
+            captureTitlePaint.color = Color.parseColor("#FFF4C7")
+            captureTitlePaint.alpha = alpha
+            captureTitlePaint.setShadowLayer(
+                bannerHeight * 0.055f,
+                0f,
+                bannerHeight * 0.035f,
+                Color.argb((alpha * 0.85f).roundToInt(), 40, 8, 3),
+            )
+            captureTitleStrokePaint.textSize = captureTitlePaint.textSize
+            captureTitleStrokePaint.color = Color.parseColor("#632019")
+            captureTitleStrokePaint.alpha = alpha
+            captureTitleStrokePaint.strokeWidth = bannerHeight * 0.045f
+            canvas.drawText("CAPTURED!", 0f, -bannerHeight * 0.035f, captureTitleStrokePaint)
+            canvas.drawText("CAPTURED!", 0f, -bannerHeight * 0.035f, captureTitlePaint)
+            captureTitlePaint.clearShadowLayer()
+
+            val store = if (feedback.mover == PieceColor.WHITE) "SOUTH" else "NORTH"
+            captureSubtitlePaint.textSize = bannerHeight * 0.16f
+            captureSubtitlePaint.color = Color.parseColor("#FFE09C")
+            captureSubtitlePaint.alpha = alpha
+            canvas.drawText(
+                "+${feedback.stones} STONES  •  $store STORE",
+                0f,
+                bannerHeight * 0.30f,
+                captureSubtitlePaint,
+            )
+            canvas.restore()
+        }
+
         private fun drawLandingRipple(
             canvas: Canvas,
             center: PointF,
@@ -1599,6 +1781,7 @@ class MancalaActivity : AppCompatActivity() {
         override fun onDetachedFromWindow() {
             highlightAnimator?.cancel()
             highlightAnimator = null
+            clearCaptureFeedback()
             super.onDetachedFromWindow()
         }
     }
