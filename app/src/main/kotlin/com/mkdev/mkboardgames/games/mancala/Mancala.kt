@@ -184,17 +184,46 @@ class MancalaRuleEngine : RuleEngine {
             destination != storeFor(mover)
         ) return emptyList()
 
+        return pathBetween(from, destination, mover)
+    }
+
+    /**
+     * Returns every board cell from [from] through [destination], inclusive,
+     * moving in the same direction as [mover]. The opponent's store is never
+     * part of the route.
+     *
+     * This is separate from [sowingPath], which returns only the landing cell
+     * for each stone. The UI uses this full route so a stone visibly advances
+     * one pit at a time instead of jumping directly to a later destination.
+     */
+    fun pathBetween(
+        from: Int,
+        destination: Int,
+        mover: PieceColor,
+        minimumSteps: Int = 0,
+    ): List<Int> {
+        if (from !in 0 until BOARD_CELLS ||
+            destination !in 0 until BOARD_CELLS ||
+            from == SOUTH_STORE ||
+            from == NORTH_STORE ||
+            destination == storeFor(mover.opponent()) ||
+            minimumSteps < 0
+        ) return emptyList()
+
         val skippedStore = storeFor(mover.opponent())
         val path = ArrayList<Int>()
         var cursor = from
+        var steps = 0
         path += cursor
-        while (cursor != destination && path.size <= BOARD_CELLS) {
+        val maxSteps = maxOf(BOARD_CELLS, minimumSteps + BOARD_CELLS)
+        while ((cursor != destination || steps < minimumSteps) && steps < maxSteps) {
             cursor = (cursor + 1) % BOARD_CELLS
             if (cursor != skippedStore) {
                 path += cursor
+                steps++
             }
         }
-        return if (cursor == destination) path else emptyList()
+        return if (cursor == destination && steps >= minimumSteps) path else emptyList()
     }
 
     private fun counts(state: GameState) = IntArray(BOARD_CELLS) { stones(state, it) }

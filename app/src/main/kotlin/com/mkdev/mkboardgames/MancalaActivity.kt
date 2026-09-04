@@ -63,6 +63,7 @@ class MancalaActivity : AppCompatActivity() {
     private data class MoveAnimation(
         val from: Int,
         val path: List<Int>,
+        val sowingRoutes: List<List<Int>>,
         val before: IntArray,
         val after: IntArray,
         val beforeStyles: Array<List<StoneAppearance>>,
@@ -75,10 +76,17 @@ class MancalaActivity : AppCompatActivity() {
         val pickupDuration = 0f
         val placementDuration = 320f
         val settleDuration = 600f
-        val sowingDuration = path.size * placementDuration
-        val settlementDuration = settlementTransfers.size * placementDuration
+        val sowingDuration = sowingRoutes.fold(0f) { total, route ->
+            total + routeDuration(route)
+        }
+        val settlementDuration = settlementTransfers.fold(0f) { total, transfer ->
+            total + routeDuration(transfer.route)
+        }
         val totalDuration =
             pickupDuration + sowingDuration + settlementDuration + settleDuration
+
+        private fun routeDuration(route: List<Int>): Float =
+            maxOf(1, route.size - 1) * placementDuration
     }
 
     private data class HoleMeasurement(
@@ -783,6 +791,19 @@ class MancalaActivity : AppCompatActivity() {
                 onMoveAnimationFinished = null
                 return
             }
+            val sowingRoutes = path.mapIndexed { pathIndex, destination ->
+                engine.pathBetween(
+                    from = move.from.col,
+                    destination = destination,
+                    mover = previousState.currentTurn,
+                    minimumSteps = pathIndex + 1,
+                ).ifEmpty {
+                    // This should not occur for a legal sowing path, but keep
+                    // the animation bounded if a future rules variant adds a
+                    // destination that is not on the standard ring.
+                    listOf(move.from.col, destination)
+                }
+            }
 
             val beforeStyles = copyStoneStyles()
             val movedStones = beforeStyles[move.from.col].toList()
@@ -800,6 +821,7 @@ class MancalaActivity : AppCompatActivity() {
             moveAnimation = MoveAnimation(
                 from = move.from.col,
                 path = path,
+                sowingRoutes = sowingRoutes,
                 before = countsOf(previousState),
                 after = countsOf(newState),
                 beforeStyles = beforeStyles,
@@ -1125,23 +1147,58 @@ class MancalaActivity : AppCompatActivity() {
         }
 
         private fun placedCount(animation: MoveAnimation): Int {
-            if (animation.placementDuration <= 0f) return animation.path.size
-            return floor((animationElapsed(animation) - animation.pickupDuration) /
-                animation.placementDuration)
-                .toInt()
-                .coerceIn(0, animation.path.size)
+            return completedRouteCount(
+                animation.sowingRoutes,
+                animationElapsed(animation) - animation.pickupDuration,
+                animation.placementDuration,
+            )
         }
 
         private fun settlementPlacedCount(animation: MoveAnimation): Int {
-            if (animation.placementDuration <= 0f) return animation.settlementTransfers.size
-            return floor((animationElapsed(animation) - animation.sowingDuration) /
-                animation.placementDuration)
-                .toInt()
-                .coerceIn(0, animation.settlementTransfers.size)
+            return completedRouteCount(
+                animation.settlementTransfers.map { it.route },
+                animationElapsed(animation) - animation.sowingDuration,
+                animation.placementDuration,
+            )
         }
 
         private fun animationElapsed(animation: MoveAnimation): Float =
             animationProgress * animation.totalDuration
+
+        private fun routeDuration(route: List<Int>, placementDuration: Float): Float =
+            maxOf(1, route.size - 1) * placementDuration
+
+        private fun completedRouteCount(
+            routes: List<List<Int>>,
+            elapsed: Float,
+            placementDuration: Float,
+        ): Int {
+            var remaining = elapsed.coerceAtLeast(0f)
+            var completed = 0
+            routes.forEach { route ->
+                val duration = routeDuration(route, placementDuration)
+                if (remaining < duration) return completed
+                remaining -= duration
+                completed++
+            }
+            return completed
+        }
+
+        private fun activeRouteProgress(
+            routes: List<List<Int>>,
+            elapsed: Float,
+            placementDuration: Float,
+        ): Pair<Int, Float>? {
+            var remaining = elapsed.coerceAtLeast(0f)
+            routes.forEachIndexed { index, route ->
+                val duration = routeDuration(route, placementDuration)
+                if (remaining < duration) {
+                    return index to (remaining / duration).coerceIn(0f, 1f)
+                }
+                remaining -= duration
+            }
+            return null
+        }
 
         private fun pointAlongRoute(route: List<Int>, progress: Float): PointF {
             if (route.isEmpty()) return PointF(boardRect.centerX(), boardRect.centerY())
@@ -1194,11 +1251,9 @@ class MancalaActivity : AppCompatActivity() {
 
             counts[animation.from] = 0
             val sowingElapsed = elapsed - animation.pickupDuration
-            val landed = floor(sowingElapsed / animation.placementDuration)
-                .toInt()
-                .coerceIn(0, animation.path.size)
-            repeat(landed) { counts[animation.path[it]]++ }
-            return if (sowingElapsed >= animation.path.size * animation.placementDuration) {
+            val completed = placedCount(animation)
+            repeat(completed) { counts[animation.path[it]]++ }
+            return if (sowingElapsed >= animation.sowingDuration) {
                 animation.after.copyOf()
             } else {
                 counts
@@ -1213,6 +1268,7 @@ class MancalaActivity : AppCompatActivity() {
             val placed = placedCount(animation)
             if (placed < animation.path.size) {
                 val index = placed
+                val route = animation.sowingRoutes[index]
                 val sourceHole = holeMeasurementFor(animation.from)
                 val sourceOffset = stableCircularOffset(
                     animation.movedStones[index],
@@ -1220,12 +1276,16 @@ class MancalaActivity : AppCompatActivity() {
                     (radiusFor(sourceHole) - chipRadius * 1.28f).coerceAtLeast(0f),
                 )
                 val start = PointF(from.x + sourceOffset.x, from.y + sourceOffset.y)
-                val end = centerFor(animation.path[index])
-                val local = ((elapsed - animation.pickupDuration) %
-                    animation.placementDuration) / animation.placementDuration
+                val routeProgress = activeRouteProgress(
+                    animation.sowingRoutes,
+                    elapsed - animation.pickupDuration,
+                    animation.placementDuration,
+                )
+                val local = routeProgress?.second ?: 0f
+                val routePoint = pointAlongRoute(route, local)
                 val stone = animation.movedStones[index]
-                val x = start.x + (end.x - start.x) * local
-                val y = start.y + (end.y - start.y) * local
+                val x = routePoint.x + sourceOffset.x * (1f - local)
+                val y = routePoint.y + sourceOffset.y * (1f - local)
                 drawStone(
                     canvas,
                     x,
@@ -1257,9 +1317,12 @@ class MancalaActivity : AppCompatActivity() {
                     (boardRect.width() * 0.24f - chipRadius * 1.28f).coerceAtLeast(0f),
                     (boardRect.height() * 0.045f - chipRadius * 1.28f).coerceAtLeast(0f),
                 )
-                val local = ((elapsed - animation.sowingDuration -
-                    settlementPlaced * animation.placementDuration) /
-                    animation.placementDuration).coerceIn(0f, 1f)
+                val settlementRoutes = animation.settlementTransfers.map { it.route }
+                val local = activeRouteProgress(
+                    settlementRoutes,
+                    elapsed - animation.sowingDuration,
+                    animation.placementDuration,
+                )?.second ?: 0f
                 val route = transfer.route.ifEmpty { listOf(transfer.from, transfer.to) }
                 val routePoint = pointAlongRoute(route, local)
                 val start = PointF(

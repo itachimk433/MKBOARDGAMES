@@ -109,6 +109,22 @@ class MancalaRuleEngineTest {
         assertTrue(northRoute.indexOf(13) > northRoute.indexOf(1))
     }
 
+    @Test
+    fun fullForwardRouteVisitsEachCellBeforeItsDestination() {
+        assertEquals(
+            listOf(3, 4, 5, MancalaRuleEngine.SOUTH_STORE),
+            engine.pathBetween(3, MancalaRuleEngine.SOUTH_STORE, PieceColor.WHITE),
+        )
+        assertEquals(
+            listOf(10, 11, 12, MancalaRuleEngine.NORTH_STORE, 0, 1, 2),
+            engine.pathBetween(10, 2, PieceColor.BLACK),
+        )
+        assertEquals(
+            listOf(5, 6, 7, 8, 9, 10, 11, 12, 0, 1, 2, 3, 4, 5),
+            engine.pathBetween(5, 5, PieceColor.WHITE, minimumSteps = 13),
+        )
+    }
+
     private fun moveFrom(index: Int) = Move(Position(0, index), Position(0, index))
 
     private fun stateWith(counts: IntArray, turn: PieceColor): GameState {
