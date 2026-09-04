@@ -1455,8 +1455,9 @@ class MancalaActivity : AppCompatActivity() {
                 .getInterpolation(intro)
             val outroScale = 1f + 0.06f * outro
             val scale = introScale * outroScale
-            val bannerWidth = min(boardRect.width() * 0.82f, dp(this@MancalaActivity, 340f))
-            val bannerHeight = min(boardRect.width() * 0.23f, dp(this@MancalaActivity, 96f))
+            val density = resources.displayMetrics.density
+            val bannerWidth = min(boardRect.width() * 0.82f, 340f * density)
+            val bannerHeight = min(boardRect.width() * 0.23f, 96f * density)
             val centerX = boardRect.centerX()
             val centerY = boardRect.top + boardRect.height() * 0.505f
             val rect = RectF(
