@@ -642,7 +642,7 @@ class MancalaActivity : AppCompatActivity() {
             else -> return
         }
         val overlay = MancalaGameOverView(this, message)
-        overlay.onClose = { onBackPressed() }
+        overlay.onClose = { showBoardAfterDialog() }
         overlay.onChoice = { which ->
             dismissMancalaOverlay()
             if (which == 0) {
