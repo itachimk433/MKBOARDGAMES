@@ -27,6 +27,7 @@ import com.mkdev.mkboardgames.ui.MancalaWoodButton
 import com.mkdev.mkboardgames.ui.AutoplayButtonView
 import kotlinx.coroutines.*
 import kotlin.math.*
+import kotlin.random.Random
 
 class MancalaActivity : AppCompatActivity() {
     private val engine = MancalaRuleEngine()
@@ -691,12 +692,6 @@ class MancalaActivity : AppCompatActivity() {
             textAlign = Paint.Align.CENTER
             typeface = Typeface.DEFAULT_BOLD
         }
-        private val chipOffsets = listOf(
-            -0.30f to -0.30f, 0f to -0.30f, 0.30f to -0.30f,
-            -0.30f to 0f, 0f to 0f, 0.30f to 0f,
-            -0.30f to 0.30f, 0f to 0.30f, 0.30f to 0.30f,
-            -0.14f to -0.14f, 0.14f to -0.14f, 0f to 0.16f,
-        )
         // Measured in source-image pixels from mancala_board.webp (768 x 2048).
         private val leftHoles = arrayOf(
             HoleMeasurement(239f, 410f, 110f),
@@ -819,15 +814,35 @@ class MancalaActivity : AppCompatActivity() {
         }
 
         private fun drawLabels(canvas: Canvas) {
-            labelPaint.textSize = boardRect.width() * 0.07f
+            val counts = moveAnimation?.let { visibleCounts(it) } ?: countsOf(state)
             val top = centerFor(MancalaRuleEngine.NORTH_STORE)
             val bottom = centerFor(MancalaRuleEngine.SOUTH_STORE)
-            canvas.drawText("NORTH", top.x, top.y - boardRect.height() * 0.045f, labelPaint)
-            canvas.drawText("SOUTH", bottom.x, bottom.y + boardRect.height() * 0.06f, labelPaint)
+            val labelSize = boardRect.width() * 0.052f
+            val scoreSize = boardRect.width() * 0.085f
+            val sideInset = boardRect.width() * 0.13f
+            val northX = (boardRect.left - sideInset).coerceAtLeast(labelSize)
+            val southX = (boardRect.right - sideInset).coerceAtMost(width - labelSize)
+
+            labelPaint.textSize = labelSize
+            countPaint.textSize = scoreSize
+            countPaint.color = Color.argb(235, 255, 244, 221)
+            canvas.drawText("NORTH", northX, top.y - scoreSize * 0.12f, labelPaint)
+            canvas.drawText(
+                counts[MancalaRuleEngine.NORTH_STORE].toString(),
+                northX,
+                top.y + scoreSize * 0.82f,
+                countPaint,
+            )
+            canvas.drawText("SOUTH", southX, bottom.y - scoreSize * 0.12f, labelPaint)
+            canvas.drawText(
+                counts[MancalaRuleEngine.SOUTH_STORE].toString(),
+                southX,
+                bottom.y + scoreSize * 0.82f,
+                countPaint,
+            )
         }
 
         private fun drawPits(canvas: Canvas) {
-            val stoneSpreadRadius = boardRect.width() * 0.060f
             val chipRadius = boardRect.width() * 0.022f * 2.25f
             val counts = moveAnimation?.let { visibleCounts(it) } ?: countsOf(state)
             for (index in 0 until MancalaRuleEngine.BOARD_CELLS) {
@@ -856,27 +871,27 @@ class MancalaActivity : AppCompatActivity() {
                 val owner = if (index <= MancalaRuleEngine.SOUTH_STORE) PieceColor.WHITE else PieceColor.BLACK
                 if (isStore) {
                     drawStoreStones(canvas, point, count, chipRadius, owner)
-                    countPaint.textSize = boardRect.width() * 0.10f
-                    countPaint.color = Color.argb(235, 255, 244, 221)
-                    canvas.drawText(count.toString(), point.x, point.y + countPaint.textSize * 0.35f, countPaint)
                     continue
                 }
                 val pitRadius = radiusFor(hole)
-                val containedSpreadRadius = min(
-                    stoneSpreadRadius,
-                    ((pitRadius - chipRadius * 1.08f) / 0.30f).coerceAtLeast(0f),
+                val visible = min(count, 12)
+                val randomOffsets = randomCircularOffsets(
+                    count = visible,
+                    seed = index * 977 + 53,
+                    maxDistance = (pitRadius - chipRadius * 1.08f).coerceAtLeast(0f),
+                    minimumSeparation = chipRadius * 0.62f,
                 )
-                chipOffsets.take(min(count, chipOffsets.size)).forEachIndexed { stackIndex, (dx, dy) ->
+                randomOffsets.forEachIndexed { stackIndex, offset ->
                     drawStone(
                         canvas,
-                        point.x + dx * containedSpreadRadius,
-                        point.y + dy * containedSpreadRadius,
+                        point.x + offset.x,
+                        point.y + offset.y,
                         chipRadius,
                         owner,
                         stoneVariation = index + stackIndex,
                     )
                 }
-                if (count > chipOffsets.size) {
+                if (count > visible) {
                     countPaint.textSize = boardRect.width() * 0.055f
                     countPaint.color = Color.argb(235, 255, 244, 221)
                     canvas.drawText(count.toString(), point.x, point.y + countPaint.textSize * 0.35f, countPaint)
@@ -891,39 +906,107 @@ class MancalaActivity : AppCompatActivity() {
             radius: Float,
             owner: PieceColor,
         ) {
-            val columns = when {
-                count <= 18 -> 6
-                count <= 32 -> 8
-                else -> 10
-            }
-            val rows = ceil(count.toFloat() / columns).toInt()
             val pieceRadius = radius * when {
                 count <= 18 -> 0.90f
                 count <= 32 -> 0.76f
                 else -> 0.62f
             }
-            val xSpacing = boardRect.width() * when {
-                columns <= 6 -> 0.075f
-                columns <= 8 -> 0.060f
-                else -> 0.050f
-            }
-            val ySpacing = boardRect.height() * when {
-                rows <= 3 -> 0.026f
-                rows <= 4 -> 0.021f
-                else -> 0.018f
-            }
-            repeat(count) { index ->
-                val column = index % columns
-                val row = index / columns
+            val randomOffsets = randomRectOffsets(
+                count = count,
+                seed = if (owner == PieceColor.WHITE) 17 else 53,
+                maxX = (boardRect.width() * 0.28f - pieceRadius * 1.08f).coerceAtLeast(0f),
+                maxY = (boardRect.height() * 0.052f - pieceRadius * 1.08f).coerceAtLeast(0f),
+                minimumSeparation = pieceRadius * 0.52f,
+            )
+            randomOffsets.forEachIndexed { index, offset ->
                 drawStone(
                     canvas,
-                    center.x + (column - (columns - 1) / 2f) * xSpacing,
-                    center.y + (row - (rows - 1) / 2f) * ySpacing,
+                    center.x + offset.x,
+                    center.y + offset.y,
                     pieceRadius,
                     owner,
                     stoneVariation = index,
                 )
             }
+        }
+
+        private fun randomCircularOffsets(
+            count: Int,
+            seed: Int,
+            maxDistance: Float,
+            minimumSeparation: Float,
+        ): List<PointF> {
+            if (count <= 0) return emptyList()
+            val random = Random(seed)
+            val positions = ArrayList<PointF>(count)
+            repeat(count) {
+                var best = PointF(0f, 0f)
+                var bestClearance = -Float.MAX_VALUE
+                for (attempt in 0 until 32) {
+                    val angle = random.nextFloat() * (2f * PI.toFloat())
+                    val distance = sqrt(random.nextFloat()) * maxDistance
+                    val candidate = PointF(
+                        cos(angle) * distance,
+                        sin(angle) * distance,
+                    )
+                    var clearance = Float.POSITIVE_INFINITY
+                    positions.forEach { placed ->
+                        clearance = min(
+                            clearance,
+                            sqrt(
+                                (candidate.x - placed.x) * (candidate.x - placed.x) +
+                                    (candidate.y - placed.y) * (candidate.y - placed.y),
+                            ),
+                        )
+                    }
+                    if (clearance > bestClearance) {
+                        best = candidate
+                        bestClearance = clearance
+                    }
+                    if (clearance >= minimumSeparation) break
+                }
+                positions += best
+            }
+            return positions
+        }
+
+        private fun randomRectOffsets(
+            count: Int,
+            seed: Int,
+            maxX: Float,
+            maxY: Float,
+            minimumSeparation: Float,
+        ): List<PointF> {
+            if (count <= 0) return emptyList()
+            val random = Random(seed)
+            val positions = ArrayList<PointF>(count)
+            repeat(count) {
+                var best = PointF(0f, 0f)
+                var bestClearance = -Float.MAX_VALUE
+                for (attempt in 0 until 40) {
+                    val candidate = PointF(
+                        (random.nextFloat() * 2f - 1f) * maxX,
+                        (random.nextFloat() * 2f - 1f) * maxY,
+                    )
+                    var clearance = Float.POSITIVE_INFINITY
+                    positions.forEach { placed ->
+                        clearance = min(
+                            clearance,
+                            sqrt(
+                                (candidate.x - placed.x) * (candidate.x - placed.x) +
+                                    (candidate.y - placed.y) * (candidate.y - placed.y),
+                            ),
+                        )
+                    }
+                    if (clearance > bestClearance) {
+                        best = candidate
+                        bestClearance = clearance
+                    }
+                    if (clearance >= minimumSeparation) break
+                }
+                positions += best
+            }
+            return positions
         }
 
         private fun visibleCounts(animation: MoveAnimation): IntArray {
@@ -1041,12 +1124,18 @@ class MancalaActivity : AppCompatActivity() {
             } else {
                 radius * 2.4f
             }
-            val visible = min(count, chipOffsets.size)
-            chipOffsets.take(visible).forEachIndexed { stackIndex, (dx, dy) ->
+            val visible = min(count, 12)
+            val randomOffsets = randomCircularOffsets(
+                count = visible,
+                seed = stoneVariation * 149 + count * 17,
+                maxDistance = radius * 1.35f,
+                minimumSeparation = radius * 0.56f,
+            )
+            randomOffsets.forEachIndexed { stackIndex, offset ->
                 drawStone(
                     canvas,
-                    center.x + dx * radius * 1.8f,
-                    center.y + dy * radius * 1.8f - lift,
+                    center.x + offset.x,
+                    center.y + offset.y - lift,
                     radius * 0.92f,
                     color,
                     elevation = radius * 1.2f,
