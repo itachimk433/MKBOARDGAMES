@@ -820,8 +820,8 @@ class MancalaActivity : AppCompatActivity() {
             val labelSize = boardRect.width() * 0.052f
             val scoreSize = boardRect.width() * 0.085f
             val sideInset = boardRect.width() * 0.13f
-            val northX = (boardRect.left - sideInset).coerceAtLeast(labelSize)
-            val southX = (boardRect.right - sideInset).coerceAtMost(width - labelSize)
+            val northX = (boardRect.left - sideInset).coerceAtLeast(scoreSize * 0.8f)
+            val southX = (boardRect.right + sideInset).coerceAtMost(width - scoreSize * 0.8f)
 
             labelPaint.textSize = labelSize
             countPaint.textSize = scoreSize
@@ -878,7 +878,7 @@ class MancalaActivity : AppCompatActivity() {
                 val randomOffsets = randomCircularOffsets(
                     count = visible,
                     seed = index * 977 + 53,
-                    maxDistance = (pitRadius - chipRadius * 1.08f).coerceAtLeast(0f),
+                    maxDistance = (pitRadius - chipRadius * 1.28f).coerceAtLeast(0f),
                     minimumSeparation = chipRadius * 0.62f,
                 )
                 randomOffsets.forEachIndexed { stackIndex, offset ->
@@ -886,7 +886,7 @@ class MancalaActivity : AppCompatActivity() {
                         canvas,
                         point.x + offset.x,
                         point.y + offset.y,
-                        chipRadius,
+                        stoneRadius(chipRadius, owner, index + stackIndex),
                         owner,
                         stoneVariation = index + stackIndex,
                     )
@@ -906,24 +906,19 @@ class MancalaActivity : AppCompatActivity() {
             radius: Float,
             owner: PieceColor,
         ) {
-            val pieceRadius = radius * when {
-                count <= 18 -> 0.90f
-                count <= 32 -> 0.76f
-                else -> 0.62f
-            }
             val randomOffsets = randomRectOffsets(
                 count = count,
                 seed = if (owner == PieceColor.WHITE) 17 else 53,
-                maxX = (boardRect.width() * 0.28f - pieceRadius * 1.08f).coerceAtLeast(0f),
-                maxY = (boardRect.height() * 0.052f - pieceRadius * 1.08f).coerceAtLeast(0f),
-                minimumSeparation = pieceRadius * 0.52f,
+                maxX = (boardRect.width() * 0.24f - radius * 1.28f).coerceAtLeast(0f),
+                maxY = (boardRect.height() * 0.045f - radius * 1.28f).coerceAtLeast(0f),
+                minimumSeparation = radius * 0.52f,
             )
             randomOffsets.forEachIndexed { index, offset ->
                 drawStone(
                     canvas,
                     center.x + offset.x,
                     center.y + offset.y,
-                    pieceRadius,
+                    stoneRadius(radius, owner, index),
                     owner,
                     stoneVariation = index,
                 )
@@ -1083,7 +1078,11 @@ class MancalaActivity : AppCompatActivity() {
                     canvas,
                     x,
                     y,
-                    chipRadius * (1f + 0.13f * sin(local * PI).toFloat()),
+                    stoneRadius(
+                        chipRadius * (1f + 0.13f * sin(local * PI).toFloat()),
+                        animation.color,
+                        animation.stoneVariation,
+                    ),
                     animation.color,
                     elevation = travelRadius * 0.18f,
                     stoneVariation = animation.stoneVariation,
@@ -1136,7 +1135,7 @@ class MancalaActivity : AppCompatActivity() {
                     canvas,
                     center.x + offset.x,
                     center.y + offset.y - lift,
-                    radius * 0.92f,
+                    stoneRadius(radius * 0.92f, color, stoneVariation + stackIndex),
                     color,
                     elevation = radius * 1.2f,
                     stoneVariation = stoneVariation + stackIndex,
@@ -1169,6 +1168,13 @@ class MancalaActivity : AppCompatActivity() {
                 ripplePaint,
             )
         }
+
+        private fun stoneRadius(radius: Float, owner: PieceColor, variation: Int): Float =
+            if (owner == PieceColor.BLACK && (variation and 1) == 1) {
+                radius * 0.985f
+            } else {
+                radius
+            }
 
         private fun drawStone(
             canvas: Canvas,
