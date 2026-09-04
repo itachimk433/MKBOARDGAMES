@@ -51,6 +51,7 @@ class MancalaActivity : AppCompatActivity() {
         val stone: StoneAppearance,
         val from: Int,
         val to: Int,
+        val route: List<Int>,
     )
 
     private data class StyleTransition(
@@ -876,14 +877,20 @@ class MancalaActivity : AppCompatActivity() {
             }
             val settlementTransfers = ArrayList<SettlementTransfer>()
             if (captured > 0 && landing != null) {
+                val opposite = MancalaRuleEngine.oppositePit(landing)
                 val capturedStones = working[landing].toList() +
-                    working[12 - landing].toList()
-                listOf(landing, 12 - landing).forEach { source ->
+                    working[opposite].toList()
+                listOf(landing, opposite).forEach { source ->
                     working[source].forEach { stone ->
                         settlementTransfers += SettlementTransfer(
                             stone = stone,
                             from = source,
                             to = MancalaRuleEngine.storeFor(previousState.currentTurn),
+                            route = engine.forwardPath(
+                                source,
+                                MancalaRuleEngine.storeFor(previousState.currentTurn),
+                                previousState.currentTurn,
+                            ),
                         )
                     }
                 }
@@ -903,6 +910,11 @@ class MancalaActivity : AppCompatActivity() {
                             stone = stone,
                             from = it,
                             to = MancalaRuleEngine.SOUTH_STORE,
+                            route = engine.forwardPath(
+                                it,
+                                MancalaRuleEngine.SOUTH_STORE,
+                                PieceColor.WHITE,
+                            ),
                         )
                     }
                     working[MancalaRuleEngine.SOUTH_STORE] += working[it]
@@ -916,6 +928,11 @@ class MancalaActivity : AppCompatActivity() {
                             stone = stone,
                             from = it,
                             to = MancalaRuleEngine.NORTH_STORE,
+                            route = engine.forwardPath(
+                                it,
+                                MancalaRuleEngine.NORTH_STORE,
+                                PieceColor.BLACK,
+                            ),
                         )
                     }
                     working[MancalaRuleEngine.NORTH_STORE] += working[it]
@@ -1126,6 +1143,21 @@ class MancalaActivity : AppCompatActivity() {
         private fun animationElapsed(animation: MoveAnimation): Float =
             animationProgress * animation.totalDuration
 
+        private fun pointAlongRoute(route: List<Int>, progress: Float): PointF {
+            if (route.isEmpty()) return PointF(boardRect.centerX(), boardRect.centerY())
+            if (route.size == 1) return centerFor(route.first())
+
+            val segmentProgress = progress.coerceIn(0f, 1f) * (route.size - 1)
+            val segment = floor(segmentProgress).toInt().coerceAtMost(route.size - 2)
+            val local = (segmentProgress - segment).coerceIn(0f, 1f)
+            val start = centerFor(route[segment])
+            val end = centerFor(route[segment + 1])
+            return PointF(
+                start.x + (end.x - start.x) * local,
+                start.y + (end.y - start.y) * local,
+            )
+        }
+
         private fun stableCircularOffset(
             style: StoneAppearance,
             pitIndex: Int,
@@ -1213,8 +1245,6 @@ class MancalaActivity : AppCompatActivity() {
             ) {
                 val settlementPlaced = settlementPlacedCount(animation)
                 val transfer = animation.settlementTransfers[settlementPlaced]
-                val source = centerFor(transfer.from)
-                val destination = centerFor(transfer.to)
                 val sourceOffset = stableCircularOffset(
                     transfer.stone,
                     transfer.from,
@@ -1227,16 +1257,21 @@ class MancalaActivity : AppCompatActivity() {
                     (boardRect.width() * 0.24f - chipRadius * 1.28f).coerceAtLeast(0f),
                     (boardRect.height() * 0.045f - chipRadius * 1.28f).coerceAtLeast(0f),
                 )
-                val start = PointF(source.x + sourceOffset.x, source.y + sourceOffset.y)
-                val end = PointF(
-                    destination.x + destinationOffset.x,
-                    destination.y + destinationOffset.y,
-                )
                 val local = ((elapsed - animation.sowingDuration -
                     settlementPlaced * animation.placementDuration) /
                     animation.placementDuration).coerceIn(0f, 1f)
-                val x = start.x + (end.x - start.x) * local
-                val y = start.y + (end.y - start.y) * local
+                val route = transfer.route.ifEmpty { listOf(transfer.from, transfer.to) }
+                val routePoint = pointAlongRoute(route, local)
+                val start = PointF(
+                    centerFor(transfer.from).x + sourceOffset.x,
+                    centerFor(transfer.from).y + sourceOffset.y,
+                )
+                val x = routePoint.x +
+                    sourceOffset.x * (1f - local) +
+                    destinationOffset.x * local
+                val y = routePoint.y +
+                    sourceOffset.y * (1f - local) +
+                    destinationOffset.y * local
                 drawStone(
                     canvas,
                     x,

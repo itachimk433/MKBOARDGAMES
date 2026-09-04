@@ -39,6 +39,13 @@ class MancalaRuleEngine : RuleEngine {
         fun storeFor(color: PieceColor) = if (color == PieceColor.WHITE) SOUTH_STORE else NORTH_STORE
         fun ownsPit(color: PieceColor, index: Int) =
             if (color == PieceColor.WHITE) isSouthPit(index) else isNorthPit(index)
+
+        fun oppositePit(index: Int) =
+            if (index in 0 until BOARD_CELLS && index != SOUTH_STORE && index != NORTH_STORE) {
+                12 - index
+            } else {
+                -1
+            }
     }
 
     override fun initialState(): GameState = stateFrom(
@@ -84,10 +91,12 @@ class MancalaRuleEngine : RuleEngine {
         }
 
         var captured = 0
+        var capturedFrom = -1
         if (ownsPit(mover, landing) && counts[landing] == 1) {
-            val opposite = 12 - landing
+            val opposite = oppositePit(landing)
             if (counts[opposite] > 0) {
                 captured = counts[opposite] + counts[landing]
+                capturedFrom = opposite
                 counts[storeFor(mover)] += captured
                 counts[opposite] = 0
                 counts[landing] = 0
@@ -105,6 +114,8 @@ class MancalaRuleEngine : RuleEngine {
                 "lastLanding" to landing,
                 "extraTurn" to extraTurn,
                 "captured" to captured,
+                "capturedFrom" to capturedFrom,
+                "captureStore" to storeFor(mover),
             ),
         )
         return candidate.copy(status = gameStatus(candidate))
@@ -156,6 +167,34 @@ class MancalaRuleEngine : RuleEngine {
             hand--
         }
         return path
+    }
+
+    /**
+     * Returns the forward board route from one cell to a player's store.
+     *
+     * Captures are removed from the opposite pit immediately by the rules, but
+     * the UI can use this route to show the captured stone travelling forward
+     * around the same ring rather than appearing to reverse direction.
+     */
+    fun forwardPath(from: Int, destination: Int, mover: PieceColor): List<Int> {
+        if (from !in 0 until BOARD_CELLS ||
+            destination !in 0 until BOARD_CELLS ||
+            from == SOUTH_STORE ||
+            from == NORTH_STORE ||
+            destination != storeFor(mover)
+        ) return emptyList()
+
+        val skippedStore = storeFor(mover.opponent())
+        val path = ArrayList<Int>()
+        var cursor = from
+        path += cursor
+        while (cursor != destination && path.size <= BOARD_CELLS) {
+            cursor = (cursor + 1) % BOARD_CELLS
+            if (cursor != skippedStore) {
+                path += cursor
+            }
+        }
+        return if (cursor == destination) path else emptyList()
     }
 
     private fun counts(state: GameState) = IntArray(BOARD_CELLS) { stones(state, it) }
