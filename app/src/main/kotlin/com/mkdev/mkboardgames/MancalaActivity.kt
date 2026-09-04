@@ -878,14 +878,28 @@ class MancalaActivity : AppCompatActivity() {
                 }
             }
 
-            return Array(MancalaRuleEngine.BOARD_CELLS) { index ->
+            val normalized = Array(MancalaRuleEngine.BOARD_CELLS) {
+                mutableListOf<StoneAppearance>()
+            }
+            val overflow = ArrayList<StoneAppearance>()
+            for (index in 0 until MancalaRuleEngine.BOARD_CELLS) {
                 val expected = engine.stones(newState, index)
-                if (working[index].size == expected) {
-                    working[index].toList()
-                } else {
-                    working[index].take(expected).toList()
+                val keep = min(expected, working[index].size)
+                normalized[index] += working[index].take(keep)
+                overflow += working[index].drop(keep)
+            }
+            for (index in 0 until MancalaRuleEngine.BOARD_CELLS) {
+                val missing = engine.stones(newState, index) - normalized[index].size
+                repeat(missing) {
+                    val recovered = if (overflow.isNotEmpty()) overflow.removeAt(0) else null
+                    normalized[index] += recovered ?: StoneAppearance(
+                        id = 100000 + index * 1000 + normalized[index].size,
+                        color = colorForCell(index),
+                        variation = normalized[index].size,
+                    )
                 }
             }
+            return Array(MancalaRuleEngine.BOARD_CELLS) { index -> normalized[index].toList() }
         }
 
         override fun onDraw(canvas: Canvas) {
@@ -970,7 +984,11 @@ class MancalaActivity : AppCompatActivity() {
                     stoneStyles[index]
                 } else {
                     val visibleStyles = animation.beforeStyles[index].toMutableList()
-                    if (index == animation.from) visibleStyles.clear()
+                    if (index == animation.from) {
+                        visibleStyles.clear()
+                        visibleStyles += animation.beforeStyles[index]
+                            .drop((placed + 1).coerceAtMost(animation.beforeStyles[index].size))
+                    }
                     animation.path.take(placed).forEachIndexed { pathIndex, destination ->
                         if (destination == index) {
                             visibleStyles += animation.movedStones[pathIndex]
@@ -1059,7 +1077,7 @@ class MancalaActivity : AppCompatActivity() {
         private fun visibleCounts(animation: MoveAnimation): IntArray {
             val counts = animation.before.copyOf()
             val elapsed = animationProgress * animation.totalDuration
-            if (elapsed < animation.pickupDuration) {
+            if (animation.pickupDuration > 0f && elapsed < animation.pickupDuration) {
                 val pickup = (elapsed / animation.pickupDuration).coerceIn(0f, 1f)
                 counts[animation.from] =
                     (animation.before[animation.from] * (1f - pickup)).roundToInt()
