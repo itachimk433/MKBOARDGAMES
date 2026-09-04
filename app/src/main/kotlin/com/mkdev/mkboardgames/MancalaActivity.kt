@@ -38,6 +38,7 @@ class MancalaActivity : AppCompatActivity() {
     private var activityResumed = false
     private var resultRecorded = false
     private var autoplayEnabled = false
+    private var autoplayMoveInProgress = false
     private var movementSpeedMultiplier = 1f
     private val previousStates = ArrayDeque<GameState>()
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
@@ -154,13 +155,12 @@ class MancalaActivity : AppCompatActivity() {
         }
         autoplayButton = AutoplayButtonView(this, circularStyle = false)
         autoplayButton.onAutoplayChanged = { enabled ->
-            if (boardView.isMoveAnimating) {
-                autoplayButton.setAutoplayEnabled(autoplayEnabled, animate = false)
-            } else if (vsAI) {
+            if (vsAI) {
                 autoplayEnabled = enabled
                 if (enabled &&
                     matchStarted &&
                     gameState.status == GameStatus.IN_PROGRESS &&
+                    !boardView.isMoveAnimating &&
                     !boardView.isLocked &&
                     aiControlsCurrentTurn()
                 ) {
@@ -513,6 +513,7 @@ class MancalaActivity : AppCompatActivity() {
         matchStarted = true
         resultRecorded = false
         autoplayEnabled = false
+        autoplayMoveInProgress = false
         autoplayButton.setAutoplayEnabled(false, animate = false)
         autoplayButton.visibility = if (vsAI) View.VISIBLE else View.GONE
         previousStates.clear()
@@ -558,23 +559,27 @@ class MancalaActivity : AppCompatActivity() {
         playMove(move)
     }
 
-    private fun playMove(move: Move) {
+    private fun playMove(move: Move, autoplayTurn: Boolean = false) {
         previousStates.add(gameState)
         gameState = engine.applyMove(gameState, move)
+        autoplayMoveInProgress = autoplayTurn
         if (gameState.status == GameStatus.IN_PROGRESS) {
             boardView.onMoveAnimationFinished = {
                 boardView.isLocked = false
-                autoplayButton.isEnabled = true
+                if (autoplayMoveInProgress) {
+                    autoplayMoveInProgress = false
+                    autoplayEnabled = false
+                    autoplayButton.setAutoplayEnabled(false, animate = false)
+                }
                 if (vsAI && aiControlsCurrentTurn()) triggerAI()
             }
         }
-        autoplayButton.isEnabled = false
         boardView.setGameState(gameState)
         updateHud()
         if (gameState.status != GameStatus.IN_PROGRESS) {
             autoplayEnabled = false
+            autoplayMoveInProgress = false
             autoplayButton.setAutoplayEnabled(false, animate = false)
-            autoplayButton.isEnabled = false
             boardView.isLocked = true
             recordResult()
             SoundPlayer.play(if (gameState.status == GameStatus.DRAW) "game_draw" else "game_end")
@@ -592,6 +597,7 @@ class MancalaActivity : AppCompatActivity() {
         boardView.isLocked = true
         statusView.text = "Computer is thinking…"
         val snapshot = gameState
+        val autoplayingPlayerTurn = autoplayEnabled && snapshot.currentTurn == playerColor
         scope.launch {
             val move = withContext(Dispatchers.Default) {
                 MancalaAIPlayer(engine, SettingsManager.mancalaAiDepth(this@MancalaActivity)).bestMove(snapshot)
@@ -604,7 +610,7 @@ class MancalaActivity : AppCompatActivity() {
                 return@launch
             }
             boardView.isLocked = false
-            if (move != null) playMove(move)
+            if (move != null) playMove(move, autoplayTurn = autoplayingPlayerTurn)
         }
     }
 
@@ -621,6 +627,7 @@ class MancalaActivity : AppCompatActivity() {
 
     private fun stopAutomatedGameplay() {
         autoplayEnabled = false
+        autoplayMoveInProgress = false
         scope.coroutineContext.cancelChildren()
         if (::boardView.isInitialized) {
             boardView.isLocked = false
