@@ -46,12 +46,12 @@ class MancalaActivity : AppCompatActivity() {
         val before: IntArray,
         val after: IntArray,
         val color: PieceColor,
+        val stoneVariation: Int,
     ) {
-        // Longer phases keep each stone readable while preserving a continuous,
-        // handoff-like rhythm from one pit to the next.
-        val pickupDuration = 300f
-        val placementDuration = 180f
-        val settleDuration = 400f
+        // Give each handoff time to read clearly, especially on smaller screens.
+        val pickupDuration = 500f
+        val placementDuration = 320f
+        val settleDuration = 600f
         val totalDuration =
             pickupDuration + path.size * placementDuration + settleDuration
     }
@@ -766,6 +766,7 @@ class MancalaActivity : AppCompatActivity() {
                 before = countsOf(previousState),
                 after = countsOf(newState),
                 color = previousState.currentTurn,
+                stoneVariation = move.from.col,
             )
             animationProgress = 0f
             isLocked = true
@@ -826,7 +827,7 @@ class MancalaActivity : AppCompatActivity() {
         }
 
         private fun drawPits(canvas: Canvas) {
-            val stoneSpreadRadius = boardRect.width() * 0.078f
+            val stoneSpreadRadius = boardRect.width() * 0.060f
             val chipRadius = boardRect.width() * 0.022f * 2.25f
             val counts = moveAnimation?.let { visibleCounts(it) } ?: countsOf(state)
             for (index in 0 until MancalaRuleEngine.BOARD_CELLS) {
@@ -860,11 +861,16 @@ class MancalaActivity : AppCompatActivity() {
                     canvas.drawText(count.toString(), point.x, point.y + countPaint.textSize * 0.35f, countPaint)
                     continue
                 }
+                val pitRadius = radiusFor(hole)
+                val containedSpreadRadius = min(
+                    stoneSpreadRadius,
+                    ((pitRadius - chipRadius * 1.08f) / 0.30f).coerceAtLeast(0f),
+                )
                 chipOffsets.take(min(count, chipOffsets.size)).forEachIndexed { stackIndex, (dx, dy) ->
                     drawStone(
                         canvas,
-                        point.x + dx * stoneSpreadRadius,
-                        point.y + dy * stoneSpreadRadius,
+                        point.x + dx * containedSpreadRadius,
+                        point.y + dy * containedSpreadRadius,
                         chipRadius,
                         owner,
                         stoneVariation = index + stackIndex,
@@ -885,17 +891,35 @@ class MancalaActivity : AppCompatActivity() {
             radius: Float,
             owner: PieceColor,
         ) {
-            val visible = min(count, 18)
-            val xSpacing = boardRect.width() * 0.075f
-            val ySpacing = boardRect.height() * 0.026f
-            repeat(visible) { index ->
-                val column = index % 6
-                val row = index / 6
+            val columns = when {
+                count <= 18 -> 6
+                count <= 32 -> 8
+                else -> 10
+            }
+            val rows = ceil(count.toFloat() / columns).toInt()
+            val pieceRadius = radius * when {
+                count <= 18 -> 0.90f
+                count <= 32 -> 0.76f
+                else -> 0.62f
+            }
+            val xSpacing = boardRect.width() * when {
+                columns <= 6 -> 0.075f
+                columns <= 8 -> 0.060f
+                else -> 0.050f
+            }
+            val ySpacing = boardRect.height() * when {
+                rows <= 3 -> 0.026f
+                rows <= 4 -> 0.021f
+                else -> 0.018f
+            }
+            repeat(count) { index ->
+                val column = index % columns
+                val row = index / columns
                 drawStone(
                     canvas,
-                    center.x + (column - 2.5f) * xSpacing,
-                    center.y + (row - 1f) * ySpacing,
-                    radius * 0.9f,
+                    center.x + (column - (columns - 1) / 2f) * xSpacing,
+                    center.y + (row - (rows - 1) / 2f) * ySpacing,
+                    pieceRadius,
                     owner,
                     stoneVariation = index,
                 )
@@ -948,7 +972,16 @@ class MancalaActivity : AppCompatActivity() {
                 (animation.path.size - placed - moving).coerceAtLeast(0)
             }
             if (held > 0) {
-                drawHeldStones(canvas, from, held, chipRadius, animation.color, elapsed)
+                drawHeldStones(
+                    canvas,
+                    from,
+                    held,
+                    chipRadius,
+                    animation.color,
+                    elapsed,
+                    animation.pickupDuration,
+                    animation.stoneVariation,
+                )
             }
 
             if (moving == 1) {
@@ -970,7 +1003,7 @@ class MancalaActivity : AppCompatActivity() {
                     chipRadius * (1f + 0.13f * sin(local * PI).toFloat()),
                     animation.color,
                     elevation = travelRadius * 0.18f,
-                    stoneVariation = index,
+                    stoneVariation = animation.stoneVariation,
                 )
                 drawLandingRipple(
                     canvas,
@@ -1000,9 +1033,11 @@ class MancalaActivity : AppCompatActivity() {
             radius: Float,
             color: PieceColor,
             elapsed: Float,
+            pickupDuration: Float,
+            stoneVariation: Int,
         ) {
-            val lift = if (elapsed < 170f) {
-                sin((elapsed / 170f).coerceIn(0f, 1f) * PI).toFloat() * radius * 2.4f
+            val lift = if (elapsed < pickupDuration) {
+                sin((elapsed / pickupDuration).coerceIn(0f, 1f) * PI).toFloat() * radius * 2.4f
             } else {
                 radius * 2.4f
             }
@@ -1015,7 +1050,7 @@ class MancalaActivity : AppCompatActivity() {
                     radius * 0.92f,
                     color,
                     elevation = radius * 1.2f,
-                    stoneVariation = stackIndex,
+                    stoneVariation = stoneVariation + stackIndex,
                 )
             }
             if (count > visible) {
