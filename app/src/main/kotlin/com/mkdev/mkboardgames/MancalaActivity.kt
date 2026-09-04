@@ -38,6 +38,7 @@ class MancalaActivity : AppCompatActivity() {
     private var activityResumed = false
     private var resultRecorded = false
     private var autoplayEnabled = false
+    private var movementSpeedMultiplier = 1f
     private val previousStates = ArrayDeque<GameState>()
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
@@ -76,11 +77,13 @@ class MancalaActivity : AppCompatActivity() {
         val afterStyles: Array<List<StoneAppearance>>,
         val movedStones: List<StoneAppearance>,
         val settlementTransfers: List<SettlementTransfer>,
+        val speedMultiplier: Float,
     ) {
         // Each stone leaves its original position without a pickup-stack phase.
         val pickupDuration = 0f
-        val placementDuration = 320f
-        val settleDuration = 600f
+        private val normalizedSpeed = speedMultiplier.coerceIn(1f, 4f)
+        val placementDuration = 320f / normalizedSpeed
+        val settleDuration = 600f / normalizedSpeed
         val sowingDuration = sowingRoutes.fold(0f) { total, route ->
             total + routeDuration(route)
         }
@@ -112,6 +115,7 @@ class MancalaActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         makeFullscreen()
         val dp = resources.displayMetrics.density
+        movementSpeedMultiplier = SettingsManager.getMancalaMovementSpeed(this).toFloat()
 
         val gameLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -231,11 +235,15 @@ class MancalaActivity : AppCompatActivity() {
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
+        if (gameState.status != GameStatus.IN_PROGRESS) {
+            leaveCompletedGameToHome()
+            return
+        }
         if (activeMancalaOverlay != null) {
             cancelMancalaOverlay()
             return
         }
-        if (!matchStarted || gameState.status != GameStatus.IN_PROGRESS) {
+        if (!matchStarted) {
             @Suppress("DEPRECATION") super.onBackPressed()
         } else {
             showMenu()
@@ -357,15 +365,45 @@ class MancalaActivity : AppCompatActivity() {
         showChoiceOverlay(
             "Game Menu",
             "What would you like to do?",
-            listOf("New Game / Restart", "How To Play", "AI Difficulty", "Back", "Home"),
+            listOf(
+                "New Game / Restart",
+                "How To Play",
+                "AI Difficulty",
+                "Movement Speed",
+                "Back",
+                "Home",
+            ),
             onCancel = { showBoardAfterDialog() },
         ) { which ->
             when (which) {
                 0 -> showRestartConfirmation()
                 1 -> showRules(false)
                 2 -> showDifficultyMenu(returnToHome = false)
-                3 -> showBoardAfterDialog()
+                3 -> showMovementSpeedMenu()
+                4 -> showBoardAfterDialog()
                 else -> showHomeConfirmation()
+            }
+        }
+    }
+
+    private fun showMovementSpeedMenu() {
+        val current = SettingsManager.getMancalaMovementSpeed(this)
+        val options = (1..4).map { multiplier ->
+            "${multiplier}x${if (multiplier == current) "  ✓" else ""}"
+        } + "Back"
+        showChoiceOverlay(
+            "Movement Speed",
+            "Choose how quickly stones move around the board.",
+            options,
+            onCancel = { showMenu() },
+        ) { which ->
+            if (which in 0..3) {
+                val multiplier = which + 1
+                SettingsManager.setMancalaMovementSpeed(this, multiplier)
+                movementSpeedMultiplier = multiplier.toFloat()
+                showMenu()
+            } else {
+                showMenu()
             }
         }
     }
@@ -617,6 +655,14 @@ class MancalaActivity : AppCompatActivity() {
         showMancalaOverlay(overlay) { showBoardAfterDialog() }
     }
 
+    private fun leaveCompletedGameToHome() {
+        stopAutomatedGameplay()
+        dismissMancalaOverlay()
+        clearPausedMatch()
+        matchStarted = false
+        showHome()
+    }
+
     private fun recordResult() {
         if (resultRecorded || !vsAI) return
         resultRecorded = true
@@ -655,8 +701,6 @@ class MancalaActivity : AppCompatActivity() {
     }
 
     private fun updateHud() {
-        val south = engine.stones(gameState, MancalaRuleEngine.SOUTH_STORE)
-        val north = engine.stones(gameState, MancalaRuleEngine.NORTH_STORE)
         val turn = when {
             gameState.status != GameStatus.IN_PROGRESS -> "Game over"
             vsAI && gameState.currentTurn == playerColor -> "Your turn"
@@ -664,7 +708,7 @@ class MancalaActivity : AppCompatActivity() {
             gameState.currentTurn == PieceColor.WHITE -> "South's turn"
             else -> "North's turn"
         }
-        statusView.text = "$turn   •   South $south  ·  North $north"
+        statusView.text = turn
     }
 
     inner class MancalaBoardView(context: Context) : View(context) {
@@ -868,6 +912,7 @@ class MancalaActivity : AppCompatActivity() {
                 afterStyles = transition.afterStyles,
                 movedStones = movedStones,
                 settlementTransfers = transition.settlementTransfers,
+                speedMultiplier = movementSpeedMultiplier,
             )
             animationProgress = 0f
             isLocked = true

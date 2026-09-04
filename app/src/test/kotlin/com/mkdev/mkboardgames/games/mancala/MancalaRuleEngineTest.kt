@@ -1,5 +1,6 @@
 package com.mkdev.mkboardgames.games.mancala
 
+import com.mkdev.mkboardgames.SettingsManager
 import com.mkdev.mkboardgames.engine.GameState
 import com.mkdev.mkboardgames.engine.GameStatus
 import com.mkdev.mkboardgames.engine.Move
@@ -119,6 +120,31 @@ class MancalaRuleEngineTest {
             listOf(1, MancalaRuleEngine.NORTH_STORE),
             engine.capturePath(1, MancalaRuleEngine.NORTH_STORE, PieceColor.BLACK),
         )
+    }
+
+    @Test
+    fun mancalaAiDifficultyChangesTheSelectedMove() {
+        val state = stateWith(
+            intArrayOf(0, 1, 0, 1, 0, 0, 0, 1, 1, 0, 3, 0, 1, 0),
+            PieceColor.WHITE,
+        )
+
+        val easyMove = MancalaAIPlayer(
+            engine,
+            SettingsManager.mancalaAiProfileForLevel(0).depth,
+        ).bestMove(state)
+        val mediumMove = MancalaAIPlayer(
+            engine,
+            SettingsManager.mancalaAiProfileForLevel(1).depth,
+        ).bestMove(state)
+        val hardMove = MancalaAIPlayer(
+            engine,
+            SettingsManager.mancalaAiProfileForLevel(2).depth,
+        ).bestMove(state)
+
+        assertEquals(3, easyMove?.from?.col)
+        assertEquals(1, mediumMove?.from?.col)
+        assertEquals(1, hardMove?.from?.col)
     }
 
     @Test

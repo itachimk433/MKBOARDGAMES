@@ -17,6 +17,7 @@ object SettingsManager {
     private const val KEY_SHOGI_DIFFICULTY = "shogi_ai_difficulty"
     private const val KEY_GO_DIFFICULTY = "go_ai_difficulty"
     private const val KEY_MANCALA_DIFFICULTY = "mancala_ai_difficulty"
+    private const val KEY_MANCALA_MOVEMENT_SPEED = "mancala_movement_speed"
 
     // ── Hints keys ───────────────────────────────────────────────────────────
     private const val KEY_CHESS_HINTS    = "chess_show_hints"
@@ -166,17 +167,27 @@ object SettingsManager {
     }
 
     // ── Mancala ───────────────────────────────────────────────────────────────
+    data class MancalaAiProfile(val depth: Int)
+
+    fun mancalaAiProfileForLevel(level: Int): MancalaAiProfile = when (level.coerceIn(0, 2)) {
+        0 -> MancalaAiProfile(depth = 2) // Easy
+        1 -> MancalaAiProfile(depth = 5) // Medium
+        else -> MancalaAiProfile(depth = 7) // Hard
+    }
+
     fun getMancalaDifficulty(ctx: Context) =
         prefs(ctx).getInt(KEY_MANCALA_DIFFICULTY, 1).coerceIn(0, 2)
 
     fun setMancalaDifficulty(ctx: Context, v: Int) =
         prefs(ctx).edit().putInt(KEY_MANCALA_DIFFICULTY, v.coerceIn(0, 2)).apply()
 
-    fun mancalaAiDepth(ctx: Context) = when (getMancalaDifficulty(ctx)) {
-        0 -> 2
-        2 -> 7
-        else -> 5
-    }
+    fun mancalaAiDepth(ctx: Context) = mancalaAiProfileForLevel(getMancalaDifficulty(ctx)).depth
+
+    fun getMancalaMovementSpeed(ctx: Context) =
+        prefs(ctx).getInt(KEY_MANCALA_MOVEMENT_SPEED, 1).coerceIn(1, 4)
+
+    fun setMancalaMovementSpeed(ctx: Context, multiplier: Int) =
+        prefs(ctx).edit().putInt(KEY_MANCALA_MOVEMENT_SPEED, multiplier.coerceIn(1, 4)).apply()
 
     // ── Tic-Tac-Toe ──────────────────────────────────────────────────────────
     private const val KEY_TTT_DIFFICULTY = "ttt_ai_difficulty"
