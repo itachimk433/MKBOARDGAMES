@@ -144,7 +144,9 @@ class MancalaActivity : AppCompatActivity() {
 
         boardView = MancalaBoardView(this)
         boardView.onPitTapped = { handlePitTap(it) }
-        boardView.onGameOverTapped = { showResultDialog() }
+        boardView.onGameOverTapped = {
+            if (!boardView.isMoveAnimating) showResultDialog()
+        }
 
         val controls = LinearLayout(this).apply {
             gravity = Gravity.CENTER
@@ -152,7 +154,9 @@ class MancalaActivity : AppCompatActivity() {
         }
         autoplayButton = AutoplayButtonView(this, circularStyle = false)
         autoplayButton.onAutoplayChanged = { enabled ->
-            if (vsAI) {
+            if (boardView.isLocked) {
+                autoplayButton.setAutoplayEnabled(autoplayEnabled, animate = false)
+            } else if (vsAI) {
                 autoplayEnabled = enabled
                 if (enabled &&
                     matchStarted &&
@@ -165,7 +169,9 @@ class MancalaActivity : AppCompatActivity() {
             }
         }
         val menu = actionButton("Menu")
-        menu.setOnClickListener { showMenu() }
+        menu.setOnClickListener {
+            if (!boardView.isLocked) showMenu()
+        }
         controls.addView(
             autoplayButton,
             LinearLayout.LayoutParams(0, 46 * dp.toInt(), 1f),
@@ -236,6 +242,7 @@ class MancalaActivity : AppCompatActivity() {
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
+        if (::boardView.isInitialized && boardView.isMoveAnimating) return
         if (gameState.status != GameStatus.IN_PROGRESS) {
             leaveCompletedGameToHome()
             return
@@ -244,6 +251,7 @@ class MancalaActivity : AppCompatActivity() {
             cancelMancalaOverlay()
             return
         }
+        if (boardView.isLocked) return
         if (!matchStarted) {
             @Suppress("DEPRECATION") super.onBackPressed()
         } else {
@@ -361,6 +369,7 @@ class MancalaActivity : AppCompatActivity() {
     }
 
     private fun showMenu() {
+        if (boardView.isLocked) return
         stopAutomatedGameplay()
         boardView.isLocked = true
         showChoiceOverlay(
@@ -556,14 +565,17 @@ class MancalaActivity : AppCompatActivity() {
         if (gameState.status == GameStatus.IN_PROGRESS) {
             boardView.onMoveAnimationFinished = {
                 boardView.isLocked = false
+                autoplayButton.isEnabled = true
                 if (vsAI && aiControlsCurrentTurn()) triggerAI()
             }
         }
+        autoplayButton.isEnabled = false
         boardView.setGameState(gameState)
         updateHud()
         if (gameState.status != GameStatus.IN_PROGRESS) {
             autoplayEnabled = false
             autoplayButton.setAutoplayEnabled(false, animate = false)
+            autoplayButton.isEnabled = false
             boardView.isLocked = true
             recordResult()
             SoundPlayer.play(if (gameState.status == GameStatus.DRAW) "game_draw" else "game_end")
@@ -714,6 +726,8 @@ class MancalaActivity : AppCompatActivity() {
 
     inner class MancalaBoardView(context: Context) : View(context) {
         var isLocked = false
+        val isMoveAnimating: Boolean
+            get() = moveAnimator?.isRunning == true || moveAnimation != null
         var onPitTapped: ((Int) -> Unit)? = null
         var onGameOverTapped: (() -> Unit)? = null
         var onMoveAnimationFinished: (() -> Unit)? = null
