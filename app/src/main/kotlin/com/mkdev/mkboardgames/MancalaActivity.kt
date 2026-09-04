@@ -47,21 +47,37 @@ class MancalaActivity : AppCompatActivity() {
         val variation: Int,
     )
 
+    private data class SettlementTransfer(
+        val stone: StoneAppearance,
+        val from: Int,
+        val to: Int,
+    )
+
+    private data class StyleTransition(
+        val preSettlementStyles: Array<List<StoneAppearance>>,
+        val afterStyles: Array<List<StoneAppearance>>,
+        val settlementTransfers: List<SettlementTransfer>,
+    )
+
     private data class MoveAnimation(
         val from: Int,
         val path: List<Int>,
         val before: IntArray,
         val after: IntArray,
         val beforeStyles: Array<List<StoneAppearance>>,
+        val preSettlementStyles: Array<List<StoneAppearance>>,
         val afterStyles: Array<List<StoneAppearance>>,
         val movedStones: List<StoneAppearance>,
+        val settlementTransfers: List<SettlementTransfer>,
     ) {
         // Each stone leaves its original position without a pickup-stack phase.
         val pickupDuration = 0f
         val placementDuration = 320f
         val settleDuration = 600f
+        val sowingDuration = path.size * placementDuration
+        val settlementDuration = settlementTransfers.size * placementDuration
         val totalDuration =
-            pickupDuration + path.size * placementDuration + settleDuration
+            pickupDuration + sowingDuration + settlementDuration + settleDuration
     }
 
     private data class HoleMeasurement(
@@ -769,7 +785,7 @@ class MancalaActivity : AppCompatActivity() {
 
             val beforeStyles = copyStoneStyles()
             val movedStones = beforeStyles[move.from.col].toList()
-            val afterStyles = stylesAfterMove(
+            val transition = stylesAfterMove(
                 previousState,
                 newState,
                 move.from.col,
@@ -778,7 +794,7 @@ class MancalaActivity : AppCompatActivity() {
                 movedStones,
             )
             state = newState
-            stoneStyles = afterStyles.map { it.toMutableList() }.toTypedArray()
+            stoneStyles = transition.afterStyles.map { it.toMutableList() }.toTypedArray()
             val generation = animationGeneration
             moveAnimation = MoveAnimation(
                 from = move.from.col,
@@ -786,8 +802,10 @@ class MancalaActivity : AppCompatActivity() {
                 before = countsOf(previousState),
                 after = countsOf(newState),
                 beforeStyles = beforeStyles,
-                afterStyles = afterStyles,
+                preSettlementStyles = transition.preSettlementStyles,
+                afterStyles = transition.afterStyles,
                 movedStones = movedStones,
+                settlementTransfers = transition.settlementTransfers,
             )
             animationProgress = 0f
             isLocked = true
@@ -842,7 +860,7 @@ class MancalaActivity : AppCompatActivity() {
             path: List<Int>,
             beforeStyles: Array<List<StoneAppearance>>,
             movedStones: List<StoneAppearance>,
-        ): Array<List<StoneAppearance>> {
+        ): StyleTransition {
             val working = Array(MancalaRuleEngine.BOARD_CELLS) { index ->
                 beforeStyles[index].toMutableList()
             }
@@ -853,9 +871,22 @@ class MancalaActivity : AppCompatActivity() {
 
             val captured = (newState.metadata["captured"] as? Int) ?: 0
             val landing = engine.landing(newState)
+            val preSettlementStyles = Array(MancalaRuleEngine.BOARD_CELLS) { index ->
+                working[index].toList()
+            }
+            val settlementTransfers = ArrayList<SettlementTransfer>()
             if (captured > 0 && landing != null) {
                 val capturedStones = working[landing].toList() +
                     working[12 - landing].toList()
+                listOf(landing, 12 - landing).forEach { source ->
+                    working[source].forEach { stone ->
+                        settlementTransfers += SettlementTransfer(
+                            stone = stone,
+                            from = source,
+                            to = MancalaRuleEngine.storeFor(previousState.currentTurn),
+                        )
+                    }
+                }
                 working[landing].clear()
                 working[12 - landing].clear()
                 working[MancalaRuleEngine.storeFor(previousState.currentTurn)] += capturedStones
@@ -867,12 +898,26 @@ class MancalaActivity : AppCompatActivity() {
                 .all { engine.stones(newState, it) == 0 }
             if (southEnded) {
                 (0 until MancalaRuleEngine.PITS_PER_SIDE).forEach {
+                    working[it].forEach { stone ->
+                        settlementTransfers += SettlementTransfer(
+                            stone = stone,
+                            from = it,
+                            to = MancalaRuleEngine.SOUTH_STORE,
+                        )
+                    }
                     working[MancalaRuleEngine.SOUTH_STORE] += working[it]
                     working[it].clear()
                 }
             }
             if (northEnded) {
                 (MancalaRuleEngine.SOUTH_STORE + 1 until MancalaRuleEngine.NORTH_STORE).forEach {
+                    working[it].forEach { stone ->
+                        settlementTransfers += SettlementTransfer(
+                            stone = stone,
+                            from = it,
+                            to = MancalaRuleEngine.NORTH_STORE,
+                        )
+                    }
                     working[MancalaRuleEngine.NORTH_STORE] += working[it]
                     working[it].clear()
                 }
@@ -899,7 +944,13 @@ class MancalaActivity : AppCompatActivity() {
                     )
                 }
             }
-            return Array(MancalaRuleEngine.BOARD_CELLS) { index -> normalized[index].toList() }
+            return StyleTransition(
+                preSettlementStyles = preSettlementStyles,
+                afterStyles = Array(MancalaRuleEngine.BOARD_CELLS) { index ->
+                    normalized[index].toList()
+                },
+                settlementTransfers = settlementTransfers,
+            )
         }
 
         override fun onDraw(canvas: Canvas) {
@@ -958,6 +1009,7 @@ class MancalaActivity : AppCompatActivity() {
             val chipRadius = boardRect.width() * 0.022f * 2.25f
             val animation = moveAnimation
             val placed = animation?.let { placedCount(it) } ?: 0
+            val settlementPlaced = animation?.let { settlementPlacedCount(it) } ?: 0
             for (index in 0 until MancalaRuleEngine.BOARD_CELLS) {
                 val point = centerFor(index)
                 val hole = holeMeasurementFor(index)
@@ -982,6 +1034,19 @@ class MancalaActivity : AppCompatActivity() {
 
                 val styles = if (animation == null) {
                     stoneStyles[index]
+                } else if (animation.settlementTransfers.isNotEmpty() &&
+                    animationElapsed(animation) >= animation.sowingDuration
+                ) {
+                    val visibleStyles = animation.preSettlementStyles[index].toMutableList()
+                    animation.settlementTransfers.take(settlementPlaced).forEach { transfer ->
+                        if (transfer.from == index) visibleStyles.remove(transfer.stone)
+                        if (transfer.to == index) visibleStyles += transfer.stone
+                    }
+                    if (settlementPlaced < animation.settlementTransfers.size) {
+                        val moving = animation.settlementTransfers[settlementPlaced]
+                        if (moving.from == index) visibleStyles.remove(moving.stone)
+                    }
+                    visibleStyles
                 } else {
                     val visibleStyles = animation.beforeStyles[index].toMutableList()
                     if (index == animation.from) {
@@ -1044,11 +1109,22 @@ class MancalaActivity : AppCompatActivity() {
 
         private fun placedCount(animation: MoveAnimation): Int {
             if (animation.placementDuration <= 0f) return animation.path.size
-            val elapsed = animationProgress * animation.totalDuration
-            return floor((elapsed - animation.pickupDuration) / animation.placementDuration)
+            return floor((animationElapsed(animation) - animation.pickupDuration) /
+                animation.placementDuration)
                 .toInt()
                 .coerceIn(0, animation.path.size)
         }
+
+        private fun settlementPlacedCount(animation: MoveAnimation): Int {
+            if (animation.placementDuration <= 0f) return animation.settlementTransfers.size
+            return floor((animationElapsed(animation) - animation.sowingDuration) /
+                animation.placementDuration)
+                .toInt()
+                .coerceIn(0, animation.settlementTransfers.size)
+        }
+
+        private fun animationElapsed(animation: MoveAnimation): Float =
+            animationProgress * animation.totalDuration
 
         private fun stableCircularOffset(
             style: StoneAppearance,
@@ -1099,7 +1175,7 @@ class MancalaActivity : AppCompatActivity() {
 
         private fun drawMoveAnimation(canvas: Canvas) {
             val animation = moveAnimation ?: return
-            val elapsed = animationProgress * animation.totalDuration
+            val elapsed = animationElapsed(animation)
             val from = centerFor(animation.from)
             val chipRadius = boardRect.width() * 0.022f * 2.25f
             val placed = placedCount(animation)
@@ -1130,6 +1206,53 @@ class MancalaActivity : AppCompatActivity() {
                     canvas,
                     start,
                     radiusFor(holeMeasurementFor(animation.from)),
+                    1f - local,
+                )
+            } else if (animation.settlementTransfers.isNotEmpty() &&
+                settlementPlacedCount(animation) < animation.settlementTransfers.size
+            ) {
+                val settlementPlaced = settlementPlacedCount(animation)
+                val transfer = animation.settlementTransfers[settlementPlaced]
+                val source = centerFor(transfer.from)
+                val destination = centerFor(transfer.to)
+                val sourceOffset = stableCircularOffset(
+                    transfer.stone,
+                    transfer.from,
+                    (radiusFor(holeMeasurementFor(transfer.from)) -
+                        chipRadius * 1.28f).coerceAtLeast(0f),
+                )
+                val destinationOffset = stableRectOffset(
+                    transfer.stone,
+                    transfer.to,
+                    (boardRect.width() * 0.24f - chipRadius * 1.28f).coerceAtLeast(0f),
+                    (boardRect.height() * 0.045f - chipRadius * 1.28f).coerceAtLeast(0f),
+                )
+                val start = PointF(source.x + sourceOffset.x, source.y + sourceOffset.y)
+                val end = PointF(
+                    destination.x + destinationOffset.x,
+                    destination.y + destinationOffset.y,
+                )
+                val local = ((elapsed - animation.sowingDuration -
+                    settlementPlaced * animation.placementDuration) /
+                    animation.placementDuration).coerceIn(0f, 1f)
+                val x = start.x + (end.x - start.x) * local
+                val y = start.y + (end.y - start.y) * local
+                drawStone(
+                    canvas,
+                    x,
+                    y,
+                    stoneRadius(
+                        chipRadius,
+                        transfer.stone.color,
+                        transfer.stone.variation,
+                    ),
+                    transfer.stone.color,
+                    stoneVariation = transfer.stone.variation,
+                )
+                drawLandingRipple(
+                    canvas,
+                    start,
+                    radiusFor(holeMeasurementFor(transfer.from)),
                     1f - local,
                 )
             } else if (placed > 0) {
