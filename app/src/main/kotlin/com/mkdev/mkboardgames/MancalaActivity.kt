@@ -154,7 +154,7 @@ class MancalaActivity : AppCompatActivity() {
         }
         autoplayButton = AutoplayButtonView(this, circularStyle = false)
         autoplayButton.onAutoplayChanged = { enabled ->
-            if (boardView.isLocked) {
+            if (boardView.isMoveAnimating) {
                 autoplayButton.setAutoplayEnabled(autoplayEnabled, animate = false)
             } else if (vsAI) {
                 autoplayEnabled = enabled
@@ -170,7 +170,7 @@ class MancalaActivity : AppCompatActivity() {
         }
         val menu = actionButton("Menu")
         menu.setOnClickListener {
-            if (!boardView.isLocked) showMenu()
+            if (!boardView.isMoveAnimating) showMenu()
         }
         controls.addView(
             autoplayButton,
@@ -251,7 +251,6 @@ class MancalaActivity : AppCompatActivity() {
             cancelMancalaOverlay()
             return
         }
-        if (boardView.isLocked) return
         if (!matchStarted) {
             @Suppress("DEPRECATION") super.onBackPressed()
         } else {
@@ -369,7 +368,7 @@ class MancalaActivity : AppCompatActivity() {
     }
 
     private fun showMenu() {
-        if (boardView.isLocked) return
+        if (boardView.isMoveAnimating) return
         stopAutomatedGameplay()
         boardView.isLocked = true
         showChoiceOverlay(
