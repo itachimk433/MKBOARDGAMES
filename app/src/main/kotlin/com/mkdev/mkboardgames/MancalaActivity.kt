@@ -982,7 +982,7 @@ class MancalaActivity : AppCompatActivity() {
                             stone = stone,
                             from = source,
                             to = MancalaRuleEngine.storeFor(previousState.currentTurn),
-                            route = engine.forwardPath(
+                            route = engine.capturePath(
                                 source,
                                 MancalaRuleEngine.storeFor(previousState.currentTurn),
                                 previousState.currentTurn,

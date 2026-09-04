@@ -94,7 +94,7 @@ class MancalaRuleEngineTest {
     }
 
     @Test
-    fun forwardCaptureRouteSkipsOnlyTheOpponentsStore() {
+    fun forwardStoreRouteSkipsOnlyTheOpponentsStore() {
         val southRoute = engine.forwardPath(11, MancalaRuleEngine.SOUTH_STORE, PieceColor.WHITE)
         val northRoute = engine.forwardPath(1, MancalaRuleEngine.NORTH_STORE, PieceColor.BLACK)
 
@@ -107,6 +107,18 @@ class MancalaRuleEngineTest {
         assertEquals(13, northRoute.last())
         assertFalse(MancalaRuleEngine.SOUTH_STORE in northRoute)
         assertTrue(northRoute.indexOf(13) > northRoute.indexOf(1))
+    }
+
+    @Test
+    fun capturedStonesTravelDirectlyToTheMoverStore() {
+        assertEquals(
+            listOf(11, MancalaRuleEngine.SOUTH_STORE),
+            engine.capturePath(11, MancalaRuleEngine.SOUTH_STORE, PieceColor.WHITE),
+        )
+        assertEquals(
+            listOf(1, MancalaRuleEngine.NORTH_STORE),
+            engine.capturePath(1, MancalaRuleEngine.NORTH_STORE, PieceColor.BLACK),
+        )
     }
 
     @Test

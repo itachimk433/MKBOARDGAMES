@@ -172,9 +172,8 @@ class MancalaRuleEngine : RuleEngine {
     /**
      * Returns the forward board route from one cell to a player's store.
      *
-     * Captures are removed from the opposite pit immediately by the rules, but
-     * the UI can use this route to show the captured stone travelling forward
-     * around the same ring rather than appearing to reverse direction.
+     * This route is useful for sweeping remaining stones at the end of a game,
+     * where showing the stones follow the board is natural.
      */
     fun forwardPath(from: Int, destination: Int, mover: PieceColor): List<Int> {
         if (from !in 0 until BOARD_CELLS ||
@@ -185,6 +184,24 @@ class MancalaRuleEngine : RuleEngine {
         ) return emptyList()
 
         return pathBetween(from, destination, mover)
+    }
+
+    /**
+     * Returns the visual route for a capture transfer.
+     *
+     * A capture is an immediate transfer of the landing stone and the
+     * opposite pit's stones into the mover's store. Unlike normal sowing, the
+     * captured stones must not circle the board or pass through other pits.
+     */
+    fun capturePath(from: Int, destination: Int, mover: PieceColor): List<Int> {
+        if (from !in 0 until BOARD_CELLS ||
+            destination !in 0 until BOARD_CELLS ||
+            from == SOUTH_STORE ||
+            from == NORTH_STORE ||
+            destination != storeFor(mover)
+        ) return emptyList()
+
+        return listOf(from, destination)
     }
 
     /**
