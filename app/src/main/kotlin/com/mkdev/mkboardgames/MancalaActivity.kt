@@ -182,6 +182,7 @@ class MancalaActivity : AppCompatActivity() {
             onPlay = { showModeDialog() }
             onHowToPlay = { showRules(showModeAfter = false) }
             onMore = { showHomeMenu() }
+            onHome = { finish() }
         }
         gameLayout.visibility = View.GONE
         screenRoot.addView(
@@ -1393,23 +1394,66 @@ class MancalaActivity : AppCompatActivity() {
         }
 
         private fun visibleCounts(animation: MoveAnimation): IntArray {
-            val counts = animation.before.copyOf()
             val elapsed = animationProgress * animation.totalDuration
-            if (animation.pickupDuration > 0f && elapsed < animation.pickupDuration) {
-                val pickup = (elapsed / animation.pickupDuration).coerceIn(0f, 1f)
+            val counts = animation.before.copyOf()
+            val pickupElapsed = elapsed.coerceAtLeast(0f)
+            if (animation.pickupDuration > 0f && pickupElapsed < animation.pickupDuration) {
+                val pickup = (pickupElapsed / animation.pickupDuration).coerceIn(0f, 1f)
                 counts[animation.from] =
                     (animation.before[animation.from] * (1f - pickup)).roundToInt()
                 return counts
             }
 
-            counts[animation.from] = 0
             val sowingElapsed = elapsed - animation.pickupDuration
-            val completed = placedCount(animation)
-            repeat(completed) { counts[animation.path[it]]++ }
-            return if (sowingElapsed >= animation.sowingDuration) {
+            if (sowingElapsed < animation.sowingDuration) {
+                val completed = placedCount(animation)
+                val active = if (activeRouteProgress(
+                        animation.sowingRoutes,
+                        sowingElapsed,
+                        animation.placementDuration,
+                    ) != null
+                ) {
+                    1
+                } else {
+                    0
+                }
+                val movedOut = (completed + active).coerceAtMost(animation.path.size)
+                counts[animation.from] =
+                    (animation.before[animation.from] - movedOut).coerceAtLeast(0)
+                repeat(completed) { counts[animation.path[it]]++ }
+                return counts
+            }
+
+            // During captures and end-of-round cleanup, mirror the styles that
+            // are currently visible instead of jumping straight to the final
+            // engine state. A pit loses a stone as it starts moving, and the
+            // destination gains it only when the transfer lands.
+            val settlementCounts = IntArray(MancalaRuleEngine.BOARD_CELLS) { index ->
+                animation.preSettlementStyles[index].size
+            }
+            val settlementElapsed = elapsed - animation.sowingDuration
+            val completedTransfers = settlementPlacedCount(animation)
+            repeat(completedTransfers) { transferIndex ->
+                val transfer = animation.settlementTransfers[transferIndex]
+                settlementCounts[transfer.from] =
+                    (settlementCounts[transfer.from] - 1).coerceAtLeast(0)
+                settlementCounts[transfer.to]++
+            }
+            if (completedTransfers < animation.settlementTransfers.size &&
+                activeRouteProgress(
+                    animation.settlementTransfers.map { it.route },
+                    settlementElapsed,
+                    animation.placementDuration,
+                ) != null
+            ) {
+                val activeTransfer = animation.settlementTransfers[completedTransfers]
+                settlementCounts[activeTransfer.from] =
+                    (settlementCounts[activeTransfer.from] - 1).coerceAtLeast(0)
+            }
+            return if (settlementElapsed >= animation.settlementDuration) {
                 animation.after.copyOf()
             } else {
-                counts
+                settlementCounts
             }
         }
 

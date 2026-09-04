@@ -168,6 +168,7 @@ class MancalaHomeView(context: Context) : View(context) {
     var onPlay: (() -> Unit)? = null
     var onHowToPlay: (() -> Unit)? = null
     var onMore: (() -> Unit)? = null
+    var onHome: (() -> Unit)? = null
 
     private val boardBitmap = try {
         context.assets.open("mancala_board.webp").use { BitmapFactory.decodeStream(it) }
@@ -207,6 +208,14 @@ class MancalaHomeView(context: Context) : View(context) {
         drawTitle(canvas, w, h)
 
         buttonRects.clear()
+        val homeSize = min(dp(context, 52f), h * 0.12f)
+        val homeInset = dp(context, 14f)
+        drawIconButton(
+            canvas,
+            "home",
+            RectF(homeInset, homeInset, homeInset + homeSize, homeInset + homeSize),
+            "⌂",
+        )
         val mainWidth = min(w * 0.42f, dp(context, 250f))
         val mainHeight = min(dp(context, 58f), h * 0.13f)
         val mainLeft = (w - mainWidth) / 2f
@@ -476,6 +485,7 @@ class MancalaHomeView(context: Context) : View(context) {
                 if (!hit) return true
                 SoundPlayer.play("ui_click")
                 when (key) {
+                    "home" -> onHome?.invoke()
                     "play" -> onPlay?.invoke()
                     "rules" -> onHowToPlay?.invoke()
                     "more" -> onMore?.invoke()
