@@ -134,12 +134,21 @@ class MenuView(context: Context) : View(context) {
         color = Color.parseColor("#555555"); textAlign = Paint.Align.LEFT
         textSize = 10f * sp.coerceAtMost(3f)
     }
-    private val gearIconPaint  = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#7FC8F8"); textAlign = Paint.Align.CENTER
-        textSize = 22f * sp.coerceAtMost(3f)
+    private val gearFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#E3B86A")
+        style = Paint.Style.FILL
+    }
+    private val gearEdgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#F7D99B")
+        style = Paint.Style.STROKE
+        strokeWidth = 1.2f * dp
+    }
+    private val gearHolePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#102C32")
+        style = Paint.Style.FILL
     }
     private val gearLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#7FC8F8"); textAlign = Paint.Align.CENTER
+        color = Color.parseColor("#E3B86A"); textAlign = Paint.Align.CENTER
         textSize = 9f * sp.coerceAtMost(3f); isFakeBoldText = true; letterSpacing = 0.08f
     }
     private val miniLightPaint = Paint().apply { color = Color.parseColor("#F0D9B5") }
@@ -195,7 +204,9 @@ class MenuView(context: Context) : View(context) {
     private var pressedGear  = false
     private var logoPressed  = false
     private var logoScale     = 1f
+    private var gearRotation  = 0f
     private var scaleAnim: ValueAnimator? = null
+    private var gearSpinAnim: ValueAnimator? = null
     private val cardScales    = HashMap<GameType, Float>()
 
     private fun animateCardScale(type: GameType, to: Float) {
@@ -273,7 +284,9 @@ class MenuView(context: Context) : View(context) {
                 }
                 if (pressedGear && gearTouch.contains(event.x, cy)) {
                     com.mkdev.mkboardgames.SoundPlayer.play("ui_click")
-                    onSettingsClicked?.invoke(); pressedGear = false; invalidate(); return true
+                    animateGearSpin()
+                    postDelayed({ onSettingsClicked?.invoke() }, 180L)
+                    pressedGear = false; invalidate(); return true
                 }
                 val hit = cards.firstOrNull { it.rect.contains(event.x, cy) }?.type
                 pressedCard?.let { animateCardScale(it, 1f) }
@@ -1089,11 +1102,60 @@ class MenuView(context: Context) : View(context) {
     private fun drawGear(canvas: Canvas) {
         val cx = gearRect.centerX(); val cy = gearRect.centerY()
         if (pressedGear) {
-            val bgP = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(40, 127, 200, 248) }
+            val bgP = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(48, 227, 184, 106) }
             canvas.drawRoundRect(gearTouch, 8f * dp, 8f * dp, bgP)
         }
-        canvas.drawText("⚙", cx, cy + gearIconPaint.textSize * 0.36f, gearIconPaint)
+
+        val buttonPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (isLightMode) Color.argb(225, 255, 255, 255)
+            else Color.argb(225, 16, 44, 50)
+        }
+        val buttonEdgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (isLightMode) Color.parseColor("#B8C8D1")
+            else Color.parseColor("#6C573B")
+            style = Paint.Style.STROKE
+            strokeWidth = 1f * dp
+        }
+        canvas.drawCircle(cx, cy, 17f * dp, buttonPaint)
+        canvas.drawCircle(cx, cy, 17f * dp, buttonEdgePaint)
+
+        canvas.save()
+        canvas.rotate(gearRotation, cx, cy)
+        val gearPath = Path()
+        val teeth = 8
+        val points = teeth * 4
+        val outerRadius = 12.5f * dp
+        val innerRadius = 9.2f * dp
+        for (i in 0 until points) {
+            val angle = (-Math.PI / 2.0 + (Math.PI * 2.0 * i / points)).toFloat()
+            val radius = when (i % 4) {
+                1, 2 -> outerRadius
+                else -> innerRadius
+            }
+            val x = cx + kotlin.math.cos(angle) * radius
+            val y = cy + kotlin.math.sin(angle) * radius
+            if (i == 0) gearPath.moveTo(x, y) else gearPath.lineTo(x, y)
+        }
+        gearPath.close()
+        canvas.drawPath(gearPath, gearFillPaint)
+        canvas.drawPath(gearPath, gearEdgePaint)
+        canvas.drawCircle(cx, cy, 4.2f * dp, gearHolePaint)
+        canvas.restore()
+
         canvas.drawText("Settings", cx, gearRect.bottom + 14f * dp, gearLabelPaint)
+    }
+
+    private fun animateGearSpin() {
+        gearSpinAnim?.cancel()
+        gearSpinAnim = ValueAnimator.ofFloat(gearRotation, gearRotation + 360f).apply {
+            duration = 650L
+            interpolator = android.view.animation.DecelerateInterpolator()
+            addUpdateListener {
+                gearRotation = it.animatedValue as Float
+                invalidate()
+            }
+            start()
+        }
     }
 
     private fun applyLightTheme() {
@@ -1107,6 +1169,10 @@ class MenuView(context: Context) : View(context) {
             cardTitlePaint.color = Color.parseColor("#1A1A1A")
             cardDescPaint.color  = Color.parseColor("#555555")
             copyrightPaint.color = Color.parseColor("#999999")
+            gearFillPaint.color  = Color.parseColor("#1976A8")
+            gearEdgePaint.color  = Color.parseColor("#0D5277")
+            gearHolePaint.color  = Color.parseColor("#F5F5F5")
+            gearLabelPaint.color = Color.parseColor("#1976A8")
         } else {
             bgPaint.color        = Color.parseColor("#121212")
             cardPaint.color      = Color.parseColor("#202429")
@@ -1117,6 +1183,10 @@ class MenuView(context: Context) : View(context) {
             cardTitlePaint.color = Color.WHITE
             cardDescPaint.color  = Color.parseColor("#BDBDBD")
             copyrightPaint.color = Color.parseColor("#555555")
+            gearFillPaint.color  = Color.parseColor("#E3B86A")
+            gearEdgePaint.color  = Color.parseColor("#F7D99B")
+            gearHolePaint.color  = Color.parseColor("#102C32")
+            gearLabelPaint.color = Color.parseColor("#E3B86A")
         }
     }
 

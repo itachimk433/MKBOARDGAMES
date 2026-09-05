@@ -977,6 +977,7 @@ class MainActivity : AppCompatActivity() {
 
         AlertDialog.Builder(ctx, android.R.style.Theme_Material_Dialog_MinWidth)
             .setTitle("Your Stats (vs AI)")
+            .setIcon(R.drawable.ic_app_logo)
             .setView(wrapper)
             .setPositiveButton("OK", null)
             .setNeutralButton("Reset") { _, _ ->
