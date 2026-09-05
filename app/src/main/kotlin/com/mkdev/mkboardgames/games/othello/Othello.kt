@@ -14,6 +14,6 @@ object OthelloSetup {
         board[3 * 8 + 4] = OthelloPiece(PieceColor.BLACK)
         board[4 * 8 + 3] = OthelloPiece(PieceColor.BLACK)
         board[4 * 8 + 4] = OthelloPiece(PieceColor.WHITE)
-        return GameState(board = board, currentTurn = PieceColor.BLACK)
+        return GameState(board = board, currentTurn = PieceColor.WHITE)
     }
 }
