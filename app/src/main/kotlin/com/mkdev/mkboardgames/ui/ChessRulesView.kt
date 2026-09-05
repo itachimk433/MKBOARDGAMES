@@ -31,7 +31,6 @@ class ChessRulesView(
     private val isChess = isChessStyledLabel(gameLabel)
     private val isDraughts = isDraughtsStyledLabel(gameLabel)
     private val isOthello = isOthelloStyledLabel(gameLabel)
-    private val isMorabaraba = isMorabarabaStyledLabel(gameLabel)
 
     init {
         if (isChess || isDraughts || isOthello || isMorabaraba) {
@@ -169,6 +168,7 @@ private class ChessMancalaRulesView(
     private val density = resources.displayMetrics.density
     private val isDraughts = isDraughtsStyledLabel(gameLabel)
     private val isOthello = isOthelloStyledLabel(gameLabel)
+    private val isMorabaraba = isMorabarabaStyledLabel(gameLabel)
     private val backRect = RectF()
     private val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val headingPaint = Paint(Paint.ANTI_ALIAS_FLAG)
