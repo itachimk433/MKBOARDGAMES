@@ -126,12 +126,15 @@ class ChessMenuView(
     }
     private val chessBackdropPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val chessHeroPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-    private val gameIconLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#FFF0C2")
+    private val gameIconTitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.CENTER
         isFakeBoldText = true
-        letterSpacing = 0.08f
-        typeface = Typeface.create("sans-serif-condensed", Typeface.BOLD)
+        letterSpacing = 0.04f
+        typeface = Typeface.create("serif", Typeface.BOLD)
+    }
+    private val gameIconTitleGlowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(210, 77, 196, 255)
+        strokeCap = Paint.Cap.ROUND
     }
     private val chessWavePaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val chessWaveEdgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -635,7 +638,7 @@ class ChessMenuView(
                 ),
                 chessHeroPaint,
             )
-            drawGameIconLabel(
+            drawGameHeroTitle(
                 canvas,
                 if (isInternationalDraughts) "INTERNATIONAL DRAUGHTS" else "DRAUGHTS",
                 width / 2f,
@@ -661,35 +664,70 @@ class ChessMenuView(
                 ),
                 chessHeroPaint,
             )
-            drawGameIconLabel(canvas, "OTHELLO", width / 2f, top, size)
+            drawGameHeroTitle(canvas, "OTHELLO", width / 2f, top, size)
         }
     }
 
-    private fun drawGameIconLabel(
+    private fun drawGameHeroTitle(
         canvas: Canvas,
         label: String,
         centerX: Float,
         top: Float,
         size: Float,
     ) {
-        val maxWidth = size * 0.92f
-        val baseSize = if (label.length > 12) 11f else 15f
-        gameIconLabelPaint.textSize = baseSize * textScale
-        if (gameIconLabelPaint.measureText(label) > maxWidth) {
-            gameIconLabelPaint.textSize *= maxWidth / gameIconLabelPaint.measureText(label)
+        val maxWidth = centerX * 2f * 0.92f
+        gameIconTitlePaint.textSize = 92f * textScale
+        if (gameIconTitlePaint.measureText(label) > maxWidth) {
+            gameIconTitlePaint.textSize *= maxWidth / gameIconTitlePaint.measureText(label)
         }
-        val baseline = top + size * 0.19f
+        val baseline = top - 48f * unit
+        val titleHeight = gameIconTitlePaint.textSize
 
-        gameIconLabelPaint.style = Paint.Style.STROKE
-        gameIconLabelPaint.strokeWidth = 3f * unit
-        gameIconLabelPaint.color = Color.argb(220, 24, 16, 32)
-        canvas.drawText(label, centerX, baseline, gameIconLabelPaint)
+        gameIconTitleGlowPaint.strokeWidth = 2f * unit
+        gameIconTitleGlowPaint.setShadowLayer(
+            12f * unit,
+            0f,
+            0f,
+            Color.argb(220, 35, 179, 255),
+        )
+        canvas.drawLine(
+            centerX - min(size * 0.56f, 104f * unit),
+            top - 30f * unit,
+            centerX + min(size * 0.56f, 104f * unit),
+            top - 30f * unit,
+            gameIconTitleGlowPaint,
+        )
+        gameIconTitleGlowPaint.clearShadowLayer()
 
-        gameIconLabelPaint.style = Paint.Style.FILL
-        gameIconLabelPaint.color = Color.parseColor("#FFF0C2")
-        gameIconLabelPaint.setShadowLayer(4f * unit, 0f, 2f * unit, Color.argb(210, 12, 8, 20))
-        canvas.drawText(label, centerX, baseline, gameIconLabelPaint)
-        gameIconLabelPaint.clearShadowLayer()
+        gameIconTitlePaint.style = Paint.Style.STROKE
+        gameIconTitlePaint.strokeWidth = 5f * unit
+        gameIconTitlePaint.shader = null
+        gameIconTitlePaint.color = Color.argb(235, 42, 22, 16)
+        gameIconTitlePaint.setShadowLayer(
+            7f * unit,
+            0f,
+            5f * unit,
+            Color.argb(210, 8, 11, 20),
+        )
+        canvas.drawText(label, centerX, baseline, gameIconTitlePaint)
+
+        gameIconTitlePaint.style = Paint.Style.FILL
+        gameIconTitlePaint.clearShadowLayer()
+        gameIconTitlePaint.shader = LinearGradient(
+            0f,
+            baseline - titleHeight,
+            0f,
+            baseline + 4f * unit,
+            intArrayOf(
+                Color.parseColor("#FFF3C8"),
+                Color.parseColor("#E6B86F"),
+                Color.parseColor("#8A4C1F"),
+            ),
+            floatArrayOf(0f, 0.46f, 1f),
+            Shader.TileMode.CLAMP,
+        )
+        canvas.drawText(label, centerX, baseline, gameIconTitlePaint)
+        gameIconTitlePaint.shader = null
     }
 
     private fun drawDraughtsHeader(canvas: Canvas, width: Float, topOffset: Float) {
