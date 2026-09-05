@@ -65,6 +65,34 @@ class ChessChoiceView(
     private val isDraughts = isDraughtsStyledLabel(gameLabel)
     private val isOthello = isOthelloStyledLabel(gameLabel)
     private val isMorabaraba = isMorabarabaStyledLabel(gameLabel)
+    private val isFoxAndGeese =
+        gameLabel.replace(" ", "").replace("·", "").equals("FOX&GEESE", ignoreCase = true)
+    private val isGo = gameLabel.replace(" ", "").equals("GO", ignoreCase = true)
+    private val isShogi = gameLabel.replace(" ", "").equals("SHOGI", ignoreCase = true)
+    private val isXiangqi = gameLabel.replace(" ", "").equals("XIANGQI", ignoreCase = true)
+    private val isChessFamily =
+        isChess || isDraughts || isOthello || isFoxAndGeese || isGo || isShogi || isXiangqi
+    private val gameIconBitmap = run {
+        val assetName = when {
+            isChess -> "chess_home_icon.png"
+            isDraughts && gameLabel.replace(" ", "").equals("INTLDRAUGHTS", ignoreCase = true) ->
+                "international_draughts_home_icon.png"
+            isDraughts -> "draughts_home_icon.png"
+            isOthello -> "othello_home_icon.png"
+            isFoxAndGeese -> "fox_and_geese_home_icon.png"
+            isGo -> "go_home_icon.png"
+            isShogi -> "shogi_home_icon.png"
+            isXiangqi -> "xiangqi_home_icon.png"
+            else -> null
+        }
+        assetName?.let {
+            try {
+                context.assets.open(it).use { stream -> BitmapFactory.decodeStream(stream) }
+            } catch (_: Throwable) {
+                null
+            }
+        }
+    }
     private val surfacePaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val cardPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -116,6 +144,7 @@ class ChessChoiceView(
         textAlign = Paint.Align.CENTER
         textSize = 10f * textScale
     }
+    private val gameIconPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
 
     private val hits = choices.mapIndexed { index, choice -> ChoiceHit(choice, index) }
     private val scales = HashMap<Int, Float>()
@@ -125,6 +154,7 @@ class ChessChoiceView(
     private var downY = 0f
     private var contentOffset = 0f
     private var atmospherePhase = 0f
+    private val chessFamilyBackdrop = ChessFamilyBackdrop(unit)
     private val atmosphereAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
         duration = 36_000L
         repeatCount = ValueAnimator.INFINITE
@@ -143,7 +173,7 @@ class ChessChoiceView(
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
-        if (isDraughts || isOthello || isMorabaraba) atmosphereAnimator.start()
+        if (isChessFamily || isMorabaraba) atmosphereAnimator.start()
     }
 
     override fun onDetachedFromWindow() {
@@ -183,17 +213,8 @@ class ChessChoiceView(
     override fun onDraw(canvas: Canvas) {
         val width = width.toFloat()
         val height = height.toFloat()
-        if (isChess || isDraughts || isOthello || isMorabaraba) {
-            if (isOthello) {
-                drawOthelloAtmosphere(
-                    canvas,
-                    width,
-                    height,
-                    unit,
-                    rounded = !fullScreen,
-                    phase = atmospherePhase,
-                )
-            } else if (isMorabaraba) {
+        if (isChessFamily || isMorabaraba) {
+            if (isMorabaraba) {
                 drawMorabarabaAtmosphere(
                     canvas,
                     width,
@@ -202,17 +223,14 @@ class ChessChoiceView(
                     rounded = !fullScreen,
                     phase = atmospherePhase,
                 )
-            } else if (isDraughts) {
-                drawDraughtsAtmosphere(
+            } else {
+                chessFamilyBackdrop.draw(
                     canvas,
                     width,
                     height,
-                    unit,
+                    atmospherePhase,
                     rounded = !fullScreen,
-                    phase = atmospherePhase,
                 )
-            } else {
-                drawChessAtmosphere(canvas, width, height, unit, rounded = !fullScreen)
             }
         } else {
             surfacePaint.shader = LinearGradient(
@@ -233,9 +251,7 @@ class ChessChoiceView(
         }
 
         when {
-            isChess -> drawChessHeader(canvas, width, contentOffset)
-            isDraughts -> drawDraughtsHeader(canvas, width, contentOffset)
-            isOthello -> drawOthelloHeader(canvas, width, contentOffset)
+            isChessFamily -> drawChessFamilyHeader(canvas, width, contentOffset)
             isMorabaraba -> drawMorabarabaHeader(canvas, width, contentOffset)
             else -> drawHeader(canvas, width, contentOffset)
         }
@@ -248,6 +264,29 @@ class ChessChoiceView(
         canvas.drawText(headerSymbol, center, topOffset + 43f * unit, crownPaint)
         eyebrowPaint.color = Color.parseColor("#FFE09C")
         canvas.drawText(gameLabel, center, topOffset + 58f * unit, eyebrowPaint)
+        titlePaint.color = Color.WHITE
+        canvas.drawText(title, center, topOffset + 99f * unit, titlePaint)
+        subtitlePaint.color = Color.parseColor("#D6E8FF")
+        canvas.drawText(subtitle, center, topOffset + 125f * unit, subtitlePaint)
+    }
+
+    private fun drawChessFamilyHeader(canvas: Canvas, width: Float, topOffset: Float) {
+        val center = width / 2f
+        gameIconBitmap?.let { bitmap ->
+            val size = minOf(width * 0.22f, 66f * unit)
+            val top = topOffset + 5f * unit
+            canvas.drawBitmap(
+                bitmap,
+                null,
+                RectF(
+                    center - size / 2f,
+                    top,
+                    center + size / 2f,
+                    top + size,
+                ),
+                gameIconPaint,
+            )
+        }
         titlePaint.color = Color.WHITE
         canvas.drawText(title, center, topOffset + 99f * unit, titlePaint)
         subtitlePaint.color = Color.parseColor("#D6E8FF")
@@ -374,8 +413,8 @@ class ChessChoiceView(
     }
 
     private fun drawChoice(canvas: Canvas, hit: ChoiceHit) {
-        if (isChess || isDraughts || isOthello || isMorabaraba) {
-            if (isOthello || isMorabaraba) drawOthelloChoice(canvas, hit) else drawChessChoice(canvas, hit)
+        if (isChessFamily || isMorabaraba) {
+            if (isMorabaraba) drawOthelloChoice(canvas, hit) else drawChessChoice(canvas, hit)
             return
         }
         val scale = scales[hit.index] ?: 1f
@@ -505,7 +544,7 @@ class ChessChoiceView(
             }
             MotionEvent.ACTION_MOVE -> {
                 if (kotlin.math.hypot((event.x - downX).toDouble(), (event.y - downY).toDouble()) > 18f * unit) {
-                    if (!isChess) pressedIndex?.let { animateScale(it, 1f) }
+                    if (!isChessFamily && !isMorabaraba) pressedIndex?.let { animateScale(it, 1f) }
                     pressedIndex = null
                     invalidate()
                 }
@@ -513,7 +552,7 @@ class ChessChoiceView(
             }
             MotionEvent.ACTION_UP -> {
                 val selected = pressedIndex
-                if (!isChess) selected?.let { animateScale(it, 1f) }
+                if (!isChessFamily && !isMorabaraba) selected?.let { animateScale(it, 1f) }
                 if (selected != null && hits[selected].rect.contains(event.x, event.y)) {
                     SoundPlayer.play("ui_click")
                     onChoiceSelected?.invoke(selected)
@@ -523,7 +562,7 @@ class ChessChoiceView(
                 return true
             }
             MotionEvent.ACTION_CANCEL -> {
-                if (!isChess) pressedIndex?.let { animateScale(it, 1f) }
+                if (!isChessFamily && !isMorabaraba) pressedIndex?.let { animateScale(it, 1f) }
                 pressedIndex = null
                 invalidate()
                 return true

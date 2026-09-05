@@ -50,11 +50,17 @@ class ChessMenuView(
     private val isDraughts = isDraughtsStyledLabel(gameLabel)
     private val isOthello = isOthelloStyledLabel(gameLabel)
     private val isMorabaraba = isMorabarabaStyledLabel(gameLabel)
+    private val isFoxAndGeese = gameLabel.replace(" ", "").replace("·", "").equals("FOX&GEESE", ignoreCase = true)
+    private val isGo = gameLabel.replace(" ", "").equals("GO", ignoreCase = true)
+    private val isShogi = gameLabel.replace(" ", "").equals("SHOGI", ignoreCase = true)
+    private val isXiangqi = gameLabel.replace(" ", "").equals("XIANGQI", ignoreCase = true)
+    private val isChessFamily =
+        isChess || isDraughts || isOthello || isFoxAndGeese || isGo || isShogi || isXiangqi
     private val isInternationalDraughts =
         gameLabel.replace(" ", "").equals("INTLDRAUGHTS", ignoreCase = true)
     private val contentHeightDp = when {
-        (isChess || isDraughts || isOthello || isMorabaraba) && hasResumeMatch -> 548f
-        isChess || isDraughts || isOthello || isMorabaraba -> 500f
+        (isChessFamily || isMorabaraba) && hasResumeMatch -> 548f
+        isChessFamily || isMorabaraba -> 500f
         hasResumeMatch -> 462f
         else -> 414f
     }
@@ -65,6 +71,10 @@ class ChessMenuView(
             isDraughts -> "draughts_home_icon.png"
             isOthello -> "othello_home_icon.png"
             isMorabaraba -> "morabaraba_home_icon.png"
+            isFoxAndGeese -> "fox_and_geese_home_icon.png"
+            isGo -> "go_home_icon.png"
+            isShogi -> "shogi_home_icon.png"
+            isXiangqi -> "xiangqi_home_icon.png"
             else -> null
         }
         assetName?.let {
@@ -210,7 +220,7 @@ class ChessMenuView(
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
-        if (isChess || isDraughts || isOthello || isMorabaraba) {
+        if (isChessFamily || isMorabaraba) {
             backgroundAnimator.start()
         }
     }
@@ -242,7 +252,7 @@ class ChessMenuView(
         val gap = 10f * unit
         val actionWidth = (width - sidePadding * 2f - gap) / 2f
         val actionTop = contentOffset +
-            (if (isChess || isDraughts || isOthello || isMorabaraba) 244f else 164f) * unit
+            (if (isChessFamily || isMorabaraba) 244f else 164f) * unit
         val actionHeight = 82f * unit
 
         actions = listOf(
@@ -251,7 +261,7 @@ class ChessMenuView(
                 detail = "Challenge the board",
                 symbol = when {
                     isChess -> "♞"
-                    isDraughts || isOthello || isMorabaraba -> "●"
+                    isChessFamily || isMorabaraba -> "●"
                     else -> ""
                 },
                 accent = Color.parseColor("#E3B86A"),
@@ -262,7 +272,7 @@ class ChessMenuView(
                 detail = "Play on one board",
                 symbol = when {
                     isChess -> "♙"
-                    isDraughts || isOthello || isMorabaraba -> "○"
+                    isChessFamily || isMorabaraba -> "○"
                     else -> ""
                 },
                 accent = Color.parseColor("#8EC7B9"),
@@ -299,43 +309,15 @@ class ChessMenuView(
         super.onDraw(canvas)
         val width = width.toFloat()
         val height = height.toFloat()
-        if (isChess || isDraughts || isOthello || isMorabaraba) {
-            if (isOthello) {
-                drawOthelloAtmosphere(
-                    canvas,
-                    width,
-                    height,
-                    unit,
-                    rounded = !fullScreen,
-                    phase = backgroundPhase,
-                )
-            } else if (isDraughts) {
-                drawDraughtsAtmosphere(
-                    canvas,
-                    width,
-                    height,
-                    unit,
-                    rounded = !fullScreen,
-                    phase = backgroundPhase * backgroundSpeedMultiplier,
-                )
-            } else {
-                drawChessBackdrop(
-                    canvas,
-                    width,
-                    height,
-                    drawFloatingPieces = isChess,
-                )
-            }
-            if (isChess || isMorabaraba) {
-                drawChessHero(canvas, width, contentOffset)
-                drawChessHeader(canvas, width, contentOffset)
-            } else if (isDraughts) {
-                drawDraughtsHero(canvas, width, contentOffset)
-                drawDraughtsHeader(canvas, width, contentOffset)
-            } else {
-                drawOthelloHero(canvas, width, contentOffset)
-                drawOthelloHeader(canvas, width, contentOffset)
-            }
+        if (isChessFamily || isMorabaraba) {
+            drawChessBackdrop(
+                canvas,
+                width,
+                height,
+                drawFloatingPieces = isChess,
+            )
+            drawChessHero(canvas, width, contentOffset)
+            drawChessHeader(canvas, width, contentOffset)
         } else {
             val corner = 12f * unit
             surfacePaint.shader = LinearGradient(
@@ -355,7 +337,7 @@ class ChessMenuView(
             surfacePaint.shader = null
         }
 
-        if (!isChess && !isDraughts && !isOthello && !isMorabaraba) {
+        if (!isChessFamily && !isMorabaraba) {
             drawHeader(canvas, width, contentOffset)
         }
         actions.forEach { drawAction(canvas, it) }
@@ -804,7 +786,7 @@ class ChessMenuView(
     }
 
     private fun drawAction(canvas: Canvas, action: MenuAction) {
-        if (isChess || isDraughts || isOthello || isMorabaraba) {
+        if (isChessFamily || isMorabaraba) {
             if (isOthello) drawOthelloAction(canvas, action) else drawChessAction(canvas, action)
             return
         }
@@ -896,7 +878,7 @@ class ChessMenuView(
     }
 
     private fun drawResumeAction(canvas: Canvas, width: Float) {
-        if (isChess || isDraughts || isOthello || isMorabaraba) {
+        if (isChessFamily || isMorabaraba) {
             if (isOthello) drawOthelloResumeAction(canvas, width) else drawChessResumeAction(canvas, width)
             return
         }
@@ -952,7 +934,7 @@ class ChessMenuView(
 
             MotionEvent.ACTION_MOVE -> {
                 if (kotlin.math.hypot((event.x - downX).toDouble(), (event.y - downY).toDouble()) > 18f * unit) {
-                    if (!isChess && !isMorabaraba) pressedAction?.let { animateAction(it, 1f) }
+                    if (!isChessFamily && !isMorabaraba) pressedAction?.let { animateAction(it, 1f) }
                     pressedAction = null
                     resumePressed = false
                     invalidate()
@@ -962,7 +944,7 @@ class ChessMenuView(
 
             MotionEvent.ACTION_UP -> {
                 val action = pressedAction
-                if (!isChess && !isMorabaraba) action?.let { animateAction(it, 1f) }
+                if (!isChessFamily && !isMorabaraba) action?.let { animateAction(it, 1f) }
                 if (action != null && action.rect.contains(event.x, event.y)) {
                     SoundPlayer.play("ui_click")
                     action.action()
@@ -977,7 +959,7 @@ class ChessMenuView(
             }
 
             MotionEvent.ACTION_CANCEL -> {
-                if (!isChess && !isMorabaraba) pressedAction?.let { animateAction(it, 1f) }
+                if (!isChessFamily && !isMorabaraba) pressedAction?.let { animateAction(it, 1f) }
                 pressedAction = null
                 resumePressed = false
                 invalidate()

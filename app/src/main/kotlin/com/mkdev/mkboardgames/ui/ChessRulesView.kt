@@ -32,9 +32,16 @@ class ChessRulesView(
     private val isDraughts = isDraughtsStyledLabel(gameLabel)
     private val isOthello = isOthelloStyledLabel(gameLabel)
     private val isMorabaraba = isMorabarabaStyledLabel(gameLabel)
+    private val isFoxAndGeese =
+        gameLabel.replace(" ", "").replace("·", "").equals("FOX&GEESE", ignoreCase = true)
+    private val isGo = gameLabel.replace(" ", "").equals("GO", ignoreCase = true)
+    private val isShogi = gameLabel.replace(" ", "").equals("SHOGI", ignoreCase = true)
+    private val isXiangqi = gameLabel.replace(" ", "").equals("XIANGQI", ignoreCase = true)
+    private val isChessFamily =
+        isChess || isDraughts || isOthello || isFoxAndGeese || isGo || isShogi || isXiangqi
 
     init {
-        if (isChess || isDraughts || isOthello || isMorabaraba) {
+        if (isChessFamily || isMorabaraba) {
             configureStyledRules()
         } else {
             configureClassicRules()
@@ -167,9 +174,39 @@ private class ChessMancalaRulesView(
     var onBack: (() -> Unit)? = null
 
     private val density = resources.displayMetrics.density
+    private val isChess = isChessStyledLabel(gameLabel)
     private val isDraughts = isDraughtsStyledLabel(gameLabel)
     private val isOthello = isOthelloStyledLabel(gameLabel)
     private val isMorabaraba = isMorabarabaStyledLabel(gameLabel)
+    private val isFoxAndGeese =
+        gameLabel.replace(" ", "").replace("·", "").equals("FOX&GEESE", ignoreCase = true)
+    private val isGo = gameLabel.replace(" ", "").equals("GO", ignoreCase = true)
+    private val isShogi = gameLabel.replace(" ", "").equals("SHOGI", ignoreCase = true)
+    private val isXiangqi = gameLabel.replace(" ", "").equals("XIANGQI", ignoreCase = true)
+    private val isChessFamily =
+        isChess || isDraughts || isOthello || isFoxAndGeese || isGo || isShogi || isXiangqi
+    private val gameIconBitmap = run {
+        val assetName = when {
+            isChess -> "chess_home_icon.png"
+            isDraughts && gameLabel.replace(" ", "").equals("INTLDRAUGHTS", ignoreCase = true) ->
+                "international_draughts_home_icon.png"
+            isDraughts -> "draughts_home_icon.png"
+            isOthello -> "othello_home_icon.png"
+            isFoxAndGeese -> "fox_and_geese_home_icon.png"
+            isGo -> "go_home_icon.png"
+            isShogi -> "shogi_home_icon.png"
+            isXiangqi -> "xiangqi_home_icon.png"
+            else -> null
+        }
+        assetName?.let {
+            try {
+                context.assets.open(it).use { stream -> BitmapFactory.decodeStream(stream) }
+            } catch (_: Throwable) {
+                null
+            }
+        }
+    }
+    private val chessFamilyBackdrop = ChessFamilyBackdrop(density)
     private val backRect = RectF()
     private val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val headingPaint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -200,7 +237,7 @@ private class ChessMancalaRulesView(
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
-        if (isDraughts || isOthello || isMorabaraba) atmosphereAnimator.start()
+        if (isChessFamily || isMorabaraba) atmosphereAnimator.start()
     }
 
     override fun onDetachedFromWindow() {
@@ -211,16 +248,7 @@ private class ChessMancalaRulesView(
     override fun onDraw(canvas: Canvas) {
         val width = width.toFloat()
         val height = height.toFloat()
-        if (isOthello) {
-            drawOthelloAtmosphere(
-                canvas,
-                width,
-                height,
-                density,
-                rounded = false,
-                phase = atmospherePhase,
-            )
-        } else if (isMorabaraba) {
+        if (isMorabaraba) {
             drawMorabarabaAtmosphere(
                 canvas,
                 width,
@@ -229,14 +257,13 @@ private class ChessMancalaRulesView(
                 rounded = false,
                 phase = atmospherePhase,
             )
-        } else if (isDraughts) {
-            drawDraughtsAtmosphere(
+        } else if (isChessFamily) {
+            chessFamilyBackdrop.draw(
                 canvas,
                 width,
                 height,
-                density,
+                animationPhase = atmospherePhase,
                 rounded = false,
-                phase = atmospherePhase,
             )
         } else {
             drawChessAtmosphere(canvas, width, height, density, rounded = false)
@@ -276,7 +303,22 @@ private class ChessMancalaRulesView(
         } else {
             "CHESS"
         }
-        if (!isMorabaraba) {
+        if (isChessFamily) {
+            gameIconBitmap?.let { bitmap ->
+                val size = minOf(panel.width() * 0.16f, dp(58f))
+                canvas.drawBitmap(
+                    bitmap,
+                    null,
+                    RectF(
+                        panel.centerX() - size / 2f,
+                        panel.top + dp(8f),
+                        panel.centerX() + size / 2f,
+                        panel.top + dp(8f) + size,
+                    ),
+                    Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG),
+                )
+            }
+        } else if (!isMorabaraba) {
             canvas.drawText(displayLabel, panel.centerX(), panel.top + dp(52f), titlePaint)
         }
         titlePaint.color = Color.parseColor("#FFE09C")
