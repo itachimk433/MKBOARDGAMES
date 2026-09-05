@@ -294,15 +294,12 @@ class LudoActivity : AppCompatActivity() {
     private fun finishToHome() {
         if (exitPosted) return
         exitPosted = true
-        if (::overlay.isInitialized) overlay.visibility = View.INVISIBLE
-        window.decorView.setBackgroundColor(Color.BLACK)
-        window.decorView.postOnAnimation {
-            window.decorView.postOnAnimation {
-                super.finish()
-                @Suppress("DEPRECATION")
-                overridePendingTransition(0, 0)
-            }
-        }
+        if (::overlay.isInitialized) overlay.visibility = View.GONE
+        window.decorView.postDelayed({
+            super.finish()
+            @Suppress("DEPRECATION")
+            overridePendingTransition(0, 0)
+        }, 16L)
     }
 
     private val motionListener = object : SensorEventListener {

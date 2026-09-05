@@ -160,15 +160,12 @@ class MorabarabaActivity : AppCompatActivity() {
     private fun finishToHome() {
         if (exitPosted) return
         exitPosted = true
-        if (::gameRoot.isInitialized) gameRoot.visibility = View.INVISIBLE
-        window.decorView.setBackgroundColor(Color.BLACK)
-        window.decorView.postOnAnimation {
-            window.decorView.postOnAnimation {
-                super.finish()
-                @Suppress("DEPRECATION")
-                overridePendingTransition(0, 0)
-            }
-        }
+        if (::gameRoot.isInitialized) gameRoot.visibility = View.GONE
+        window.decorView.postDelayed({
+            super.finish()
+            @Suppress("DEPRECATION")
+            overridePendingTransition(0, 0)
+        }, 16L)
     }
 
     @Deprecated("Deprecated in Java")
