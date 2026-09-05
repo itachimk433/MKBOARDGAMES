@@ -218,7 +218,7 @@ class MainActivity : AppCompatActivity() {
         homeBackgroundRow.setOnClickListener {
             homeBackground = !homeBackground
             SettingsManager.setHomeBackgroundEnabled(ctx, homeBackground)
-            menu.isHomeBackgroundEnabled = homeBackground
+            menuView?.isHomeBackgroundEnabled = homeBackground
             homeBackgroundVal.text = if (homeBackground) "On" else "Off"
         }
         root.addView(homeBackgroundRow)
