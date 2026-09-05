@@ -61,6 +61,25 @@ object StyledDialogs {
         return dialog
     }
 
+    fun showFullScreenView(
+        context: Context,
+        content: View,
+        onBack: (() -> Unit)? = null,
+    ) {
+        showOverlay(
+            context = context,
+            content = content,
+            fullScreen = true,
+            contentHeightDp = 0f,
+            cancelOnOutside = false,
+            onBack = onBack,
+        )
+    }
+
+    fun dismiss() {
+        removeOverlay()
+    }
+
     private fun showOverlay(
         context: Context,
         content: View,

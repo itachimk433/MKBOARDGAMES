@@ -13,6 +13,7 @@ import com.mkdev.mkboardgames.games.morabaraba.MorabarabaRuleEngine
 import com.mkdev.mkboardgames.ui.AutoplayButtonView
 import com.mkdev.mkboardgames.ui.CaptureStripView
 import com.mkdev.mkboardgames.ui.ChessChoiceView
+import com.mkdev.mkboardgames.ui.ChessMenuView
 import com.mkdev.mkboardgames.ui.BoardStyleSwitchView
 import com.mkdev.mkboardgames.ui.MorabaraBoardView
 import com.mkdev.mkboardgames.ui.MorabarabaBoardStyle
@@ -201,21 +202,29 @@ class MorabarabaActivity : AppCompatActivity() {
     // ─── Game flow ────────────────────────────────────────────────────────────
 
     private fun showModeDialog() {
-        val paused = PausedMatchStore.has(this, "MORABARABA")
-        val choices = mutableListOf<ChessChoiceView.Choice>()
-        val actions = mutableListOf<() -> Unit>()
-        if (paused) {
-            choices += ChessChoiceView.Choice("Resume Match", "Continue where you left off", "Ⅱ", Color.parseColor("#E3B86A"))
-            actions += { resumePausedMatch() }
+        val menuView = ChessMenuView(
+            this,
+            PausedMatchStore.has(this, "MORABARABA"),
+            gameLabel = "M O R A B A R A B A",
+        )
+        menuView.onVsAi = {
+            StyledDialogs.dismiss()
+            showVariantDialog(isVsAI = true)
         }
-        choices += ChessChoiceView.Choice("vs AI", "Play against the computer", "", Color.parseColor("#8EC7B9"))
-        actions += { showVariantDialog(isVsAI = true) }
-        choices += ChessChoiceView.Choice("2 Players", "Share the board locally", "", Color.parseColor("#A9B6E8"))
-        actions += { showVariantDialog(isVsAI = false) }
-        choices += ChessChoiceView.Choice("How to Play", "Review the essentials", "?", Color.parseColor("#E58A7A"))
-        actions += { showTutorial(showModeAfter = !matchStarted) }
-        showChoiceDialog("Choose your match", "Choose how to begin.", choices, actions, 570f) {
-            if (!matchStarted) finish()
+        menuView.onTwoPlayers = {
+            StyledDialogs.dismiss()
+            showVariantDialog(isVsAI = false)
+        }
+        menuView.onHowToPlay = {
+            StyledDialogs.dismiss()
+            showTutorial(showModeAfter = !matchStarted)
+        }
+        menuView.onResumeMatch = {
+            StyledDialogs.dismiss()
+            resumePausedMatch()
+        }
+        StyledDialogs.showFullScreenView(this, menuView) {
+            if (!matchStarted) finish() else showBoardAfterDialog()
         }
     }
 
