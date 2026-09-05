@@ -7,7 +7,11 @@ import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
 import android.view.animation.DecelerateInterpolator
+import android.view.animation.LinearInterpolator
 import com.mkdev.mkboardgames.SoundPlayer
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
 import kotlin.math.min
 
 /**
@@ -107,6 +111,47 @@ class ChessMenuView(
     }
     private val chessBackdropPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val chessHeroPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+    private val chessWavePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val chessWaveEdgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 1.2f * unit
+    }
+    private val floatingPiecePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textAlign = Paint.Align.CENTER
+        typeface = Typeface.create("serif", Typeface.BOLD)
+    }
+
+    private data class FloatingPiece(
+        val symbol: String,
+        val x: Float,
+        val y: Float,
+        val size: Float,
+        val speed: Float,
+        val drift: Float,
+        val phase: Float,
+        val alpha: Int,
+        val tint: Int,
+    )
+
+    private val floatingPieces = listOf(
+        FloatingPiece("♞", 0.08f, 0.20f, 30f, 0.62f, 0.045f, 0.5f, 86, Color.rgb(174, 220, 255)),
+        FloatingPiece("♟", 0.86f, 0.16f, 24f, -0.38f, 0.055f, 2.3f, 72, Color.rgb(149, 193, 255)),
+        FloatingPiece("♜", 0.94f, 0.48f, 28f, 0.28f, 0.06f, 4.4f, 68, Color.rgb(165, 238, 222)),
+        FloatingPiece("♗", 0.07f, 0.69f, 25f, -0.24f, 0.05f, 1.4f, 64, Color.rgb(196, 173, 255)),
+        FloatingPiece("♛", 0.83f, 0.78f, 32f, 0.18f, 0.065f, 5.1f, 60, Color.rgb(225, 190, 255)),
+        FloatingPiece("♙", 0.25f, 0.92f, 22f, -0.16f, 0.045f, 3.2f, 56, Color.rgb(133, 222, 223)),
+    )
+
+    private var backgroundPhase = 0f
+    private val backgroundAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
+        duration = 42_000L
+        repeatCount = ValueAnimator.INFINITE
+        interpolator = LinearInterpolator()
+        addUpdateListener {
+            backgroundPhase = it.animatedValue as Float
+            invalidate()
+        }
+    }
 
     private lateinit var actions: List<MenuAction>
     private var pressedAction: MenuAction? = null
@@ -121,6 +166,18 @@ class ChessMenuView(
     init {
         isClickable = true
         setLayerType(View.LAYER_TYPE_SOFTWARE, null)
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        if (isChess) {
+            backgroundAnimator.start()
+        }
+    }
+
+    override fun onDetachedFromWindow() {
+        backgroundAnimator.cancel()
+        super.onDetachedFromWindow()
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
@@ -237,61 +294,202 @@ class ChessMenuView(
     }
 
     private fun drawChessBackdrop(canvas: Canvas, width: Float, height: Float) {
+        val phase = backgroundPhase * (2f * PI.toFloat())
+        val paletteSlot = backgroundPhase * chessPalettes.size
+        val paletteIndex = paletteSlot.toInt().coerceIn(0, chessPalettes.lastIndex)
+        val paletteProgress = smoothStep(paletteSlot - paletteIndex)
+        val paletteStart = chessPalettes[paletteIndex]
+        val paletteEnd = chessPalettes[(paletteIndex + 1) % chessPalettes.size]
+        val palette = IntArray(paletteStart.size) { index ->
+            blendColor(paletteStart[index], paletteEnd[index], paletteProgress)
+        }
+
         chessBackdropPaint.shader = LinearGradient(
             0f,
             0f,
             width * 0.9f,
             height,
-            intArrayOf(
-                Color.parseColor("#112C68"),
-                Color.parseColor("#173C78"),
-                Color.parseColor("#102951"),
-                Color.parseColor("#061321"),
-            ),
+            palette,
             floatArrayOf(0f, 0.32f, 0.68f, 1f),
             Shader.TileMode.CLAMP,
         )
         canvas.drawRect(0f, 0f, width, height, chessBackdropPaint)
         chessBackdropPaint.shader = null
 
-        drawChessGlow(canvas, width * 0.12f, height * 0.18f, min(width, height) * 0.58f, Color.rgb(53, 137, 220))
-        drawChessGlow(canvas, width * 0.9f, height * 0.64f, min(width, height) * 0.5f, Color.rgb(22, 194, 190))
-        drawChessGlow(canvas, width * 0.46f, height * 1.02f, min(width, height) * 0.68f, Color.rgb(71, 37, 134))
+        drawChessWaves(canvas, width, height, phase)
 
-        val horizon = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            shader = LinearGradient(
-                0f,
-                height * 0.48f,
-                width,
-                height * 0.58f,
-                intArrayOf(
-                    Color.argb(0, 104, 194, 255),
-                    Color.argb(54, 77, 158, 232),
-                    Color.argb(0, 104, 194, 255),
-                ),
-                floatArrayOf(0f, 0.5f, 1f),
-                Shader.TileMode.CLAMP,
-            )
-        }
-        canvas.drawRect(0f, height * 0.4f, width, height * 0.65f, horizon)
+        drawChessGlow(
+            canvas,
+            width * (0.12f + 0.055f * sin(phase * 0.72f).toFloat()),
+            height * (0.18f + 0.045f * cos(phase * 0.54f).toFloat()),
+            min(width, height) * 0.58f,
+            blendColor(Color.rgb(53, 137, 220), Color.rgb(115, 89, 226), (sin(phase * 0.25f) + 1f) / 2f),
+        )
+        drawChessGlow(
+            canvas,
+            width * (0.9f + 0.05f * cos(phase * 0.48f).toFloat()),
+            height * (0.64f + 0.06f * sin(phase * 0.66f).toFloat()),
+            min(width, height) * 0.5f,
+            blendColor(Color.rgb(22, 194, 190), Color.rgb(74, 140, 235), (sin(phase * 0.32f + 1.4f) + 1f) / 2f),
+        )
+        drawChessGlow(
+            canvas,
+            width * (0.46f + 0.08f * sin(phase * 0.4f + 2f).toFloat()),
+            height * (1.02f + 0.045f * cos(phase * 0.58f).toFloat()),
+            min(width, height) * 0.68f,
+            blendColor(Color.rgb(71, 37, 134), Color.rgb(19, 120, 143), (sin(phase * 0.28f + 2f) + 1f) / 2f),
+        )
 
         val stars = Paint(Paint.ANTI_ALIAS_FLAG)
         for (index in 0 until 62) {
-            val x = ((index * 83 + 37) % 1000) / 1000f * width
-            val y = ((index * 47 + 23) % 920) / 1000f * height
+            val baseX = ((index * 83 + 37) % 1000) / 1000f * width
+            val baseY = ((index * 47 + 23) % 920) / 1000f * height
+            val x = baseX + sin(phase * (0.18f + (index % 3) * 0.07f) + index).toFloat() * 7f * unit
+            val y = baseY + cos(phase * (0.16f + (index % 4) * 0.05f) + index * 0.7f).toFloat() * 5f * unit
             val radius = (0.55f + (index % 4) * 0.45f) * unit
-            stars.color = Color.argb(70 + (index % 5) * 28, 220, 241, 255)
+            val twinkle = ((sin(phase * (0.7f + (index % 4) * 0.12f) + index) + 1f) * 0.5f).toFloat()
+            stars.color = Color.argb(58 + ((index % 5) * 22 * twinkle).toInt(), 220, 241, 255)
             canvas.drawCircle(x, y, radius, stars)
             if (index % 11 == 0) {
-                stars.color = Color.argb(130, 178, 224, 255)
-                canvas.drawCircle(x, y, radius * 2.4f, stars)
+                stars.color = Color.argb(100 + (30f * twinkle).toInt(), 178, 224, 255)
+                canvas.drawCircle(x, y, radius * (2.1f + 0.5f * twinkle), stars)
             }
         }
         stars.color = Color.argb(34, 88, 207, 220)
-        canvas.drawCircle(width * 0.08f, height * 0.72f, min(width, height) * 0.18f, stars)
+        canvas.drawCircle(
+            width * (0.08f + 0.025f * sin(phase * 0.4f).toFloat()),
+            height * 0.72f,
+            min(width, height) * 0.18f,
+            stars,
+        )
         stars.color = Color.argb(25, 150, 109, 226)
-        canvas.drawCircle(width * 0.88f, height * 0.3f, min(width, height) * 0.2f, stars)
+        canvas.drawCircle(
+            width * 0.88f,
+            height * (0.3f + 0.03f * cos(phase * 0.52f).toFloat()),
+            min(width, height) * 0.2f,
+            stars,
+        )
+        drawFloatingChessPieces(canvas, width, height, phase)
     }
+
+    private fun drawChessWaves(canvas: Canvas, width: Float, height: Float, phase: Float) {
+        val bands = arrayOf(
+            Triple(0.28f, 0.045f, Color.rgb(64, 167, 218)),
+            Triple(0.49f, 0.06f, Color.rgb(74, 117, 225)),
+            Triple(0.72f, 0.052f, Color.rgb(126, 83, 213)),
+        )
+        val margin = width * 0.14f
+        val segmentCount = 28
+
+        bands.forEachIndexed { bandIndex, (heightRatio, amplitudeRatio, color) ->
+            val path = Path()
+            val bandPhase = phase * (0.46f + bandIndex * 0.11f) + bandIndex * 1.8f
+            val baseY = height * heightRatio
+            val amplitude = height * amplitudeRatio
+            path.moveTo(-margin, height)
+            path.lineTo(-margin, baseY)
+            for (step in 0..segmentCount) {
+                val progress = step / segmentCount.toFloat()
+                val x = -margin + (width + margin * 2f) * progress
+                val wave = sin(progress * (2.15f * PI.toFloat()) + bandPhase).toFloat() * amplitude
+                val secondary = cos(progress * (4.5f * PI.toFloat()) - bandPhase * 0.72f).toFloat() * amplitude * 0.28f
+                path.lineTo(x, baseY + wave + secondary)
+            }
+            path.lineTo(width + margin, height)
+            path.close()
+
+            chessWavePaint.color = Color.argb(18 + bandIndex * 5, Color.red(color), Color.green(color), Color.blue(color))
+            canvas.drawPath(path, chessWavePaint)
+
+            val edge = Path()
+            edge.moveTo(-margin, baseY)
+            for (step in 0..segmentCount) {
+                val progress = step / segmentCount.toFloat()
+                val x = -margin + (width + margin * 2f) * progress
+                val wave = sin(progress * (2.15f * PI.toFloat()) + bandPhase).toFloat() * amplitude
+                val secondary = cos(progress * (4.5f * PI.toFloat()) - bandPhase * 0.72f).toFloat() * amplitude * 0.28f
+                edge.lineTo(x, baseY + wave + secondary)
+            }
+            chessWaveEdgePaint.color = Color.argb(34 + bandIndex * 8, Color.red(color), Color.green(color), Color.blue(color))
+            canvas.drawPath(edge, chessWaveEdgePaint)
+        }
+
+        chessWavePaint.shader = LinearGradient(
+            0f,
+            height * 0.42f,
+            width,
+            height * 0.58f,
+            intArrayOf(
+                Color.argb(0, 118, 213, 255),
+                Color.argb(42, 96, 168, 239),
+                Color.argb(0, 166, 119, 238),
+            ),
+            floatArrayOf(0f, 0.5f, 1f),
+            Shader.TileMode.CLAMP,
+        )
+        canvas.drawRect(0f, height * 0.37f, width, height * 0.64f, chessWavePaint)
+        chessWavePaint.shader = null
+    }
+
+    private fun drawFloatingChessPieces(canvas: Canvas, width: Float, height: Float, phase: Float) {
+        floatingPieces.forEachIndexed { index, piece ->
+            val travel = (piece.x + piece.speed * backgroundPhase).let {
+                ((it % 1f) + 1f) % 1f
+            }
+            val x = width * travel + sin(phase * (0.22f + index * 0.025f) + piece.phase).toFloat() * width * piece.drift
+            val y = height * piece.y + cos(phase * (0.19f + index * 0.018f) + piece.phase).toFloat() * height * 0.035f
+            val rotation = sin(phase * 0.25f + piece.phase).toFloat() * (5f + index)
+            val size = piece.size * unit * (0.94f + 0.08f * sin(phase * 0.2f + piece.phase).toFloat())
+
+            floatingPiecePaint.color = Color.argb(piece.alpha, Color.red(piece.tint), Color.green(piece.tint), Color.blue(piece.tint))
+            floatingPiecePaint.textSize = size
+            canvas.save()
+            canvas.rotate(rotation, x, y)
+            canvas.drawText(piece.symbol, x, y, floatingPiecePaint)
+            canvas.restore()
+        }
+    }
+
+    private fun smoothStep(value: Float): Float {
+        val clamped = value.coerceIn(0f, 1f)
+        return clamped * clamped * (3f - 2f * clamped)
+    }
+
+    private fun blendColor(start: Int, end: Int, fraction: Float): Int {
+        val amount = fraction.coerceIn(0f, 1f)
+        return Color.rgb(
+            (Color.red(start) + (Color.red(end) - Color.red(start)) * amount).toInt(),
+            (Color.green(start) + (Color.green(end) - Color.green(start)) * amount).toInt(),
+            (Color.blue(start) + (Color.blue(end) - Color.blue(start)) * amount).toInt(),
+        )
+    }
+
+    private val chessPalettes = arrayOf(
+        intArrayOf(
+            Color.parseColor("#112C68"),
+            Color.parseColor("#173C78"),
+            Color.parseColor("#102951"),
+            Color.parseColor("#061321"),
+        ),
+        intArrayOf(
+            Color.parseColor("#182D68"),
+            Color.parseColor("#303A7C"),
+            Color.parseColor("#0C4C62"),
+            Color.parseColor("#081A2F"),
+        ),
+        intArrayOf(
+            Color.parseColor("#142F52"),
+            Color.parseColor("#145064"),
+            Color.parseColor("#113D50"),
+            Color.parseColor("#06182A"),
+        ),
+        intArrayOf(
+            Color.parseColor("#291F62"),
+            Color.parseColor("#432E78"),
+            Color.parseColor("#143F63"),
+            Color.parseColor("#07162B"),
+        ),
+    )
 
     private fun drawChessGlow(canvas: Canvas, x: Float, y: Float, radius: Float, color: Int) {
         chessBackdropPaint.shader = RadialGradient(
