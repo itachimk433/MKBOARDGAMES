@@ -114,10 +114,12 @@ class MenuView(context: Context) : View(context) {
     private val cardTitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE; textAlign = Paint.Align.CENTER; isFakeBoldText = true
         textSize = 14f * sp.coerceAtMost(3f)
+        setShadowLayer(2f * dp, 0f, 1f * dp, Color.argb(230, 0, 0, 0))
     }
     private val cardDescPaint  = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#BDBDBD"); textAlign = Paint.Align.CENTER
         textSize = 10f * sp.coerceAtMost(3f)
+        setShadowLayer(1.5f * dp, 0f, 1f * dp, Color.argb(210, 0, 0, 0))
     }
     private val copyrightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#555555"); textAlign = Paint.Align.CENTER
@@ -138,6 +140,42 @@ class MenuView(context: Context) : View(context) {
     private val miniLightPaint = Paint().apply { color = Color.parseColor("#F0D9B5") }
     private val miniDarkPaint  = Paint().apply { color = Color.parseColor("#B58863") }
     private val bitmapPaint    = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+    private val cardWoodPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val cardWoodPressedPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val cardWoodInnerPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val cardWoodInnerPressedPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val cardWoodOuterHighlightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 1.2f * dp
+        color = Color.argb(220, 173, 113, 70)
+    }
+    private val cardWoodOuterShadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 1.8f * dp
+        color = Color.argb(230, 47, 19, 10)
+    }
+    private val cardWoodInnerHighlightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 1f * dp
+        color = Color.argb(210, 186, 124, 75)
+    }
+    private val cardWoodInnerShadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 1.6f * dp
+        color = Color.argb(220, 41, 16, 9)
+    }
+    private val cardStudPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val cardStudHighlightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(220, 232, 178, 112)
+    }
+    private val cardPreviewBackingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(220, 39, 18, 10)
+    }
+    private val cardPreviewFramePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 1.1f * dp
+        color = Color.argb(220, 202, 139, 84)
+    }
     private val homeBackgroundPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
         alpha = 190
     }
@@ -338,25 +376,33 @@ class MenuView(context: Context) : View(context) {
         val scale = cardScales[card.type] ?: 1f
         val r = card.rect; val pressed = pressedCard == card.type
         if (scale != 1f) { canvas.save(); canvas.scale(scale, scale, r.centerX(), r.centerY()) }
-        val shadowP = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(50, 0, 0, 0)
-            maskFilter = BlurMaskFilter(10f, BlurMaskFilter.Blur.NORMAL)
+        if (isLightMode) {
+            val shadowP = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.argb(50, 0, 0, 0)
+                maskFilter = BlurMaskFilter(10f, BlurMaskFilter.Blur.NORMAL)
+            }
+            val cardRadius = 18f * dp
+            canvas.drawRoundRect(
+                RectF(r.left + 3f * dp, r.top + 4f * dp, r.right + 3f * dp, r.bottom + 4f * dp),
+                cardRadius, cardRadius, shadowP
+            )
+            canvas.drawRoundRect(r, cardRadius, cardRadius, if (pressed) cardHiPaint else cardPaint)
+            canvas.drawRoundRect(
+                RectF(r.left + 0.5f * dp, r.top + 0.5f * dp, r.right - 0.5f * dp, r.bottom - 0.5f * dp),
+                cardRadius, cardRadius, cardBorderPaint
+            )
+        } else {
+            drawWoodCardShell(canvas, r, pressed)
         }
-        val cardRadius = 18f * dp
-        canvas.drawRoundRect(
-            RectF(r.left + 3f * dp, r.top + 4f * dp, r.right + 3f * dp, r.bottom + 4f * dp),
-            cardRadius, cardRadius, shadowP
-        )
-        canvas.drawRoundRect(r, cardRadius, cardRadius, if (pressed) cardHiPaint else cardPaint)
-        canvas.drawRoundRect(
-            RectF(r.left + 0.5f * dp, r.top + 0.5f * dp, r.right - 0.5f * dp, r.bottom - 0.5f * dp),
-            cardRadius, cardRadius, cardBorderPaint
-        )
 
         val previewSz   = minOf(r.height() * 0.46f, r.width() * 0.64f)
         val previewLeft = r.centerX() - previewSz / 2f
         val previewTop  = r.top + 10f * dp
-        drawMiniBoard(canvas, previewLeft, previewTop, previewSz, card.type)
+        if (isLightMode) {
+            drawMiniBoard(canvas, previewLeft, previewTop, previewSz, card.type)
+        } else {
+            drawCardPreview(canvas, previewLeft, previewTop, previewSz, card.type)
+        }
 
         val (title, desc) = when (card.type) {
             GameType.CHESS       -> "Chess"        to "vs AI  •  2 Players"
@@ -392,6 +438,132 @@ class MenuView(context: Context) : View(context) {
         val descY = titleStartY + titleLines.size * (cardTitlePaint.textSize + 1f * dp) + 2f * dp
         canvas.drawText(desc, r.centerX(), descY, cardDescPaint)
         if (scale != 1f) canvas.restore()
+    }
+
+    private fun drawWoodCardShell(canvas: Canvas, r: RectF, pressed: Boolean) {
+        val radius = 11f * dp
+        val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(155, 0, 0, 0)
+            maskFilter = BlurMaskFilter(5f * dp, BlurMaskFilter.Blur.NORMAL)
+        }
+        canvas.drawRoundRect(
+            RectF(r.left + 2.5f * dp, r.top + 5f * dp, r.right + 2.5f * dp, r.bottom + 5f * dp),
+            radius, radius, shadowPaint
+        )
+
+        val outerPaint = if (pressed) cardWoodPressedPaint else cardWoodPaint
+        outerPaint.shader = LinearGradient(
+            0f,
+            r.top,
+            0f,
+            r.bottom,
+            if (pressed) {
+                intArrayOf(
+                    Color.rgb(119, 70, 39),
+                    Color.rgb(76, 37, 20),
+                    Color.rgb(105, 57, 30),
+                )
+            } else {
+                intArrayOf(
+                    Color.rgb(139, 83, 46),
+                    Color.rgb(77, 37, 20),
+                    Color.rgb(119, 64, 34),
+                )
+            },
+            null,
+            Shader.TileMode.CLAMP,
+        )
+        canvas.drawRoundRect(r, radius, radius, outerPaint)
+        canvas.drawRoundRect(
+            RectF(r.left + 0.8f * dp, r.top + 0.8f * dp, r.right - 0.8f * dp, r.bottom - 0.8f * dp),
+            radius - 0.5f * dp,
+            radius - 0.5f * dp,
+            cardWoodOuterHighlightPaint,
+        )
+        canvas.drawRoundRect(
+            RectF(r.left + 2f * dp, r.top + 2f * dp, r.right - 2f * dp, r.bottom - 2f * dp),
+            radius - 1f * dp,
+            radius - 1f * dp,
+            cardWoodOuterShadowPaint,
+        )
+
+        val inner = RectF(
+            r.left + 4.5f * dp,
+            r.top + 4.5f * dp,
+            r.right - 4.5f * dp,
+            r.bottom - 4.5f * dp,
+        )
+        val innerPaint = if (pressed) cardWoodInnerPressedPaint else cardWoodInnerPaint
+        innerPaint.shader = LinearGradient(
+            0f,
+            inner.top,
+            inner.right,
+            inner.bottom,
+            intArrayOf(Color.rgb(67, 30, 16), Color.rgb(42, 18, 10), Color.rgb(74, 35, 18)),
+            null,
+            Shader.TileMode.CLAMP,
+        )
+        val innerRadius = 7f * dp
+        canvas.drawRoundRect(inner, innerRadius, innerRadius, innerPaint)
+        canvas.drawRoundRect(
+            RectF(inner.left + 1f * dp, inner.top + 1f * dp, inner.right - 1f * dp, inner.bottom - 1f * dp),
+            innerRadius - 0.5f * dp,
+            innerRadius - 0.5f * dp,
+            cardWoodInnerHighlightPaint,
+        )
+        canvas.drawRoundRect(
+            RectF(inner.left + 2.5f * dp, inner.top + 2.5f * dp, inner.right - 2.5f * dp, inner.bottom - 2.5f * dp),
+            innerRadius - 1.5f * dp,
+            innerRadius - 1.5f * dp,
+            cardWoodInnerShadowPaint,
+        )
+
+        val studRadius = 1.8f * dp
+        val studInset = 6.5f * dp
+        cardStudPaint.color = Color.rgb(111, 62, 31)
+        listOf(
+            r.left + studInset to r.top + studInset,
+            r.right - studInset to r.top + studInset,
+            r.left + studInset to r.bottom - studInset,
+            r.right - studInset to r.bottom - studInset,
+        ).forEach { (x, y) ->
+            canvas.drawCircle(x, y, studRadius, cardStudPaint)
+            canvas.drawCircle(
+                x - studRadius * 0.35f,
+                y - studRadius * 0.35f,
+                studRadius * 0.35f,
+                cardStudHighlightPaint,
+            )
+        }
+    }
+
+    private fun drawCardPreview(
+        canvas: Canvas,
+        left: Float,
+        top: Float,
+        size: Float,
+        type: GameType,
+    ) {
+        val framePad = 3.5f * dp
+        val frame = RectF(left - framePad, top - framePad, left + size + framePad, top + size + framePad)
+        val frameRadius = 5.5f * dp
+        canvas.drawRoundRect(
+            RectF(frame.left + 1.5f * dp, frame.top + 2.5f * dp, frame.right + 1.5f * dp, frame.bottom + 2.5f * dp),
+            frameRadius,
+            frameRadius,
+            cardWoodOuterShadowPaint,
+        )
+        canvas.drawRoundRect(frame, frameRadius, frameRadius, cardPreviewBackingPaint)
+
+        val previewRect = RectF(left, top, left + size, top + size)
+        val clipPath = Path().apply {
+            addRoundRect(previewRect, 3f * dp, 3f * dp, Path.Direction.CW)
+        }
+        canvas.save()
+        canvas.clipPath(clipPath)
+        drawMiniBoard(canvas, left, top, size, type)
+        canvas.restore()
+        canvas.drawRoundRect(frame, frameRadius, frameRadius, cardPreviewFramePaint)
     }
 
     private fun drawMiniBoard(canvas: Canvas, left: Float, top: Float, size: Float, type: GameType) {
