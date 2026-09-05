@@ -88,43 +88,122 @@ class MainActivity : AppCompatActivity() {
         val diffs  = SettingsManager.chessDifficultyLabels()
         val themes = SettingsManager.THEMES.map { it.name }.toTypedArray()
 
-        // Wrapper: sticky title on top, scrollable rows below
+        // A board-room surface: deep teal like Chess/Draughts, with Mancala's
+        // warm wood and gold controls layered over it.
         val wrapper = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor("#1A1A1A"))
+            background = android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                intArrayOf(
+                    Color.parseColor("#102C32"),
+                    Color.parseColor("#0B1D25"),
+                    Color.parseColor("#061321"),
+                ),
+            )
+            setLayerType(View.LAYER_TYPE_SOFTWARE, null)
         }
-        wrapper.addView(TextView(ctx).apply {
-            text = "⚙  Settings"
-            setTextColor(Color.WHITE)
+        val header = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            background = android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                intArrayOf(
+                    Color.parseColor("#4A1714"),
+                    Color.parseColor("#6A2D2B"),
+                    Color.parseColor("#321718"),
+                ),
+            ).apply {
+                cornerRadius = 16f * dp
+                setStroke((1.2f * dp).toInt(), Color.parseColor("#C8894C"))
+            }
+            elevation = 6f * dp
+            setPadding((18 * dp).toInt(), (15 * dp).toInt(), (18 * dp).toInt(), (13 * dp).toInt())
+        }
+        header.addView(TextView(ctx).apply {
+            text = "⚙  SETTINGS"
+            setTextColor(Color.parseColor("#F7D99B"))
             setTypeface(typeface, Typeface.BOLD)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
-            setPadding((8*dp).toInt(), (14*dp).toInt(), (8*dp).toInt(), (4*dp).toInt())
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
+            letterSpacing = 0.08f
+            setShadowLayer(2f * dp, 0f, 1f * dp, Color.argb(180, 20, 4, 3))
+        })
+        header.addView(TextView(ctx).apply {
+            text = "Tune your board room"
+            setTextColor(Color.parseColor("#F5DCC0"))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+            setPadding(0, (4 * dp).toInt(), 0, 0)
+        })
+        wrapper.addView(header, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+        ).also {
+            it.setMargins((10 * dp).toInt(), (10 * dp).toInt(), (10 * dp).toInt(), (8 * dp).toInt())
         })
         wrapper.addView(View(ctx).apply {
-            setBackgroundColor(Color.parseColor("#2A2A2A"))
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (1*dp).toInt())
+            background = android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
+                intArrayOf(
+                    Color.TRANSPARENT,
+                    Color.parseColor("#C8894C"),
+                    Color.TRANSPARENT,
+                ),
+            )
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                (1 * dp).toInt(),
+            ).also {
+                it.setMargins((18 * dp).toInt(), 0, (18 * dp).toInt(), (4 * dp).toInt())
+            }
         })
         val scroll = ScrollView(ctx)
         val root   = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding((8*dp).toInt(), 0, (8*dp).toInt(), (16*dp).toInt())
+            setPadding((12 * dp).toInt(), 0, (12 * dp).toInt(), (20 * dp).toInt())
         }
         scroll.addView(root)
         wrapper.addView(scroll)
 
         fun sectionHeader(text: String) = TextView(ctx).apply {
             this.text = text
-            setTextColor(Color.parseColor("#7FC8F8"))
+            setTextColor(Color.parseColor("#E3B86A"))
             setTypeface(typeface, Typeface.BOLD)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
-            setPadding((12*dp).toInt(), (12*dp).toInt(), (12*dp).toInt(), (6*dp).toInt())
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11.5f)
             letterSpacing = 0.12f
+            setShadowLayer(1.5f * dp, 0f, 1f * dp, Color.argb(180, 25, 9, 5))
+            background = android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
+                intArrayOf(
+                    Color.parseColor("#21454A"),
+                    Color.parseColor("#16353B"),
+                ),
+            ).apply {
+                cornerRadius = 10f * dp
+                setStroke((1f * dp).toInt(), Color.parseColor("#2C5960"))
+            }
+            elevation = 2f * dp
+            setPadding((14 * dp).toInt(), (10 * dp).toInt(), (14 * dp).toInt(), (9 * dp).toInt())
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).also {
+                it.setMargins((2 * dp).toInt(), (14 * dp).toInt(), (2 * dp).toInt(), (6 * dp).toInt())
+            }
         }
 
         fun divider() = View(ctx).apply {
-            setBackgroundColor(Color.parseColor("#2A2A2A"))
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (1*dp).toInt())
-                .also { it.setMargins((16*dp).toInt(), 0, (16*dp).toInt(), 0) }
+            background = android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
+                intArrayOf(
+                    Color.TRANSPARENT,
+                    Color.parseColor("#85502D"),
+                    Color.TRANSPARENT,
+                ),
+            )
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                (1 * dp).toInt(),
+            ).also {
+                it.setMargins((12 * dp).toInt(), (2 * dp).toInt(), (12 * dp).toInt(), (2 * dp).toInt())
+            }
         }
 
         fun settingRow(
@@ -134,18 +213,47 @@ class MainActivity : AppCompatActivity() {
             iconRes: Int? = null
         ): Pair<LinearLayout, TextView> {
             val valueView = TextView(ctx).apply {
-                text = value; setTextColor(Color.parseColor("#7FC8F8"))
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
-                textAlignment = View.TEXT_ALIGNMENT_TEXT_END
+                text = value
+                setTextColor(Color.parseColor("#4A1714"))
+                setTypeface(typeface, Typeface.BOLD)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+                gravity = Gravity.CENTER
+                minWidth = (54 * dp).toInt()
+                setPadding((10 * dp).toInt(), (5 * dp).toInt(), (10 * dp).toInt(), (5 * dp).toInt())
+                background = android.graphics.drawable.GradientDrawable(
+                    android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
+                    intArrayOf(
+                        Color.parseColor("#F7D99B"),
+                        Color.parseColor("#C8894C"),
+                    ),
+                ).apply {
+                    cornerRadius = 8f * dp
+                    setStroke((1f * dp).toInt(), Color.parseColor("#85502D"))
+                }
+                elevation = 2f * dp
             }
             val row = LinearLayout(ctx).apply {
                 orientation = LinearLayout.HORIZONTAL
-                background = android.graphics.drawable.GradientDrawable().apply {
-                    setColor(Color.parseColor("#222222")); cornerRadius = 12*dp
+                background = android.graphics.drawable.GradientDrawable(
+                    android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                    intArrayOf(
+                        Color.parseColor("#21454A"),
+                        Color.parseColor("#16353B"),
+                        Color.parseColor("#102C32"),
+                    ),
+                ).apply {
+                    cornerRadius = 12f * dp
+                    setStroke((1f * dp).toInt(), Color.parseColor("#2C5960"))
                 }
-                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
-                    .also { it.setMargins((4*dp).toInt(), (4*dp).toInt(), (4*dp).toInt(), (4*dp).toInt()) }
-                setPadding((12*dp).toInt(), (14*dp).toInt(), (16*dp).toInt(), (14*dp).toInt())
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                ).also {
+                    it.setMargins((2 * dp).toInt(), (3 * dp).toInt(), (2 * dp).toInt(), (3 * dp).toInt())
+                }
+                minimumHeight = (56 * dp).toInt()
+                setPadding((10 * dp).toInt(), (9 * dp).toInt(), (12 * dp).toInt(), (9 * dp).toInt())
+                elevation = 3f * dp
                 isClickable = true; isFocusable = true
                 setOnTouchListener { v, e ->
                     when (e.action) {
@@ -165,22 +273,44 @@ class MainActivity : AppCompatActivity() {
                     ImageView(ctx).apply {
                         setImageResource(iconRes)
                         imageTintList = android.content.res.ColorStateList.valueOf(
-                            Color.parseColor("#7FC8F8")
+                            Color.parseColor("#F7D99B")
                         )
                         contentDescription = "$label icon"
                         layoutParams = LinearLayout.LayoutParams(
-                            (24 * dp).toInt(),
-                            (24 * dp).toInt()
-                        ).also { it.marginEnd = (12 * dp).toInt() }
+                            (36 * dp).toInt(),
+                            (36 * dp).toInt(),
+                        ).also { it.marginEnd = (11 * dp).toInt() }
+                        background = android.graphics.drawable.GradientDrawable().apply {
+                            shape = android.graphics.drawable.GradientDrawable.OVAL
+                            setColor(Color.parseColor("#321718"))
+                            setStroke((1f * dp).toInt(), Color.parseColor("#C8894C"))
+                        }
+                        setPadding((7 * dp).toInt(), (7 * dp).toInt(), (7 * dp).toInt(), (7 * dp).toInt())
                     }
                 } else {
                     TextView(ctx).apply {
                         this.text = icon
-                        setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
-                        setPadding(0, 0, (12 * dp).toInt(), 0)
+                        setTextColor(Color.parseColor("#F7D99B"))
+                        setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
+                        gravity = Gravity.CENTER
+                        layoutParams = LinearLayout.LayoutParams(
+                            (36 * dp).toInt(),
+                            (36 * dp).toInt(),
+                        ).also { it.marginEnd = (11 * dp).toInt() }
+                        background = android.graphics.drawable.GradientDrawable().apply {
+                            shape = android.graphics.drawable.GradientDrawable.OVAL
+                            setColor(Color.parseColor("#321718"))
+                            setStroke((1f * dp).toInt(), Color.parseColor("#C8894C"))
+                        }
                     }
                 }
-                val labelView = TextView(ctx).apply { this.text = label; setTextColor(Color.parseColor("#EEEEEE")); setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f) }
+                val labelView = TextView(ctx).apply {
+                    this.text = label
+                    setTextColor(Color.parseColor("#FFF8E8"))
+                    setTypeface(typeface, Typeface.BOLD)
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+                    setShadowLayer(1.5f * dp, 0f, 1f * dp, Color.argb(160, 0, 0, 0))
+                }
                 leftGroup.addView(iconView); leftGroup.addView(labelView)
                 addView(leftGroup); addView(valueView)
             }
@@ -442,7 +572,7 @@ class MainActivity : AppCompatActivity() {
             }
             fun pTxt(t: String, bold: Boolean = false, accent: Boolean = false) = TextView(ctx).apply {
                 text = t
-                setTextColor(if (accent) Color.parseColor("#7FC8F8") else Color.parseColor("#CCCCCC"))
+                setTextColor(if (accent) Color.parseColor("#E3B86A") else Color.parseColor("#CCCCCC"))
                 setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12.5f)
                 if (bold) setTypeface(typeface, android.graphics.Typeface.BOLD)
                 setPadding(0, (4*dp).toInt(), 0, (4*dp).toInt())
@@ -459,7 +589,7 @@ class MainActivity : AppCompatActivity() {
             ppScroll.addView(ppContent)
             val ppWrapper = LinearLayout(ctx).apply {
                 orientation = LinearLayout.VERTICAL
-                setBackgroundColor(Color.parseColor("#1A1A1A"))
+                setBackgroundColor(Color.parseColor("#061321"))
             }
             ppWrapper.addView(ppScroll)
             AlertDialog.Builder(ctx, android.R.style.Theme_Material_Dialog_MinWidth)
@@ -470,7 +600,7 @@ class MainActivity : AppCompatActivity() {
                 }
                 .create()
                 .apply {
-                    window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.parseColor("#1A1A1A")))
+                    window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.parseColor("#061321")))
                     show()
                 }
         }
@@ -483,7 +613,7 @@ class MainActivity : AppCompatActivity() {
             }
             fun tTxt(t: String, bold: Boolean = false, accent: Boolean = false) = TextView(ctx).apply {
                 text = t
-                setTextColor(if (accent) Color.parseColor("#7FC8F8") else Color.parseColor("#CCCCCC"))
+                setTextColor(if (accent) Color.parseColor("#E3B86A") else Color.parseColor("#CCCCCC"))
                 setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12.5f)
                 if (bold) setTypeface(typeface, android.graphics.Typeface.BOLD)
                 setPadding(0, (4*dp).toInt(), 0, (4*dp).toInt())
@@ -502,7 +632,7 @@ class MainActivity : AppCompatActivity() {
             tosScroll.addView(tosContent)
             val tosWrapper = LinearLayout(ctx).apply {
                 orientation = LinearLayout.VERTICAL
-                setBackgroundColor(Color.parseColor("#1A1A1A"))
+                setBackgroundColor(Color.parseColor("#061321"))
             }
             tosWrapper.addView(tosScroll)
             AlertDialog.Builder(ctx, android.R.style.Theme_Material_Dialog_MinWidth)
@@ -513,7 +643,7 @@ class MainActivity : AppCompatActivity() {
                 }
                 .create()
                 .apply {
-                    window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.parseColor("#1A1A1A")))
+                    window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.parseColor("#061321")))
                     show()
                 }
         }
@@ -536,9 +666,19 @@ class MainActivity : AppCompatActivity() {
         val dialog = AlertDialog.Builder(ctx, android.R.style.Theme_Material_Dialog_MinWidth)
             .setView(wrapper).setPositiveButton("Done", null).create()
         dialog.window?.setBackgroundDrawable(
-            android.graphics.drawable.ColorDrawable(Color.parseColor("#1A1A1A")))
+            android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                intArrayOf(
+                    Color.parseColor("#102C32"),
+                    Color.parseColor("#061321"),
+                ),
+            ).apply {
+                cornerRadius = 18f * dp
+                setStroke((1.2f * dp).toInt(), Color.parseColor("#85502D"))
+            })
         dialog.setOnDismissListener { if (activeSettingsDialog === dialog) activeSettingsDialog = null }
         dialog.show()
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(Color.parseColor("#F7D99B"))
         activeSettingsDialog = dialog
     }
 
