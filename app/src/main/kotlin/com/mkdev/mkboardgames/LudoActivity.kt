@@ -384,10 +384,10 @@ class LudoActivity : AppCompatActivity() {
                     StyledDialogs.choice("Keep Playing", "Return to the board", "↩", "#A9B6E8"),
                 ), 420f, "L U D O", onCancel = { showBoardAfterDialog() }) { which, dialog ->
                     dialog.dismiss()
-                    if (which == 0) super.onBackPressed() else showBoardAfterDialog()
+                    if (which == 0) finish() else showBoardAfterDialog()
                 }
         } else {
-            super.onBackPressed()
+            finish()
         }
     }
 

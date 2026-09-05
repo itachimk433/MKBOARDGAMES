@@ -431,7 +431,8 @@ class GameActivity : AppCompatActivity() {
             return
         }
         if (!matchStarted || gameState.status != GameStatus.IN_PROGRESS) {
-            @Suppress("DEPRECATION") super.onBackPressed(); return
+            finish()
+            return
         }
         stopAutoplayAndAiThinking()
         if (isStyledBoardGame()) {
@@ -446,7 +447,7 @@ class GameActivity : AppCompatActivity() {
             .setNeutralButton("Leave Match") { _, _ ->
                 clearPausedMatch()
                 if (vsAI) SettingsManager.recordForfeit(this)
-                @Suppress("DEPRECATION") super.onBackPressed()
+                finish()
             }
             .setNegativeButton("Keep Playing", null).show()
     }
@@ -491,7 +492,7 @@ class GameActivity : AppCompatActivity() {
                     dismissStyledOverlay()
                     clearPausedMatch()
                     if (vsAI) SettingsManager.recordForfeit(this)
-                    @Suppress("DEPRECATION") super.onBackPressed()
+                    finish()
                 }
                 else -> {
                     dismissStyledOverlay()

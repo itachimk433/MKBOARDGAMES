@@ -163,7 +163,8 @@ class TicTacToeActivity : AppCompatActivity() {
             return
         }
         if (!matchStarted || gameState.status != GameStatus.IN_PROGRESS) {
-            @Suppress("DEPRECATION") super.onBackPressed(); return
+            finish()
+            return
         }
         stopAutomatedGameplay()
         hideBoardWhileDialogIsOpen()
@@ -180,7 +181,7 @@ class TicTacToeActivity : AppCompatActivity() {
                 1 -> {
                     clearPausedMatch()
                     if (vsAI) SettingsManager.recordForfeit(this)
-                    @Suppress("DEPRECATION") super.onBackPressed()
+                    finish()
                 }
                 2 -> showBoardAfterDialog()
             }

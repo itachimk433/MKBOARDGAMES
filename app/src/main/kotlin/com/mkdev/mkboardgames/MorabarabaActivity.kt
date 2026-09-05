@@ -172,7 +172,8 @@ class MorabarabaActivity : AppCompatActivity() {
     override fun onBackPressed() {
         if (StyledDialogs.handleBackPressed()) return
         if (!matchStarted) {
-            @Suppress("DEPRECATION") super.onBackPressed(); return
+            finish()
+            return
         }
         if (gameState.status != GameStatus.IN_PROGRESS) {
             showResult()
@@ -287,7 +288,7 @@ class MorabarabaActivity : AppCompatActivity() {
                 {
                     clearPausedMatch()
                     if (vsAI) SettingsManager.recordForfeit(this)
-                    @Suppress("DEPRECATION") super.onBackPressed()
+                    finish()
                 },
                 { showBoardAfterDialog() },
             ),
