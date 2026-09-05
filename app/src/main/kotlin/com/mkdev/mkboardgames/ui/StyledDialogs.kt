@@ -159,6 +159,7 @@ object StyledDialogs {
             normalizedLabel.contains("DRAUGHTS") -> "●"
             normalizedLabel.contains("CONNECT") -> "●"
             normalizedLabel.contains("MANCALA") -> "●"
+            normalizedLabel.contains("MORABARABA") -> "●"
             normalizedLabel.contains("FOX") -> "🦊"
             gameLabel == "L U D O" -> "⚄"
             else -> "♛"

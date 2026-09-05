@@ -31,9 +31,10 @@ class ChessRulesView(
     private val isChess = isChessStyledLabel(gameLabel)
     private val isDraughts = isDraughtsStyledLabel(gameLabel)
     private val isOthello = isOthelloStyledLabel(gameLabel)
+    private val isMorabaraba = isMorabarabaStyledLabel(gameLabel)
 
     init {
-        if (isChess || isDraughts || isOthello) {
+        if (isChess || isDraughts || isOthello || isMorabaraba) {
             configureStyledRules()
         } else {
             configureClassicRules()
@@ -190,6 +191,7 @@ private class ChessMancalaRulesView(
         contentDescription = when {
             isDraughts -> "Draughts how to play"
             isOthello -> "Othello how to play"
+            isMorabaraba -> "Morabaraba how to play"
             else -> "Chess how to play"
         }
         setLayerType(LAYER_TYPE_SOFTWARE, null)
@@ -197,7 +199,7 @@ private class ChessMancalaRulesView(
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
-        if (isDraughts || isOthello) atmosphereAnimator.start()
+        if (isDraughts || isOthello || isMorabaraba) atmosphereAnimator.start()
     }
 
     override fun onDetachedFromWindow() {
@@ -210,6 +212,15 @@ private class ChessMancalaRulesView(
         val height = height.toFloat()
         if (isOthello) {
             drawOthelloAtmosphere(
+                canvas,
+                width,
+                height,
+                density,
+                rounded = false,
+                phase = atmospherePhase,
+            )
+        } else if (isMorabaraba) {
+            drawMorabarabaAtmosphere(
                 canvas,
                 width,
                 height,
@@ -264,7 +275,9 @@ private class ChessMancalaRulesView(
         } else {
             "CHESS"
         }
-        canvas.drawText(displayLabel, panel.centerX(), panel.top + dp(52f), titlePaint)
+        if (!isMorabaraba) {
+            canvas.drawText(displayLabel, panel.centerX(), panel.top + dp(52f), titlePaint)
+        }
         titlePaint.color = Color.parseColor("#FFE09C")
         titlePaint.textSize = minOf(dp(22f), panelWidth * 0.065f)
         canvas.drawText("HOW TO PLAY", panel.centerX(), panel.top + dp(84f), titlePaint)

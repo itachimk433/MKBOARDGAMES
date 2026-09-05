@@ -64,6 +64,7 @@ class ChessChoiceView(
     private val isChess = isChessStyledLabel(gameLabel)
     private val isDraughts = isDraughtsStyledLabel(gameLabel)
     private val isOthello = isOthelloStyledLabel(gameLabel)
+    private val isMorabaraba = isMorabarabaStyledLabel(gameLabel)
     private val surfacePaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val cardPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -142,7 +143,7 @@ class ChessChoiceView(
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
-        if (isDraughts || isOthello) atmosphereAnimator.start()
+        if (isDraughts || isOthello || isMorabaraba) atmosphereAnimator.start()
     }
 
     override fun onDetachedFromWindow() {
@@ -182,9 +183,18 @@ class ChessChoiceView(
     override fun onDraw(canvas: Canvas) {
         val width = width.toFloat()
         val height = height.toFloat()
-        if (isChess || isDraughts || isOthello) {
+        if (isChess || isDraughts || isOthello || isMorabaraba) {
             if (isOthello) {
                 drawOthelloAtmosphere(
+                    canvas,
+                    width,
+                    height,
+                    unit,
+                    rounded = !fullScreen,
+                    phase = atmospherePhase,
+                )
+            } else if (isMorabaraba) {
+                drawMorabarabaAtmosphere(
                     canvas,
                     width,
                     height,
@@ -226,6 +236,7 @@ class ChessChoiceView(
             isChess -> drawChessHeader(canvas, width, contentOffset)
             isDraughts -> drawDraughtsHeader(canvas, width, contentOffset)
             isOthello -> drawOthelloHeader(canvas, width, contentOffset)
+            isMorabaraba -> drawMorabarabaHeader(canvas, width, contentOffset)
             else -> drawHeader(canvas, width, contentOffset)
         }
         hits.forEach { drawChoice(canvas, it) }
@@ -305,6 +316,37 @@ class ChessChoiceView(
         canvas.drawText(subtitle, center, topOffset + 125f * unit, subtitlePaint)
     }
 
+    private fun drawMorabarabaHeader(canvas: Canvas, width: Float, topOffset: Float) {
+        val center = width / 2f
+        val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#D7A94D")
+            strokeWidth = 1.5f * unit
+        }
+        canvas.drawLine(
+            center - 118f * unit,
+            topOffset + 36f * unit,
+            center - 42f * unit,
+            topOffset + 36f * unit,
+            linePaint,
+        )
+        canvas.drawLine(
+            center + 42f * unit,
+            topOffset + 36f * unit,
+            center + 118f * unit,
+            topOffset + 36f * unit,
+            linePaint,
+        )
+        crownPaint.color = Color.parseColor("#FFB45E")
+        crownPaint.textSize = 22f * textScale
+        canvas.drawText(headerSymbol, center, topOffset + 43f * unit, crownPaint)
+        // Keep the animated Morabaraba surface free of a second game-name
+        // treatment; the circular pieces are its visual signature.
+        titlePaint.color = Color.WHITE
+        canvas.drawText(title, center, topOffset + 99f * unit, titlePaint)
+        subtitlePaint.color = Color.parseColor("#D6E8FF")
+        canvas.drawText(subtitle, center, topOffset + 125f * unit, subtitlePaint)
+    }
+
     private fun drawHeader(canvas: Canvas, width: Float, topOffset: Float) {
         val center = width / 2f
         val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -332,8 +374,8 @@ class ChessChoiceView(
     }
 
     private fun drawChoice(canvas: Canvas, hit: ChoiceHit) {
-        if (isChess || isDraughts || isOthello) {
-            if (isOthello) drawOthelloChoice(canvas, hit) else drawChessChoice(canvas, hit)
+        if (isChess || isDraughts || isOthello || isMorabaraba) {
+            if (isOthello || isMorabaraba) drawOthelloChoice(canvas, hit) else drawChessChoice(canvas, hit)
             return
         }
         val scale = scales[hit.index] ?: 1f

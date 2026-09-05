@@ -214,7 +214,7 @@ class MorabarabaActivity : AppCompatActivity() {
         actions += { showVariantDialog(isVsAI = false) }
         choices += ChessChoiceView.Choice("How to Play", "Review the essentials", "?", Color.parseColor("#E58A7A"))
         actions += { showTutorial(showModeAfter = !matchStarted) }
-        showChoiceDialog("Morabaraba", "Choose how to begin.", choices, actions, 570f) {
+        showChoiceDialog("Choose your match", "Choose how to begin.", choices, actions, 570f) {
             if (!matchStarted) finish()
         }
     }
@@ -223,7 +223,7 @@ class MorabarabaActivity : AppCompatActivity() {
         val choices = listOf(
             ChessChoiceView.Choice("6 Cows", "Simple variant", "VI", Color.parseColor("#8EC7B9")),
             ChessChoiceView.Choice("9 Cows", "Classic variant", "IX", Color.parseColor("#E3B86A")),
-            ChessChoiceView.Choice("12 Cows", "Full Morabaraba", "XII", Color.parseColor("#E58A7A")),
+            ChessChoiceView.Choice("12 Cows", "Full variant", "XII", Color.parseColor("#E58A7A")),
         )
         showChoiceDialog("Choose Variant", "Select the number of cows in play.", choices, choices.mapIndexed { index, _ ->
             {
@@ -588,7 +588,7 @@ class MorabarabaActivity : AppCompatActivity() {
             { showTutorial(showModeAfter = false) },
         )
         if (vsAI) {
-            choices += ChessChoiceView.Choice("AI Difficulty", "Adjust the challenge", "♞", Color.parseColor("#8EC7B9"))
+            choices += ChessChoiceView.Choice("AI Difficulty", "Adjust the challenge", "●", Color.parseColor("#8EC7B9"))
             actions += { showDifficultyDialog() }
         }
         choices += ChessChoiceView.Choice("Main Menu", if (inProgress) "Leave this match" else "Choose another game", "⌂", Color.parseColor("#E58A7A"))
