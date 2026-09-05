@@ -313,7 +313,7 @@ class ChessMenuView(
     private fun drawChessHero(canvas: Canvas, width: Float, topOffset: Float) {
         chessHomeIconBitmap?.let { bitmap ->
             val size = min(width * 0.36f, 150f * unit)
-            val top = topOffset + 6f * unit
+            val top = topOffset + 18f * unit
             chessHeroPaint.alpha = 255
             canvas.drawBitmap(
                 bitmap,

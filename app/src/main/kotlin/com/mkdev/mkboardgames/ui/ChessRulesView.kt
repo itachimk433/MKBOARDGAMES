@@ -18,7 +18,7 @@ import java.util.Locale
 class ChessRulesView(
     context: Context,
     private val gameName: String,
-    rulesText: String,
+    private val rulesText: String,
     private val gameLabel: String = "C H E S S",
     private val headerSymbol: String = "♛",
 ) : LinearLayout(context) {
