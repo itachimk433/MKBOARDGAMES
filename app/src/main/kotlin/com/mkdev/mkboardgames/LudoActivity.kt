@@ -1826,7 +1826,9 @@ class LudoActivity : AppCompatActivity() {
         diceView.setGameplayVisible(false)
         boardView.cancelAnimations()
         SoundPlayer.stop("ludo_dice", "ludo_move", "ludo_star")
-        overlay.visibility = View.INVISIBLE
+        // Keep the board mounted under the dialog. Hiding the activity root
+        // leaves a black frame while the next dialog window is created.
+        overlay.visibility = View.VISIBLE
     }
 
     private fun showBoardAfterDialog() {

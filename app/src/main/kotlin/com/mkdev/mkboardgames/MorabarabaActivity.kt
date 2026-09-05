@@ -820,7 +820,9 @@ You win by either:
     }
 
     private fun hideBoardWhileDialogIsOpen() {
-        gameRoot.visibility = View.INVISIBLE
+        // Dialogs are separate windows. Keep this activity's game surface
+        // mounted underneath them so dialog swaps cannot reveal black.
+        gameRoot.visibility = View.VISIBLE
     }
 
     private fun showBoardAfterDialog(resumeAi: Boolean = true) {

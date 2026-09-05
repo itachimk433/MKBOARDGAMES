@@ -288,14 +288,15 @@ class ChessMenuView(
         super.onDraw(canvas)
         val width = width.toFloat()
         val height = height.toFloat()
-        if (isChess) {
+        if (isChess || isDraughts) {
             drawChessBackdrop(canvas, width, height)
-            drawChessHero(canvas, width, contentOffset)
-            drawChessHeader(canvas, width, contentOffset)
-        } else if (isDraughts) {
-            drawDraughtsAtmosphere(canvas, width, height, unit, rounded = !fullScreen, phase = backgroundPhase)
-            drawDraughtsHero(canvas, width, contentOffset)
-            drawDraughtsHeader(canvas, width, contentOffset)
+            if (isChess) {
+                drawChessHero(canvas, width, contentOffset)
+                drawChessHeader(canvas, width, contentOffset)
+            } else {
+                drawDraughtsHero(canvas, width, contentOffset)
+                drawDraughtsHeader(canvas, width, contentOffset)
+            }
         } else {
             val corner = 12f * unit
             surfacePaint.shader = LinearGradient(
@@ -606,10 +607,10 @@ class ChessMenuView(
     }
 
     private fun drawDraughtsHeader(canvas: Canvas, width: Float, topOffset: Float) {
-        titlePaint.color = Color.parseColor("#FFF5E6")
+        titlePaint.color = Color.WHITE
         titlePaint.textSize = 24f * textScale
         canvas.drawText("Choose your match", width / 2f, topOffset + 196f * unit, titlePaint)
-        subtitlePaint.color = Color.parseColor("#D4E9E5")
+        subtitlePaint.color = Color.parseColor("#D6E8FF")
         canvas.drawText(
             "Choose your side and make every capture count.",
             width / 2f,
@@ -670,12 +671,8 @@ class ChessMenuView(
     }
 
     private fun drawAction(canvas: Canvas, action: MenuAction) {
-        if (isChess) {
+        if (isChess || isDraughts) {
             drawChessAction(canvas, action)
-            return
-        }
-        if (isDraughts) {
-            drawDraughtsAction(canvas, action)
             return
         }
         val scale = actionScale[action.label] ?: 1f
@@ -752,12 +749,8 @@ class ChessMenuView(
     }
 
     private fun drawResumeAction(canvas: Canvas, width: Float) {
-        if (isChess) {
+        if (isChess || isDraughts) {
             drawChessResumeAction(canvas, width)
-            return
-        }
-        if (isDraughts) {
-            drawDraughtsResumeAction(canvas, width)
             return
         }
         panelPaint.color = if (resumePressed) Color.parseColor("#21454A") else Color.parseColor("#16353B")

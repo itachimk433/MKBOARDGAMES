@@ -181,10 +181,8 @@ class ChessChoiceView(
     override fun onDraw(canvas: Canvas) {
         val width = width.toFloat()
         val height = height.toFloat()
-        if (isChess) {
+        if (isChess || isDraughts) {
             drawChessAtmosphere(canvas, width, height, unit, rounded = !fullScreen)
-        } else if (isDraughts) {
-            drawDraughtsAtmosphere(canvas, width, height, unit, rounded = !fullScreen, phase = atmospherePhase)
         } else {
             surfacePaint.shader = LinearGradient(
                 0f,
@@ -226,7 +224,7 @@ class ChessChoiceView(
     private fun drawDraughtsHeader(canvas: Canvas, width: Float, topOffset: Float) {
         val center = width / 2f
         val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#D8A05E")
+            color = Color.parseColor("#D7A94D")
             strokeWidth = 1.5f * unit
         }
         canvas.drawLine(
@@ -243,14 +241,14 @@ class ChessChoiceView(
             topOffset + 36f * unit,
             linePaint,
         )
-        crownPaint.color = Color.parseColor("#F1C77C")
+        crownPaint.color = Color.parseColor("#FFB45E")
         crownPaint.textSize = 22f * textScale
         canvas.drawText(headerSymbol, center, topOffset + 43f * unit, crownPaint)
-        eyebrowPaint.color = Color.parseColor("#F3D39B")
+        eyebrowPaint.color = Color.parseColor("#FFE09C")
         canvas.drawText(gameLabel, center, topOffset + 58f * unit, eyebrowPaint)
-        titlePaint.color = Color.parseColor("#FFF5E6")
+        titlePaint.color = Color.WHITE
         canvas.drawText(title, center, topOffset + 99f * unit, titlePaint)
-        subtitlePaint.color = Color.parseColor("#D4E9E5")
+        subtitlePaint.color = Color.parseColor("#D6E8FF")
         canvas.drawText(subtitle, center, topOffset + 125f * unit, subtitlePaint)
     }
 
@@ -281,12 +279,8 @@ class ChessChoiceView(
     }
 
     private fun drawChoice(canvas: Canvas, hit: ChoiceHit) {
-        if (isChess) {
+        if (isChess || isDraughts) {
             drawChessChoice(canvas, hit)
-            return
-        }
-        if (isDraughts) {
-            drawDraughtsChoice(canvas, hit)
             return
         }
         val scale = scales[hit.index] ?: 1f

@@ -622,7 +622,9 @@ Control the centre columns, build threats in more than one direction, and block 
     private fun hideBoardWhileDialogIsOpen() {
         boardStyleSwitch.removeCallbacks(boardStyleSwitchFadeRunnable)
         boardStyleSwitch.animate().cancel()
-        gameRoot.visibility = View.INVISIBLE
+        // Keep the game surface mounted behind the dialog so replacing one
+        // styled window with another never exposes the dark activity window.
+        gameRoot.visibility = View.VISIBLE
     }
 
     private fun showBoardAfterDialog(resumeAi: Boolean = true) {

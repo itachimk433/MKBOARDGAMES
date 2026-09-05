@@ -202,12 +202,7 @@ private class ChessMancalaRulesView(
     override fun onDraw(canvas: Canvas) {
         val width = width.toFloat()
         val height = height.toFloat()
-        if (isDraughts) {
-            drawDraughtsAtmosphere(canvas, width, height, density, rounded = false, phase = atmospherePhase)
-            canvas.drawColor(Color.argb(112, 0, 6, 14))
-        } else {
-            canvas.drawColor(Color.argb(205, 0, 6, 14))
-        }
+        drawChessAtmosphere(canvas, width, height, density, rounded = false)
 
         val panelWidth = minOf(width * 0.9f, dp(610f))
         val panelHeight = minOf(height * 0.9f, dp(700f))
@@ -223,8 +218,8 @@ private class ChessMancalaRulesView(
                 panel.top,
                 0f,
                 panel.bottom,
-                if (isDraughts) Color.parseColor("#287078") else Color.parseColor("#17677F"),
-                if (isDraughts) Color.parseColor("#102F48") else Color.parseColor("#0C3344"),
+                Color.parseColor("#17677F"),
+                Color.parseColor("#0C3344"),
                 Shader.TileMode.CLAMP,
             )
             setShadowLayer(dp(18f), 0f, dp(8f), Color.BLACK)
@@ -242,7 +237,7 @@ private class ChessMancalaRulesView(
             "CHESS"
         }
         canvas.drawText(displayLabel, panel.centerX(), panel.top + dp(52f), titlePaint)
-        titlePaint.color = if (isDraughts) Color.parseColor("#F1C77C") else Color.parseColor("#FFE09C")
+        titlePaint.color = Color.parseColor("#FFE09C")
         titlePaint.textSize = minOf(dp(22f), panelWidth * 0.065f)
         canvas.drawText("HOW TO PLAY", panel.centerX(), panel.top + dp(84f), titlePaint)
 
@@ -251,12 +246,12 @@ private class ChessMancalaRulesView(
         val contentBottom = panel.bottom - dp(82f)
         val lineHeight = dp(15f)
         var y = panel.top + dp(122f)
-        headingPaint.color = if (isDraughts) Color.parseColor("#F1C77C") else Color.parseColor("#FFE09C")
+        headingPaint.color = Color.parseColor("#FFE09C")
         headingPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         headingPaint.textSize = minOf(dp(14f), contentWidth * 0.043f)
         bodyPaint.textAlign = Paint.Align.LEFT
         bodyPaint.typeface = Typeface.DEFAULT
-        bodyPaint.color = if (isDraughts) Color.parseColor("#E4F1F0") else Color.parseColor("#E4F1F0")
+        bodyPaint.color = Color.parseColor("#E4F1F0")
         bodyPaint.textSize = minOf(dp(12.5f), contentWidth * 0.038f)
 
         canvas.save()
@@ -314,16 +309,6 @@ private class ChessMancalaRulesView(
     }
 
     private fun drawBackButton(canvas: Canvas, rect: RectF) {
-        if (isDraughts) {
-            drawDraughtsButton(canvas, rect, pressed = false, unit = density)
-            bodyPaint.textAlign = Paint.Align.CENTER
-            bodyPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-            bodyPaint.color = Color.parseColor("#321718")
-            bodyPaint.textSize = minOf(dp(19f), rect.height() * 0.4f)
-            val metrics = bodyPaint.fontMetrics
-            canvas.drawText("Back", rect.centerX(), rect.centerY() - (metrics.ascent + metrics.descent) / 2f, bodyPaint)
-            return
-        }
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = LinearGradient(
                 0f,

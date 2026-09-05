@@ -609,7 +609,10 @@ Strategy
     }
 
     private fun hideBoardWhileDialogIsOpen() {
-        gameRoot.visibility = View.INVISIBLE
+        // Keep the game surface mounted behind the dialog. The dialog is a
+        // separate window, and hiding this root exposes the dark activity
+        // background during dialog swaps.
+        gameRoot.visibility = View.VISIBLE
     }
 
     private fun showBoardAfterDialog(resumeAi: Boolean = true) {
