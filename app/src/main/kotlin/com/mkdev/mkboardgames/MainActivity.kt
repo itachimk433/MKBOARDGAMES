@@ -136,7 +136,7 @@ class MainActivity : AppCompatActivity() {
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT,
         ).also {
-            it.setMargins((10 * dp).toInt(), (10 * dp).toInt(), (10 * dp).toInt(), (8 * dp).toInt())
+            it.setMargins((10 * dp).toInt(), (2 * dp).toInt(), (10 * dp).toInt(), (8 * dp).toInt())
         })
         wrapper.addView(View(ctx).apply {
             background = android.graphics.drawable.GradientDrawable(
@@ -167,6 +167,7 @@ class MainActivity : AppCompatActivity() {
             setTextColor(Color.parseColor("#E3B86A"))
             setTypeface(typeface, Typeface.BOLD)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 11.5f)
+            gravity = Gravity.CENTER
             letterSpacing = 0.12f
             setShadowLayer(1.5f * dp, 0f, 1f * dp, Color.argb(180, 25, 9, 5))
             background = android.graphics.drawable.GradientDrawable(
@@ -317,15 +318,138 @@ class MainActivity : AppCompatActivity() {
             return row to valueView
         }
 
+        fun showSettingsChoiceDialog(
+            title: String,
+            options: Array<String>,
+            selectedIndex: Int,
+            onSelected: (Int) -> Unit,
+        ) {
+            fun panelBackground(selected: Boolean) =
+                android.graphics.drawable.GradientDrawable(
+                    android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                    if (selected) {
+                        intArrayOf(
+                            Color.parseColor("#6A2D2B"),
+                            Color.parseColor("#4A1714"),
+                        )
+                    } else {
+                        intArrayOf(
+                            Color.parseColor("#21454A"),
+                            Color.parseColor("#16353B"),
+                        )
+                    },
+                ).apply {
+                    cornerRadius = 10f * dp
+                    setStroke(
+                        (1f * dp).toInt(),
+                        Color.parseColor(if (selected) "#C8894C" else "#2C5960"),
+                    )
+                }
+
+            val content = LinearLayout(ctx).apply {
+                orientation = LinearLayout.VERTICAL
+                background = android.graphics.drawable.GradientDrawable(
+                    android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                    intArrayOf(
+                        Color.parseColor("#102C32"),
+                        Color.parseColor("#061321"),
+                    ),
+                )
+                setPadding((14 * dp).toInt(), (14 * dp).toInt(), (14 * dp).toInt(), (12 * dp).toInt())
+            }
+            content.addView(TextView(ctx).apply {
+                text = title
+                setTextColor(Color.parseColor("#F7D99B"))
+                setTypeface(typeface, Typeface.BOLD)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
+                gravity = Gravity.CENTER
+                setPadding((4 * dp).toInt(), (2 * dp).toInt(), (4 * dp).toInt(), (10 * dp).toInt())
+            })
+
+            lateinit var choiceDialog: AlertDialog
+            options.forEachIndexed { index, option ->
+                val optionRow = LinearLayout(ctx).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    background = panelBackground(index == selectedIndex)
+                    setPadding((12 * dp).toInt(), (9 * dp).toInt(), (12 * dp).toInt(), (9 * dp).toInt())
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                    ).also {
+                        it.setMargins(0, (3 * dp).toInt(), 0, (3 * dp).toInt())
+                    }
+                    isClickable = true
+                    isFocusable = true
+                    setOnTouchListener { v, e ->
+                        when (e.action) {
+                            android.view.MotionEvent.ACTION_DOWN ->
+                                v.animate().scaleX(0.98f).scaleY(0.98f).setDuration(60L).start()
+                            android.view.MotionEvent.ACTION_UP,
+                            android.view.MotionEvent.ACTION_CANCEL ->
+                                v.animate().scaleX(1f).scaleY(1f).setDuration(100L).start()
+                        }
+                        false
+                    }
+                    setOnClickListener {
+                        onSelected(index)
+                        choiceDialog.dismiss()
+                    }
+                }
+                optionRow.addView(TextView(ctx).apply {
+                    text = if (index == selectedIndex) "◉" else "○"
+                    setTextColor(
+                        Color.parseColor(if (index == selectedIndex) "#F7D99B" else "#9FB5B8"),
+                    )
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
+                    gravity = Gravity.CENTER
+                    layoutParams = LinearLayout.LayoutParams(
+                        (30 * dp).toInt(),
+                        (30 * dp).toInt(),
+                    )
+                })
+                optionRow.addView(TextView(ctx).apply {
+                    text = option
+                    setTextColor(Color.parseColor("#FFF8E8"))
+                    setTypeface(typeface, Typeface.BOLD)
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+                    gravity = Gravity.CENTER_VERTICAL
+                    layoutParams = LinearLayout.LayoutParams(
+                        0,
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        1f,
+                    )
+                })
+                content.addView(optionRow)
+            }
+
+            choiceDialog = AlertDialog.Builder(ctx, android.R.style.Theme_Material_Dialog_MinWidth)
+                .setView(content)
+                .create()
+            choiceDialog.window?.setBackgroundDrawable(
+                android.graphics.drawable.GradientDrawable(
+                    android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                    intArrayOf(
+                        Color.parseColor("#102C32"),
+                        Color.parseColor("#061321"),
+                    ),
+                ).apply {
+                    cornerRadius = 18f * dp
+                    setStroke((1.2f * dp).toInt(), Color.parseColor("#85502D"))
+                },
+            )
+            choiceDialog.show()
+        }
+
         fun themeRow(game: String, getT: () -> Int, setT: (Int) -> Unit): Pair<LinearLayout, TextView> {
             var t = getT()
             val (row, valV) = settingRow("🖌", "Board Theme", themes[t])
             row.setOnClickListener {
-                AlertDialog.Builder(ctx, android.R.style.Theme_Material_Dialog_MinWidth)
-                    .setTitle("$game · Theme")
-                    .setSingleChoiceItems(themes, t) { d, i ->
-                        setT(i); t = i; valV.text = themes[i]; d.dismiss()
-                    }.show()
+                showSettingsChoiceDialog("$game · Theme", themes, t) { i ->
+                    setT(i)
+                    t = i
+                    valV.text = themes[i]
+                }
             }
             return row to valV
         }
@@ -344,7 +468,7 @@ class MainActivity : AppCompatActivity() {
 
         var brownHomeStyle = SettingsManager.isBrownHomeStyleEnabled(ctx)
         val (homeStyleRow, homeStyleVal) =
-            settingRow("🪵", "Home Style", if (brownHomeStyle) "Brown" else "Classic")
+            settingRow("🖌️", "Home Style", if (brownHomeStyle) "Brown" else "Classic")
         homeStyleRow.setOnClickListener {
             brownHomeStyle = !brownHomeStyle
             SettingsManager.setBrownHomeStyleEnabled(ctx, brownHomeStyle)
@@ -370,11 +494,11 @@ class MainActivity : AppCompatActivity() {
         var chessHints = SettingsManager.getChessHints(ctx)
         val (chessDiffRow, chessDiffVal) = settingRow("🎯", "AI Difficulty", diffs[chessDiff])
         chessDiffRow.setOnClickListener {
-            AlertDialog.Builder(ctx, android.R.style.Theme_Material_Dialog_MinWidth)
-                .setTitle("Chess · AI Difficulty")
-                .setSingleChoiceItems(diffs, chessDiff) { d, i ->
-                    SettingsManager.setChessDifficulty(ctx, i); chessDiff = i; chessDiffVal.text = diffs[i]; d.dismiss()
-                }.show()
+            showSettingsChoiceDialog("Chess · AI Difficulty", diffs, chessDiff) { i ->
+                SettingsManager.setChessDifficulty(ctx, i)
+                chessDiff = i
+                chessDiffVal.text = diffs[i]
+            }
         }
         root.addView(chessDiffRow); root.addView(divider())
         val (chessHintsRow, chessHintsVal) = settingRow("💡", "Move Hints", if (chessHints) "On" else "Off")
@@ -393,11 +517,11 @@ class MainActivity : AppCompatActivity() {
         var checkersHints = SettingsManager.getCheckersHints(ctx)
         val (checkersDiffRow, checkersDiffVal) = settingRow("🎯", "AI Difficulty", diffs[checkersDiff])
         checkersDiffRow.setOnClickListener {
-            AlertDialog.Builder(ctx, android.R.style.Theme_Material_Dialog_MinWidth)
-                .setTitle("Draughts · AI Difficulty")
-                .setSingleChoiceItems(diffs, checkersDiff) { d, i ->
-                    SettingsManager.setCheckersDifficulty(ctx, i); checkersDiff = i; checkersDiffVal.text = diffs[i]; d.dismiss()
-                }.show()
+            showSettingsChoiceDialog("Draughts · AI Difficulty", diffs, checkersDiff) { i ->
+                SettingsManager.setCheckersDifficulty(ctx, i)
+                checkersDiff = i
+                checkersDiffVal.text = diffs[i]
+            }
         }
         root.addView(checkersDiffRow); root.addView(divider())
         val (checkersHintsRow, checkersHintsVal) = settingRow("💡", "Move Hints", if (checkersHints) "On" else "Off")
@@ -416,14 +540,15 @@ class MainActivity : AppCompatActivity() {
         val (internationalDraughtsDiffRow, internationalDraughtsDiffVal) =
             settingRow("🎯", "AI Difficulty", diffs[internationalDraughtsDiff])
         internationalDraughtsDiffRow.setOnClickListener {
-            AlertDialog.Builder(ctx, android.R.style.Theme_Material_Dialog_MinWidth)
-                .setTitle("International Draughts · AI Difficulty")
-                .setSingleChoiceItems(diffs, internationalDraughtsDiff) { d, i ->
-                    SettingsManager.setInternationalDraughtsDifficulty(ctx, i)
-                    internationalDraughtsDiff = i
-                    internationalDraughtsDiffVal.text = diffs[i]
-                    d.dismiss()
-                }.show()
+            showSettingsChoiceDialog(
+                "International Draughts · AI Difficulty",
+                diffs,
+                internationalDraughtsDiff,
+            ) { i ->
+                SettingsManager.setInternationalDraughtsDifficulty(ctx, i)
+                internationalDraughtsDiff = i
+                internationalDraughtsDiffVal.text = diffs[i]
+            }
         }
         root.addView(internationalDraughtsDiffRow); root.addView(divider())
         root.addView(themeRow("International Draughts",
@@ -441,11 +566,11 @@ class MainActivity : AppCompatActivity() {
         var morabaraDiff = SettingsManager.getMorabarabaDifficulty(ctx)
         val (morabaraDiffRow, morabaraDiffVal) = settingRow("🎯", "AI Difficulty", diffs[morabaraDiff])
         morabaraDiffRow.setOnClickListener {
-            AlertDialog.Builder(ctx, android.R.style.Theme_Material_Dialog_MinWidth)
-                .setTitle("Morabaraba · AI Difficulty")
-                .setSingleChoiceItems(diffs, morabaraDiff) { d, i ->
-                    SettingsManager.setMorabarabaDifficulty(ctx, i); morabaraDiff = i; morabaraDiffVal.text = diffs[i]; d.dismiss()
-                }.show()
+            showSettingsChoiceDialog("Morabaraba · AI Difficulty", diffs, morabaraDiff) { i ->
+                SettingsManager.setMorabarabaDifficulty(ctx, i)
+                morabaraDiff = i
+                morabaraDiffVal.text = diffs[i]
+            }
         }
         root.addView(morabaraDiffRow); root.addView(divider())
         root.addView(themeRow("Morabaraba",
@@ -457,11 +582,11 @@ class MainActivity : AppCompatActivity() {
         var tttDiff = SettingsManager.getTttDifficulty(ctx)
         val (tttDiffRow, tttDiffVal) = settingRow("🎯", "AI Difficulty", diffs[tttDiff])
         tttDiffRow.setOnClickListener {
-            AlertDialog.Builder(ctx, android.R.style.Theme_Material_Dialog_MinWidth)
-                .setTitle("Tic-Tac-Toe · AI Difficulty")
-                .setSingleChoiceItems(diffs, tttDiff) { d, i ->
-                    SettingsManager.setTttDifficulty(ctx, i); tttDiff = i; tttDiffVal.text = diffs[i]; d.dismiss()
-                }.show()
+            showSettingsChoiceDialog("Tic-Tac-Toe · AI Difficulty", diffs, tttDiff) { i ->
+                SettingsManager.setTttDifficulty(ctx, i)
+                tttDiff = i
+                tttDiffVal.text = diffs[i]
+            }
         }
         root.addView(tttDiffRow); root.addView(divider())
         root.addView(themeRow("Tic-Tac-Toe",
@@ -474,14 +599,11 @@ class MainActivity : AppCompatActivity() {
         val (connectFourDiffRow, connectFourDiffVal) =
             settingRow("🎯", "AI Difficulty", diffs[connectFourDiff])
         connectFourDiffRow.setOnClickListener {
-            AlertDialog.Builder(ctx, android.R.style.Theme_Material_Dialog_MinWidth)
-                .setTitle("Connect Four · AI Difficulty")
-                .setSingleChoiceItems(diffs, connectFourDiff) { d, i ->
-                    SettingsManager.setConnectFourDifficulty(ctx, i)
-                    connectFourDiff = i
-                    connectFourDiffVal.text = diffs[i]
-                    d.dismiss()
-                }.show()
+            showSettingsChoiceDialog("Connect Four · AI Difficulty", diffs, connectFourDiff) { i ->
+                SettingsManager.setConnectFourDifficulty(ctx, i)
+                connectFourDiff = i
+                connectFourDiffVal.text = diffs[i]
+            }
         }
         root.addView(connectFourDiffRow); root.addView(divider())
         root.addView(themeRow("Connect Four",
@@ -494,14 +616,11 @@ class MainActivity : AppCompatActivity() {
         val (foxAndGeeseDiffRow, foxAndGeeseDiffVal) =
             settingRow("🎯", "AI Difficulty", diffs[foxAndGeeseDiff])
         foxAndGeeseDiffRow.setOnClickListener {
-            AlertDialog.Builder(ctx, android.R.style.Theme_Material_Dialog_MinWidth)
-                .setTitle("Fox & Geese · AI Difficulty")
-                .setSingleChoiceItems(diffs, foxAndGeeseDiff) { d, i ->
-                    SettingsManager.setFoxAndGeeseDifficulty(ctx, i)
-                    foxAndGeeseDiff = i
-                    foxAndGeeseDiffVal.text = diffs[i]
-                    d.dismiss()
-                }.show()
+            showSettingsChoiceDialog("Fox & Geese · AI Difficulty", diffs, foxAndGeeseDiff) { i ->
+                SettingsManager.setFoxAndGeeseDifficulty(ctx, i)
+                foxAndGeeseDiff = i
+                foxAndGeeseDiffVal.text = diffs[i]
+            }
         }
         root.addView(foxAndGeeseDiffRow); root.addView(divider())
         root.addView(themeRow("Fox & Geese",
@@ -514,14 +633,11 @@ class MainActivity : AppCompatActivity() {
         val (ludoDiffRow, ludoDiffVal) =
             settingRow("🎯", "AI Difficulty", diffs[ludoDiff])
         ludoDiffRow.setOnClickListener {
-            AlertDialog.Builder(ctx, android.R.style.Theme_Material_Dialog_MinWidth)
-                .setTitle("Ludo · AI Difficulty")
-                .setSingleChoiceItems(diffs, ludoDiff) { d, i ->
-                    SettingsManager.setLudoDifficulty(ctx, i)
-                    ludoDiff = i
-                    ludoDiffVal.text = diffs[i]
-                    d.dismiss()
-                }.show()
+            showSettingsChoiceDialog("Ludo · AI Difficulty", diffs, ludoDiff) { i ->
+                SettingsManager.setLudoDifficulty(ctx, i)
+                ludoDiff = i
+                ludoDiffVal.text = diffs[i]
+            }
         }
         root.addView(ludoDiffRow)
         root.addView(divider())
@@ -531,14 +647,11 @@ class MainActivity : AppCompatActivity() {
         var goDiff = SettingsManager.getGoDifficulty(ctx)
         val (goDiffRow, goDiffVal) = settingRow("🎯", "AI Difficulty", diffs[goDiff])
         goDiffRow.setOnClickListener {
-            AlertDialog.Builder(ctx, android.R.style.Theme_Material_Dialog_MinWidth)
-                .setTitle("Go · AI Difficulty")
-                .setSingleChoiceItems(diffs, goDiff) { d, i ->
-                    SettingsManager.setGoDifficulty(ctx, i)
-                    goDiff = i
-                    goDiffVal.text = diffs[i]
-                    d.dismiss()
-                }.show()
+            showSettingsChoiceDialog("Go · AI Difficulty", diffs, goDiff) { i ->
+                SettingsManager.setGoDifficulty(ctx, i)
+                goDiff = i
+                goDiffVal.text = diffs[i]
+            }
         }
         root.addView(goDiffRow)
         root.addView(divider())
@@ -548,14 +661,11 @@ class MainActivity : AppCompatActivity() {
         var shogiDiff = SettingsManager.getShogiDifficulty(ctx)
         val (shogiDiffRow, shogiDiffVal) = settingRow("🎯", "AI Difficulty", diffs[shogiDiff])
         shogiDiffRow.setOnClickListener {
-            AlertDialog.Builder(ctx, android.R.style.Theme_Material_Dialog_MinWidth)
-                .setTitle("Shogi · AI Difficulty")
-                .setSingleChoiceItems(diffs, shogiDiff) { d, i ->
-                    SettingsManager.setShogiDifficulty(ctx, i)
-                    shogiDiff = i
-                    shogiDiffVal.text = diffs[i]
-                    d.dismiss()
-                }.show()
+            showSettingsChoiceDialog("Shogi · AI Difficulty", diffs, shogiDiff) { i ->
+                SettingsManager.setShogiDifficulty(ctx, i)
+                shogiDiff = i
+                shogiDiffVal.text = diffs[i]
+            }
         }
         root.addView(shogiDiffRow)
         root.addView(divider())
@@ -666,16 +776,7 @@ class MainActivity : AppCompatActivity() {
         val dialog = AlertDialog.Builder(ctx, android.R.style.Theme_Material_Dialog_MinWidth)
             .setView(wrapper).setPositiveButton("Done", null).create()
         dialog.window?.setBackgroundDrawable(
-            android.graphics.drawable.GradientDrawable(
-                android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
-                intArrayOf(
-                    Color.parseColor("#102C32"),
-                    Color.parseColor("#061321"),
-                ),
-            ).apply {
-                cornerRadius = 18f * dp
-                setStroke((1.2f * dp).toInt(), Color.parseColor("#85502D"))
-            })
+            android.graphics.drawable.ColorDrawable(Color.parseColor("#061321")))
         dialog.setOnDismissListener { if (activeSettingsDialog === dialog) activeSettingsDialog = null }
         dialog.show()
         dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(Color.parseColor("#F7D99B"))
