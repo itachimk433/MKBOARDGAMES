@@ -233,6 +233,13 @@ object SettingsManager {
         prefs(ctx).getBoolean(KEY_WOOD_GAME_CARDS, true)
     fun setWoodGameCardStyleEnabled(ctx: Context, v: Boolean) =
         prefs(ctx).edit().putBoolean(KEY_WOOD_GAME_CARDS, v).apply()
+    fun isBrownHomeStyleEnabled(ctx: Context) =
+        isHomeBackgroundEnabled(ctx) && isWoodGameCardStyleEnabled(ctx)
+    fun setBrownHomeStyleEnabled(ctx: Context, v: Boolean) =
+        prefs(ctx).edit()
+            .putBoolean(KEY_HOME_BACKGROUND, v)
+            .putBoolean(KEY_WOOD_GAME_CARDS, v)
+            .apply()
 
     // ── Hints ────────────────────────────────────────────────────────────────
     fun getChessHints(ctx: Context) = prefs(ctx).getBoolean(KEY_CHESS_HINTS, true)

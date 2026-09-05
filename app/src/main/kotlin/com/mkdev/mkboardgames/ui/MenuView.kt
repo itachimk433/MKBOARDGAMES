@@ -31,10 +31,10 @@ class MenuView(context: Context) : View(context) {
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
         isLightMode = com.mkdev.mkboardgames.SettingsManager.isLightMode(context)
-        isHomeBackgroundEnabled =
-            com.mkdev.mkboardgames.SettingsManager.isHomeBackgroundEnabled(context)
-        isWoodGameCardStyleEnabled =
-            com.mkdev.mkboardgames.SettingsManager.isWoodGameCardStyleEnabled(context)
+        val brownHomeStyle =
+            com.mkdev.mkboardgames.SettingsManager.isBrownHomeStyleEnabled(context)
+        isHomeBackgroundEnabled = brownHomeStyle
+        isWoodGameCardStyleEnabled = brownHomeStyle
         com.mkdev.mkboardgames.SoundPlayer.init(context)
     }
 

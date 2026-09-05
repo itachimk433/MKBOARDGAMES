@@ -212,27 +212,17 @@ class MainActivity : AppCompatActivity() {
         }
         root.addView(movSoundRow)
 
-        var homeBackground = SettingsManager.isHomeBackgroundEnabled(ctx)
-        val (homeBackgroundRow, homeBackgroundVal) =
-            settingRow("🪵", "Wood Home Background", if (homeBackground) "On" else "Off")
-        homeBackgroundRow.setOnClickListener {
-            homeBackground = !homeBackground
-            SettingsManager.setHomeBackgroundEnabled(ctx, homeBackground)
-            menuView?.isHomeBackgroundEnabled = homeBackground
-            homeBackgroundVal.text = if (homeBackground) "On" else "Off"
+        var brownHomeStyle = SettingsManager.isBrownHomeStyleEnabled(ctx)
+        val (homeStyleRow, homeStyleVal) =
+            settingRow("🪵", "Home Style", if (brownHomeStyle) "Brown" else "Classic")
+        homeStyleRow.setOnClickListener {
+            brownHomeStyle = !brownHomeStyle
+            SettingsManager.setBrownHomeStyleEnabled(ctx, brownHomeStyle)
+            menuView?.isHomeBackgroundEnabled = brownHomeStyle
+            menuView?.isWoodGameCardStyleEnabled = brownHomeStyle
+            homeStyleVal.text = if (brownHomeStyle) "Brown" else "Classic"
         }
-        root.addView(homeBackgroundRow)
-
-        var woodGameCards = SettingsManager.isWoodGameCardStyleEnabled(ctx)
-        val (woodGameCardsRow, woodGameCardsVal) =
-            settingRow("🃏", "Game Card Style", if (woodGameCards) "Realistic Wood" else "Classic")
-        woodGameCardsRow.setOnClickListener {
-            woodGameCards = !woodGameCards
-            SettingsManager.setWoodGameCardStyleEnabled(ctx, woodGameCards)
-            menuView?.isWoodGameCardStyleEnabled = woodGameCards
-            woodGameCardsVal.text = if (woodGameCards) "Realistic Wood" else "Classic"
-        }
-        root.addView(woodGameCardsRow)
+        root.addView(homeStyleRow)
 
         var motionDice = SettingsManager.isMotionDiceEnabled(ctx)
         val (motionDiceRow, motionDiceVal) =
