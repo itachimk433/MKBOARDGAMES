@@ -25,11 +25,16 @@ class MenuView(context: Context) : View(context) {
     var isHomeBackgroundEnabled: Boolean = false
         set(v) { field = v; invalidate() }
 
+    var isWoodGameCardStyleEnabled: Boolean = true
+        set(v) { field = v; invalidate() }
+
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
         isLightMode = com.mkdev.mkboardgames.SettingsManager.isLightMode(context)
         isHomeBackgroundEnabled =
             com.mkdev.mkboardgames.SettingsManager.isHomeBackgroundEnabled(context)
+        isWoodGameCardStyleEnabled =
+            com.mkdev.mkboardgames.SettingsManager.isWoodGameCardStyleEnabled(context)
         com.mkdev.mkboardgames.SoundPlayer.init(context)
     }
 
@@ -376,7 +381,7 @@ class MenuView(context: Context) : View(context) {
         val scale = cardScales[card.type] ?: 1f
         val r = card.rect; val pressed = pressedCard == card.type
         if (scale != 1f) { canvas.save(); canvas.scale(scale, scale, r.centerX(), r.centerY()) }
-        if (isLightMode) {
+        if (isLightMode || !isWoodGameCardStyleEnabled) {
             val shadowP = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.argb(50, 0, 0, 0)
                 maskFilter = BlurMaskFilter(10f, BlurMaskFilter.Blur.NORMAL)

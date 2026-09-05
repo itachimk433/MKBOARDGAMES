@@ -227,6 +227,13 @@ object SettingsManager {
     fun setHomeBackgroundEnabled(ctx: Context, v: Boolean) =
         prefs(ctx).edit().putBoolean(KEY_HOME_BACKGROUND, v).apply()
 
+    // ── Home game card style ─────────────────────────────────────────────────
+    private const val KEY_WOOD_GAME_CARDS = "wood_game_cards"
+    fun isWoodGameCardStyleEnabled(ctx: Context) =
+        prefs(ctx).getBoolean(KEY_WOOD_GAME_CARDS, true)
+    fun setWoodGameCardStyleEnabled(ctx: Context, v: Boolean) =
+        prefs(ctx).edit().putBoolean(KEY_WOOD_GAME_CARDS, v).apply()
+
     // ── Hints ────────────────────────────────────────────────────────────────
     fun getChessHints(ctx: Context) = prefs(ctx).getBoolean(KEY_CHESS_HINTS, true)
     fun setChessHints(ctx: Context, v: Boolean) = prefs(ctx).edit().putBoolean(KEY_CHESS_HINTS, v).apply()

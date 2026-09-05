@@ -15,6 +15,7 @@ import com.mkdev.mkboardgames.ui.MenuView
 class MainActivity : AppCompatActivity() {
 
     private var activeSettingsDialog: AlertDialog? = null
+    private var menuView: MenuView? = null
 
     private companion object {
         const val SUPPORT_EMAIL = "mkdev4360@gmail.com"
@@ -29,6 +30,7 @@ class MainActivity : AppCompatActivity() {
         makeFullscreen()
 
         val menu = MenuView(this)
+        menuView = menu
         menu.onGameSelected = { type ->
             when (type) {
                 MenuView.GameType.MORABARABA ->
@@ -220,6 +222,17 @@ class MainActivity : AppCompatActivity() {
             homeBackgroundVal.text = if (homeBackground) "On" else "Off"
         }
         root.addView(homeBackgroundRow)
+
+        var woodGameCards = SettingsManager.isWoodGameCardStyleEnabled(ctx)
+        val (woodGameCardsRow, woodGameCardsVal) =
+            settingRow("🃏", "Game Card Style", if (woodGameCards) "Realistic Wood" else "Classic")
+        woodGameCardsRow.setOnClickListener {
+            woodGameCards = !woodGameCards
+            SettingsManager.setWoodGameCardStyleEnabled(ctx, woodGameCards)
+            menuView?.isWoodGameCardStyleEnabled = woodGameCards
+            woodGameCardsVal.text = if (woodGameCards) "Realistic Wood" else "Classic"
+        }
+        root.addView(woodGameCardsRow)
 
         var motionDice = SettingsManager.isMotionDiceEnabled(ctx)
         val (motionDiceRow, motionDiceVal) =
