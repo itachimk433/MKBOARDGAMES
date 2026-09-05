@@ -31,6 +31,7 @@ class ChessRulesView(
     private val isChess = isChessStyledLabel(gameLabel)
     private val isDraughts = isDraughtsStyledLabel(gameLabel)
     private val isOthello = isOthelloStyledLabel(gameLabel)
+    private val isMorabaraba = isMorabarabaStyledLabel(gameLabel)
 
     init {
         if (isChess || isDraughts || isOthello || isMorabaraba) {
