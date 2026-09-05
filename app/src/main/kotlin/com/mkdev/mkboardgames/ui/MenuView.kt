@@ -173,14 +173,6 @@ class MenuView(context: Context) : View(context) {
     private val cardStudHighlightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(220, 232, 178, 112)
     }
-    private val cardPreviewBackingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(220, 39, 18, 10)
-    }
-    private val cardPreviewFramePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-        strokeWidth = 1.1f * dp
-        color = Color.argb(220, 202, 139, 84)
-    }
     private val homeBackgroundPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
         alpha = 190
     }
@@ -403,11 +395,7 @@ class MenuView(context: Context) : View(context) {
         val previewSz   = minOf(r.height() * 0.46f, r.width() * 0.64f)
         val previewLeft = r.centerX() - previewSz / 2f
         val previewTop  = r.top + 10f * dp
-        if (isLightMode) {
-            drawMiniBoard(canvas, previewLeft, previewTop, previewSz, card.type)
-        } else {
-            drawCardPreview(canvas, previewLeft, previewTop, previewSz, card.type)
-        }
+        drawMiniBoard(canvas, previewLeft, previewTop, previewSz, card.type)
 
         val (title, desc) = when (card.type) {
             GameType.CHESS       -> "Chess"        to "vs AI  •  2 Players"
@@ -540,35 +528,6 @@ class MenuView(context: Context) : View(context) {
                 cardStudHighlightPaint,
             )
         }
-    }
-
-    private fun drawCardPreview(
-        canvas: Canvas,
-        left: Float,
-        top: Float,
-        size: Float,
-        type: GameType,
-    ) {
-        val framePad = 3.5f * dp
-        val frame = RectF(left - framePad, top - framePad, left + size + framePad, top + size + framePad)
-        val frameRadius = 5.5f * dp
-        canvas.drawRoundRect(
-            RectF(frame.left + 1.5f * dp, frame.top + 2.5f * dp, frame.right + 1.5f * dp, frame.bottom + 2.5f * dp),
-            frameRadius,
-            frameRadius,
-            cardWoodOuterShadowPaint,
-        )
-        canvas.drawRoundRect(frame, frameRadius, frameRadius, cardPreviewBackingPaint)
-
-        val previewRect = RectF(left, top, left + size, top + size)
-        val clipPath = Path().apply {
-            addRoundRect(previewRect, 3f * dp, 3f * dp, Path.Direction.CW)
-        }
-        canvas.save()
-        canvas.clipPath(clipPath)
-        drawMiniBoard(canvas, left, top, size, type)
-        canvas.restore()
-        canvas.drawRoundRect(frame, frameRadius, frameRadius, cardPreviewFramePaint)
     }
 
     private fun drawMiniBoard(canvas: Canvas, left: Float, top: Float, size: Float, type: GameType) {
