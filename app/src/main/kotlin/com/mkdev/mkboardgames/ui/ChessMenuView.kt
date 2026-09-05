@@ -132,10 +132,6 @@ class ChessMenuView(
         letterSpacing = 0.04f
         typeface = Typeface.create("serif", Typeface.BOLD)
     }
-    private val gameIconTitleGlowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(210, 77, 196, 255)
-        strokeCap = Paint.Cap.ROUND
-    }
     private val chessWavePaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val chessWaveEdgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
@@ -677,27 +673,12 @@ class ChessMenuView(
     ) {
         val maxWidth = centerX * 2f * 0.92f
         gameIconTitlePaint.textSize = 92f * textScale
-        if (gameIconTitlePaint.measureText(label) > maxWidth) {
-            gameIconTitlePaint.textSize *= maxWidth / gameIconTitlePaint.measureText(label)
+        val internationalTitleWidth = gameIconTitlePaint.measureText("INTERNATIONAL DRAUGHTS")
+        if (internationalTitleWidth > maxWidth) {
+            gameIconTitlePaint.textSize *= maxWidth / internationalTitleWidth
         }
-        val baseline = top - 48f * unit
+        val baseline = top - 36f * unit
         val titleHeight = gameIconTitlePaint.textSize
-
-        gameIconTitleGlowPaint.strokeWidth = 2f * unit
-        gameIconTitleGlowPaint.setShadowLayer(
-            12f * unit,
-            0f,
-            0f,
-            Color.argb(220, 35, 179, 255),
-        )
-        canvas.drawLine(
-            centerX - min(size * 0.56f, 104f * unit),
-            top - 30f * unit,
-            centerX + min(size * 0.56f, 104f * unit),
-            top - 30f * unit,
-            gameIconTitleGlowPaint,
-        )
-        gameIconTitleGlowPaint.clearShadowLayer()
 
         gameIconTitlePaint.style = Paint.Style.STROKE
         gameIconTitlePaint.strokeWidth = 5f * unit
