@@ -54,8 +54,12 @@ class ChessMenuView(
     private val isGo = gameLabel.replace(" ", "").equals("GO", ignoreCase = true)
     private val isShogi = gameLabel.replace(" ", "").equals("SHOGI", ignoreCase = true)
     private val isXiangqi = gameLabel.replace(" ", "").equals("XIANGQI", ignoreCase = true)
+    private val isTicTacToe = gameLabel.replace(" ", "").replace("·", "").equals("TICTACTOE", ignoreCase = true)
+    private val isConnectFour = gameLabel.replace(" ", "").replace("·", "").equals("CONNECTFOUR", ignoreCase = true)
+    private val isLudo = gameLabel.replace(" ", "").equals("LUDO", ignoreCase = true)
     private val isChessFamily =
-        isChess || isDraughts || isOthello || isFoxAndGeese || isGo || isShogi || isXiangqi
+        isChess || isDraughts || isOthello || isFoxAndGeese || isGo || isShogi ||
+            isXiangqi || isTicTacToe || isConnectFour || isLudo
     private val isInternationalDraughts =
         gameLabel.replace(" ", "").equals("INTLDRAUGHTS", ignoreCase = true)
     private val contentHeightDp = when {
@@ -75,6 +79,8 @@ class ChessMenuView(
             isGo -> "go_home_icon.png"
             isShogi -> "shogi_home_icon.png"
             isXiangqi -> "xiangqi_home_icon.png"
+            isConnectFour -> "connect_four_home_icon.png"
+            isLudo -> "ludo_home_icon.png"
             else -> null
         }
         assetName?.let {

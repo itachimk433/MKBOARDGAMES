@@ -37,8 +37,12 @@ class ChessRulesView(
     private val isGo = gameLabel.replace(" ", "").equals("GO", ignoreCase = true)
     private val isShogi = gameLabel.replace(" ", "").equals("SHOGI", ignoreCase = true)
     private val isXiangqi = gameLabel.replace(" ", "").equals("XIANGQI", ignoreCase = true)
+    private val isTicTacToe = gameLabel.replace(" ", "").replace("·", "").equals("TICTACTOE", ignoreCase = true)
+    private val isConnectFour = gameLabel.replace(" ", "").replace("·", "").equals("CONNECTFOUR", ignoreCase = true)
+    private val isLudo = gameLabel.replace(" ", "").equals("LUDO", ignoreCase = true)
     private val isChessFamily =
-        isChess || isDraughts || isOthello || isFoxAndGeese || isGo || isShogi || isXiangqi
+        isChess || isDraughts || isOthello || isFoxAndGeese || isGo || isShogi ||
+            isXiangqi || isTicTacToe || isConnectFour || isLudo
 
     init {
         if (isChessFamily || isMorabaraba) {
@@ -183,8 +187,12 @@ private class ChessMancalaRulesView(
     private val isGo = gameLabel.replace(" ", "").equals("GO", ignoreCase = true)
     private val isShogi = gameLabel.replace(" ", "").equals("SHOGI", ignoreCase = true)
     private val isXiangqi = gameLabel.replace(" ", "").equals("XIANGQI", ignoreCase = true)
+    private val isTicTacToe = gameLabel.replace(" ", "").replace("·", "").equals("TICTACTOE", ignoreCase = true)
+    private val isConnectFour = gameLabel.replace(" ", "").replace("·", "").equals("CONNECTFOUR", ignoreCase = true)
+    private val isLudo = gameLabel.replace(" ", "").equals("LUDO", ignoreCase = true)
     private val isChessFamily =
-        isChess || isDraughts || isOthello || isFoxAndGeese || isGo || isShogi || isXiangqi
+        isChess || isDraughts || isOthello || isFoxAndGeese || isGo || isShogi ||
+            isXiangqi || isTicTacToe || isConnectFour || isLudo
     private val gameIconBitmap = run {
         val assetName = when {
             isChess -> "chess_home_icon.png"
@@ -196,6 +204,8 @@ private class ChessMancalaRulesView(
             isGo -> "go_home_icon.png"
             isShogi -> "shogi_home_icon.png"
             isXiangqi -> "xiangqi_home_icon.png"
+            isConnectFour -> "connect_four_home_icon.png"
+            isLudo -> "ludo_home_icon.png"
             else -> null
         }
         assetName?.let {
@@ -296,18 +306,21 @@ private class ChessMancalaRulesView(
         titlePaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         titlePaint.color = Color.WHITE
         titlePaint.textSize = minOf(dp(28f), panelWidth * 0.08f)
-        val displayLabel = if (isDraughts) {
-            gameLabel.replace(" ", "").replace("INTL", "INTL ")
-        } else if (isOthello) {
-            "OTHELLO"
-        } else {
-            "CHESS"
+        val displayLabel = when {
+            isDraughts -> gameLabel.replace(" ", "").replace("INTL", "INTL ")
+            isOthello -> "OTHELLO"
+            isChess -> "CHESS"
+            isTicTacToe -> "TIC-TAC-TOE"
+            isConnectFour -> "CONNECT FOUR"
+            isLudo -> "LUDO"
+            else -> gameLabel
         }
         if (isChessFamily) {
-            gameIconBitmap?.let { bitmap ->
+            val gameIcon = gameIconBitmap
+            if (gameIcon != null) {
                 val size = minOf(panel.width() * 0.16f, dp(58f))
                 canvas.drawBitmap(
-                    bitmap,
+                    gameIcon,
                     null,
                     RectF(
                         panel.centerX() - size / 2f,
@@ -317,6 +330,18 @@ private class ChessMancalaRulesView(
                     ),
                     Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG),
                 )
+            } else {
+                titlePaint.color = Color.parseColor("#FFB45E")
+                titlePaint.textSize = minOf(dp(30f), panelWidth * 0.09f)
+                canvas.drawText(
+                    if (isTicTacToe) "✕" else headerSymbol,
+                    panel.centerX(),
+                    panel.top + dp(34f),
+                    titlePaint,
+                )
+                titlePaint.color = Color.parseColor("#FFE09C")
+                titlePaint.textSize = minOf(dp(11f), panelWidth * 0.04f)
+                canvas.drawText(displayLabel, panel.centerX(), panel.top + dp(55f), titlePaint)
             }
         } else if (!isMorabaraba) {
             canvas.drawText(displayLabel, panel.centerX(), panel.top + dp(52f), titlePaint)

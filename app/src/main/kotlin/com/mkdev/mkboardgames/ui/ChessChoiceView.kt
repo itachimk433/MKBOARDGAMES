@@ -70,8 +70,12 @@ class ChessChoiceView(
     private val isGo = gameLabel.replace(" ", "").equals("GO", ignoreCase = true)
     private val isShogi = gameLabel.replace(" ", "").equals("SHOGI", ignoreCase = true)
     private val isXiangqi = gameLabel.replace(" ", "").equals("XIANGQI", ignoreCase = true)
+    private val isTicTacToe = gameLabel.replace(" ", "").replace("·", "").equals("TICTACTOE", ignoreCase = true)
+    private val isConnectFour = gameLabel.replace(" ", "").replace("·", "").equals("CONNECTFOUR", ignoreCase = true)
+    private val isLudo = gameLabel.replace(" ", "").equals("LUDO", ignoreCase = true)
     private val isChessFamily =
-        isChess || isDraughts || isOthello || isFoxAndGeese || isGo || isShogi || isXiangqi
+        isChess || isDraughts || isOthello || isFoxAndGeese || isGo || isShogi ||
+            isXiangqi || isTicTacToe || isConnectFour || isLudo
     private val gameIconBitmap = run {
         val assetName = when {
             isChess -> "chess_home_icon.png"
@@ -83,6 +87,8 @@ class ChessChoiceView(
             isGo -> "go_home_icon.png"
             isShogi -> "shogi_home_icon.png"
             isXiangqi -> "xiangqi_home_icon.png"
+            isConnectFour -> "connect_four_home_icon.png"
+            isLudo -> "ludo_home_icon.png"
             else -> null
         }
         assetName?.let {
@@ -272,11 +278,12 @@ class ChessChoiceView(
 
     private fun drawChessFamilyHeader(canvas: Canvas, width: Float, topOffset: Float) {
         val center = width / 2f
-        gameIconBitmap?.let { bitmap ->
+        val gameIcon = gameIconBitmap
+        if (gameIcon != null) {
             val size = minOf(width * 0.22f, 66f * unit)
             val top = topOffset + 5f * unit
             canvas.drawBitmap(
-                bitmap,
+                gameIcon,
                 null,
                 RectF(
                     center - size / 2f,
@@ -286,6 +293,16 @@ class ChessChoiceView(
                 ),
                 gameIconPaint,
             )
+        } else {
+            crownPaint.color = Color.parseColor("#FFB45E")
+            canvas.drawText(
+                if (isTicTacToe) "✕" else headerSymbol,
+                center,
+                topOffset + 43f * unit,
+                crownPaint,
+            )
+            eyebrowPaint.color = Color.parseColor("#FFE09C")
+            canvas.drawText(gameLabel, center, topOffset + 58f * unit, eyebrowPaint)
         }
         titlePaint.color = Color.WHITE
         canvas.drawText(title, center, topOffset + 99f * unit, titlePaint)

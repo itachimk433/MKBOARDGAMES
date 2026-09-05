@@ -180,6 +180,7 @@ object StyledDialogs {
             normalizedLabel.contains("MANCALA") -> "●"
             normalizedLabel.contains("MORABARABA") -> "●"
             normalizedLabel.contains("FOX") -> "🦊"
+            normalizedLabel.contains("TICTACTOE") -> "✕"
             gameLabel == "L U D O" -> "⚄"
             else -> "♛"
         }
