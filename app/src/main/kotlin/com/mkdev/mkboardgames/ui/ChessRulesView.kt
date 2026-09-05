@@ -22,22 +22,30 @@ class ChessRulesView(
     var onDone: (() -> Unit)? = null
 
     private val density = resources.displayMetrics.density
+    private val isChess = isChessStyledLabel(gameLabel)
 
     init {
         orientation = VERTICAL
         setPadding((18f * density).toInt(), (18f * density).toInt(), (18f * density).toInt(), (14f * density).toInt())
         background = GradientDrawable(
             GradientDrawable.Orientation.TL_BR,
-            intArrayOf(Color.parseColor("#102C32"), Color.parseColor("#0B1D25")),
+            if (isChess) {
+                intArrayOf(Color.parseColor("#112C68"), Color.parseColor("#061321"))
+            } else {
+                intArrayOf(Color.parseColor("#102C32"), Color.parseColor("#0B1D25"))
+            },
         ).apply {
             cornerRadius = 12f * density
-            setStroke((1f * density).toInt(), Color.parseColor("#2C5960"))
+            setStroke(
+                (1f * density).toInt(),
+                if (isChess) Color.parseColor("#6D89C4") else Color.parseColor("#2C5960"),
+            )
         }
 
         addView(TextView(context).apply {
             text = headerSymbol
             gravity = Gravity.CENTER
-            setTextColor(Color.parseColor("#E3B86A"))
+            setTextColor(if (isChess) Color.parseColor("#FFB45E") else Color.parseColor("#E3B86A"))
             setTextSize(22f)
             setPadding(0, 0, 0, (1f * density).toInt())
         }, LayoutParams(LayoutParams.MATCH_PARENT, (32f * density).toInt()))
@@ -45,7 +53,7 @@ class ChessRulesView(
         addView(TextView(context).apply {
             text = gameLabel
             gravity = Gravity.CENTER
-            setTextColor(Color.parseColor("#E3B86A"))
+            setTextColor(if (isChess) Color.parseColor("#FFE09C") else Color.parseColor("#E3B86A"))
             setTypeface(typeface, android.graphics.Typeface.BOLD)
             setTextSize(11f)
             letterSpacing = 0.18f
@@ -71,11 +79,14 @@ class ChessRulesView(
         val scroll = ScrollView(context).apply {
             isFillViewport = true
             overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
-            background = roundedBackground(Color.parseColor("#0D252B"), 8f)
+            background = roundedBackground(
+                if (isChess) Color.parseColor("#102951") else Color.parseColor("#0D252B"),
+                8f,
+            )
         }
         scroll.addView(TextView(context).apply {
             text = rulesText
-            setTextColor(Color.parseColor("#D7E1E0"))
+            setTextColor(if (isChess) Color.parseColor("#E4F1F0") else Color.parseColor("#D7E1E0"))
             setTextSize(14f)
             setLineSpacing(4f * density, 1f)
             setPadding((16f * density).toInt(), (16f * density).toInt(), (16f * density).toInt(), (18f * density).toInt())
@@ -88,10 +99,23 @@ class ChessRulesView(
         addView(TextView(context).apply {
             text = "Got it"
             gravity = Gravity.CENTER
-            setTextColor(Color.parseColor("#102C32"))
+            setTextColor(if (isChess) Color.parseColor("#4A1714") else Color.parseColor("#102C32"))
             setTypeface(typeface, android.graphics.Typeface.BOLD)
             setTextSize(14f)
-            background = roundedBackground(Color.parseColor("#E3B86A"), 8f)
+            background = if (isChess) {
+                GradientDrawable(
+                    GradientDrawable.Orientation.TOP_BOTTOM,
+                    intArrayOf(
+                        Color.parseColor("#F7D99B"),
+                        Color.parseColor("#C8894C"),
+                        Color.parseColor("#85502D"),
+                    ),
+                ).apply {
+                    cornerRadius = 8f * density
+                }
+            } else {
+                roundedBackground(Color.parseColor("#E3B86A"), 8f)
+            }
             setOnClickListener {
                 performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
                 onDone?.invoke()

@@ -43,6 +43,12 @@ class ChessMenuView(
     private val textScale = scaledDensity.coerceAtMost(2f)
     private val fullScreen = isFullScreenStyledGameLabel(gameLabel)
     private val isChess = gameLabel.replace(" ", "").equals("CHESS", ignoreCase = true)
+    private val contentHeightDp = when {
+        isChess && hasResumeMatch -> 548f
+        isChess -> 500f
+        hasResumeMatch -> 462f
+        else -> 414f
+    }
     private val chessHomeIconBitmap = try {
         context.assets.open("chess_home_icon.png").use { BitmapFactory.decodeStream(it) }
     } catch (_: Throwable) {
@@ -125,7 +131,7 @@ class ChessMenuView(
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        val desiredHeight = if (hasResumeMatch) 462f * unit else 414f * unit
+        val desiredHeight = contentHeightDp * unit
         val measuredWidth = MeasureSpec.getSize(widthMeasureSpec)
         val measuredHeight = if (fullScreen && MeasureSpec.getMode(heightMeasureSpec) != MeasureSpec.UNSPECIFIED) {
             MeasureSpec.getSize(heightMeasureSpec)
@@ -136,7 +142,7 @@ class ChessMenuView(
     }
 
     override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
-        val contentHeight = if (hasResumeMatch) 462f * unit else 414f * unit
+        val contentHeight = contentHeightDp * unit
         contentOffset = if (fullScreen) {
             ((height - contentHeight) / 2f).coerceAtLeast(0f)
         } else {
@@ -145,7 +151,7 @@ class ChessMenuView(
         val sidePadding = 18f * unit
         val gap = 10f * unit
         val actionWidth = (width - sidePadding * 2f - gap) / 2f
-        val actionTop = contentOffset + 164f * unit
+        val actionTop = contentOffset + (if (isChess) 244f else 164f) * unit
         val actionHeight = 82f * unit
 
         actions = listOf(
@@ -231,7 +237,7 @@ class ChessMenuView(
             canvas.drawText(
                 "Choose your move. The board is waiting.",
                 width / 2f,
-                contentOffset + (if (hasResumeMatch) 462f else 414f) * unit - 17f * unit,
+                contentOffset + contentHeightDp * unit - 17f * unit,
                 footerPaint,
             )
         }
@@ -313,8 +319,8 @@ class ChessMenuView(
 
     private fun drawChessHero(canvas: Canvas, width: Float, topOffset: Float) {
         chessHomeIconBitmap?.let { bitmap ->
-            val size = min(width * 0.58f, 250f * unit)
-            val top = topOffset + 52f * unit
+            val size = min(width * 0.30f, 125f * unit)
+            val top = topOffset + 6f * unit
             chessHeroPaint.alpha = 190
             chessHeroPaint.setShadowLayer(18f * unit, 0f, 12f * unit, Color.argb(150, 0, 0, 0))
             canvas.drawBitmap(
@@ -334,8 +340,8 @@ class ChessMenuView(
     }
 
     private fun drawChessHeader(canvas: Canvas, width: Float, topOffset: Float) {
-        val baseline = topOffset + 106f * unit
-        chessTitlePaint.textSize = min(width * 0.145f, 58f * unit).coerceAtLeast(36f * unit)
+        val baseline = topOffset + 180f * unit
+        chessTitlePaint.textSize = min(width * 0.13f, 52f * unit).coerceAtLeast(36f * unit)
         chessTitlePaint.style = Paint.Style.STROKE
         chessTitlePaint.strokeWidth = 3.5f * unit
         chessTitlePaint.color = Color.argb(220, 49, 20, 56)
@@ -346,9 +352,9 @@ class ChessMenuView(
         chessTitlePaint.style = Paint.Style.FILL
         chessTitlePaint.shader = LinearGradient(
             0f,
-            topOffset + 54f * unit,
+            topOffset + 128f * unit,
             0f,
-            topOffset + 122f * unit,
+            topOffset + 196f * unit,
             intArrayOf(
                 Color.parseColor("#FFF1B6"),
                 Color.parseColor("#FFB45E"),
@@ -365,12 +371,12 @@ class ChessMenuView(
 
         titlePaint.color = Color.WHITE
         titlePaint.textSize = 24f * textScale
-        canvas.drawText("Choose your match", width / 2f, topOffset + 137f * unit, titlePaint)
+        canvas.drawText("Choose your match", width / 2f, topOffset + 210f * unit, titlePaint)
         subtitlePaint.color = Color.parseColor("#D6E8FF")
         canvas.drawText(
             "A good game starts with the right opponent.",
             width / 2f,
-            topOffset + 158f * unit,
+            topOffset + 231f * unit,
             subtitlePaint,
         )
     }
@@ -449,63 +455,17 @@ class ChessMenuView(
     }
 
     private fun drawChessAction(canvas: Canvas, action: MenuAction) {
-        val scale = actionScale[action.label] ?: 1f
         val rect = action.rect
         val pressed = pressedAction == action
-        val offset = if (pressed) 2f * unit else 0f
-        val drawn = RectF(rect.left, rect.top + offset, rect.right, rect.bottom + offset)
-        val radius = 13f * unit
-
-        canvas.save()
-        canvas.scale(scale, scale, rect.centerX(), rect.centerY())
-        panelPaint.shader = LinearGradient(
-            0f,
-            drawn.top,
-            0f,
-            drawn.bottom,
-            intArrayOf(
-                Color.parseColor("#F7D99B"),
-                Color.parseColor("#C8894C"),
-                Color.parseColor("#85502D"),
-            ),
-            floatArrayOf(0f, 0.5f, 1f),
-            Shader.TileMode.CLAMP,
-        )
-        panelPaint.setShadowLayer(
-            if (pressed) 2f * unit else 6f * unit,
-            0f,
-            4f * unit,
-            Color.argb(190, 15, 4, 2),
-        )
-        canvas.drawRoundRect(drawn, radius, radius, panelPaint)
-        panelPaint.clearShadowLayer()
-        panelPaint.shader = null
-
-        panelBorderPaint.color = Color.parseColor("#7B4025")
-        panelBorderPaint.strokeWidth = 2f * unit
-        canvas.drawRoundRect(drawn, radius, radius, panelBorderPaint)
-        panelBorderPaint.color = Color.argb(180, 255, 246, 220)
-        panelBorderPaint.strokeWidth = unit
-        canvas.drawRoundRect(
-            RectF(
-                drawn.left + 3f * unit,
-                drawn.top + 3f * unit,
-                drawn.right - 3f * unit,
-                drawn.bottom - 3f * unit,
-            ),
-            radius * 0.82f,
-            radius * 0.82f,
-            panelBorderPaint,
-        )
-
+        drawChessWoodButton(canvas, rect, pressed, unit)
+        val drawnTop = rect.top + if (pressed) 2f * unit else 0f
         actionSymbolPaint.color = Color.parseColor("#63301F")
         actionSymbolPaint.textSize = 23f * textScale
-        canvas.drawText(action.symbol, drawn.centerX(), drawn.top + 28f * unit, actionSymbolPaint)
+        canvas.drawText(action.symbol, rect.centerX(), drawnTop + 28f * unit, actionSymbolPaint)
         actionLabelPaint.color = Color.parseColor("#4A1714")
-        canvas.drawText(action.label, drawn.centerX(), drawn.top + 55f * unit, actionLabelPaint)
+        canvas.drawText(action.label, rect.centerX(), drawnTop + 55f * unit, actionLabelPaint)
         actionDetailPaint.color = Color.parseColor("#6A2D1B")
-        canvas.drawText(action.detail, drawn.centerX(), drawn.top + 72f * unit, actionDetailPaint)
-        canvas.restore()
+        canvas.drawText(action.detail, rect.centerX(), drawnTop + 72f * unit, actionDetailPaint)
     }
 
     private fun drawCenteredActionText(canvas: Canvas, rect: RectF, action: MenuAction) {
@@ -537,34 +497,12 @@ class ChessMenuView(
     }
 
     private fun drawChessResumeAction(canvas: Canvas, width: Float) {
-        val offset = if (resumePressed) 2f * unit else 0f
-        val drawn = RectF(
-            resumeRect.left,
-            resumeRect.top + offset,
-            resumeRect.right,
-            resumeRect.bottom + offset,
-        )
-        val radius = 12f * unit
-        panelPaint.shader = LinearGradient(
-            0f,
-            drawn.top,
-            0f,
-            drawn.bottom,
-            Color.parseColor("#F2D095"),
-            Color.parseColor("#93562F"),
-            Shader.TileMode.CLAMP,
-        )
-        panelPaint.setShadowLayer(5f * unit, 0f, 4f * unit, Color.argb(180, 10, 5, 2))
-        canvas.drawRoundRect(drawn, radius, radius, panelPaint)
-        panelPaint.clearShadowLayer()
-        panelPaint.shader = null
-        panelBorderPaint.color = Color.parseColor("#71391F")
-        panelBorderPaint.strokeWidth = unit
-        canvas.drawRoundRect(drawn, radius, radius, panelBorderPaint)
+        drawChessWoodButton(canvas, resumeRect, resumePressed, unit)
+        val drawnTop = resumeRect.top + if (resumePressed) 2f * unit else 0f
         resumePaint.color = Color.parseColor("#4A1714")
-        canvas.drawText("RESUME SAVED MATCH", width / 2f, drawn.top + 20f * unit, resumePaint)
+        canvas.drawText("RESUME SAVED MATCH", width / 2f, drawnTop + 20f * unit, resumePaint)
         footerPaint.color = Color.parseColor("#6A2D1B")
-        canvas.drawText("Tap here to continue your last game", width / 2f, drawn.top + 38f * unit, footerPaint)
+        canvas.drawText("Tap here to continue your last game", width / 2f, drawnTop + 38f * unit, footerPaint)
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
@@ -577,17 +515,14 @@ class ChessMenuView(
                     resumePressed = true
                     performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
                 }
-                pressedAction?.let {
-                    performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-                    animateAction(it, 0.95f)
-                }
+                pressedAction?.let { performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY) }
                 invalidate()
                 return true
             }
 
             MotionEvent.ACTION_MOVE -> {
                 if (kotlin.math.hypot((event.x - downX).toDouble(), (event.y - downY).toDouble()) > 18f * unit) {
-                    pressedAction?.let { animateAction(it, 1f) }
+                    if (!isChess) pressedAction?.let { animateAction(it, 1f) }
                     pressedAction = null
                     resumePressed = false
                     invalidate()
@@ -597,7 +532,7 @@ class ChessMenuView(
 
             MotionEvent.ACTION_UP -> {
                 val action = pressedAction
-                action?.let { animateAction(it, 1f) }
+                if (!isChess) action?.let { animateAction(it, 1f) }
                 if (action != null && action.rect.contains(event.x, event.y)) {
                     SoundPlayer.play("ui_click")
                     action.action()
@@ -612,7 +547,7 @@ class ChessMenuView(
             }
 
             MotionEvent.ACTION_CANCEL -> {
-                pressedAction?.let { animateAction(it, 1f) }
+                if (!isChess) pressedAction?.let { animateAction(it, 1f) }
                 pressedAction = null
                 resumePressed = false
                 invalidate()

@@ -60,6 +60,7 @@ class ChessChoiceView(
     private val unit = density.coerceAtLeast(1f)
     private val textScale = scaledDensity.coerceAtMost(2f)
     private val fullScreen = fullScreenOverride ?: isFullScreenStyledGameLabel(gameLabel)
+    private val isChess = isChessStyledLabel(gameLabel)
     private val surfacePaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val cardPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -157,24 +158,40 @@ class ChessChoiceView(
     override fun onDraw(canvas: Canvas) {
         val width = width.toFloat()
         val height = height.toFloat()
-        surfacePaint.shader = LinearGradient(
-            0f,
-            0f,
-            width,
-            height,
-            Color.parseColor("#102C32"),
-            Color.parseColor("#0B1D25"),
-            Shader.TileMode.CLAMP,
-        )
-        if (fullScreen) {
-            canvas.drawRect(0f, 0f, width, height, surfacePaint)
+        if (isChess) {
+            drawChessAtmosphere(canvas, width, height, unit, rounded = !fullScreen)
         } else {
-            canvas.drawRoundRect(0f, 0f, width, height, 12f * unit, 12f * unit, surfacePaint)
+            surfacePaint.shader = LinearGradient(
+                0f,
+                0f,
+                width,
+                height,
+                Color.parseColor("#102C32"),
+                Color.parseColor("#0B1D25"),
+                Shader.TileMode.CLAMP,
+            )
+            if (fullScreen) {
+                canvas.drawRect(0f, 0f, width, height, surfacePaint)
+            } else {
+                canvas.drawRoundRect(0f, 0f, width, height, 12f * unit, 12f * unit, surfacePaint)
+            }
+            surfacePaint.shader = null
         }
-        surfacePaint.shader = null
 
-        drawHeader(canvas, width, contentOffset)
+        if (isChess) drawChessHeader(canvas, width, contentOffset) else drawHeader(canvas, width, contentOffset)
         hits.forEach { drawChoice(canvas, it) }
+    }
+
+    private fun drawChessHeader(canvas: Canvas, width: Float, topOffset: Float) {
+        val center = width / 2f
+        crownPaint.color = Color.parseColor("#FFB45E")
+        canvas.drawText(headerSymbol, center, topOffset + 43f * unit, crownPaint)
+        eyebrowPaint.color = Color.parseColor("#FFE09C")
+        canvas.drawText(gameLabel, center, topOffset + 58f * unit, eyebrowPaint)
+        titlePaint.color = Color.WHITE
+        canvas.drawText(title, center, topOffset + 99f * unit, titlePaint)
+        subtitlePaint.color = Color.parseColor("#D6E8FF")
+        canvas.drawText(subtitle, center, topOffset + 125f * unit, subtitlePaint)
     }
 
     private fun drawHeader(canvas: Canvas, width: Float, topOffset: Float) {
@@ -204,6 +221,10 @@ class ChessChoiceView(
     }
 
     private fun drawChoice(canvas: Canvas, hit: ChoiceHit) {
+        if (isChess) {
+            drawChessChoice(canvas, hit)
+            return
+        }
         val scale = scales[hit.index] ?: 1f
         val rect = hit.rect
         val pressed = pressedIndex == hit.index
@@ -230,6 +251,31 @@ class ChessChoiceView(
         canvas.restore()
     }
 
+    private fun drawChessChoice(canvas: Canvas, hit: ChoiceHit) {
+        val rect = hit.rect
+        val pressed = pressedIndex == hit.index
+        drawChessWoodButton(canvas, rect, pressed, unit)
+        val top = rect.top + if (pressed) 2f * unit else 0f
+
+        if (hit.choice.symbol.isNotBlank()) {
+            iconPaint.color = Color.parseColor("#63301F")
+            iconPaint.textSize = 23f * textScale
+            canvas.drawText(hit.choice.symbol, rect.centerX(), top + 29f * unit, iconPaint)
+            labelPaint.color = Color.parseColor("#4A1714")
+            canvas.drawText(hit.choice.label, rect.centerX(), top + 56f * unit, labelPaint)
+            detailPaint.color = Color.parseColor("#6A2D1B")
+            canvas.drawText(hit.choice.detail, rect.centerX(), top + 74f * unit, detailPaint)
+        } else {
+            labelPaint.color = Color.parseColor("#4A1714")
+            detailPaint.color = Color.parseColor("#6A2D1B")
+            drawCenteredChoiceText(
+                canvas,
+                RectF(rect.left, top, rect.right, rect.bottom + (top - rect.top)),
+                hit.choice,
+            )
+        }
+    }
+
     private fun drawCenteredChoiceText(canvas: Canvas, rect: RectF, choice: Choice) {
         val labelMetrics = labelPaint.fontMetrics
         val detailMetrics = detailPaint.fontMetrics
@@ -250,16 +296,13 @@ class ChessChoiceView(
                 downX = event.x
                 downY = event.y
                 pressedIndex = hits.firstOrNull { it.rect.contains(event.x, event.y) }?.index
-                pressedIndex?.let {
-                    performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-                    animateScale(it, 0.95f)
-                }
+                pressedIndex?.let { performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY) }
                 invalidate()
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
                 if (kotlin.math.hypot((event.x - downX).toDouble(), (event.y - downY).toDouble()) > 18f * unit) {
-                    pressedIndex?.let { animateScale(it, 1f) }
+                    if (!isChess) pressedIndex?.let { animateScale(it, 1f) }
                     pressedIndex = null
                     invalidate()
                 }
@@ -267,7 +310,7 @@ class ChessChoiceView(
             }
             MotionEvent.ACTION_UP -> {
                 val selected = pressedIndex
-                selected?.let { animateScale(it, 1f) }
+                if (!isChess) selected?.let { animateScale(it, 1f) }
                 if (selected != null && hits[selected].rect.contains(event.x, event.y)) {
                     SoundPlayer.play("ui_click")
                     onChoiceSelected?.invoke(selected)
@@ -277,7 +320,7 @@ class ChessChoiceView(
                 return true
             }
             MotionEvent.ACTION_CANCEL -> {
-                pressedIndex?.let { animateScale(it, 1f) }
+                if (!isChess) pressedIndex?.let { animateScale(it, 1f) }
                 pressedIndex = null
                 invalidate()
                 return true

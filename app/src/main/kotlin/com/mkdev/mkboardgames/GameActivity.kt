@@ -435,6 +435,7 @@ class GameActivity : AppCompatActivity() {
                     Color.parseColor("#A9B6E8"),
                 ),
             ),
+            gameLabel = styledGameLabel(),
         )
         val dialog = Dialog(this)
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
@@ -1752,6 +1753,7 @@ Checkmate your opponent's King.
                     Color.parseColor("#E58A7A"),
                 ),
             ),
+            gameLabel = styledGameLabel(),
         )
         val dialog = Dialog(this)
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
@@ -1894,6 +1896,7 @@ Checkmate your opponent's King.
                     Color.parseColor("#E3B86A"),
                 ),
             ),
+            gameLabel = styledGameLabel(),
         )
         val dialog = Dialog(this)
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
