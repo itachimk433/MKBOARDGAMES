@@ -51,6 +51,10 @@ class MenuView(context: Context) : View(context) {
         (context.resources.getDrawable(R.drawable.ic_app_logo, null) as? BitmapDrawable)?.bitmap
     } catch (e: Exception) { null }
 
+    private val homeBackgroundBitmap: Bitmap? = try {
+        context.assets.open("mk_board_home_background.webp").use { BitmapFactory.decodeStream(it) }
+    } catch (e: Exception) { null }
+
     private val ludoHomeIconBitmap: Bitmap? = try {
         context.assets.open("ludo_home_icon.png").use { BitmapFactory.decodeStream(it) }
     } catch (e: Exception) { null }
@@ -129,6 +133,12 @@ class MenuView(context: Context) : View(context) {
     private val miniLightPaint = Paint().apply { color = Color.parseColor("#F0D9B5") }
     private val miniDarkPaint  = Paint().apply { color = Color.parseColor("#B58863") }
     private val bitmapPaint    = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+    private val homeBackgroundPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
+        alpha = 190
+    }
+    private val homeBackgroundScrimPaint = Paint().apply {
+        color = Color.argb(105, 0, 0, 0)
+    }
 
     private val gridColumns = 3
     private val cardH = 136f * dp
@@ -245,6 +255,7 @@ class MenuView(context: Context) : View(context) {
     // ── Draw ──────────────────────────────────────────────────────────────────
     override fun onDraw(canvas: Canvas) {
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
+        drawHomeBackground(canvas)
         // The header, game cards, and footer are one continuous scrollable
         // surface. This keeps the home screen predictable on short displays
         // and makes the version/settings area move with the game catalogue.
@@ -257,6 +268,31 @@ class MenuView(context: Context) : View(context) {
         cards.forEach { drawCard(canvas, it) }
         drawFooter(canvas)
         canvas.restore()
+    }
+
+    private fun drawHomeBackground(canvas: Canvas) {
+        val bitmap = homeBackgroundBitmap ?: return
+        val scale = maxOf(
+            width.toFloat() / bitmap.width.toFloat(),
+            height.toFloat() / bitmap.height.toFloat(),
+        )
+        val scaledWidth = bitmap.width * scale
+        val scaledHeight = bitmap.height * scale
+        val left = (width - scaledWidth) / 2f
+        val top = (height - scaledHeight) / 2f
+        canvas.drawBitmap(
+            bitmap,
+            null,
+            RectF(left, top, left + scaledWidth, top + scaledHeight),
+            homeBackgroundPaint,
+        )
+        canvas.drawRect(
+            0f,
+            0f,
+            width.toFloat(),
+            height.toFloat(),
+            homeBackgroundScrimPaint,
+        )
     }
 
     private fun drawTitle(canvas: Canvas) {
