@@ -22,9 +22,14 @@ class MenuView(context: Context) : View(context) {
     var isLightMode: Boolean = false
         set(v) { field = v; applyLightTheme(); invalidate() }
 
+    var isHomeBackgroundEnabled: Boolean = false
+        set(v) { field = v; invalidate() }
+
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
         isLightMode = com.mkdev.mkboardgames.SettingsManager.isLightMode(context)
+        isHomeBackgroundEnabled =
+            com.mkdev.mkboardgames.SettingsManager.isHomeBackgroundEnabled(context)
         com.mkdev.mkboardgames.SoundPlayer.init(context)
     }
 
@@ -255,7 +260,7 @@ class MenuView(context: Context) : View(context) {
     // ── Draw ──────────────────────────────────────────────────────────────────
     override fun onDraw(canvas: Canvas) {
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
-        drawHomeBackground(canvas)
+        if (isHomeBackgroundEnabled) drawHomeBackground(canvas)
         // The header, game cards, and footer are one continuous scrollable
         // surface. This keeps the home screen predictable on short displays
         // and makes the version/settings area move with the game catalogue.

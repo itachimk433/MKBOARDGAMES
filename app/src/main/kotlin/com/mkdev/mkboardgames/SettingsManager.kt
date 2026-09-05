@@ -220,6 +220,13 @@ object SettingsManager {
     fun isLightMode(ctx: Context) = prefs(ctx).getBoolean(KEY_LIGHT_MODE, false)
     fun setLightMode(ctx: Context, v: Boolean) = prefs(ctx).edit().putBoolean(KEY_LIGHT_MODE, v).apply()
 
+    // ── Home background ──────────────────────────────────────────────────────
+    private const val KEY_HOME_BACKGROUND = "home_background"
+    fun isHomeBackgroundEnabled(ctx: Context) =
+        prefs(ctx).getBoolean(KEY_HOME_BACKGROUND, false)
+    fun setHomeBackgroundEnabled(ctx: Context, v: Boolean) =
+        prefs(ctx).edit().putBoolean(KEY_HOME_BACKGROUND, v).apply()
+
     // ── Hints ────────────────────────────────────────────────────────────────
     fun getChessHints(ctx: Context) = prefs(ctx).getBoolean(KEY_CHESS_HINTS, true)
     fun setChessHints(ctx: Context, v: Boolean) = prefs(ctx).edit().putBoolean(KEY_CHESS_HINTS, v).apply()

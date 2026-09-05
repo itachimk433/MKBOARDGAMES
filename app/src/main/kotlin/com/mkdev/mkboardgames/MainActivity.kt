@@ -209,6 +209,18 @@ class MainActivity : AppCompatActivity() {
             movSoundVal.text = if (movementSounds) "On" else "Off"
         }
         root.addView(movSoundRow)
+
+        var homeBackground = SettingsManager.isHomeBackgroundEnabled(ctx)
+        val (homeBackgroundRow, homeBackgroundVal) =
+            settingRow("🪵", "Wood Home Background", if (homeBackground) "On" else "Off")
+        homeBackgroundRow.setOnClickListener {
+            homeBackground = !homeBackground
+            SettingsManager.setHomeBackgroundEnabled(ctx, homeBackground)
+            menu.isHomeBackgroundEnabled = homeBackground
+            homeBackgroundVal.text = if (homeBackground) "On" else "Off"
+        }
+        root.addView(homeBackgroundRow)
+
         var motionDice = SettingsManager.isMotionDiceEnabled(ctx)
         val (motionDiceRow, motionDiceVal) =
             settingRow("◈", "Motion Dice", if (motionDice) "On" else "Off")
