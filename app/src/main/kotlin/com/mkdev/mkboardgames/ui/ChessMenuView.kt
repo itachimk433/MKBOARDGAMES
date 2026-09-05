@@ -289,7 +289,18 @@ class ChessMenuView(
         val width = width.toFloat()
         val height = height.toFloat()
         if (isChess || isDraughts) {
-            drawChessBackdrop(canvas, width, height)
+            if (isDraughts) {
+                drawDraughtsAtmosphere(
+                    canvas,
+                    width,
+                    height,
+                    unit,
+                    rounded = !fullScreen,
+                    phase = backgroundPhase * backgroundSpeedMultiplier,
+                )
+            } else {
+                drawChessBackdrop(canvas, width, height)
+            }
             if (isChess) {
                 drawChessHero(canvas, width, contentOffset)
                 drawChessHeader(canvas, width, contentOffset)

@@ -3,11 +3,9 @@ package com.mkdev.mkboardgames
 import android.content.Context
 import android.content.Intent
 import android.graphics.*
-import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
 import android.view.*
 import android.widget.*
-import android.app.Dialog
 import androidx.appcompat.app.AppCompatActivity
 import com.mkdev.mkboardgames.engine.*
 import com.mkdev.mkboardgames.games.morabaraba.MorabarabaBoard
@@ -15,11 +13,10 @@ import com.mkdev.mkboardgames.games.morabaraba.MorabarabaRuleEngine
 import com.mkdev.mkboardgames.ui.AutoplayButtonView
 import com.mkdev.mkboardgames.ui.CaptureStripView
 import com.mkdev.mkboardgames.ui.ChessChoiceView
-import com.mkdev.mkboardgames.ui.ChessRulesView
 import com.mkdev.mkboardgames.ui.BoardStyleSwitchView
 import com.mkdev.mkboardgames.ui.MorabaraBoardView
 import com.mkdev.mkboardgames.ui.MorabarabaBoardStyle
-import com.mkdev.mkboardgames.ui.isFullScreenStyledGameLabel
+import com.mkdev.mkboardgames.ui.StyledDialogs
 import kotlinx.coroutines.*
 
 class MorabarabaActivity : AppCompatActivity() {
@@ -153,6 +150,7 @@ class MorabarabaActivity : AppCompatActivity() {
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
+        if (StyledDialogs.handleBackPressed()) return
         if (!matchStarted) {
             @Suppress("DEPRECATION") super.onBackPressed(); return
         }
@@ -238,59 +236,20 @@ class MorabarabaActivity : AppCompatActivity() {
         fullScreen: Boolean = true,
         onCancel: (() -> Unit)? = null,
     ) {
-        val view = ChessChoiceView(
-            this,
-            title = title,
-            subtitle = subtitle,
-            choices = choices,
-            gameLabel = "M O R A B A R A B A",
-            fullScreenOverride = fullScreen,
-        )
         hideBoardWhileDialogIsOpen()
-        val dialog = Dialog(this)
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
-        dialog.setContentView(view)
-        dialog.setCanceledOnTouchOutside(true)
-        dialog.setOnCancelListener {
-            onCancel?.invoke() ?: run {
+        StyledDialogs.showChoices(
+            this,
+            title,
+            subtitle,
+            choices,
+            heightDp,
+            "M O R A B A R A B A",
+            onCancel = onCancel ?: {
                 if (matchStarted) showBoardAfterDialog() else finish()
-            }
-        }
-        view.onChoiceSelected = { which ->
-            dialog.dismiss()
+            },
+            fullScreen = fullScreen,
+        ) { which, _ ->
             actions.getOrNull(which)?.invoke()
-        }
-        dialog.show()
-        styleMorabarabaDialog(dialog, heightDp, fullScreen)
-    }
-
-    private fun styleMorabarabaDialog(dialog: Dialog, heightDp: Float, fullScreen: Boolean = true) {
-        val metrics = resources.displayMetrics
-        if (fullScreen) {
-            dialog.window?.let { window ->
-                window.setBackgroundDrawable(ColorDrawable(Color.parseColor("#0B1D25")))
-                window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-                window.setWindowAnimations(0)
-                window.decorView.setPadding(0, 0, 0, 0)
-                window.setGravity(Gravity.CENTER)
-                window.setLayout(
-                    WindowManager.LayoutParams.MATCH_PARENT,
-                    WindowManager.LayoutParams.MATCH_PARENT,
-                )
-            }
-            return
-        }
-        val horizontalMargin = (24f * metrics.density).toInt()
-        val maxWidth = (420f * metrics.density).toInt()
-        val width = minOf(metrics.widthPixels - horizontalMargin * 2, maxWidth)
-        val maxHeight = (metrics.heightPixels * 0.84f).toInt()
-        val height = minOf((heightDp * metrics.density).toInt(), maxHeight)
-        dialog.window?.let { window ->
-            window.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-            window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-            window.setWindowAnimations(0)
-            window.attributes = window.attributes.apply { dimAmount = 0.72f }
-            window.setLayout(width, height)
         }
     }
 
@@ -801,27 +760,21 @@ You win by either:
 • Reducing your opponent to fewer than 3 cows, OR
 • Leaving your opponent with no legal moves.
             """.trimIndent()
-        val dialog = Dialog(this)
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
-        val view = ChessRulesView(this, "Morabaraba", rulesText, "M O R A B A R A B A")
-        dialog.setContentView(view)
-        dialog.setCanceledOnTouchOutside(true)
-        dialog.setOnDismissListener {
-            if (!isFinishing) {
-                if (showModeAfter) showModeDialog() else showBoardAfterDialog()
-            }
-        }
-        dialog.setOnCancelListener { }
-        view.onDone = {
-            dialog.dismiss()
-        }
-        dialog.show()
-        styleMorabarabaDialog(dialog, 620f)
+        StyledDialogs.showRules(
+            this,
+            "Morabaraba",
+            rulesText,
+            "M O R A B A R A B A",
+            onDone = {
+                if (!isFinishing) {
+                    if (showModeAfter) showModeDialog() else showBoardAfterDialog()
+                }
+            },
+        )
     }
 
     private fun hideBoardWhileDialogIsOpen() {
-        // Dialogs are separate windows. Keep this activity's game surface
-        // mounted underneath them so dialog swaps cannot reveal black.
+        // Keep the game surface mounted under the in-activity overlay.
         gameRoot.visibility = View.VISIBLE
     }
 

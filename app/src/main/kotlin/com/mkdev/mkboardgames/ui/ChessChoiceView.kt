@@ -182,7 +182,18 @@ class ChessChoiceView(
         val width = width.toFloat()
         val height = height.toFloat()
         if (isChess || isDraughts) {
-            drawChessAtmosphere(canvas, width, height, unit, rounded = !fullScreen)
+            if (isDraughts) {
+                drawDraughtsAtmosphere(
+                    canvas,
+                    width,
+                    height,
+                    unit,
+                    rounded = !fullScreen,
+                    phase = atmospherePhase,
+                )
+            } else {
+                drawChessAtmosphere(canvas, width, height, unit, rounded = !fullScreen)
+            }
         } else {
             surfacePaint.shader = LinearGradient(
                 0f,

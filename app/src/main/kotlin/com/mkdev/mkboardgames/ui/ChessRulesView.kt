@@ -202,7 +202,18 @@ private class ChessMancalaRulesView(
     override fun onDraw(canvas: Canvas) {
         val width = width.toFloat()
         val height = height.toFloat()
-        drawChessAtmosphere(canvas, width, height, density, rounded = false)
+        if (isDraughts) {
+            drawDraughtsAtmosphere(
+                canvas,
+                width,
+                height,
+                density,
+                rounded = false,
+                phase = atmospherePhase,
+            )
+        } else {
+            drawChessAtmosphere(canvas, width, height, density, rounded = false)
+        }
 
         val panelWidth = minOf(width * 0.9f, dp(610f))
         val panelHeight = minOf(height * 0.9f, dp(700f))

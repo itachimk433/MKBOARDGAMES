@@ -173,6 +173,7 @@ class ConnectFourActivity : AppCompatActivity() {
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
+        if (StyledDialogs.handleBackPressed()) return
         if (matchStarted && gameState.status != GameStatus.IN_PROGRESS) {
             showResultDialog()
             return

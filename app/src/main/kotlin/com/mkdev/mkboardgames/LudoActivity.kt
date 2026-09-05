@@ -347,6 +347,7 @@ class LudoActivity : AppCompatActivity() {
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
+        if (StyledDialogs.handleBackPressed()) return
         if (matchStarted && state.status != GameStatus.IN_PROGRESS) {
             showResultDialog()
             return
