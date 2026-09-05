@@ -126,6 +126,13 @@ class ChessMenuView(
     }
     private val chessBackdropPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val chessHeroPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+    private val gameIconLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#FFF0C2")
+        textAlign = Paint.Align.CENTER
+        isFakeBoldText = true
+        letterSpacing = 0.08f
+        typeface = Typeface.create("sans-serif-condensed", Typeface.BOLD)
+    }
     private val chessWavePaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val chessWaveEdgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
@@ -628,6 +635,13 @@ class ChessMenuView(
                 ),
                 chessHeroPaint,
             )
+            drawGameIconLabel(
+                canvas,
+                if (isInternationalDraughts) "INTERNATIONAL DRAUGHTS" else "DRAUGHTS",
+                width / 2f,
+                top,
+                size,
+            )
         }
     }
 
@@ -647,7 +661,35 @@ class ChessMenuView(
                 ),
                 chessHeroPaint,
             )
+            drawGameIconLabel(canvas, "OTHELLO", width / 2f, top, size)
         }
+    }
+
+    private fun drawGameIconLabel(
+        canvas: Canvas,
+        label: String,
+        centerX: Float,
+        top: Float,
+        size: Float,
+    ) {
+        val maxWidth = size * 0.92f
+        val baseSize = if (label.length > 12) 11f else 15f
+        gameIconLabelPaint.textSize = baseSize * textScale
+        if (gameIconLabelPaint.measureText(label) > maxWidth) {
+            gameIconLabelPaint.textSize *= maxWidth / gameIconLabelPaint.measureText(label)
+        }
+        val baseline = top + size * 0.19f
+
+        gameIconLabelPaint.style = Paint.Style.STROKE
+        gameIconLabelPaint.strokeWidth = 3f * unit
+        gameIconLabelPaint.color = Color.argb(220, 24, 16, 32)
+        canvas.drawText(label, centerX, baseline, gameIconLabelPaint)
+
+        gameIconLabelPaint.style = Paint.Style.FILL
+        gameIconLabelPaint.color = Color.parseColor("#FFF0C2")
+        gameIconLabelPaint.setShadowLayer(4f * unit, 0f, 2f * unit, Color.argb(210, 12, 8, 20))
+        canvas.drawText(label, centerX, baseline, gameIconLabelPaint)
+        gameIconLabelPaint.clearShadowLayer()
     }
 
     private fun drawDraughtsHeader(canvas: Canvas, width: Float, topOffset: Float) {
