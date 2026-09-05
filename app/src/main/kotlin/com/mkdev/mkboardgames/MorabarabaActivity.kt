@@ -148,6 +148,16 @@ class MorabarabaActivity : AppCompatActivity() {
         scope.cancel()
     }
 
+    override fun finish() {
+        super.finish()
+        @Suppress("DEPRECATION")
+        overridePendingTransition(0, 0)
+    }
+
+    override fun finishAfterTransition() {
+        finish()
+    }
+
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         if (StyledDialogs.handleBackPressed()) return

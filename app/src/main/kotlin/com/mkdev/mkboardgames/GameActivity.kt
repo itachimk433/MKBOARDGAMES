@@ -373,6 +373,16 @@ class GameActivity : AppCompatActivity() {
         scope.cancel()
     }
 
+    override fun finish() {
+        super.finish()
+        @Suppress("DEPRECATION")
+        overridePendingTransition(0, 0)
+    }
+
+    override fun finishAfterTransition() {
+        finish()
+    }
+
     private fun scheduleBoardStyleSwitchFade() {
         if (boardStyleSwitchEnabled && ::boardStyleSwitch.isInitialized) {
             boardStyleSwitch.removeCallbacks(boardStyleSwitchFadeRunnable)

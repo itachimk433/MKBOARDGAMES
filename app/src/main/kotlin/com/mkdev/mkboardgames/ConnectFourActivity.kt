@@ -158,6 +158,16 @@ class ConnectFourActivity : AppCompatActivity() {
         scope.cancel()
     }
 
+    override fun finish() {
+        super.finish()
+        @Suppress("DEPRECATION")
+        overridePendingTransition(0, 0)
+    }
+
+    override fun finishAfterTransition() {
+        finish()
+    }
+
     private fun stopAutomatedGameplay() {
         autoplayEnabled = false
         scope.coroutineContext.cancelChildren()

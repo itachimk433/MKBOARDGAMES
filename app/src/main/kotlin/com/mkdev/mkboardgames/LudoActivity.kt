@@ -282,6 +282,16 @@ class LudoActivity : AppCompatActivity() {
         super.onDestroy()
     }
 
+    override fun finish() {
+        super.finish()
+        @Suppress("DEPRECATION")
+        overridePendingTransition(0, 0)
+    }
+
+    override fun finishAfterTransition() {
+        finish()
+    }
+
     private val motionListener = object : SensorEventListener {
         override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
 
