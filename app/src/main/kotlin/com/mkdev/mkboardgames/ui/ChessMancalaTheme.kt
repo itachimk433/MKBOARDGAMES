@@ -7,10 +7,16 @@ import android.graphics.Paint
 import android.graphics.RadialGradient
 import android.graphics.RectF
 import android.graphics.Shader
+import kotlin.math.PI
+import kotlin.math.cos
 import kotlin.math.min
+import kotlin.math.sin
 
 internal fun isChessStyledLabel(label: String): Boolean =
     label.replace(" ", "").equals("CHESS", ignoreCase = true)
+
+internal fun isDraughtsStyledLabel(label: String): Boolean =
+    label.replace(" ", "").uppercase() in setOf("DRAUGHTS", "INTLDRAUGHTS")
 
 internal fun drawChessAtmosphere(canvas: Canvas, width: Float, height: Float, unit: Float, rounded: Boolean) {
     val background = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -128,6 +134,279 @@ internal fun drawChessWoodButton(canvas: Canvas, rect: RectF, pressed: Boolean, 
     canvas.drawRoundRect(drawn, radius, radius, border)
     border.strokeWidth = unit
     border.color = Color.argb(180, 255, 246, 220)
+    val inner = RectF(
+        drawn.left + 3f * unit,
+        drawn.top + 3f * unit,
+        drawn.right - 3f * unit,
+        drawn.bottom - 3f * unit,
+    )
+    canvas.drawRoundRect(inner, radius * 0.82f, radius * 0.82f, border)
+}
+
+private data class DraughtsPalette(
+    val top: Int,
+    val middle: Int,
+    val lower: Int,
+    val bottom: Int,
+)
+
+private data class DraughtsFloatSeed(
+    val x: Float,
+    val y: Float,
+    val size: Float,
+    val horizontalRange: Float,
+    val verticalRange: Float,
+    val speed: Float,
+    val phase: Float,
+    val dark: Boolean,
+)
+
+private val draughtsPalettes = arrayOf(
+    DraughtsPalette(
+        Color.parseColor("#183B58"),
+        Color.parseColor("#254A63"),
+        Color.parseColor("#242D50"),
+        Color.parseColor("#081728"),
+    ),
+    DraughtsPalette(
+        Color.parseColor("#3B315F"),
+        Color.parseColor("#31536A"),
+        Color.parseColor("#173C4D"),
+        Color.parseColor("#071A2B"),
+    ),
+    DraughtsPalette(
+        Color.parseColor("#49314F"),
+        Color.parseColor("#315066"),
+        Color.parseColor("#124554"),
+        Color.parseColor("#081A27"),
+    ),
+)
+
+private val draughtsFloatSeeds = listOf(
+    DraughtsFloatSeed(0.12f, 0.18f, 0.024f, 0.055f, 0.075f, 0.82f, 0.3f, dark = false),
+    DraughtsFloatSeed(0.84f, 0.16f, 0.021f, 0.07f, 0.06f, 0.64f, 1.8f, dark = true),
+    DraughtsFloatSeed(0.88f, 0.46f, 0.026f, 0.075f, 0.085f, 0.58f, 3.4f, dark = false),
+    DraughtsFloatSeed(0.14f, 0.64f, 0.022f, 0.06f, 0.08f, 0.74f, 4.7f, dark = true),
+    DraughtsFloatSeed(0.78f, 0.77f, 0.029f, 0.075f, 0.065f, 0.49f, 5.5f, dark = false),
+    DraughtsFloatSeed(0.30f, 0.88f, 0.020f, 0.065f, 0.05f, 0.68f, 2.6f, dark = true),
+)
+
+private val draughtsAtmospherePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+private val draughtsPiecePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+private val draughtsPieceEdgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    style = Paint.Style.STROKE
+}
+
+internal fun drawDraughtsAtmosphere(
+    canvas: Canvas,
+    width: Float,
+    height: Float,
+    unit: Float,
+    rounded: Boolean,
+    phase: Float,
+) {
+    val cycle = ((phase % 1f) + 1f) % 1f
+    val paletteSlot = cycle * draughtsPalettes.size
+    val paletteIndex = paletteSlot.toInt().coerceIn(0, draughtsPalettes.lastIndex)
+    val paletteProgress = smoothDraughtsStep(paletteSlot - paletteIndex)
+    val start = draughtsPalettes[paletteIndex]
+    val end = draughtsPalettes[(paletteIndex + 1) % draughtsPalettes.size]
+    val background = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        shader = LinearGradient(
+            0f,
+            0f,
+            width * 0.92f,
+            height,
+            intArrayOf(
+                blendDraughtsColor(start.top, end.top, paletteProgress),
+                blendDraughtsColor(start.middle, end.middle, paletteProgress),
+                blendDraughtsColor(start.lower, end.lower, paletteProgress),
+                blendDraughtsColor(start.bottom, end.bottom, paletteProgress),
+            ),
+            floatArrayOf(0f, 0.31f, 0.68f, 1f),
+            Shader.TileMode.CLAMP,
+        )
+    }
+    if (rounded) {
+        canvas.drawRoundRect(0f, 0f, width, height, 12f * unit, 12f * unit, background)
+    } else {
+        canvas.drawRect(0f, 0f, width, height, background)
+    }
+
+    val radians = cycle * (2f * PI.toFloat())
+    drawDraughtsGlow(
+        canvas,
+        width * (0.12f + 0.05f * sin(radians * 0.7f).toFloat()),
+        height * (0.18f + 0.04f * cos(radians * 0.5f).toFloat()),
+        min(width, height) * 0.58f,
+        blendDraughtsColor(Color.rgb(53, 157, 208), Color.rgb(137, 91, 192), (sin(radians * 0.26f) + 1f) / 2f),
+    )
+    drawDraughtsGlow(
+        canvas,
+        width * (0.88f + 0.045f * cos(radians * 0.42f).toFloat()),
+        height * (0.63f + 0.055f * sin(radians * 0.63f).toFloat()),
+        min(width, height) * 0.52f,
+        blendDraughtsColor(Color.rgb(28, 173, 169), Color.rgb(83, 124, 219), (sin(radians * 0.31f + 1.2f) + 1f) / 2f),
+    )
+    drawDraughtsGlow(
+        canvas,
+        width * (0.46f + 0.07f * sin(radians * 0.36f + 2f).toFloat()),
+        height * (1.02f + 0.04f * cos(radians * 0.54f).toFloat()),
+        min(width, height) * 0.7f,
+        Color.rgb(93, 55, 147),
+    )
+
+    drawDraughtsWaves(canvas, width, height, radians)
+
+    val stars = Paint(Paint.ANTI_ALIAS_FLAG)
+    repeat(48) { index ->
+        val baseX = ((index * 97 + 19) % 1000) / 1000f * width
+        val baseY = ((index * 43 + 31) % 940) / 1000f * height
+        val x = baseX + sin(radians * (0.15f + (index % 3) * 0.06f) + index).toFloat() * 6f * unit
+        val y = baseY + cos(radians * (0.14f + (index % 4) * 0.04f) + index).toFloat() * 5f * unit
+        val twinkle = ((sin(radians * (0.55f + (index % 4) * 0.1f) + index) + 1f) * 0.5f).toFloat()
+        stars.color = Color.argb(42 + (index % 4) * 18 + (twinkle * 18f).toInt(), 224, 242, 238)
+        canvas.drawCircle(x, y, (0.55f + (index % 3) * 0.42f) * unit, stars)
+    }
+
+    drawDraughtsFloatingPieces(canvas, width, height, unit, radians, 0.82f)
+}
+
+private fun drawDraughtsWaves(canvas: Canvas, width: Float, height: Float, radians: Float) {
+    val waveColors = intArrayOf(
+        Color.rgb(62, 171, 201),
+        Color.rgb(92, 124, 213),
+        Color.rgb(155, 91, 181),
+    )
+    val segmentCount = 56
+    val margin = width * 0.15f
+    waveColors.forEachIndexed { bandIndex, color ->
+        val baseY = height * (0.3f + bandIndex * 0.2f)
+        val amplitude = height * (0.04f + bandIndex * 0.012f)
+        val wavePhase = radians * (0.42f + bandIndex * 0.1f) + bandIndex * 1.9f
+        val path = Path()
+        path.moveTo(-margin, height)
+        path.lineTo(-margin, baseY)
+        for (step in 0..segmentCount) {
+            val progress = step / segmentCount.toFloat()
+            val x = -margin + (width + margin * 2f) * progress
+            val primary = sin(progress * (2.05f * PI.toFloat()) + wavePhase).toFloat() * amplitude
+            val secondary = cos(progress * (4.3f * PI.toFloat()) - wavePhase * 0.7f).toFloat() * amplitude * 0.24f
+            path.lineTo(x, baseY + primary + secondary)
+        }
+        path.lineTo(width + margin, height)
+        path.close()
+        draughtsAtmospherePaint.color = Color.argb(15 + bandIndex * 5, Color.red(color), Color.green(color), Color.blue(color))
+        canvas.drawPath(path, draughtsAtmospherePaint)
+    }
+}
+
+private fun drawDraughtsGlow(canvas: Canvas, x: Float, y: Float, radius: Float, color: Int) {
+    draughtsAtmospherePaint.shader = RadialGradient(
+        x,
+        y,
+        radius,
+        intArrayOf(
+            Color.argb(76, Color.red(color), Color.green(color), Color.blue(color)),
+            Color.argb(22, Color.red(color), Color.green(color), Color.blue(color)),
+            Color.TRANSPARENT,
+        ),
+        floatArrayOf(0f, 0.5f, 1f),
+        Shader.TileMode.CLAMP,
+    )
+    canvas.drawCircle(x, y, radius, draughtsAtmospherePaint)
+    draughtsAtmospherePaint.shader = null
+}
+
+private fun drawDraughtsFloatingPieces(
+    canvas: Canvas,
+    width: Float,
+    height: Float,
+    unit: Float,
+    radians: Float,
+    opacity: Float,
+) {
+    draughtsFloatSeeds.forEachIndexed { index, seed ->
+        val primary = radians * seed.speed + seed.phase
+        val secondary = radians * (seed.speed * 0.59f + 0.1f) + seed.phase * 1.6f
+        val x = width * (
+            seed.x +
+                sin(primary).toFloat() * seed.horizontalRange +
+                cos(secondary).toFloat() * seed.horizontalRange * 0.38f
+            )
+        val y = height * (
+            seed.y +
+                cos(primary * 0.82f + seed.phase * 0.3f).toFloat() * seed.verticalRange +
+                sin(secondary * 1.15f).toFloat() * seed.verticalRange * 0.4f
+            )
+        val radius = min(width, height) * seed.size * (0.96f + 0.05f * sin(primary * 0.8f).toFloat())
+        val alpha = (if (seed.dark) 76f else 96f) * opacity
+        val baseColor = if (seed.dark) Color.rgb(50, 31, 39) else Color.rgb(218, 174, 103)
+        val highlightColor = if (seed.dark) Color.rgb(105, 65, 72) else Color.rgb(255, 223, 151)
+
+        draughtsPiecePaint.color = Color.argb(alpha.toInt(), Color.red(baseColor), Color.green(baseColor), Color.blue(baseColor))
+        draughtsPiecePaint.setShadowLayer(radius * 0.38f, 0f, radius * 0.14f, Color.argb((alpha * 0.8f).toInt(), 0, 0, 0))
+        canvas.drawCircle(x, y, radius, draughtsPiecePaint)
+        draughtsPiecePaint.clearShadowLayer()
+
+        draughtsPieceEdgePaint.strokeWidth = maxOf(unit, radius * 0.12f)
+        draughtsPieceEdgePaint.color = Color.argb(alpha.toInt(), Color.red(highlightColor), Color.green(highlightColor), Color.blue(highlightColor))
+        canvas.drawCircle(x, y, radius * 0.78f, draughtsPieceEdgePaint)
+        draughtsPieceEdgePaint.color = Color.argb((alpha * 0.7f).toInt(), Color.red(highlightColor), Color.green(highlightColor), Color.blue(highlightColor))
+        canvas.drawCircle(x - radius * 0.2f, y - radius * 0.24f, radius * 0.18f, draughtsPieceEdgePaint)
+    }
+}
+
+private fun smoothDraughtsStep(value: Float): Float {
+    val clamped = value.coerceIn(0f, 1f)
+    return clamped * clamped * (3f - 2f * clamped)
+}
+
+private fun blendDraughtsColor(start: Int, end: Int, fraction: Float): Int {
+    val amount = fraction.coerceIn(0f, 1f)
+    return Color.rgb(
+        (Color.red(start) + (Color.red(end) - Color.red(start)) * amount).toInt(),
+        (Color.green(start) + (Color.green(end) - Color.green(start)) * amount).toInt(),
+        (Color.blue(start) + (Color.blue(end) - Color.blue(start)) * amount).toInt(),
+    )
+}
+
+internal fun drawDraughtsButton(canvas: Canvas, rect: RectF, pressed: Boolean, unit: Float) {
+    val offset = if (pressed) 2f * unit else 0f
+    val drawn = RectF(rect.left, rect.top + offset, rect.right, rect.bottom + offset)
+    val radius = drawn.height() * 0.2f
+    val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        shader = LinearGradient(
+            0f,
+            drawn.top,
+            0f,
+            drawn.bottom,
+            intArrayOf(
+                Color.parseColor("#EFD19A"),
+                Color.parseColor("#B7774A"),
+                Color.parseColor("#6F3D32"),
+            ),
+            floatArrayOf(0f, 0.52f, 1f),
+            Shader.TileMode.CLAMP,
+        )
+        setShadowLayer(
+            if (pressed) 1f * unit else 4f * unit,
+            0f,
+            if (pressed) 1f * unit else 3f * unit,
+            Color.argb(170, 22, 9, 16),
+        )
+    }
+    canvas.drawRoundRect(drawn, radius, radius, fill)
+    fill.clearShadowLayer()
+
+    val border = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 2f * unit
+        color = Color.parseColor("#71322C")
+    }
+    canvas.drawRoundRect(drawn, radius, radius, border)
+    border.strokeWidth = unit
+    border.color = Color.argb(180, 255, 238, 204)
     val inner = RectF(
         drawn.left + 3f * unit,
         drawn.top + 3f * unit,

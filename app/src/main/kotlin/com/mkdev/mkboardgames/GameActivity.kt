@@ -650,13 +650,23 @@ class GameActivity : AppCompatActivity() {
                 ChessChoiceView.Choice(
                     if (isFoxAndGeese) "Fox" else "White",
                     if (isFoxAndGeese) "Moves second" else "Moves first",
-                    if (gameType == "CHESS") "♔" else "",
+                    when {
+                        gameType == "CHESS" -> "♔"
+                        gameType == "CHECKERS" -> "●"
+                        gameType == "INTERNATIONAL_DRAUGHTS" -> "●"
+                        else -> ""
+                    },
                     Color.parseColor("#E3B86A"),
                 ),
                 ChessChoiceView.Choice(
                     if (isFoxAndGeese) "Geese" else "Black",
                     if (isFoxAndGeese) "Moves first" else "Moves second",
-                    if (gameType == "CHESS") "♚" else "",
+                    when {
+                        gameType == "CHESS" -> "♚"
+                        gameType == "CHECKERS" -> "◉"
+                        gameType == "INTERNATIONAL_DRAUGHTS" -> "◉"
+                        else -> ""
+                    },
                     Color.parseColor("#A9B6E8"),
                 ),
             ),
@@ -810,7 +820,7 @@ If an opponent's piece is diagonally adjacent and the square beyond it is empty,
 ─────────────────────────
 
 Kinging
-When a piece reaches the far end of the board it becomes a King (marked ♔). Kings may move and jump diagonally in any direction.
+When a piece reaches the far end of the board it becomes a King. Kings may move and jump diagonally in any direction.
 
 ─────────────────────────
 

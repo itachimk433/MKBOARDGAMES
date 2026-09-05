@@ -1,5 +1,6 @@
 package com.mkdev.mkboardgames.ui
 
+import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.*
 import android.graphics.drawable.GradientDrawable
@@ -7,6 +8,7 @@ import android.view.Gravity
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
+import android.view.animation.LinearInterpolator
 import android.widget.*
 import com.mkdev.mkboardgames.SoundPlayer
 import java.util.Locale
@@ -27,20 +29,21 @@ class ChessRulesView(
 
     private val density = resources.displayMetrics.density
     private val isChess = isChessStyledLabel(gameLabel)
+    private val isDraughts = isDraughtsStyledLabel(gameLabel)
 
     init {
-        if (isChess) {
-            configureChessRules()
+        if (isChess || isDraughts) {
+            configureStyledRules()
         } else {
             configureClassicRules()
         }
     }
 
-    private fun configureChessRules() {
+    private fun configureStyledRules() {
         orientation = VERTICAL
         setPadding(0, 0, 0, 0)
         setBackgroundColor(Color.TRANSPARENT)
-        addView(ChessMancalaRulesView(context, rulesText).apply {
+        addView(ChessMancalaRulesView(context, rulesText, gameLabel, headerSymbol).apply {
             onBack = { onDone?.invoke() }
         }, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
     }
@@ -156,27 +159,55 @@ class ChessRulesView(
 private class ChessMancalaRulesView(
     context: Context,
     rulesText: String,
+    private val gameLabel: String,
+    private val headerSymbol: String,
 ) : View(context) {
     var onBack: (() -> Unit)? = null
 
     private val density = resources.displayMetrics.density
+    private val isDraughts = isDraughtsStyledLabel(gameLabel)
     private val backRect = RectF()
     private val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val headingPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val sections = parseSections(rulesText)
+    private var atmospherePhase = 0f
+    private val atmosphereAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
+        duration = 36_000L
+        repeatCount = ValueAnimator.INFINITE
+        interpolator = LinearInterpolator()
+        addUpdateListener {
+            atmospherePhase = it.animatedValue as Float
+            invalidate()
+        }
+    }
 
     init {
         isClickable = true
         isFocusable = true
-        contentDescription = "Chess how to play"
+        contentDescription = "${if (isDraughts) "Draughts" else "Chess"} how to play"
         setLayerType(LAYER_TYPE_SOFTWARE, null)
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        if (isDraughts) atmosphereAnimator.start()
+    }
+
+    override fun onDetachedFromWindow() {
+        atmosphereAnimator.cancel()
+        super.onDetachedFromWindow()
     }
 
     override fun onDraw(canvas: Canvas) {
         val width = width.toFloat()
         val height = height.toFloat()
-        canvas.drawColor(Color.argb(205, 0, 6, 14))
+        if (isDraughts) {
+            drawDraughtsAtmosphere(canvas, width, height, density, rounded = false, phase = atmospherePhase)
+            canvas.drawColor(Color.argb(112, 0, 6, 14))
+        } else {
+            canvas.drawColor(Color.argb(205, 0, 6, 14))
+        }
 
         val panelWidth = minOf(width * 0.9f, dp(610f))
         val panelHeight = minOf(height * 0.9f, dp(700f))
@@ -192,8 +223,8 @@ private class ChessMancalaRulesView(
                 panel.top,
                 0f,
                 panel.bottom,
-                Color.parseColor("#17677F"),
-                Color.parseColor("#0C3344"),
+                if (isDraughts) Color.parseColor("#287078") else Color.parseColor("#17677F"),
+                if (isDraughts) Color.parseColor("#102F48") else Color.parseColor("#0C3344"),
                 Shader.TileMode.CLAMP,
             )
             setShadowLayer(dp(18f), 0f, dp(8f), Color.BLACK)
@@ -205,8 +236,13 @@ private class ChessMancalaRulesView(
         titlePaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         titlePaint.color = Color.WHITE
         titlePaint.textSize = minOf(dp(28f), panelWidth * 0.08f)
-        canvas.drawText("CHESS", panel.centerX(), panel.top + dp(52f), titlePaint)
-        titlePaint.color = Color.parseColor("#FFE09C")
+        val displayLabel = if (isDraughts) {
+            gameLabel.replace(" ", "").replace("INTL", "INTL ")
+        } else {
+            "CHESS"
+        }
+        canvas.drawText(displayLabel, panel.centerX(), panel.top + dp(52f), titlePaint)
+        titlePaint.color = if (isDraughts) Color.parseColor("#F1C77C") else Color.parseColor("#FFE09C")
         titlePaint.textSize = minOf(dp(22f), panelWidth * 0.065f)
         canvas.drawText("HOW TO PLAY", panel.centerX(), panel.top + dp(84f), titlePaint)
 
@@ -215,12 +251,12 @@ private class ChessMancalaRulesView(
         val contentBottom = panel.bottom - dp(82f)
         val lineHeight = dp(15f)
         var y = panel.top + dp(122f)
-        headingPaint.color = Color.parseColor("#FFE09C")
+        headingPaint.color = if (isDraughts) Color.parseColor("#F1C77C") else Color.parseColor("#FFE09C")
         headingPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         headingPaint.textSize = minOf(dp(14f), contentWidth * 0.043f)
         bodyPaint.textAlign = Paint.Align.LEFT
         bodyPaint.typeface = Typeface.DEFAULT
-        bodyPaint.color = Color.parseColor("#E4F1F0")
+        bodyPaint.color = if (isDraughts) Color.parseColor("#E4F1F0") else Color.parseColor("#E4F1F0")
         bodyPaint.textSize = minOf(dp(12.5f), contentWidth * 0.038f)
 
         canvas.save()
@@ -278,6 +314,16 @@ private class ChessMancalaRulesView(
     }
 
     private fun drawBackButton(canvas: Canvas, rect: RectF) {
+        if (isDraughts) {
+            drawDraughtsButton(canvas, rect, pressed = false, unit = density)
+            bodyPaint.textAlign = Paint.Align.CENTER
+            bodyPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            bodyPaint.color = Color.parseColor("#321718")
+            bodyPaint.textSize = minOf(dp(19f), rect.height() * 0.4f)
+            val metrics = bodyPaint.fontMetrics
+            canvas.drawText("Back", rect.centerX(), rect.centerY() - (metrics.ascent + metrics.descent) / 2f, bodyPaint)
+            return
+        }
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = LinearGradient(
                 0f,
@@ -323,6 +369,11 @@ private class ChessMancalaRulesView(
             "Castling",
             "Check & Checkmate",
             "Promotion",
+            "Moving",
+            "Jumping",
+            "Kinging",
+            "Capturing",
+            "Flying Kings",
             "Winning",
         )
         val sections = mutableListOf<Pair<String, String>>()

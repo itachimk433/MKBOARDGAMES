@@ -7,6 +7,7 @@ import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
 import android.view.animation.DecelerateInterpolator
+import android.view.animation.LinearInterpolator
 import com.mkdev.mkboardgames.SoundPlayer
 
 internal fun isFullScreenStyledGameLabel(gameLabel: String): Boolean =
@@ -61,6 +62,7 @@ class ChessChoiceView(
     private val textScale = scaledDensity.coerceAtMost(2f)
     private val fullScreen = fullScreenOverride ?: isFullScreenStyledGameLabel(gameLabel)
     private val isChess = isChessStyledLabel(gameLabel)
+    private val isDraughts = isDraughtsStyledLabel(gameLabel)
     private val surfacePaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val cardPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -120,11 +122,32 @@ class ChessChoiceView(
     private var downX = 0f
     private var downY = 0f
     private var contentOffset = 0f
+    private var atmospherePhase = 0f
+    private val atmosphereAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
+        duration = 36_000L
+        repeatCount = ValueAnimator.INFINITE
+        interpolator = LinearInterpolator()
+        addUpdateListener {
+            atmospherePhase = it.animatedValue as Float
+            invalidate()
+        }
+    }
 
     init {
         isClickable = true
         setLayerType(View.LAYER_TYPE_SOFTWARE, null)
         hits.forEach { scales[it.index] = 1f }
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        if (isDraughts) atmosphereAnimator.start()
+    }
+
+    override fun onDetachedFromWindow() {
+        atmosphereAnimator.cancel()
+        animator?.cancel()
+        super.onDetachedFromWindow()
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
@@ -160,6 +183,8 @@ class ChessChoiceView(
         val height = height.toFloat()
         if (isChess) {
             drawChessAtmosphere(canvas, width, height, unit, rounded = !fullScreen)
+        } else if (isDraughts) {
+            drawDraughtsAtmosphere(canvas, width, height, unit, rounded = !fullScreen, phase = atmospherePhase)
         } else {
             surfacePaint.shader = LinearGradient(
                 0f,
@@ -178,7 +203,11 @@ class ChessChoiceView(
             surfacePaint.shader = null
         }
 
-        if (isChess) drawChessHeader(canvas, width, contentOffset) else drawHeader(canvas, width, contentOffset)
+        when {
+            isChess -> drawChessHeader(canvas, width, contentOffset)
+            isDraughts -> drawDraughtsHeader(canvas, width, contentOffset)
+            else -> drawHeader(canvas, width, contentOffset)
+        }
         hits.forEach { drawChoice(canvas, it) }
     }
 
@@ -191,6 +220,37 @@ class ChessChoiceView(
         titlePaint.color = Color.WHITE
         canvas.drawText(title, center, topOffset + 99f * unit, titlePaint)
         subtitlePaint.color = Color.parseColor("#D6E8FF")
+        canvas.drawText(subtitle, center, topOffset + 125f * unit, subtitlePaint)
+    }
+
+    private fun drawDraughtsHeader(canvas: Canvas, width: Float, topOffset: Float) {
+        val center = width / 2f
+        val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#D8A05E")
+            strokeWidth = 1.5f * unit
+        }
+        canvas.drawLine(
+            center - 118f * unit,
+            topOffset + 36f * unit,
+            center - 42f * unit,
+            topOffset + 36f * unit,
+            linePaint,
+        )
+        canvas.drawLine(
+            center + 42f * unit,
+            topOffset + 36f * unit,
+            center + 118f * unit,
+            topOffset + 36f * unit,
+            linePaint,
+        )
+        crownPaint.color = Color.parseColor("#F1C77C")
+        crownPaint.textSize = 22f * textScale
+        canvas.drawText(headerSymbol, center, topOffset + 43f * unit, crownPaint)
+        eyebrowPaint.color = Color.parseColor("#F3D39B")
+        canvas.drawText(gameLabel, center, topOffset + 58f * unit, eyebrowPaint)
+        titlePaint.color = Color.parseColor("#FFF5E6")
+        canvas.drawText(title, center, topOffset + 99f * unit, titlePaint)
+        subtitlePaint.color = Color.parseColor("#D4E9E5")
         canvas.drawText(subtitle, center, topOffset + 125f * unit, subtitlePaint)
     }
 
@@ -225,6 +285,10 @@ class ChessChoiceView(
             drawChessChoice(canvas, hit)
             return
         }
+        if (isDraughts) {
+            drawDraughtsChoice(canvas, hit)
+            return
+        }
         val scale = scales[hit.index] ?: 1f
         val rect = hit.rect
         val pressed = pressedIndex == hit.index
@@ -249,6 +313,31 @@ class ChessChoiceView(
             drawCenteredChoiceText(canvas, rect, hit.choice)
         }
         canvas.restore()
+    }
+
+    private fun drawDraughtsChoice(canvas: Canvas, hit: ChoiceHit) {
+        val rect = hit.rect
+        val pressed = pressedIndex == hit.index
+        drawDraughtsButton(canvas, rect, pressed, unit)
+        val top = rect.top + if (pressed) 2f * unit else 0f
+
+        if (hit.choice.symbol.isNotBlank()) {
+            iconPaint.color = Color.parseColor("#4B211F")
+            iconPaint.textSize = 23f * textScale
+            canvas.drawText(hit.choice.symbol, rect.centerX(), top + 29f * unit, iconPaint)
+            labelPaint.color = Color.parseColor("#321718")
+            canvas.drawText(hit.choice.label, rect.centerX(), top + 56f * unit, labelPaint)
+            detailPaint.color = Color.parseColor("#5D2C27")
+            canvas.drawText(hit.choice.detail, rect.centerX(), top + 74f * unit, detailPaint)
+        } else {
+            labelPaint.color = Color.parseColor("#321718")
+            detailPaint.color = Color.parseColor("#5D2C27")
+            drawCenteredChoiceText(
+                canvas,
+                RectF(rect.left, top, rect.right, rect.bottom + (top - rect.top)),
+                hit.choice,
+            )
+        }
     }
 
     private fun drawChessChoice(canvas: Canvas, hit: ChoiceHit) {
