@@ -16,6 +16,7 @@ import com.mkdev.mkboardgames.games.connectfour.ConnectFourPiece
 import com.mkdev.mkboardgames.games.connectfour.ConnectFourRuleEngine
 import com.mkdev.mkboardgames.ui.AutoplayButtonView
 import com.mkdev.mkboardgames.ui.BoardStyleSwitchView
+import com.mkdev.mkboardgames.ui.ChessMenuView
 import com.mkdev.mkboardgames.ui.ConnectFourBoardStyle
 import com.mkdev.mkboardgames.ui.StyledDialogs
 import kotlinx.coroutines.*
@@ -251,31 +252,33 @@ class ConnectFourActivity : AppCompatActivity() {
     private fun showModeDialog() {
         hideBoardWhileDialogIsOpen()
         val paused = PausedMatchStore.has(this, "CONNECT_FOUR")
-        val options = buildList {
-            if (paused) add("Resume Match")
-            add("vs AI")
-            add("2 Players")
-            add("How to Play")
+        val menuView = ChessMenuView(
+            this,
+            paused,
+            gameLabel = "C O N N E C T · F O U R",
+        )
+        menuView.onVsAi = {
+            StyledDialogs.dismiss()
+            vsAI = true
+            showColorPickerDialog()
         }
-        StyledDialogs.showChoices(this, "Connect Four", "Choose how to begin.",
-            options.map { item ->
-                when (item) {
-                    "Resume Match" -> StyledDialogs.choice(item, "Continue where you left off", "Ⅱ", "#E3B86A")
-                    "vs AI" -> StyledDialogs.choice(item, "Play against the computer", "", "#8EC7B9")
-                    "2 Players" -> StyledDialogs.choice(item, "Share the board locally", "", "#A9B6E8")
-                    else -> StyledDialogs.choice(item, "Review the essentials", "?", "#E58A7A")
-                }
-            }, 520f, "C O N N E C T · F O U R", onCancel = {
+        menuView.onTwoPlayers = {
+            StyledDialogs.dismiss()
+            vsAI = false
+            playerColor = PieceColor.WHITE
+            startGame()
+        }
+        menuView.onHowToPlay = {
+            StyledDialogs.dismiss()
+            showRules(showModeAfter = !matchStarted)
+        }
+        menuView.onResumeMatch = {
+            StyledDialogs.dismiss()
+            resumePausedMatch()
+        }
+        StyledDialogs.showFullScreenView(this, menuView) {
                 if (!matchStarted) finish() else showBoardAfterDialog()
-            }) { which, dialog ->
-                dialog.dismiss()
-                when (options[which]) {
-                    "Resume Match" -> resumePausedMatch()
-                    "vs AI" -> { vsAI = true; showColorPickerDialog() }
-                    "2 Players" -> { vsAI = false; playerColor = PieceColor.WHITE; startGame() }
-                    "How to Play" -> showRules(showModeAfter = !matchStarted)
-                }
-            }
+        }
     }
 
     private fun showColorPickerDialog() {

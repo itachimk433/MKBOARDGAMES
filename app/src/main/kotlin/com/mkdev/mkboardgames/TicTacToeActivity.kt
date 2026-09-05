@@ -13,6 +13,7 @@ import com.mkdev.mkboardgames.engine.*
 import com.mkdev.mkboardgames.games.tictactoe.TicTacToePiece
 import com.mkdev.mkboardgames.games.tictactoe.TicTacToeRuleEngine
 import com.mkdev.mkboardgames.ui.AutoplayButtonView
+import com.mkdev.mkboardgames.ui.ChessMenuView
 import com.mkdev.mkboardgames.ui.StyledDialogs
 import kotlinx.coroutines.*
 
@@ -219,30 +220,32 @@ class TicTacToeActivity : AppCompatActivity() {
     private fun showModeDialog() {
         hideBoardWhileDialogIsOpen()
         val paused = PausedMatchStore.has(this, "TICTACTOE")
-        val options = buildList {
-            if (paused) add("Resume Match")
-            add("vs AI")
-            add("2 Players")
-            add("How to Play")
+        val menuView = ChessMenuView(
+            this,
+            paused,
+            gameLabel = "T I C · T A C · T O E",
+        )
+        menuView.onVsAi = {
+            StyledDialogs.dismiss()
+            vsAI = true
+            showBoardSizeDialog(fromMode = true)
         }
-        StyledDialogs.showChoices(this, "Tic-Tac-Toe", "Choose how to begin.",
-            options.map { item ->
-                when (item) {
-                    "Resume Match" -> StyledDialogs.choice(item, "Continue where you left off", "Ⅱ", "#E3B86A")
-                    "vs AI" -> StyledDialogs.choice(item, "Play against the computer", "", "#8EC7B9")
-                    "2 Players" -> StyledDialogs.choice(item, "Share the board locally", "", "#A9B6E8")
-                    else -> StyledDialogs.choice(item, "Review the essentials", "?", "#E58A7A")
-                }
-            }, 520f, "T I C · T A C · T O E", onCancel = {
+        menuView.onTwoPlayers = {
+            StyledDialogs.dismiss()
+            vsAI = false
+            playerColor = PieceColor.WHITE
+            showBoardSizeDialog(fromMode = false)
+        }
+        menuView.onHowToPlay = {
+            StyledDialogs.dismiss()
+            showRules(showModeAfter = !matchStarted)
+        }
+        menuView.onResumeMatch = {
+            StyledDialogs.dismiss()
+            resumePausedMatch()
+        }
+        StyledDialogs.showFullScreenView(this, menuView) {
                 if (!matchStarted) finish() else showBoardAfterDialog()
-            }) { which, dialog ->
-            dialog.dismiss()
-            when (options[which]) {
-                "Resume Match" -> resumePausedMatch()
-                "vs AI" -> { vsAI = true; showBoardSizeDialog(fromMode = true) }
-                "2 Players" -> { vsAI = false; playerColor = PieceColor.WHITE; showBoardSizeDialog(fromMode = false) }
-                "How to Play" -> showRules(showModeAfter = !matchStarted)
-            }
         }
     }
 

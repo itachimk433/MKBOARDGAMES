@@ -79,6 +79,7 @@ class ChessMenuView(
             isGo -> "go_home_icon.png"
             isShogi -> "shogi_home_icon.png"
             isXiangqi -> "xiangqi_home_icon.png"
+            isTicTacToe -> "tictactoe_home_icon.png"
             isConnectFour -> "connect_four_home_icon.png"
             isLudo -> "ludo_home_icon.png"
             else -> null
@@ -274,7 +275,7 @@ class ChessMenuView(
                 action = { onVsAi?.invoke() },
             ),
             MenuAction(
-                label = "2 Players",
+                label = if (isLudo) "4 Players" else "2 Players",
                 detail = "Play on one board",
                 symbol = when {
                     isChess -> "♙"

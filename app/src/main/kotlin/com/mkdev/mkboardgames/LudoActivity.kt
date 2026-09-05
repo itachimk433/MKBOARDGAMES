@@ -40,6 +40,7 @@ import com.mkdev.mkboardgames.ui.LudoControlTileView
 import com.mkdev.mkboardgames.ui.GlbDiceView
 import com.mkdev.mkboardgames.ui.LudoStatusStripView
 import com.mkdev.mkboardgames.ui.MotionDiceDirection
+import com.mkdev.mkboardgames.ui.ChessMenuView
 import com.mkdev.mkboardgames.ui.StyledDialogs
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -403,41 +404,44 @@ class LudoActivity : AppCompatActivity() {
 
     private fun showModeDialog() {
         hideBoardWhileDialogIsOpen()
-        val options = listOf("vs AI · Normal", "vs AI · Irregular", "4 Players", "How to Play")
-        StyledDialogs.showChoices(this, "Ludo", "Choose how to begin.",
+        val menuView = ChessMenuView(this, false, gameLabel = "L U D O")
+        menuView.onVsAi = {
+            StyledDialogs.dismiss()
+            showLudoAiModeDialog()
+        }
+        menuView.onTwoPlayers = {
+            StyledDialogs.dismiss()
+            vsAI = false
+            irregularMode = false
+            startGame()
+        }
+        menuView.onHowToPlay = {
+            StyledDialogs.dismiss()
+            showRules(showModeAfter = !matchStarted)
+        }
+        StyledDialogs.showFullScreenView(this, menuView) {
+            if (!matchStarted) finish() else showBoardAfterDialog()
+        }
+    }
+
+    private fun showLudoAiModeDialog() {
+        StyledDialogs.showChoices(
+            this,
+            "AI Match",
+            "Choose the kind of computer match.",
             listOf(
-                StyledDialogs.choice(options[0], "Classic computer match", "", "#8EC7B9"),
-                StyledDialogs.choice(options[1], "Match with abilities and coins", "", "#E3B86A"),
-                StyledDialogs.choice(options[2], "Play locally with four colours", "", "#A9B6E8"),
-                StyledDialogs.choice(options[3], "Review the essentials", "", "#E58A7A"),
-            ), 520f, "L U D O", headerSymbol = "●", onCancel = {
-                if (!matchStarted) finish() else showBoardAfterDialog()
-            }) { which, dialog ->
-                when (which) {
-                    0 -> {
-                        vsAI = true
-                        irregularMode = false
-                        dialog.dismiss()
-                        showPlayerPicker()
-                    }
-                    1 -> {
-                        vsAI = true
-                        irregularMode = true
-                        dialog.dismiss()
-                        showPlayerPicker()
-                    }
-                    2 -> {
-                        vsAI = false
-                        irregularMode = false
-                        dialog.dismiss()
-                        startGame()
-                    }
-                    3 -> {
-                        dialog.dismiss()
-                        showRules(true)
-                    }
-                }
-            }
+                StyledDialogs.choice("Normal", "Classic computer match", "", "#8EC7B9"),
+                StyledDialogs.choice("Irregular", "Abilities and coins enabled", "", "#E3B86A"),
+            ),
+            420f,
+            "L U D O",
+            onCancel = { showModeDialog() },
+        ) { which, dialog ->
+            vsAI = true
+            irregularMode = which == 1
+            dialog.dismiss()
+            showPlayerPicker()
+        }
     }
 
     private fun showPlayerPicker() {
