@@ -39,6 +39,7 @@ class ConnectFourActivity : AppCompatActivity() {
     private var interstitialAd: Any? = null
     private var boardStyleSwitchEnabled = true
     private var autoplayEnabled = false
+    private var exitPosted = false
 
     private lateinit var hudView: HudView
     private lateinit var boardStyleSwitch: BoardStyleSwitchView
@@ -159,13 +160,25 @@ class ConnectFourActivity : AppCompatActivity() {
     }
 
     override fun finish() {
-        super.finish()
-        @Suppress("DEPRECATION")
-        overridePendingTransition(0, 0)
+        finishToHome()
     }
 
     override fun finishAfterTransition() {
-        finish()
+        finishToHome()
+    }
+
+    private fun finishToHome() {
+        if (exitPosted) return
+        exitPosted = true
+        if (::gameRoot.isInitialized) gameRoot.visibility = View.INVISIBLE
+        window.decorView.setBackgroundColor(Color.BLACK)
+        window.decorView.postOnAnimation {
+            window.decorView.postOnAnimation {
+                super.finish()
+                @Suppress("DEPRECATION")
+                overridePendingTransition(0, 0)
+            }
+        }
     }
 
     private fun stopAutomatedGameplay() {

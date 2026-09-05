@@ -46,6 +46,7 @@ class TicTacToeActivity : AppCompatActivity() {
     private lateinit var autoplayButton: AutoplayButtonView
     private lateinit var gameRoot: View
     private var autoplayEnabled = false
+    private var exitPosted = false
 
     // ─── Lifecycle ────────────────────────────────────────────────────────────
 
@@ -126,13 +127,25 @@ class TicTacToeActivity : AppCompatActivity() {
     }
 
     override fun finish() {
-        super.finish()
-        @Suppress("DEPRECATION")
-        overridePendingTransition(0, 0)
+        finishToHome()
     }
 
     override fun finishAfterTransition() {
-        finish()
+        finishToHome()
+    }
+
+    private fun finishToHome() {
+        if (exitPosted) return
+        exitPosted = true
+        if (::gameRoot.isInitialized) gameRoot.visibility = View.INVISIBLE
+        window.decorView.setBackgroundColor(Color.BLACK)
+        window.decorView.postOnAnimation {
+            window.decorView.postOnAnimation {
+                super.finish()
+                @Suppress("DEPRECATION")
+                overridePendingTransition(0, 0)
+            }
+        }
     }
 
     private fun stopAutomatedGameplay() {

@@ -85,6 +85,7 @@ class GameActivity : AppCompatActivity() {
     private var resultRecorded = false
     private var interstitialAd: Any? = null
     private var boardStyleSwitchEnabled = false
+    private var exitPosted = false
     private val boardStyleSwitchFadeRunnable = Runnable {
         if (!boardStyleSwitchEnabled || !::boardStyleSwitch.isInitialized) return@Runnable
         boardStyleSwitch.animate()
@@ -375,13 +376,25 @@ class GameActivity : AppCompatActivity() {
     }
 
     override fun finish() {
-        super.finish()
-        @Suppress("DEPRECATION")
-        overridePendingTransition(0, 0)
+        finishToHome()
     }
 
     override fun finishAfterTransition() {
-        finish()
+        finishToHome()
+    }
+
+    private fun finishToHome() {
+        if (exitPosted) return
+        exitPosted = true
+        if (::gameContainer.isInitialized) gameContainer.visibility = View.INVISIBLE
+        window.decorView.setBackgroundColor(Color.BLACK)
+        window.decorView.postOnAnimation {
+            window.decorView.postOnAnimation {
+                super.finish()
+                @Suppress("DEPRECATION")
+                overridePendingTransition(0, 0)
+            }
+        }
     }
 
     private fun scheduleBoardStyleSwitchFade() {

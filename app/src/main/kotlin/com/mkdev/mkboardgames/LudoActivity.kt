@@ -79,6 +79,7 @@ class LudoActivity : AppCompatActivity() {
     private var resultDialogVisible = false
     private var celebrationMessage: String? = null
     private var celebrationGeneration = 0
+    private var exitPosted = false
     private lateinit var sensorManager: SensorManager
     private var motionSensor: Sensor? = null
     private var usingRawAccelerometer = false
@@ -283,13 +284,25 @@ class LudoActivity : AppCompatActivity() {
     }
 
     override fun finish() {
-        super.finish()
-        @Suppress("DEPRECATION")
-        overridePendingTransition(0, 0)
+        finishToHome()
     }
 
     override fun finishAfterTransition() {
-        finish()
+        finishToHome()
+    }
+
+    private fun finishToHome() {
+        if (exitPosted) return
+        exitPosted = true
+        if (::overlay.isInitialized) overlay.visibility = View.INVISIBLE
+        window.decorView.setBackgroundColor(Color.BLACK)
+        window.decorView.postOnAnimation {
+            window.decorView.postOnAnimation {
+                super.finish()
+                @Suppress("DEPRECATION")
+                overridePendingTransition(0, 0)
+            }
+        }
     }
 
     private val motionListener = object : SensorEventListener {

@@ -39,6 +39,7 @@ class MorabarabaActivity : AppCompatActivity() {
     private var matchStarted                = false
     private var activityResumed             = false
     private var autoplayEnabled             = false
+    private var exitPosted                  = false
     private var autoplayMoveInProgress      = false
     private var pieceCount                  = 12
     private var boardStyleSwitchEnabled    = false
@@ -149,13 +150,25 @@ class MorabarabaActivity : AppCompatActivity() {
     }
 
     override fun finish() {
-        super.finish()
-        @Suppress("DEPRECATION")
-        overridePendingTransition(0, 0)
+        finishToHome()
     }
 
     override fun finishAfterTransition() {
-        finish()
+        finishToHome()
+    }
+
+    private fun finishToHome() {
+        if (exitPosted) return
+        exitPosted = true
+        if (::gameRoot.isInitialized) gameRoot.visibility = View.INVISIBLE
+        window.decorView.setBackgroundColor(Color.BLACK)
+        window.decorView.postOnAnimation {
+            window.decorView.postOnAnimation {
+                super.finish()
+                @Suppress("DEPRECATION")
+                overridePendingTransition(0, 0)
+            }
+        }
     }
 
     @Deprecated("Deprecated in Java")
