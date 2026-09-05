@@ -304,6 +304,7 @@ class GameActivity : AppCompatActivity() {
         styledOverlayHost = FrameLayout(this).apply {
             isClickable = true
             isFocusable = true
+            visibility = View.GONE
         }
         screenRoot.addView(
             gameContainer,
@@ -968,6 +969,7 @@ Checkmate your opponent's King.
                 ViewGroup.LayoutParams.MATCH_PARENT,
             ),
         )
+        styledOverlayHost.visibility = View.VISIBLE
         activeStyledOverlay = overlay
         overlay.requestFocus()
     }
@@ -979,6 +981,7 @@ Checkmate your opponent's King.
         val onCancel = overlay.tag as? (() -> Unit)
         styledOverlayHost.removeView(overlay)
         activeStyledOverlay = null
+        styledOverlayHost.visibility = View.GONE
         if (invokeCancel) onCancel?.invoke()
     }
 
