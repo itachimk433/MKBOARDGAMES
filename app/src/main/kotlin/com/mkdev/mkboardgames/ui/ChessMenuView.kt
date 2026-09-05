@@ -105,13 +105,6 @@ class ChessMenuView(
         textAlign = Paint.Align.CENTER
         textSize = 10f * textScale
     }
-    private val chessTitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        textAlign = Paint.Align.CENTER
-        typeface = Typeface.create("sans-serif-condensed", Typeface.BOLD_ITALIC)
-        letterSpacing = 0.045f
-        strokeJoin = Paint.Join.ROUND
-        strokeCap = Paint.Cap.ROUND
-    }
     private val chessBackdropPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val chessHeroPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
 
@@ -319,10 +312,9 @@ class ChessMenuView(
 
     private fun drawChessHero(canvas: Canvas, width: Float, topOffset: Float) {
         chessHomeIconBitmap?.let { bitmap ->
-            val size = min(width * 0.30f, 125f * unit)
+            val size = min(width * 0.36f, 150f * unit)
             val top = topOffset + 6f * unit
-            chessHeroPaint.alpha = 190
-            chessHeroPaint.setShadowLayer(18f * unit, 0f, 12f * unit, Color.argb(150, 0, 0, 0))
+            chessHeroPaint.alpha = 255
             canvas.drawBitmap(
                 bitmap,
                 null,
@@ -334,49 +326,18 @@ class ChessMenuView(
                 ),
                 chessHeroPaint,
             )
-            chessHeroPaint.clearShadowLayer()
-            chessHeroPaint.alpha = 255
         }
     }
 
     private fun drawChessHeader(canvas: Canvas, width: Float, topOffset: Float) {
-        val baseline = topOffset + 180f * unit
-        chessTitlePaint.textSize = min(width * 0.13f, 52f * unit).coerceAtLeast(36f * unit)
-        chessTitlePaint.style = Paint.Style.STROKE
-        chessTitlePaint.strokeWidth = 3.5f * unit
-        chessTitlePaint.color = Color.argb(220, 49, 20, 56)
-        chessTitlePaint.shader = null
-        chessTitlePaint.setShadowLayer(7f * unit, 0f, 7f * unit, Color.argb(190, 3, 8, 26))
-        canvas.drawText("CHESS", width / 2f, baseline, chessTitlePaint)
-
-        chessTitlePaint.style = Paint.Style.FILL
-        chessTitlePaint.shader = LinearGradient(
-            0f,
-            topOffset + 128f * unit,
-            0f,
-            topOffset + 196f * unit,
-            intArrayOf(
-                Color.parseColor("#FFF1B6"),
-                Color.parseColor("#FFB45E"),
-                Color.parseColor("#F07843"),
-            ),
-            floatArrayOf(0f, 0.55f, 1f),
-            Shader.TileMode.CLAMP,
-        )
-        chessTitlePaint.setShadowLayer(4f * unit, 0f, 4f * unit, Color.argb(180, 226, 76, 43))
-        canvas.drawText("CHESS", width / 2f, baseline, chessTitlePaint)
-        chessTitlePaint.shader = null
-        chessTitlePaint.clearShadowLayer()
-        chessTitlePaint.strokeWidth = 0f
-
         titlePaint.color = Color.WHITE
         titlePaint.textSize = 24f * textScale
-        canvas.drawText("Choose your match", width / 2f, topOffset + 210f * unit, titlePaint)
+        canvas.drawText("Choose your match", width / 2f, topOffset + 196f * unit, titlePaint)
         subtitlePaint.color = Color.parseColor("#D6E8FF")
         canvas.drawText(
             "A good game starts with the right opponent.",
             width / 2f,
-            topOffset + 231f * unit,
+            topOffset + 217f * unit,
             subtitlePaint,
         )
     }

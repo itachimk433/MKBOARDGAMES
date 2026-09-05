@@ -1,11 +1,15 @@
 package com.mkdev.mkboardgames.ui
 
 import android.content.Context
-import android.graphics.Color
+import android.graphics.*
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
+import android.view.HapticFeedbackConstants
+import android.view.MotionEvent
 import android.view.View
 import android.widget.*
+import com.mkdev.mkboardgames.SoundPlayer
+import java.util.Locale
 
 /**
  * A scrollable rules panel that matches the Chess setup and side-picker
@@ -25,6 +29,23 @@ class ChessRulesView(
     private val isChess = isChessStyledLabel(gameLabel)
 
     init {
+        if (isChess) {
+            configureChessRules()
+        } else {
+            configureClassicRules()
+        }
+    }
+
+    private fun configureChessRules() {
+        orientation = VERTICAL
+        setPadding(0, 0, 0, 0)
+        setBackgroundColor(Color.TRANSPARENT)
+        addView(ChessMancalaRulesView(context, rulesText).apply {
+            onBack = { onDone?.invoke() }
+        }, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+    }
+
+    private fun configureClassicRules() {
         orientation = VERTICAL
         setPadding((18f * density).toInt(), (18f * density).toInt(), (18f * density).toInt(), (14f * density).toInt())
         background = GradientDrawable(
@@ -130,4 +151,205 @@ class ChessRulesView(
             setColor(color)
             cornerRadius = radiusDp * density
         }
+}
+
+private class ChessMancalaRulesView(
+    context: Context,
+    rulesText: String,
+) : View(context) {
+    var onBack: (() -> Unit)? = null
+
+    private val density = resources.displayMetrics.density
+    private val backRect = RectF()
+    private val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val headingPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val sections = parseSections(rulesText)
+
+    init {
+        isClickable = true
+        isFocusable = true
+        contentDescription = "Chess how to play"
+        setLayerType(LAYER_TYPE_SOFTWARE, null)
+    }
+
+    override fun onDraw(canvas: Canvas) {
+        val width = width.toFloat()
+        val height = height.toFloat()
+        canvas.drawColor(Color.argb(205, 0, 6, 14))
+
+        val panelWidth = minOf(width * 0.9f, dp(610f))
+        val panelHeight = minOf(height * 0.9f, dp(700f))
+        val panel = RectF(
+            (width - panelWidth) / 2f,
+            (height - panelHeight) / 2f,
+            (width + panelWidth) / 2f,
+            (height + panelHeight) / 2f,
+        )
+        val panelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = LinearGradient(
+                0f,
+                panel.top,
+                0f,
+                panel.bottom,
+                Color.parseColor("#17677F"),
+                Color.parseColor("#0C3344"),
+                Shader.TileMode.CLAMP,
+            )
+            setShadowLayer(dp(18f), 0f, dp(8f), Color.BLACK)
+        }
+        canvas.drawRoundRect(panel, dp(26f), dp(26f), panelPaint)
+        panelPaint.clearShadowLayer()
+
+        titlePaint.textAlign = Paint.Align.CENTER
+        titlePaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        titlePaint.color = Color.WHITE
+        titlePaint.textSize = minOf(dp(28f), panelWidth * 0.08f)
+        canvas.drawText("CHESS", panel.centerX(), panel.top + dp(52f), titlePaint)
+        titlePaint.color = Color.parseColor("#FFE09C")
+        titlePaint.textSize = minOf(dp(22f), panelWidth * 0.065f)
+        canvas.drawText("HOW TO PLAY", panel.centerX(), panel.top + dp(84f), titlePaint)
+
+        val contentLeft = panel.left + dp(28f)
+        val contentWidth = panel.width() - dp(56f)
+        val contentBottom = panel.bottom - dp(82f)
+        val lineHeight = dp(15f)
+        var y = panel.top + dp(122f)
+        headingPaint.color = Color.parseColor("#FFE09C")
+        headingPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        headingPaint.textSize = minOf(dp(14f), contentWidth * 0.043f)
+        bodyPaint.textAlign = Paint.Align.LEFT
+        bodyPaint.typeface = Typeface.DEFAULT
+        bodyPaint.color = Color.parseColor("#E4F1F0")
+        bodyPaint.textSize = minOf(dp(12.5f), contentWidth * 0.038f)
+
+        canvas.save()
+        canvas.clipRect(contentLeft, panel.top + dp(108f), panel.right - dp(18f), contentBottom)
+        sections.forEach { (heading, body) ->
+            canvas.drawText(heading, contentLeft, y, headingPaint)
+            y += lineHeight
+            y = drawWrapped(canvas, body, contentLeft, contentWidth, y, lineHeight, bodyPaint)
+            y += dp(6f)
+        }
+        canvas.restore()
+
+        val buttonWidth = minOf(panel.width() * 0.42f, dp(210f))
+        backRect.set(
+            panel.centerX() - buttonWidth / 2f,
+            panel.bottom - dp(62f),
+            panel.centerX() + buttonWidth / 2f,
+            panel.bottom - dp(14f),
+        )
+        drawBackButton(canvas, backRect)
+    }
+
+    private fun drawWrapped(
+        canvas: Canvas,
+        value: String,
+        left: Float,
+        maxWidth: Float,
+        startY: Float,
+        lineHeight: Float,
+        paint: Paint,
+    ): Float {
+        var y = startY
+        value.split('\n').forEach { paragraph ->
+            if (paragraph.isBlank()) {
+                y += lineHeight
+            } else {
+                var line = ""
+                paragraph.trim().split(Regex("\\s+")).forEach { word ->
+                    val candidate = if (line.isEmpty()) word else "$line $word"
+                    if (line.isNotEmpty() && paint.measureText(candidate) > maxWidth) {
+                        canvas.drawText(line, left, y, paint)
+                        y += lineHeight
+                        line = word
+                    } else {
+                        line = candidate
+                    }
+                }
+                if (line.isNotEmpty()) {
+                    canvas.drawText(line, left, y, paint)
+                    y += lineHeight
+                }
+            }
+        }
+        return y
+    }
+
+    private fun drawBackButton(canvas: Canvas, rect: RectF) {
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = LinearGradient(
+                0f,
+                rect.top,
+                0f,
+                rect.bottom,
+                Color.parseColor("#F5D49A"),
+                Color.parseColor("#A76438"),
+                Shader.TileMode.CLAMP,
+            )
+            setShadowLayer(dp(5f), 0f, dp(3f), Color.BLACK)
+        }
+        canvas.drawRoundRect(rect, dp(14f), dp(14f), paint)
+        paint.clearShadowLayer()
+        paint.shader = null
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = dp(1.5f)
+        paint.color = Color.parseColor("#733A25")
+        canvas.drawRoundRect(rect, dp(14f), dp(14f), paint)
+        bodyPaint.textAlign = Paint.Align.CENTER
+        bodyPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        bodyPaint.color = Color.parseColor("#4A1714")
+        bodyPaint.textSize = minOf(dp(19f), rect.height() * 0.4f)
+        val metrics = bodyPaint.fontMetrics
+        canvas.drawText("Back", rect.centerX(), rect.centerY() - (metrics.ascent + metrics.descent) / 2f, bodyPaint)
+    }
+
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        if (event.actionMasked == MotionEvent.ACTION_UP && backRect.contains(event.x, event.y)) {
+            performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+            SoundPlayer.play("ui_click")
+            onBack?.invoke()
+        }
+        return true
+    }
+
+    private fun dp(value: Float): Float = value * density
+
+    private fun parseSections(rulesText: String): List<Pair<String, String>> {
+        val headings = setOf(
+            "Overview",
+            "Pieces & How They Move",
+            "Castling",
+            "Check & Checkmate",
+            "Promotion",
+            "Winning",
+        )
+        val sections = mutableListOf<Pair<String, String>>()
+        var currentHeading: String? = null
+        val body = StringBuilder()
+
+        fun flush() {
+            val heading = currentHeading ?: return
+            sections += heading.uppercase(Locale.US) to body.toString().trim()
+            body.clear()
+        }
+
+        rulesText.lines().forEach { rawLine ->
+            val line = rawLine.trim()
+            when {
+                line in headings -> {
+                    flush()
+                    currentHeading = line
+                }
+                line.isEmpty() || line.all { it == '─' } || line.endsWith("— Rules") -> Unit
+                currentHeading != null -> {
+                    if (body.isNotEmpty()) body.append('\n')
+                    body.append(line)
+                }
+            }
+        }
+        flush()
+        return sections
+    }
 }
