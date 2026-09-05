@@ -91,7 +91,7 @@ class TicTacToeActivity : AppCompatActivity() {
         AdManager.attachBanner(root)
         gameRoot = root
         setContentView(root)
-        hideBoardWhileDialogIsOpen()
+        hideBoardUntilMatchStarts()
 
         @Suppress("DEPRECATION")
         window.decorView.setOnSystemUiVisibilityChangeListener { vis ->
@@ -620,10 +620,12 @@ Strategy
     }
 
     private fun hideBoardWhileDialogIsOpen() {
-        // Keep the game surface mounted behind the dialog. The dialog is a
-        // separate window, and hiding this root exposes the dark activity
-        // background during dialog swaps.
+        // Keep the game surface mounted under the in-activity overlay.
         gameRoot.visibility = View.VISIBLE
+    }
+
+    private fun hideBoardUntilMatchStarts() {
+        gameRoot.visibility = View.INVISIBLE
     }
 
     private fun showBoardAfterDialog(resumeAi: Boolean = true) {

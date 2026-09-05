@@ -123,7 +123,7 @@ class ConnectFourActivity : AppCompatActivity() {
         AdManager.attachBanner(root)
         gameRoot = root
         setContentView(root)
-        hideBoardWhileDialogIsOpen()
+        hideBoardUntilMatchStarts()
         @Suppress("DEPRECATION")
         window.decorView.setOnSystemUiVisibilityChangeListener { vis ->
             if (vis and View.SYSTEM_UI_FLAG_FULLSCREEN == 0) {
@@ -633,9 +633,12 @@ Control the centre columns, build threats in more than one direction, and block 
     private fun hideBoardWhileDialogIsOpen() {
         boardStyleSwitch.removeCallbacks(boardStyleSwitchFadeRunnable)
         boardStyleSwitch.animate().cancel()
-        // Keep the game surface mounted behind the dialog so replacing one
-        // styled window with another never exposes the dark activity window.
+        // Keep the game surface mounted under the in-activity overlay.
         gameRoot.visibility = View.VISIBLE
+    }
+
+    private fun hideBoardUntilMatchStarts() {
+        gameRoot.visibility = View.INVISIBLE
     }
 
     private fun showBoardAfterDialog(resumeAi: Boolean = true) {

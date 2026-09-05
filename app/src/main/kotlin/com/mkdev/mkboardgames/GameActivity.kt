@@ -210,9 +210,9 @@ class GameActivity : AppCompatActivity() {
         topCaptureView.onPieceSelected = ::handleShogiHandTap
         bottomCaptureView.onPieceSelected = ::handleShogiHandTap
 
-        // Render the selected game's real starting position behind the mode
-        // dialog. BoardView defaults to an empty 8x8 chess-sized state, which
-        // made Fox & Geese briefly show a chess board before startGame().
+        // Render the selected game's real starting position before the first
+        // match. The game container stays hidden until startGame() so the
+        // board cannot appear behind the initial setup choices.
         SettingsManager.activateGameTheme(this, gameType.lowercase())
         gameState = engine.initialState()
         boardView.ruleEngine = engine
@@ -328,6 +328,7 @@ class GameActivity : AppCompatActivity() {
                 window.decorView.postDelayed({ makeFullscreen() }, 200)
         }
 
+        gameContainer.visibility = View.INVISIBLE
         showModeDialog()
     }
 
@@ -1000,11 +1001,9 @@ Checkmate your opponent's King.
     }
 
     private fun showChessBoardAfterDialog(resumeAi: Boolean) {
-        if (isStyledBoardGame()) {
-            gameContainer.visibility = View.VISIBLE
-            dismissStyledOverlay()
-            if (resumeAi) resumeComputerTurnIfNeeded()
-        }
+        gameContainer.visibility = View.VISIBLE
+        dismissStyledOverlay()
+        if (resumeAi) resumeComputerTurnIfNeeded()
     }
 
     private fun startGame(restoring: PausedMatchStore.Match? = null) {

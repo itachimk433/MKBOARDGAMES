@@ -238,7 +238,7 @@ class LudoActivity : AppCompatActivity() {
             ?: sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)?.also {
                 usingRawAccelerometer = true
             }
-        hideBoardWhileDialogIsOpen()
+        hideBoardUntilMatchStarts()
         showModeDialog()
     }
 
@@ -1837,9 +1837,15 @@ class LudoActivity : AppCompatActivity() {
         diceView.setGameplayVisible(false)
         boardView.cancelAnimations()
         SoundPlayer.stop("ludo_dice", "ludo_move", "ludo_star")
-        // Keep the board mounted under the dialog. Hiding the activity root
-        // leaves a black frame while the next dialog window is created.
+        // Keep the board mounted under the in-activity overlay.
         overlay.visibility = View.VISIBLE
+    }
+
+    private fun hideBoardUntilMatchStarts() {
+        dialogOpen = true
+        diceView.setGameplayVisible(false)
+        boardView.cancelAnimations()
+        overlay.visibility = View.INVISIBLE
     }
 
     private fun showBoardAfterDialog() {

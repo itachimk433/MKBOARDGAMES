@@ -120,7 +120,7 @@ class MorabarabaActivity : AppCompatActivity() {
         AdManager.attachBanner(root)
         gameRoot = root
         setContentView(root)
-        hideBoardWhileDialogIsOpen()
+        hideBoardUntilMatchStarts()
         showModeDialog()
     }
 
@@ -786,6 +786,10 @@ You win by either:
     private fun hideBoardWhileDialogIsOpen() {
         // Keep the game surface mounted under the in-activity overlay.
         gameRoot.visibility = View.VISIBLE
+    }
+
+    private fun hideBoardUntilMatchStarts() {
+        gameRoot.visibility = View.INVISIBLE
     }
 
     private fun showBoardAfterDialog(resumeAi: Boolean = true) {
