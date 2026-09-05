@@ -131,8 +131,9 @@ class ChessMenuView(
         val x: Float,
         val y: Float,
         val size: Float,
-        val speed: Float,
-        val drift: Float,
+        val horizontalRange: Float,
+        val verticalRange: Float,
+        val orbitSpeed: Float,
         val phase: Float,
         val alpha: Int,
         val tint: Int,
@@ -145,12 +146,12 @@ class ChessMenuView(
     )
 
     private val floatingPieces = listOf(
-        FloatingPiece("♞", 0.08f, 0.20f, 30f, 0.62f, 0.045f, 0.5f, 86, Color.rgb(174, 220, 255)),
-        FloatingPiece("♟", 0.86f, 0.16f, 24f, -0.38f, 0.055f, 2.3f, 72, Color.rgb(149, 193, 255)),
-        FloatingPiece("♜", 0.94f, 0.48f, 28f, 0.28f, 0.06f, 4.4f, 68, Color.rgb(165, 238, 222)),
-        FloatingPiece("♗", 0.07f, 0.69f, 25f, -0.24f, 0.05f, 1.4f, 64, Color.rgb(196, 173, 255)),
-        FloatingPiece("♛", 0.83f, 0.78f, 32f, 0.18f, 0.065f, 5.1f, 60, Color.rgb(225, 190, 255)),
-        FloatingPiece("♙", 0.25f, 0.92f, 22f, -0.16f, 0.045f, 3.2f, 56, Color.rgb(133, 222, 223)),
+        FloatingPiece("♞", 0.14f, 0.20f, 30f, 0.075f, 0.085f, 0.92f, 0.5f, 86, Color.rgb(174, 220, 255)),
+        FloatingPiece("♟", 0.84f, 0.18f, 24f, 0.10f, 0.06f, 0.72f, 2.3f, 72, Color.rgb(149, 193, 255)),
+        FloatingPiece("♜", 0.82f, 0.48f, 28f, 0.13f, 0.095f, 0.64f, 4.4f, 68, Color.rgb(165, 238, 222)),
+        FloatingPiece("♗", 0.16f, 0.69f, 25f, 0.085f, 0.095f, 0.78f, 1.4f, 64, Color.rgb(196, 173, 255)),
+        FloatingPiece("♛", 0.78f, 0.78f, 32f, 0.13f, 0.075f, 0.52f, 5.1f, 60, Color.rgb(225, 190, 255)),
+        FloatingPiece("♙", 0.30f, 0.86f, 22f, 0.10f, 0.06f, 0.66f, 3.2f, 56, Color.rgb(133, 222, 223)),
     )
     private val chessWaveBands = arrayOf(
         WaveBand(0.28f, 0.045f, Color.rgb(64, 167, 218)),
@@ -459,13 +460,21 @@ class ChessMenuView(
         val pieceProgress = backgroundPhase * floatingPieceSpeedMultiplier
         val piecePhase = pieceProgress * (2f * PI.toFloat())
         floatingPieces.forEachIndexed { index, piece ->
-            val travel = (piece.x + piece.speed * pieceProgress).let {
-                ((it % 1f) + 1f) % 1f
-            }
-            val x = width * travel + sin(piecePhase * (0.22f + index * 0.025f) + piece.phase).toFloat() * width * piece.drift
-            val y = height * piece.y + cos(piecePhase * (0.19f + index * 0.018f) + piece.phase).toFloat() * height * 0.035f
-            val rotation = sin(piecePhase * 0.25f + piece.phase).toFloat() * (5f + index)
-            val size = piece.size * unit * (0.94f + 0.08f * sin(piecePhase * 0.2f + piece.phase).toFloat())
+            val primaryPhase = piecePhase * piece.orbitSpeed + piece.phase
+            val secondaryPhase = piecePhase * (piece.orbitSpeed * 0.57f + 0.11f) + piece.phase * 1.7f
+            val horizontalMotion = sin(primaryPhase).toFloat() * piece.horizontalRange +
+                cos(secondaryPhase).toFloat() * piece.horizontalRange * 0.42f
+            val verticalMotion = cos(primaryPhase * 0.83f + piece.phase * 0.35f).toFloat() * piece.verticalRange +
+                sin(secondaryPhase * 1.13f).toFloat() * piece.verticalRange * 0.45f
+            val x = width * (piece.x + horizontalMotion)
+            val y = height * (piece.y + verticalMotion)
+            val rotation = (
+                sin(primaryPhase * 0.72f).toFloat() * (4f + index * 0.7f) +
+                    cos(secondaryPhase * 0.65f).toFloat() * 2.5f
+                )
+            val size = piece.size * unit * (
+                0.96f + 0.06f * sin(primaryPhase * 0.8f + piece.phase).toFloat()
+                )
 
             floatingPiecePaint.color = Color.argb(piece.alpha, Color.red(piece.tint), Color.green(piece.tint), Color.blue(piece.tint))
             floatingPiecePaint.textSize = size
