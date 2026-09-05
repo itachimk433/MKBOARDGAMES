@@ -3,12 +3,10 @@ package com.mkdev.mkboardgames
 import android.content.Context
 import android.content.Intent
 import android.graphics.*
-import android.os.Build
 import android.os.Bundle
 import android.view.*
+import android.widget.FrameLayout
 import android.widget.Toast
-import android.app.Dialog
-import android.graphics.drawable.ColorDrawable
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.mkdev.mkboardgames.engine.*
@@ -36,7 +34,6 @@ import com.mkdev.mkboardgames.ui.DraughtsBoardStyle
 import com.mkdev.mkboardgames.ui.FoxAndGeeseBoardStyle
 import com.mkdev.mkboardgames.ui.OthelloBoardStyle
 import com.mkdev.mkboardgames.ui.ShogiBoardStyle
-import com.mkdev.mkboardgames.ui.StyledDialogs
 import com.mkdev.mkboardgames.ui.XiangqiBoardStyle
 import kotlinx.coroutines.*
 
@@ -56,6 +53,8 @@ class GameActivity : AppCompatActivity() {
     private lateinit var engine:           RuleEngine
     private lateinit var gameType:         String
     private lateinit var gameContainer:    View
+    private lateinit var screenRoot:       FrameLayout
+    private lateinit var styledOverlayHost: FrameLayout
     private val internationalDraughtsStyles = arrayOf(
         DraughtsBoardStyle.CANVAS,
         DraughtsBoardStyle.INTERNATIONAL_DARK_WOOD,
@@ -85,7 +84,6 @@ class GameActivity : AppCompatActivity() {
     // Result guard: stats recorded exactly once per game
     private var resultRecorded = false
     private var interstitialAd: Any? = null
-    private var chessMenuDialog: Dialog? = null
     private var boardStyleSwitchEnabled = false
     private val boardStyleSwitchFadeRunnable = Runnable {
         if (!boardStyleSwitchEnabled || !::boardStyleSwitch.isInitialized) return@Runnable
@@ -300,7 +298,28 @@ class GameActivity : AppCompatActivity() {
 
         AdManager.attachBanner(container)
         gameContainer = container
-        setContentView(gameContainer)
+        screenRoot = FrameLayout(this).apply {
+            setBackgroundColor(Color.parseColor("#121212"))
+        }
+        styledOverlayHost = FrameLayout(this).apply {
+            isClickable = true
+            isFocusable = true
+        }
+        screenRoot.addView(
+            gameContainer,
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+            ),
+        )
+        screenRoot.addView(
+            styledOverlayHost,
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+            ),
+        )
+        setContentView(screenRoot)
 
         @Suppress("DEPRECATION")
         window.decorView.setOnSystemUiVisibilityChangeListener { vis ->
@@ -381,6 +400,10 @@ class GameActivity : AppCompatActivity() {
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
+        if (activeStyledOverlay != null) {
+            dismissStyledOverlay(invokeCancel = true)
+            return
+        }
         if (matchStarted && gameState.status != GameStatus.IN_PROGRESS) {
             showResultDialog()
             return
@@ -407,10 +430,9 @@ class GameActivity : AppCompatActivity() {
     }
 
     private fun showChessLeaveMatchDialog() {
-        // Dialogs do not pause the Activity, so stop automated gameplay before
-        // hiding the board behind the leave-match screen.
+        // The overlay does not pause the Activity, so stop automated gameplay
+        // before covering the board with the leave-match screen.
         stopAutoplayAndAiThinking()
-        hideChessBoardWhileDialogIsOpen()
         val view = ChessChoiceView(
             this,
             title = "Leave Match?",
@@ -437,35 +459,29 @@ class GameActivity : AppCompatActivity() {
             ),
             gameLabel = styledGameLabel(),
         )
-        val dialog = Dialog(this)
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
-        dialog.setContentView(view)
-        dialog.setCanceledOnTouchOutside(true)
-        dialog.setOnDismissListener { clearChessDialogBlur() }
-        dialog.setOnCancelListener {
-            clearChessDialogBlur()
-            showChessBoardAfterDialog()
-        }
         view.onChoiceSelected = { which ->
             when (which) {
                 0 -> {
-                    dialog.dismiss()
+                    dismissStyledOverlay()
                     pauseMatchAndExit()
                 }
                 1 -> {
-                    dialog.dismiss()
+                    dismissStyledOverlay()
                     clearPausedMatch()
                     if (vsAI) SettingsManager.recordForfeit(this)
                     @Suppress("DEPRECATION") super.onBackPressed()
                 }
                 else -> {
-                    dialog.dismiss()
+                    dismissStyledOverlay()
                     showChessBoardAfterDialog()
                 }
             }
         }
-        dialog.show()
-        styleChessDialog(dialog, 520f)
+        showStyledOverlay(
+            view = view,
+            fullScreen = true,
+            onCancel = { showChessBoardAfterDialog() },
+        )
     }
 
     private fun pauseMatchAndExit() {
@@ -544,67 +560,32 @@ class GameActivity : AppCompatActivity() {
     }
 
     private fun showChessMenu() {
-        chessMenuDialog?.dismiss()
-        hideChessBoardWhileDialogIsOpen()
-
         val menuView = ChessMenuView(
             this,
             PausedMatchStore.has(this, gameType),
             gameLabel = styledGameLabel(),
         )
-        val dialog = Dialog(this)
-        chessMenuDialog = dialog
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
-        dialog.setContentView(menuView)
-        dialog.setCanceledOnTouchOutside(true)
-        dialog.setOnCancelListener {
-            chessMenuDialog = null
-            clearChessDialogBlur()
-            if (!matchStarted) finish() else showChessBoardAfterDialog()
-        }
-        dialog.setOnDismissListener {
-            clearChessDialogBlur()
-            if (chessMenuDialog === dialog) chessMenuDialog = null
-        }
-
         menuView.onVsAi = {
-            dialog.dismiss()
             vsAI = true
             showColorPickerDialog()
         }
         menuView.onTwoPlayers = {
-            dialog.dismiss()
             vsAI = false
             playerColor = PieceColor.WHITE
             startGame()
         }
         menuView.onHowToPlay = {
-            dialog.dismiss()
             showRules(showModeAfter = !matchStarted)
         }
         menuView.onResumeMatch = {
-            dialog.dismiss()
             resumePausedMatch()
         }
 
-        dialog.show()
-        if (isStyledBoardGame()) {
-            styleChessDialog(dialog, 0f)
-        } else {
-            dialog.window?.let { window ->
-                val metrics = resources.displayMetrics
-                val horizontalMargin = (24f * metrics.density).toInt()
-                val maxWidth = (420f * metrics.density).toInt()
-                val width = minOf(metrics.widthPixels - horizontalMargin * 2, maxWidth)
-                window.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-                window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-                window.setWindowAnimations(0)
-                window.attributes = window.attributes.apply { dimAmount = 0.72f }
-                window.setLayout(width, WindowManager.LayoutParams.WRAP_CONTENT)
-                enableChessWindowBlur(window)
-            }
-            applyChessDialogBlur()
-        }
+        showStyledOverlay(
+            view = menuView,
+            fullScreen = true,
+            onCancel = { if (!matchStarted) finish() else showChessBoardAfterDialog() },
+        )
     }
 
     private fun showColorPickerDialog() {
@@ -640,7 +621,6 @@ class GameActivity : AppCompatActivity() {
     }
 
     private fun showChessSidePicker() {
-        hideChessBoardWhileDialogIsOpen()
         val isFoxAndGeese = gameType == "FOX_AND_GEESE"
         val view = ChessChoiceView(
             this,
@@ -673,22 +653,16 @@ class GameActivity : AppCompatActivity() {
             gameLabel = styledGameLabel(),
             headerSymbol = "●",
         )
-        val dialog = Dialog(this)
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
-        dialog.setContentView(view)
-        dialog.setCanceledOnTouchOutside(true)
-        dialog.setOnCancelListener {
-            clearChessDialogBlur()
-            showModeDialog()
-        }
-        dialog.setOnDismissListener { clearChessDialogBlur() }
         view.onChoiceSelected = { which ->
             playerColor = if (which == 0) PieceColor.WHITE else PieceColor.BLACK
-            dialog.dismiss()
+            dismissStyledOverlay()
             startGame()
         }
-        dialog.show()
-        styleChessDialog(dialog, 420f)
+        showStyledOverlay(
+            view = view,
+            fullScreen = true,
+            onCancel = { showModeDialog() },
+        )
     }
 
     private fun showRules(showModeAfter: Boolean = false) {
@@ -936,105 +910,76 @@ Checkmate your opponent's King.
     }
 
     private fun showChessRulesDialog(gameName: String, rulesText: String, showModeAfter: Boolean) {
-        hideChessBoardWhileDialogIsOpen()
         val view = ChessRulesView(this, gameName, rulesText, styledGameLabel())
-        val dialog = Dialog(this)
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
-        dialog.setContentView(view)
-        dialog.setCanceledOnTouchOutside(true)
-        dialog.setOnCancelListener {
-            clearChessDialogBlur()
-            if (showModeAfter) showModeDialog()
-            else showChessBoardAfterDialog()
-        }
-        dialog.setOnDismissListener { clearChessDialogBlur() }
         view.onDone = {
-            dialog.dismiss()
+            dismissStyledOverlay()
             if (showModeAfter) showModeDialog()
             else showChessBoardAfterDialog()
         }
-        dialog.show()
-        styleChessDialog(dialog, 620f)
+        showStyledOverlay(
+            view = view,
+            fullScreen = true,
+            onCancel = {
+                if (showModeAfter) showModeDialog()
+                else showChessBoardAfterDialog()
+            },
+        )
     }
 
-    private fun styleChessDialog(
-        dialog: Dialog,
-        heightDp: Float,
-        fullScreen: Boolean = isStyledBoardGame(),
-        blurBackground: Boolean = true,
+    private fun showStyledOverlay(
+        view: View,
+        fullScreen: Boolean,
+        onCancel: () -> Unit,
+        dimBackground: Boolean = !fullScreen,
     ) {
-        val isChessFullScreen = fullScreen
-        val metrics = resources.displayMetrics
-        if (isChessFullScreen) {
-            hideChessBoardWhileDialogIsOpen()
-            dialog.window?.let { window ->
-                window.setBackgroundDrawable(ColorDrawable(Color.parseColor("#0B1D25")))
-                window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-                window.setWindowAnimations(0)
-                window.decorView.setPadding(0, 0, 0, 0)
-                window.setGravity(Gravity.CENTER)
-                window.setLayout(
-                    WindowManager.LayoutParams.MATCH_PARENT,
-                    WindowManager.LayoutParams.MATCH_PARENT,
-                )
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    window.clearFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+        dismissStyledOverlay()
+
+        val overlay = FrameLayout(this).apply {
+            isClickable = true
+            isFocusable = true
+            if (dimBackground) {
+                setBackgroundColor(Color.argb(184, 0, 0, 0))
+            }
+            setOnTouchListener { _, event ->
+                if (!fullScreen && event.actionMasked == MotionEvent.ACTION_UP) {
+                    dismissStyledOverlay(invokeCancel = true)
                 }
-            }
-            clearChessDialogBlur()
-            return
-        }
-        val horizontalMargin = (24f * metrics.density).toInt()
-        val maxWidth = (420f * metrics.density).toInt()
-        val width = minOf(metrics.widthPixels - horizontalMargin * 2, maxWidth)
-        val maxHeight = (metrics.heightPixels * 0.84f).toInt()
-        val height = minOf((heightDp * metrics.density).toInt(), maxHeight)
-        dialog.window?.let { window ->
-            window.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-            window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-            window.attributes = window.attributes.apply { dimAmount = 0.72f }
-            window.setLayout(width, height)
-            enableChessWindowBlur(window)
-        }
-        if (blurBackground) applyChessDialogBlur()
-    }
-
-    private fun enableChessWindowBlur(window: Window) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            window.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
-            window.attributes = window.attributes.apply {
-                blurBehindRadius = (28f * resources.displayMetrics.density).toInt()
+                true
             }
         }
+        val viewParams = if (fullScreen) {
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+            )
+        } else {
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.CENTER,
+            )
+        }
+        overlay.addView(view, viewParams)
+        overlay.tag = onCancel
+        styledOverlayHost.addView(
+            overlay,
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+            ),
+        )
+        activeStyledOverlay = overlay
+        overlay.requestFocus()
     }
 
-    private fun applyChessDialogBlur() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val blur = RenderEffect.createBlurEffect(22f, 22f, Shader.TileMode.CLAMP)
-            gameContainer.setRenderEffect(blur)
-            (gameContainer as? ViewGroup)?.let { container ->
-                for (index in 0 until container.childCount) {
-                    container.getChildAt(index).setRenderEffect(blur)
-                }
-            }
-        }
-    }
+    private var activeStyledOverlay: View? = null
 
-    private fun clearChessDialogBlur() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            gameContainer.setRenderEffect(null)
-            (gameContainer as? ViewGroup)?.let { container ->
-                for (index in 0 until container.childCount) {
-                    container.getChildAt(index).setRenderEffect(null)
-                }
-            }
-        }
-    }
-
-    private fun hideChessBoardWhileDialogIsOpen() {
-        if (isStyledBoardGame()) {
-            gameContainer.visibility = View.INVISIBLE
-        }
+    private fun dismissStyledOverlay(invokeCancel: Boolean = false) {
+        val overlay = activeStyledOverlay ?: return
+        val onCancel = overlay.tag as? (() -> Unit)
+        styledOverlayHost.removeView(overlay)
+        activeStyledOverlay = null
+        if (invokeCancel) onCancel?.invoke()
     }
 
     private fun showChessBoardAfterDialog() {
@@ -1044,6 +989,7 @@ Checkmate your opponent's King.
     private fun showChessBoardAfterDialog(resumeAi: Boolean) {
         if (isStyledBoardGame()) {
             gameContainer.visibility = View.VISIBLE
+            dismissStyledOverlay()
             if (resumeAi) resumeComputerTurnIfNeeded()
         }
     }
@@ -1212,7 +1158,6 @@ Checkmate your opponent's King.
     private fun showPromotionChoice(choices: List<Move>) {
         val promotionChoices = choices.filter { it.promotionType != null }
         if (promotionChoices.isEmpty()) return
-        hideChessBoardWhileDialogIsOpen()
         val details = mapOf(
             "QUEEN" to ("Queen" to "Most powerful piece"),
             "KNIGHT" to ("Knight" to "The only piece that jumps"),
@@ -1237,20 +1182,23 @@ Checkmate your opponent's King.
             val (label, detail) = details.getValue(type)
             ChessChoiceView.Choice(label, detail, symbols.getValue(type), Color.parseColor(accents.getValue(type))) to move
         }
-        StyledDialogs.showChoices(
+        val view = ChessChoiceView(
             context = this,
             title = "Choose a promotion",
             subtitle = "Your pawn reached the far rank. Select its new piece.",
             choices = available.map { it.first },
-            heightDp = 560f,
             gameLabel = styledGameLabel(),
             headerSymbol = "●",
+        )
+        view.onChoiceSelected = { index ->
+            dismissStyledOverlay()
+            showChessBoardAfterDialog()
+            boardView.animateExternalMove(available[index].second)
+        }
+        showStyledOverlay(
+            view = view,
+            fullScreen = true,
             onCancel = { showChessBoardAfterDialog() },
-            onChoice = { index, dialog ->
-                dialog.dismiss()
-                showChessBoardAfterDialog()
-                boardView.animateExternalMove(available[index].second)
-            },
         )
     }
 
@@ -1672,7 +1620,6 @@ Checkmate your opponent's King.
     }
 
     private fun showChessGameplayMenu(inProgress: Boolean) {
-        hideChessBoardWhileDialogIsOpen()
         val choices = mutableListOf(
             ChessChoiceView.Choice(
                 "New Game",
@@ -1726,25 +1673,17 @@ Checkmate your opponent's King.
             choices = choices,
             gameLabel = styledGameLabel(),
         )
-        val dialog = Dialog(this)
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
-        dialog.setContentView(view)
-        dialog.setCanceledOnTouchOutside(true)
-        dialog.setOnDismissListener { clearChessDialogBlur() }
-        dialog.setOnCancelListener {
-            clearChessDialogBlur()
-            showChessBoardAfterDialog()
-        }
         view.onChoiceSelected = { which ->
-            dialog.dismiss()
             actions.getOrNull(which)?.invoke()
         }
-        dialog.show()
-        styleChessDialog(dialog, 620f)
+        showStyledOverlay(
+            view = view,
+            fullScreen = true,
+            onCancel = { showChessBoardAfterDialog() },
+        )
     }
 
     private fun showChessForfeitDialog() {
-        hideChessBoardWhileDialogIsOpen()
         val view = ChessChoiceView(
             this,
             title = "Forfeit Match?",
@@ -1765,17 +1704,8 @@ Checkmate your opponent's King.
             ),
             gameLabel = styledGameLabel(),
         )
-        val dialog = Dialog(this)
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
-        dialog.setContentView(view)
-        dialog.setCanceledOnTouchOutside(true)
-        dialog.setOnDismissListener { clearChessDialogBlur() }
-        dialog.setOnCancelListener {
-            clearChessDialogBlur()
-            showChessBoardAfterDialog()
-        }
         view.onChoiceSelected = { which ->
-            dialog.dismiss()
+            dismissStyledOverlay()
             if (which == 1) {
                 if (vsAI) SettingsManager.recordForfeit(this)
                 showModeDialog()
@@ -1783,8 +1713,11 @@ Checkmate your opponent's King.
                 showChessBoardAfterDialog()
             }
         }
-        dialog.show()
-        styleChessDialog(dialog, 470f)
+        showStyledOverlay(
+            view = view,
+            fullScreen = true,
+            onCancel = { showChessBoardAfterDialog() },
+        )
     }
 
     private fun showDifficultyDialog() {
@@ -1818,7 +1751,6 @@ Checkmate your opponent's King.
     }
 
     private fun showStyledDifficultyDialog(current: Int, setDiff: (Int) -> Unit) {
-        hideChessBoardWhileDialogIsOpen()
         val levels = listOf(
             ChessChoiceView.Choice(
                 "Easy",
@@ -1852,27 +1784,21 @@ Checkmate your opponent's King.
             choices = levels,
             gameLabel = styledGameLabel(),
         )
-        val dialog = Dialog(this)
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
-        dialog.setContentView(view)
-        dialog.setCanceledOnTouchOutside(true)
-        dialog.setOnDismissListener { clearChessDialogBlur() }
-        dialog.setOnCancelListener {
-            clearChessDialogBlur()
-            showChessBoardAfterDialog()
-        }
         view.onChoiceSelected = { which ->
             val changed = which != current
             setDiff(which)
-            dialog.dismiss()
+            dismissStyledOverlay()
             if (changed && gameState.status == GameStatus.IN_PROGRESS && moveHistory.isNotEmpty()) {
                 showChessRestartDialog()
             } else {
                 showChessBoardAfterDialog()
             }
         }
-        dialog.show()
-        styleChessDialog(dialog, 520f)
+        showStyledOverlay(
+            view = view,
+            fullScreen = true,
+            onCancel = { showChessBoardAfterDialog() },
+        )
     }
 
     private fun styledGameLabel(): String = when (gameType) {
@@ -1887,7 +1813,6 @@ Checkmate your opponent's King.
     }
 
     private fun showChessRestartDialog() {
-        hideChessBoardWhileDialogIsOpen()
         val view = ChessChoiceView(
             this,
             title = "Restart Match?",
@@ -1908,21 +1833,15 @@ Checkmate your opponent's King.
             ),
             gameLabel = styledGameLabel(),
         )
-        val dialog = Dialog(this)
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
-        dialog.setContentView(view)
-        dialog.setCanceledOnTouchOutside(true)
-        dialog.setOnDismissListener { clearChessDialogBlur() }
-        dialog.setOnCancelListener {
-            clearChessDialogBlur()
-            showChessBoardAfterDialog()
-        }
         view.onChoiceSelected = { which ->
-            dialog.dismiss()
+            dismissStyledOverlay()
             if (which == 1) startGame() else showChessBoardAfterDialog()
         }
-        dialog.show()
-        styleChessDialog(dialog, 470f)
+        showStyledOverlay(
+            view = view,
+            fullScreen = true,
+            onCancel = { showChessBoardAfterDialog() },
+        )
     }
 
     // ─── Result dialog ────────────────────────────────────────────────────────
@@ -2023,25 +1942,20 @@ Checkmate your opponent's King.
             gameLabel = styledGameLabel(),
             fullScreenOverride = false,
         )
-        val dialog = Dialog(this)
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
-        dialog.setContentView(view)
-        dialog.setCanceledOnTouchOutside(true)
-        dialog.setOnDismissListener { clearChessDialogBlur() }
-        dialog.setOnCancelListener {
-            clearChessDialogBlur()
-            showChessBoardAfterDialog()
-        }
         view.onChoiceSelected = { which ->
-            dialog.dismiss()
+            dismissStyledOverlay()
             when (which) {
                 0 -> startGame()
                 1 -> finish()
                 2 -> launchReplay(resultLabel)
             }
         }
-        dialog.show()
-        styleChessDialog(dialog, 520f, fullScreen = false, blurBackground = false)
+        showStyledOverlay(
+            view = view,
+            fullScreen = false,
+            dimBackground = true,
+            onCancel = { showChessBoardAfterDialog() },
+        )
     }
 
     private fun buildGoResultMessage(outcome: String): String {
