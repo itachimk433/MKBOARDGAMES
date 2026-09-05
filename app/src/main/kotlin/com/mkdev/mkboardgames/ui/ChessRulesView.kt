@@ -30,9 +30,10 @@ class ChessRulesView(
     private val density = resources.displayMetrics.density
     private val isChess = isChessStyledLabel(gameLabel)
     private val isDraughts = isDraughtsStyledLabel(gameLabel)
+    private val isOthello = isOthelloStyledLabel(gameLabel)
 
     init {
-        if (isChess || isDraughts) {
+        if (isChess || isDraughts || isOthello) {
             configureStyledRules()
         } else {
             configureClassicRules()
@@ -166,6 +167,7 @@ private class ChessMancalaRulesView(
 
     private val density = resources.displayMetrics.density
     private val isDraughts = isDraughtsStyledLabel(gameLabel)
+    private val isOthello = isOthelloStyledLabel(gameLabel)
     private val backRect = RectF()
     private val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val headingPaint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -185,13 +187,17 @@ private class ChessMancalaRulesView(
     init {
         isClickable = true
         isFocusable = true
-        contentDescription = "${if (isDraughts) "Draughts" else "Chess"} how to play"
+        contentDescription = when {
+            isDraughts -> "Draughts how to play"
+            isOthello -> "Othello how to play"
+            else -> "Chess how to play"
+        }
         setLayerType(LAYER_TYPE_SOFTWARE, null)
     }
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
-        if (isDraughts) atmosphereAnimator.start()
+        if (isDraughts || isOthello) atmosphereAnimator.start()
     }
 
     override fun onDetachedFromWindow() {
@@ -202,7 +208,16 @@ private class ChessMancalaRulesView(
     override fun onDraw(canvas: Canvas) {
         val width = width.toFloat()
         val height = height.toFloat()
-        if (isDraughts) {
+        if (isOthello) {
+            drawOthelloAtmosphere(
+                canvas,
+                width,
+                height,
+                density,
+                rounded = false,
+                phase = atmospherePhase,
+            )
+        } else if (isDraughts) {
             drawDraughtsAtmosphere(
                 canvas,
                 width,
@@ -244,6 +259,8 @@ private class ChessMancalaRulesView(
         titlePaint.textSize = minOf(dp(28f), panelWidth * 0.08f)
         val displayLabel = if (isDraughts) {
             gameLabel.replace(" ", "").replace("INTL", "INTL ")
+        } else if (isOthello) {
+            "OTHELLO"
         } else {
             "CHESS"
         }
@@ -370,6 +387,9 @@ private class ChessMancalaRulesView(
             "Kinging",
             "Capturing",
             "Flying Kings",
+            "Placing a Disc",
+            "Flipping",
+            "Passing",
             "Winning",
         )
         val sections = mutableListOf<Pair<String, String>>()

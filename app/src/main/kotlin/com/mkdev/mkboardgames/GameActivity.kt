@@ -657,6 +657,7 @@ class GameActivity : AppCompatActivity() {
                         gameType == "CHESS" -> "♔"
                         gameType == "CHECKERS" -> "●"
                         gameType == "INTERNATIONAL_DRAUGHTS" -> "●"
+                        gameType == "OTHELLO" -> "●"
                         else -> ""
                     },
                     Color.parseColor("#E3B86A"),
@@ -668,6 +669,7 @@ class GameActivity : AppCompatActivity() {
                         gameType == "CHESS" -> "♚"
                         gameType == "CHECKERS" -> "◉"
                         gameType == "INTERNATIONAL_DRAUGHTS" -> "◉"
+                        gameType == "OTHELLO" -> "○"
                         else -> ""
                     },
                     Color.parseColor("#A9B6E8"),

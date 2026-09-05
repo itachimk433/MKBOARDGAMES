@@ -48,11 +48,12 @@ class ChessMenuView(
     private val fullScreen = isFullScreenStyledGameLabel(gameLabel)
     private val isChess = gameLabel.replace(" ", "").equals("CHESS", ignoreCase = true)
     private val isDraughts = isDraughtsStyledLabel(gameLabel)
+    private val isOthello = isOthelloStyledLabel(gameLabel)
     private val isInternationalDraughts =
         gameLabel.replace(" ", "").equals("INTLDRAUGHTS", ignoreCase = true)
     private val contentHeightDp = when {
-        (isChess || isDraughts) && hasResumeMatch -> 548f
-        isChess || isDraughts -> 500f
+        (isChess || isDraughts || isOthello) && hasResumeMatch -> 548f
+        isChess || isDraughts || isOthello -> 500f
         hasResumeMatch -> 462f
         else -> 414f
     }
@@ -61,6 +62,7 @@ class ChessMenuView(
             isChess -> "chess_home_icon.png"
             isDraughts && isInternationalDraughts -> "international_draughts_home_icon.png"
             isDraughts -> "draughts_home_icon.png"
+            isOthello -> "othello_home_icon.png"
             else -> null
         }
         assetName?.let {
@@ -200,7 +202,7 @@ class ChessMenuView(
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
-        if (isChess || isDraughts) {
+        if (isChess || isDraughts || isOthello) {
             backgroundAnimator.start()
         }
     }
@@ -231,7 +233,7 @@ class ChessMenuView(
         val sidePadding = 18f * unit
         val gap = 10f * unit
         val actionWidth = (width - sidePadding * 2f - gap) / 2f
-        val actionTop = contentOffset + (if (isChess || isDraughts) 244f else 164f) * unit
+        val actionTop = contentOffset + (if (isChess || isDraughts || isOthello) 244f else 164f) * unit
         val actionHeight = 82f * unit
 
         actions = listOf(
@@ -240,7 +242,7 @@ class ChessMenuView(
                 detail = "Challenge the board",
                 symbol = when {
                     isChess -> "♞"
-                    isDraughts -> "●"
+                    isDraughts || isOthello -> "●"
                     else -> ""
                 },
                 accent = Color.parseColor("#E3B86A"),
@@ -251,7 +253,7 @@ class ChessMenuView(
                 detail = "Play on one board",
                 symbol = when {
                     isChess -> "♙"
-                    isDraughts -> "◉"
+                    isDraughts || isOthello -> "○"
                     else -> ""
                 },
                 accent = Color.parseColor("#8EC7B9"),
@@ -288,8 +290,17 @@ class ChessMenuView(
         super.onDraw(canvas)
         val width = width.toFloat()
         val height = height.toFloat()
-        if (isChess || isDraughts) {
-            if (isDraughts) {
+        if (isChess || isDraughts || isOthello) {
+            if (isOthello) {
+                drawOthelloAtmosphere(
+                    canvas,
+                    width,
+                    height,
+                    unit,
+                    rounded = !fullScreen,
+                    phase = backgroundPhase,
+                )
+            } else if (isDraughts) {
                 drawDraughtsAtmosphere(
                     canvas,
                     width,
@@ -304,9 +315,12 @@ class ChessMenuView(
             if (isChess) {
                 drawChessHero(canvas, width, contentOffset)
                 drawChessHeader(canvas, width, contentOffset)
-            } else {
+            } else if (isDraughts) {
                 drawDraughtsHero(canvas, width, contentOffset)
                 drawDraughtsHeader(canvas, width, contentOffset)
+            } else {
+                drawOthelloHero(canvas, width, contentOffset)
+                drawOthelloHeader(canvas, width, contentOffset)
             }
         } else {
             val corner = 12f * unit
@@ -327,7 +341,7 @@ class ChessMenuView(
             surfacePaint.shader = null
         }
 
-        if (!isChess && !isDraughts) {
+        if (!isChess && !isDraughts && !isOthello) {
             drawHeader(canvas, width, contentOffset)
         }
         actions.forEach { drawAction(canvas, it) }
@@ -617,6 +631,25 @@ class ChessMenuView(
         }
     }
 
+    private fun drawOthelloHero(canvas: Canvas, width: Float, topOffset: Float) {
+        gameHomeIconBitmap?.let { bitmap ->
+            val size = min(width * 0.36f, 150f * unit)
+            val top = topOffset + 18f * unit
+            chessHeroPaint.alpha = 255
+            canvas.drawBitmap(
+                bitmap,
+                null,
+                RectF(
+                    (width - size) / 2f,
+                    top,
+                    (width + size) / 2f,
+                    top + size,
+                ),
+                chessHeroPaint,
+            )
+        }
+    }
+
     private fun drawDraughtsHeader(canvas: Canvas, width: Float, topOffset: Float) {
         titlePaint.color = Color.WHITE
         titlePaint.textSize = 24f * textScale
@@ -624,6 +657,19 @@ class ChessMenuView(
         subtitlePaint.color = Color.parseColor("#D6E8FF")
         canvas.drawText(
             "Choose your side and make every capture count.",
+            width / 2f,
+            topOffset + 217f * unit,
+            subtitlePaint,
+        )
+    }
+
+    private fun drawOthelloHeader(canvas: Canvas, width: Float, topOffset: Float) {
+        titlePaint.color = Color.WHITE
+        titlePaint.textSize = 24f * textScale
+        canvas.drawText("Choose your match", width / 2f, topOffset + 196f * unit, titlePaint)
+        subtitlePaint.color = Color.parseColor("#D6E8FF")
+        canvas.drawText(
+            "Place wisely, flip the board, and take control.",
             width / 2f,
             topOffset + 217f * unit,
             subtitlePaint,
@@ -682,8 +728,8 @@ class ChessMenuView(
     }
 
     private fun drawAction(canvas: Canvas, action: MenuAction) {
-        if (isChess || isDraughts) {
-            drawChessAction(canvas, action)
+        if (isChess || isDraughts || isOthello) {
+            if (isOthello) drawOthelloAction(canvas, action) else drawChessAction(canvas, action)
             return
         }
         val scale = actionScale[action.label] ?: 1f
@@ -730,6 +776,20 @@ class ChessMenuView(
         canvas.drawText(action.detail, rect.centerX(), drawnTop + 72f * unit, actionDetailPaint)
     }
 
+    private fun drawOthelloAction(canvas: Canvas, action: MenuAction) {
+        val rect = action.rect
+        val pressed = pressedAction == action
+        drawOthelloButton(canvas, rect, pressed, unit)
+        val drawnTop = rect.top + if (pressed) 2f * unit else 0f
+        actionSymbolPaint.color = Color.parseColor("#4B211F")
+        actionSymbolPaint.textSize = 23f * textScale
+        canvas.drawText(action.symbol, rect.centerX(), drawnTop + 28f * unit, actionSymbolPaint)
+        actionLabelPaint.color = Color.parseColor("#321718")
+        canvas.drawText(action.label, rect.centerX(), drawnTop + 55f * unit, actionLabelPaint)
+        actionDetailPaint.color = Color.parseColor("#5D2C27")
+        canvas.drawText(action.detail, rect.centerX(), drawnTop + 72f * unit, actionDetailPaint)
+    }
+
     private fun drawChessAction(canvas: Canvas, action: MenuAction) {
         val rect = action.rect
         val pressed = pressedAction == action
@@ -760,8 +820,8 @@ class ChessMenuView(
     }
 
     private fun drawResumeAction(canvas: Canvas, width: Float) {
-        if (isChess || isDraughts) {
-            drawChessResumeAction(canvas, width)
+        if (isChess || isDraughts || isOthello) {
+            if (isOthello) drawOthelloResumeAction(canvas, width) else drawChessResumeAction(canvas, width)
             return
         }
         panelPaint.color = if (resumePressed) Color.parseColor("#21454A") else Color.parseColor("#16353B")
@@ -774,6 +834,15 @@ class ChessMenuView(
 
     private fun drawDraughtsResumeAction(canvas: Canvas, width: Float) {
         drawDraughtsButton(canvas, resumeRect, resumePressed, unit)
+        val drawnTop = resumeRect.top + if (resumePressed) 2f * unit else 0f
+        resumePaint.color = Color.parseColor("#321718")
+        canvas.drawText("RESUME SAVED MATCH", width / 2f, drawnTop + 20f * unit, resumePaint)
+        footerPaint.color = Color.parseColor("#5D2C27")
+        canvas.drawText("Tap here to continue your last game", width / 2f, drawnTop + 38f * unit, footerPaint)
+    }
+
+    private fun drawOthelloResumeAction(canvas: Canvas, width: Float) {
+        drawOthelloButton(canvas, resumeRect, resumePressed, unit)
         val drawnTop = resumeRect.top + if (resumePressed) 2f * unit else 0f
         resumePaint.color = Color.parseColor("#321718")
         canvas.drawText("RESUME SAVED MATCH", width / 2f, drawnTop + 20f * unit, resumePaint)

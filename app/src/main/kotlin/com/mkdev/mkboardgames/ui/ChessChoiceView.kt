@@ -63,6 +63,7 @@ class ChessChoiceView(
     private val fullScreen = fullScreenOverride ?: isFullScreenStyledGameLabel(gameLabel)
     private val isChess = isChessStyledLabel(gameLabel)
     private val isDraughts = isDraughtsStyledLabel(gameLabel)
+    private val isOthello = isOthelloStyledLabel(gameLabel)
     private val surfacePaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val cardPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -141,7 +142,7 @@ class ChessChoiceView(
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
-        if (isDraughts) atmosphereAnimator.start()
+        if (isDraughts || isOthello) atmosphereAnimator.start()
     }
 
     override fun onDetachedFromWindow() {
@@ -181,8 +182,17 @@ class ChessChoiceView(
     override fun onDraw(canvas: Canvas) {
         val width = width.toFloat()
         val height = height.toFloat()
-        if (isChess || isDraughts) {
-            if (isDraughts) {
+        if (isChess || isDraughts || isOthello) {
+            if (isOthello) {
+                drawOthelloAtmosphere(
+                    canvas,
+                    width,
+                    height,
+                    unit,
+                    rounded = !fullScreen,
+                    phase = atmospherePhase,
+                )
+            } else if (isDraughts) {
                 drawDraughtsAtmosphere(
                     canvas,
                     width,
@@ -215,6 +225,7 @@ class ChessChoiceView(
         when {
             isChess -> drawChessHeader(canvas, width, contentOffset)
             isDraughts -> drawDraughtsHeader(canvas, width, contentOffset)
+            isOthello -> drawOthelloHeader(canvas, width, contentOffset)
             else -> drawHeader(canvas, width, contentOffset)
         }
         hits.forEach { drawChoice(canvas, it) }
@@ -233,6 +244,37 @@ class ChessChoiceView(
     }
 
     private fun drawDraughtsHeader(canvas: Canvas, width: Float, topOffset: Float) {
+        val center = width / 2f
+        val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#D7A94D")
+            strokeWidth = 1.5f * unit
+        }
+        canvas.drawLine(
+            center - 118f * unit,
+            topOffset + 36f * unit,
+            center - 42f * unit,
+            topOffset + 36f * unit,
+            linePaint,
+        )
+        canvas.drawLine(
+            center + 42f * unit,
+            topOffset + 36f * unit,
+            center + 118f * unit,
+            topOffset + 36f * unit,
+            linePaint,
+        )
+        crownPaint.color = Color.parseColor("#FFB45E")
+        crownPaint.textSize = 22f * textScale
+        canvas.drawText(headerSymbol, center, topOffset + 43f * unit, crownPaint)
+        eyebrowPaint.color = Color.parseColor("#FFE09C")
+        canvas.drawText(gameLabel, center, topOffset + 58f * unit, eyebrowPaint)
+        titlePaint.color = Color.WHITE
+        canvas.drawText(title, center, topOffset + 99f * unit, titlePaint)
+        subtitlePaint.color = Color.parseColor("#D6E8FF")
+        canvas.drawText(subtitle, center, topOffset + 125f * unit, subtitlePaint)
+    }
+
+    private fun drawOthelloHeader(canvas: Canvas, width: Float, topOffset: Float) {
         val center = width / 2f
         val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.parseColor("#D7A94D")
@@ -290,8 +332,8 @@ class ChessChoiceView(
     }
 
     private fun drawChoice(canvas: Canvas, hit: ChoiceHit) {
-        if (isChess || isDraughts) {
-            drawChessChoice(canvas, hit)
+        if (isChess || isDraughts || isOthello) {
+            if (isOthello) drawOthelloChoice(canvas, hit) else drawChessChoice(canvas, hit)
             return
         }
         val scale = scales[hit.index] ?: 1f
@@ -324,6 +366,31 @@ class ChessChoiceView(
         val rect = hit.rect
         val pressed = pressedIndex == hit.index
         drawDraughtsButton(canvas, rect, pressed, unit)
+        val top = rect.top + if (pressed) 2f * unit else 0f
+
+        if (hit.choice.symbol.isNotBlank()) {
+            iconPaint.color = Color.parseColor("#4B211F")
+            iconPaint.textSize = 23f * textScale
+            canvas.drawText(hit.choice.symbol, rect.centerX(), top + 29f * unit, iconPaint)
+            labelPaint.color = Color.parseColor("#321718")
+            canvas.drawText(hit.choice.label, rect.centerX(), top + 56f * unit, labelPaint)
+            detailPaint.color = Color.parseColor("#5D2C27")
+            canvas.drawText(hit.choice.detail, rect.centerX(), top + 74f * unit, detailPaint)
+        } else {
+            labelPaint.color = Color.parseColor("#321718")
+            detailPaint.color = Color.parseColor("#5D2C27")
+            drawCenteredChoiceText(
+                canvas,
+                RectF(rect.left, top, rect.right, rect.bottom + (top - rect.top)),
+                hit.choice,
+            )
+        }
+    }
+
+    private fun drawOthelloChoice(canvas: Canvas, hit: ChoiceHit) {
+        val rect = hit.rect
+        val pressed = pressedIndex == hit.index
+        drawOthelloButton(canvas, rect, pressed, unit)
         val top = rect.top + if (pressed) 2f * unit else 0f
 
         if (hit.choice.symbol.isNotBlank()) {

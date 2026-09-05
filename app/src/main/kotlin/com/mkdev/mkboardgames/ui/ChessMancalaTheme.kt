@@ -19,6 +19,9 @@ internal fun isChessStyledLabel(label: String): Boolean =
 internal fun isDraughtsStyledLabel(label: String): Boolean =
     label.replace(" ", "").uppercase() in setOf("DRAUGHTS", "INTLDRAUGHTS")
 
+internal fun isOthelloStyledLabel(label: String): Boolean =
+    label.replace(" ", "").uppercase() == "OTHELLO"
+
 internal fun drawChessAtmosphere(canvas: Canvas, width: Float, height: Float, unit: Float, rounded: Boolean) {
     val background = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         shader = LinearGradient(
@@ -192,9 +195,33 @@ private val draughtsFloatSeeds = listOf(
     DraughtsFloatSeed(0.30f, 0.88f, 0.020f, 0.065f, 0.05f, 0.68f, 2.6f, dark = true),
 )
 
+private data class OthelloFloatSeed(
+    val x: Float,
+    val y: Float,
+    val size: Float,
+    val horizontalRange: Float,
+    val verticalRange: Float,
+    val speed: Float,
+    val phase: Float,
+    val dark: Boolean,
+)
+
+private val othelloFloatSeeds = listOf(
+    OthelloFloatSeed(0.12f, 0.17f, 0.025f, 0.06f, 0.07f, 0.34f, 0.4f, dark = false),
+    OthelloFloatSeed(0.84f, 0.19f, 0.022f, 0.075f, 0.06f, 0.27f, 1.8f, dark = true),
+    OthelloFloatSeed(0.88f, 0.47f, 0.027f, 0.08f, 0.08f, 0.22f, 3.4f, dark = false),
+    OthelloFloatSeed(0.14f, 0.65f, 0.023f, 0.065f, 0.08f, 0.31f, 4.7f, dark = true),
+    OthelloFloatSeed(0.78f, 0.78f, 0.029f, 0.08f, 0.065f, 0.19f, 5.5f, dark = false),
+    OthelloFloatSeed(0.30f, 0.87f, 0.021f, 0.07f, 0.055f, 0.25f, 2.6f, dark = true),
+)
+
 private val draughtsAtmospherePaint = Paint(Paint.ANTI_ALIAS_FLAG)
 private val draughtsPiecePaint = Paint(Paint.ANTI_ALIAS_FLAG)
 private val draughtsPieceEdgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    style = Paint.Style.STROKE
+}
+private val othelloPiecePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+private val othelloPieceEdgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
     style = Paint.Style.STROKE
 }
 
@@ -271,6 +298,136 @@ internal fun drawDraughtsAtmosphere(
     }
 
     drawDraughtsFloatingPieces(canvas, width, height, unit, radians, 0.82f)
+}
+
+internal fun drawOthelloAtmosphere(
+    canvas: Canvas,
+    width: Float,
+    height: Float,
+    unit: Float,
+    rounded: Boolean,
+    phase: Float,
+) {
+    // Othello keeps the same palette and wave language as Draughts, but moves
+    // through it more gently so the discs feel like they are floating.
+    val cycle = (((phase * 0.62f) % 1f) + 1f) % 1f
+    val paletteSlot = cycle * draughtsPalettes.size
+    val paletteIndex = paletteSlot.toInt().coerceIn(0, draughtsPalettes.lastIndex)
+    val paletteProgress = smoothDraughtsStep(paletteSlot - paletteIndex)
+    val start = draughtsPalettes[paletteIndex]
+    val end = draughtsPalettes[(paletteIndex + 1) % draughtsPalettes.size]
+    val background = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        shader = LinearGradient(
+            0f,
+            0f,
+            width * 0.92f,
+            height,
+            intArrayOf(
+                blendDraughtsColor(start.top, end.top, paletteProgress),
+                blendDraughtsColor(start.middle, end.middle, paletteProgress),
+                blendDraughtsColor(start.lower, end.lower, paletteProgress),
+                blendDraughtsColor(start.bottom, end.bottom, paletteProgress),
+            ),
+            floatArrayOf(0f, 0.31f, 0.68f, 1f),
+            Shader.TileMode.CLAMP,
+        )
+    }
+    if (rounded) {
+        canvas.drawRoundRect(0f, 0f, width, height, 12f * unit, 12f * unit, background)
+    } else {
+        canvas.drawRect(0f, 0f, width, height, background)
+    }
+
+    val radians = cycle * (2f * PI.toFloat())
+    drawDraughtsGlow(
+        canvas,
+        width * (0.12f + 0.035f * sin(radians * 0.45f).toFloat()),
+        height * (0.18f + 0.028f * cos(radians * 0.34f).toFloat()),
+        min(width, height) * 0.58f,
+        blendDraughtsColor(Color.rgb(53, 157, 208), Color.rgb(137, 91, 192), (sin(radians * 0.18f) + 1f) / 2f),
+    )
+    drawDraughtsGlow(
+        canvas,
+        width * (0.88f + 0.032f * cos(radians * 0.27f).toFloat()),
+        height * (0.63f + 0.038f * sin(radians * 0.39f).toFloat()),
+        min(width, height) * 0.52f,
+        blendDraughtsColor(Color.rgb(28, 173, 169), Color.rgb(83, 124, 219), (sin(radians * 0.22f + 1.2f) + 1f) / 2f),
+    )
+    drawDraughtsGlow(
+        canvas,
+        width * (0.46f + 0.045f * sin(radians * 0.25f + 2f).toFloat()),
+        height * (1.02f + 0.028f * cos(radians * 0.37f).toFloat()),
+        min(width, height) * 0.7f,
+        Color.rgb(93, 55, 147),
+    )
+
+    drawDraughtsWaves(canvas, width, height, radians * 0.56f)
+
+    val stars = Paint(Paint.ANTI_ALIAS_FLAG)
+    repeat(48) { index ->
+        val baseX = ((index * 97 + 19) % 1000) / 1000f * width
+        val baseY = ((index * 43 + 31) % 940) / 1000f * height
+        val x = baseX + sin(radians * (0.09f + (index % 3) * 0.035f) + index).toFloat() * 4f * unit
+        val y = baseY + cos(radians * (0.085f + (index % 4) * 0.025f) + index).toFloat() * 3.5f * unit
+        val twinkle = ((sin(radians * (0.32f + (index % 4) * 0.06f) + index) + 1f) * 0.5f).toFloat()
+        stars.color = Color.argb(42 + (index % 4) * 18 + (twinkle * 14f).toInt(), 224, 242, 238)
+        canvas.drawCircle(x, y, (0.55f + (index % 3) * 0.42f) * unit, stars)
+    }
+
+    drawOthelloFloatingPieces(canvas, width, height, unit, radians, 0.82f)
+}
+
+private fun drawOthelloFloatingPieces(
+    canvas: Canvas,
+    width: Float,
+    height: Float,
+    unit: Float,
+    radians: Float,
+    opacity: Float,
+) {
+    othelloFloatSeeds.forEach { seed ->
+        val primary = radians * seed.speed + seed.phase
+        val secondary = radians * (seed.speed * 0.58f + 0.08f) + seed.phase * 1.6f
+        val x = width * (
+            seed.x +
+                sin(primary).toFloat() * seed.horizontalRange +
+                cos(secondary).toFloat() * seed.horizontalRange * 0.34f
+            )
+        val y = height * (
+            seed.y +
+                cos(primary * 0.8f + seed.phase * 0.28f).toFloat() * seed.verticalRange +
+                sin(secondary * 1.1f).toFloat() * seed.verticalRange * 0.34f
+            )
+        val radius = min(width, height) * seed.size *
+            (0.97f + 0.04f * sin(primary * 0.72f).toFloat())
+        val alpha = (if (seed.dark) 82f else 94f) * opacity
+        val base = if (seed.dark) Color.rgb(27, 25, 33) else Color.rgb(225, 219, 197)
+        val middle = if (seed.dark) Color.rgb(71, 57, 74) else Color.rgb(247, 237, 209)
+        val edge = if (seed.dark) Color.rgb(120, 86, 91) else Color.rgb(255, 245, 219)
+
+        othelloPiecePaint.shader = RadialGradient(
+            x - radius * 0.28f,
+            y - radius * 0.34f,
+            radius * 1.25f,
+            intArrayOf(
+                Color.argb(alpha.toInt(), Color.red(middle), Color.green(middle), Color.blue(middle)),
+                Color.argb(alpha.toInt(), Color.red(base), Color.green(base), Color.blue(base)),
+                Color.argb(alpha.toInt(), Color.red(base), Color.green(base), Color.blue(base)),
+            ),
+            floatArrayOf(0f, 0.64f, 1f),
+            Shader.TileMode.CLAMP,
+        )
+        othelloPiecePaint.setShadowLayer(radius * 0.38f, 0f, radius * 0.14f, Color.argb((alpha * 0.82f).toInt(), 0, 0, 0))
+        canvas.drawCircle(x, y, radius, othelloPiecePaint)
+        othelloPiecePaint.clearShadowLayer()
+        othelloPiecePaint.shader = null
+
+        othelloPieceEdgePaint.strokeWidth = maxOf(unit, radius * 0.11f)
+        othelloPieceEdgePaint.color = Color.argb(alpha.toInt(), Color.red(edge), Color.green(edge), Color.blue(edge))
+        canvas.drawCircle(x, y, radius * 0.78f, othelloPieceEdgePaint)
+        othelloPieceEdgePaint.color = Color.argb((alpha * 0.72f).toInt(), 255, 255, 255)
+        canvas.drawCircle(x - radius * 0.24f, y - radius * 0.28f, radius * 0.16f, othelloPieceEdgePaint)
+    }
 }
 
 private fun drawDraughtsWaves(canvas: Canvas, width: Float, height: Float, radians: Float) {
@@ -415,4 +572,8 @@ internal fun drawDraughtsButton(canvas: Canvas, rect: RectF, pressed: Boolean, u
         drawn.bottom - 3f * unit,
     )
     canvas.drawRoundRect(inner, radius * 0.82f, radius * 0.82f, border)
+}
+
+internal fun drawOthelloButton(canvas: Canvas, rect: RectF, pressed: Boolean, unit: Float) {
+    drawDraughtsButton(canvas, rect, pressed, unit)
 }
