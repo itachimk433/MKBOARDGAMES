@@ -8,6 +8,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.animation.DecelerateInterpolator
 import com.mkdev.mkboardgames.SoundPlayer
+import kotlin.math.min
 
 /**
  * A focused setup surface for Chess.
@@ -42,6 +43,11 @@ class ChessMenuView(
     private val textScale = scaledDensity.coerceAtMost(2f)
     private val fullScreen = isFullScreenStyledGameLabel(gameLabel)
     private val isChess = gameLabel.replace(" ", "").equals("CHESS", ignoreCase = true)
+    private val chessHomeIconBitmap = try {
+        context.assets.open("chess_home_icon.png").use { BitmapFactory.decodeStream(it) }
+    } catch (_: Throwable) {
+        null
+    }
     private val surfacePaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val panelPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val panelBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -93,6 +99,15 @@ class ChessMenuView(
         textAlign = Paint.Align.CENTER
         textSize = 10f * textScale
     }
+    private val chessTitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textAlign = Paint.Align.CENTER
+        typeface = Typeface.create("sans-serif-condensed", Typeface.BOLD_ITALIC)
+        letterSpacing = 0.045f
+        strokeJoin = Paint.Join.ROUND
+        strokeCap = Paint.Cap.ROUND
+    }
+    private val chessBackdropPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val chessHeroPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
 
     private lateinit var actions: List<MenuAction>
     private var pressedAction: MenuAction? = null
@@ -183,25 +198,32 @@ class ChessMenuView(
         super.onDraw(canvas)
         val width = width.toFloat()
         val height = height.toFloat()
-        val corner = 12f * unit
-
-        surfacePaint.shader = LinearGradient(
-            0f,
-            0f,
-            width,
-            height,
-            Color.parseColor("#102C32"),
-            Color.parseColor("#0B1D25"),
-            Shader.TileMode.CLAMP,
-        )
-        if (fullScreen) {
-            canvas.drawRect(0f, 0f, width, height, surfacePaint)
+        if (isChess) {
+            drawChessBackdrop(canvas, width, height)
+            drawChessHero(canvas, width, contentOffset)
+            drawChessHeader(canvas, width, contentOffset)
         } else {
-            canvas.drawRoundRect(0f, 0f, width, height, corner, corner, surfacePaint)
+            val corner = 12f * unit
+            surfacePaint.shader = LinearGradient(
+                0f,
+                0f,
+                width,
+                height,
+                Color.parseColor("#102C32"),
+                Color.parseColor("#0B1D25"),
+                Shader.TileMode.CLAMP,
+            )
+            if (fullScreen) {
+                canvas.drawRect(0f, 0f, width, height, surfacePaint)
+            } else {
+                canvas.drawRoundRect(0f, 0f, width, height, corner, corner, surfacePaint)
+            }
+            surfacePaint.shader = null
         }
-        surfacePaint.shader = null
 
-        drawHeader(canvas, width, contentOffset)
+        if (!isChess) {
+            drawHeader(canvas, width, contentOffset)
+        }
         actions.forEach { drawAction(canvas, it) }
         if (hasResumeMatch) {
             drawResumeAction(canvas, width)
@@ -213,6 +235,144 @@ class ChessMenuView(
                 footerPaint,
             )
         }
+    }
+
+    private fun drawChessBackdrop(canvas: Canvas, width: Float, height: Float) {
+        chessBackdropPaint.shader = LinearGradient(
+            0f,
+            0f,
+            width * 0.9f,
+            height,
+            intArrayOf(
+                Color.parseColor("#112C68"),
+                Color.parseColor("#173C78"),
+                Color.parseColor("#102951"),
+                Color.parseColor("#061321"),
+            ),
+            floatArrayOf(0f, 0.32f, 0.68f, 1f),
+            Shader.TileMode.CLAMP,
+        )
+        canvas.drawRect(0f, 0f, width, height, chessBackdropPaint)
+        chessBackdropPaint.shader = null
+
+        drawChessGlow(canvas, width * 0.12f, height * 0.18f, min(width, height) * 0.58f, Color.rgb(53, 137, 220))
+        drawChessGlow(canvas, width * 0.9f, height * 0.64f, min(width, height) * 0.5f, Color.rgb(22, 194, 190))
+        drawChessGlow(canvas, width * 0.46f, height * 1.02f, min(width, height) * 0.68f, Color.rgb(71, 37, 134))
+
+        val horizon = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = LinearGradient(
+                0f,
+                height * 0.48f,
+                width,
+                height * 0.58f,
+                intArrayOf(
+                    Color.argb(0, 104, 194, 255),
+                    Color.argb(54, 77, 158, 232),
+                    Color.argb(0, 104, 194, 255),
+                ),
+                floatArrayOf(0f, 0.5f, 1f),
+                Shader.TileMode.CLAMP,
+            )
+        }
+        canvas.drawRect(0f, height * 0.4f, width, height * 0.65f, horizon)
+
+        val stars = Paint(Paint.ANTI_ALIAS_FLAG)
+        for (index in 0 until 62) {
+            val x = ((index * 83 + 37) % 1000) / 1000f * width
+            val y = ((index * 47 + 23) % 920) / 1000f * height
+            val radius = (0.55f + (index % 4) * 0.45f) * unit
+            stars.color = Color.argb(70 + (index % 5) * 28, 220, 241, 255)
+            canvas.drawCircle(x, y, radius, stars)
+            if (index % 11 == 0) {
+                stars.color = Color.argb(130, 178, 224, 255)
+                canvas.drawCircle(x, y, radius * 2.4f, stars)
+            }
+        }
+        stars.color = Color.argb(34, 88, 207, 220)
+        canvas.drawCircle(width * 0.08f, height * 0.72f, min(width, height) * 0.18f, stars)
+        stars.color = Color.argb(25, 150, 109, 226)
+        canvas.drawCircle(width * 0.88f, height * 0.3f, min(width, height) * 0.2f, stars)
+    }
+
+    private fun drawChessGlow(canvas: Canvas, x: Float, y: Float, radius: Float, color: Int) {
+        chessBackdropPaint.shader = RadialGradient(
+            x,
+            y,
+            radius,
+            intArrayOf(
+                Color.argb(88, Color.red(color), Color.green(color), Color.blue(color)),
+                Color.argb(24, Color.red(color), Color.green(color), Color.blue(color)),
+                Color.TRANSPARENT,
+            ),
+            floatArrayOf(0f, 0.52f, 1f),
+            Shader.TileMode.CLAMP,
+        )
+        canvas.drawCircle(x, y, radius, chessBackdropPaint)
+        chessBackdropPaint.shader = null
+    }
+
+    private fun drawChessHero(canvas: Canvas, width: Float, topOffset: Float) {
+        chessHomeIconBitmap?.let { bitmap ->
+            val size = min(width * 0.58f, 250f * unit)
+            val top = topOffset + 52f * unit
+            chessHeroPaint.alpha = 190
+            chessHeroPaint.setShadowLayer(18f * unit, 0f, 12f * unit, Color.argb(150, 0, 0, 0))
+            canvas.drawBitmap(
+                bitmap,
+                null,
+                RectF(
+                    (width - size) / 2f,
+                    top,
+                    (width + size) / 2f,
+                    top + size,
+                ),
+                chessHeroPaint,
+            )
+            chessHeroPaint.clearShadowLayer()
+            chessHeroPaint.alpha = 255
+        }
+    }
+
+    private fun drawChessHeader(canvas: Canvas, width: Float, topOffset: Float) {
+        val baseline = topOffset + 106f * unit
+        chessTitlePaint.textSize = min(width * 0.145f, 58f * unit).coerceAtLeast(36f * unit)
+        chessTitlePaint.style = Paint.Style.STROKE
+        chessTitlePaint.strokeWidth = 3.5f * unit
+        chessTitlePaint.color = Color.argb(220, 49, 20, 56)
+        chessTitlePaint.shader = null
+        chessTitlePaint.setShadowLayer(7f * unit, 0f, 7f * unit, Color.argb(190, 3, 8, 26))
+        canvas.drawText("CHESS", width / 2f, baseline, chessTitlePaint)
+
+        chessTitlePaint.style = Paint.Style.FILL
+        chessTitlePaint.shader = LinearGradient(
+            0f,
+            topOffset + 54f * unit,
+            0f,
+            topOffset + 122f * unit,
+            intArrayOf(
+                Color.parseColor("#FFF1B6"),
+                Color.parseColor("#FFB45E"),
+                Color.parseColor("#F07843"),
+            ),
+            floatArrayOf(0f, 0.55f, 1f),
+            Shader.TileMode.CLAMP,
+        )
+        chessTitlePaint.setShadowLayer(4f * unit, 0f, 4f * unit, Color.argb(180, 226, 76, 43))
+        canvas.drawText("CHESS", width / 2f, baseline, chessTitlePaint)
+        chessTitlePaint.shader = null
+        chessTitlePaint.clearShadowLayer()
+        chessTitlePaint.strokeWidth = 0f
+
+        titlePaint.color = Color.WHITE
+        titlePaint.textSize = 24f * textScale
+        canvas.drawText("Choose your match", width / 2f, topOffset + 137f * unit, titlePaint)
+        subtitlePaint.color = Color.parseColor("#D6E8FF")
+        canvas.drawText(
+            "A good game starts with the right opponent.",
+            width / 2f,
+            topOffset + 158f * unit,
+            subtitlePaint,
+        )
     }
 
     private fun drawHeader(canvas: Canvas, width: Float, topOffset: Float) {
@@ -254,6 +414,10 @@ class ChessMenuView(
     }
 
     private fun drawAction(canvas: Canvas, action: MenuAction) {
+        if (isChess) {
+            drawChessAction(canvas, action)
+            return
+        }
         val scale = actionScale[action.label] ?: 1f
         val rect = action.rect
         val pressed = pressedAction == action
@@ -284,6 +448,66 @@ class ChessMenuView(
         canvas.restore()
     }
 
+    private fun drawChessAction(canvas: Canvas, action: MenuAction) {
+        val scale = actionScale[action.label] ?: 1f
+        val rect = action.rect
+        val pressed = pressedAction == action
+        val offset = if (pressed) 2f * unit else 0f
+        val drawn = RectF(rect.left, rect.top + offset, rect.right, rect.bottom + offset)
+        val radius = 13f * unit
+
+        canvas.save()
+        canvas.scale(scale, scale, rect.centerX(), rect.centerY())
+        panelPaint.shader = LinearGradient(
+            0f,
+            drawn.top,
+            0f,
+            drawn.bottom,
+            intArrayOf(
+                Color.parseColor("#F7D99B"),
+                Color.parseColor("#C8894C"),
+                Color.parseColor("#85502D"),
+            ),
+            floatArrayOf(0f, 0.5f, 1f),
+            Shader.TileMode.CLAMP,
+        )
+        panelPaint.setShadowLayer(
+            if (pressed) 2f * unit else 6f * unit,
+            0f,
+            4f * unit,
+            Color.argb(190, 15, 4, 2),
+        )
+        canvas.drawRoundRect(drawn, radius, radius, panelPaint)
+        panelPaint.clearShadowLayer()
+        panelPaint.shader = null
+
+        panelBorderPaint.color = Color.parseColor("#7B4025")
+        panelBorderPaint.strokeWidth = 2f * unit
+        canvas.drawRoundRect(drawn, radius, radius, panelBorderPaint)
+        panelBorderPaint.color = Color.argb(180, 255, 246, 220)
+        panelBorderPaint.strokeWidth = unit
+        canvas.drawRoundRect(
+            RectF(
+                drawn.left + 3f * unit,
+                drawn.top + 3f * unit,
+                drawn.right - 3f * unit,
+                drawn.bottom - 3f * unit,
+            ),
+            radius * 0.82f,
+            radius * 0.82f,
+            panelBorderPaint,
+        )
+
+        actionSymbolPaint.color = Color.parseColor("#63301F")
+        actionSymbolPaint.textSize = 23f * textScale
+        canvas.drawText(action.symbol, drawn.centerX(), drawn.top + 28f * unit, actionSymbolPaint)
+        actionLabelPaint.color = Color.parseColor("#4A1714")
+        canvas.drawText(action.label, drawn.centerX(), drawn.top + 55f * unit, actionLabelPaint)
+        actionDetailPaint.color = Color.parseColor("#6A2D1B")
+        canvas.drawText(action.detail, drawn.centerX(), drawn.top + 72f * unit, actionDetailPaint)
+        canvas.restore()
+    }
+
     private fun drawCenteredActionText(canvas: Canvas, rect: RectF, action: MenuAction) {
         actionLabelPaint.color = Color.WHITE
         val labelMetrics = actionLabelPaint.fontMetrics
@@ -300,12 +524,47 @@ class ChessMenuView(
     }
 
     private fun drawResumeAction(canvas: Canvas, width: Float) {
+        if (isChess) {
+            drawChessResumeAction(canvas, width)
+            return
+        }
         panelPaint.color = if (resumePressed) Color.parseColor("#21454A") else Color.parseColor("#16353B")
         canvas.drawRoundRect(resumeRect, 8f * unit, 8f * unit, panelPaint)
         panelBorderPaint.color = Color.parseColor("#2C5960")
         canvas.drawRoundRect(resumeRect, 8f * unit, 8f * unit, panelBorderPaint)
         canvas.drawText("RESUME SAVED MATCH", width / 2f, resumeRect.top + 20f * unit, resumePaint)
         canvas.drawText("Tap here to continue your last game", width / 2f, resumeRect.top + 38f * unit, footerPaint)
+    }
+
+    private fun drawChessResumeAction(canvas: Canvas, width: Float) {
+        val offset = if (resumePressed) 2f * unit else 0f
+        val drawn = RectF(
+            resumeRect.left,
+            resumeRect.top + offset,
+            resumeRect.right,
+            resumeRect.bottom + offset,
+        )
+        val radius = 12f * unit
+        panelPaint.shader = LinearGradient(
+            0f,
+            drawn.top,
+            0f,
+            drawn.bottom,
+            Color.parseColor("#F2D095"),
+            Color.parseColor("#93562F"),
+            Shader.TileMode.CLAMP,
+        )
+        panelPaint.setShadowLayer(5f * unit, 0f, 4f * unit, Color.argb(180, 10, 5, 2))
+        canvas.drawRoundRect(drawn, radius, radius, panelPaint)
+        panelPaint.clearShadowLayer()
+        panelPaint.shader = null
+        panelBorderPaint.color = Color.parseColor("#71391F")
+        panelBorderPaint.strokeWidth = unit
+        canvas.drawRoundRect(drawn, radius, radius, panelBorderPaint)
+        resumePaint.color = Color.parseColor("#4A1714")
+        canvas.drawText("RESUME SAVED MATCH", width / 2f, drawn.top + 20f * unit, resumePaint)
+        footerPaint.color = Color.parseColor("#6A2D1B")
+        canvas.drawText("Tap here to continue your last game", width / 2f, drawn.top + 38f * unit, footerPaint)
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
