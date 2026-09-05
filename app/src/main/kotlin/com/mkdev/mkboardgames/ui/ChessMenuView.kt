@@ -120,6 +120,11 @@ class ChessMenuView(
         textAlign = Paint.Align.CENTER
         typeface = Typeface.create("serif", Typeface.BOLD)
     }
+    private val chessStarsPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val chessWavePaths = Array(3) { Path() }
+    private val chessWaveEdgePaths = Array(3) { Path() }
+    private val backgroundSpeedMultiplier = 2f
+    private val floatingPieceSpeedMultiplier = 2.3f
 
     private data class FloatingPiece(
         val symbol: String,
@@ -133,6 +138,12 @@ class ChessMenuView(
         val tint: Int,
     )
 
+    private data class WaveBand(
+        val heightRatio: Float,
+        val amplitudeRatio: Float,
+        val color: Int,
+    )
+
     private val floatingPieces = listOf(
         FloatingPiece("♞", 0.08f, 0.20f, 30f, 0.62f, 0.045f, 0.5f, 86, Color.rgb(174, 220, 255)),
         FloatingPiece("♟", 0.86f, 0.16f, 24f, -0.38f, 0.055f, 2.3f, 72, Color.rgb(149, 193, 255)),
@@ -140,6 +151,11 @@ class ChessMenuView(
         FloatingPiece("♗", 0.07f, 0.69f, 25f, -0.24f, 0.05f, 1.4f, 64, Color.rgb(196, 173, 255)),
         FloatingPiece("♛", 0.83f, 0.78f, 32f, 0.18f, 0.065f, 5.1f, 60, Color.rgb(225, 190, 255)),
         FloatingPiece("♙", 0.25f, 0.92f, 22f, -0.16f, 0.045f, 3.2f, 56, Color.rgb(133, 222, 223)),
+    )
+    private val chessWaveBands = arrayOf(
+        WaveBand(0.28f, 0.045f, Color.rgb(64, 167, 218)),
+        WaveBand(0.49f, 0.06f, Color.rgb(74, 117, 225)),
+        WaveBand(0.72f, 0.052f, Color.rgb(126, 83, 213)),
     )
 
     private var backgroundPhase = 0f
@@ -294,8 +310,9 @@ class ChessMenuView(
     }
 
     private fun drawChessBackdrop(canvas: Canvas, width: Float, height: Float) {
-        val phase = backgroundPhase * (2f * PI.toFloat())
-        val paletteSlot = backgroundPhase * chessPalettes.size
+        val backgroundProgress = (backgroundPhase * backgroundSpeedMultiplier) % 1f
+        val phase = backgroundProgress * (2f * PI.toFloat())
+        val paletteSlot = backgroundProgress * chessPalettes.size
         val paletteIndex = paletteSlot.toInt().coerceIn(0, chessPalettes.lastIndex)
         val paletteProgress = smoothStep(paletteSlot - paletteIndex)
         val paletteStart = chessPalettes[paletteIndex]
@@ -340,7 +357,7 @@ class ChessMenuView(
             blendColor(Color.rgb(71, 37, 134), Color.rgb(19, 120, 143), (sin(phase * 0.28f + 2f) + 1f) / 2f),
         )
 
-        val stars = Paint(Paint.ANTI_ALIAS_FLAG)
+        val stars = chessStarsPaint
         for (index in 0 until 62) {
             val baseX = ((index * 83 + 37) % 1000) / 1000f * width
             val baseY = ((index * 47 + 23) % 920) / 1000f * height
@@ -369,23 +386,19 @@ class ChessMenuView(
             min(width, height) * 0.2f,
             stars,
         )
-        drawFloatingChessPieces(canvas, width, height, phase)
+        drawFloatingChessPieces(canvas, width, height)
     }
 
     private fun drawChessWaves(canvas: Canvas, width: Float, height: Float, phase: Float) {
-        val bands = arrayOf(
-            Triple(0.28f, 0.045f, Color.rgb(64, 167, 218)),
-            Triple(0.49f, 0.06f, Color.rgb(74, 117, 225)),
-            Triple(0.72f, 0.052f, Color.rgb(126, 83, 213)),
-        )
         val margin = width * 0.14f
-        val segmentCount = 28
+        val segmentCount = 64
 
-        bands.forEachIndexed { bandIndex, (heightRatio, amplitudeRatio, color) ->
-            val path = Path()
+        chessWaveBands.forEachIndexed { bandIndex, band ->
+            val path = chessWavePaths[bandIndex]
+            path.reset()
             val bandPhase = phase * (0.46f + bandIndex * 0.11f) + bandIndex * 1.8f
-            val baseY = height * heightRatio
-            val amplitude = height * amplitudeRatio
+            val baseY = height * band.heightRatio
+            val amplitude = height * band.amplitudeRatio
             path.moveTo(-margin, height)
             path.lineTo(-margin, baseY)
             for (step in 0..segmentCount) {
@@ -398,10 +411,16 @@ class ChessMenuView(
             path.lineTo(width + margin, height)
             path.close()
 
-            chessWavePaint.color = Color.argb(18 + bandIndex * 5, Color.red(color), Color.green(color), Color.blue(color))
+            chessWavePaint.color = Color.argb(
+                18 + bandIndex * 5,
+                Color.red(band.color),
+                Color.green(band.color),
+                Color.blue(band.color),
+            )
             canvas.drawPath(path, chessWavePaint)
 
-            val edge = Path()
+            val edge = chessWaveEdgePaths[bandIndex]
+            edge.reset()
             edge.moveTo(-margin, baseY)
             for (step in 0..segmentCount) {
                 val progress = step / segmentCount.toFloat()
@@ -410,7 +429,12 @@ class ChessMenuView(
                 val secondary = cos(progress * (4.5f * PI.toFloat()) - bandPhase * 0.72f).toFloat() * amplitude * 0.28f
                 edge.lineTo(x, baseY + wave + secondary)
             }
-            chessWaveEdgePaint.color = Color.argb(34 + bandIndex * 8, Color.red(color), Color.green(color), Color.blue(color))
+            chessWaveEdgePaint.color = Color.argb(
+                34 + bandIndex * 8,
+                Color.red(band.color),
+                Color.green(band.color),
+                Color.blue(band.color),
+            )
             canvas.drawPath(edge, chessWaveEdgePaint)
         }
 
@@ -431,22 +455,27 @@ class ChessMenuView(
         chessWavePaint.shader = null
     }
 
-    private fun drawFloatingChessPieces(canvas: Canvas, width: Float, height: Float, phase: Float) {
+    private fun drawFloatingChessPieces(canvas: Canvas, width: Float, height: Float) {
+        val pieceProgress = backgroundPhase * floatingPieceSpeedMultiplier
+        val piecePhase = pieceProgress * (2f * PI.toFloat())
         floatingPieces.forEachIndexed { index, piece ->
-            val travel = (piece.x + piece.speed * backgroundPhase).let {
+            val travel = (piece.x + piece.speed * pieceProgress).let {
                 ((it % 1f) + 1f) % 1f
             }
-            val x = width * travel + sin(phase * (0.22f + index * 0.025f) + piece.phase).toFloat() * width * piece.drift
-            val y = height * piece.y + cos(phase * (0.19f + index * 0.018f) + piece.phase).toFloat() * height * 0.035f
-            val rotation = sin(phase * 0.25f + piece.phase).toFloat() * (5f + index)
-            val size = piece.size * unit * (0.94f + 0.08f * sin(phase * 0.2f + piece.phase).toFloat())
+            val x = width * travel + sin(piecePhase * (0.22f + index * 0.025f) + piece.phase).toFloat() * width * piece.drift
+            val y = height * piece.y + cos(piecePhase * (0.19f + index * 0.018f) + piece.phase).toFloat() * height * 0.035f
+            val rotation = sin(piecePhase * 0.25f + piece.phase).toFloat() * (5f + index)
+            val size = piece.size * unit * (0.94f + 0.08f * sin(piecePhase * 0.2f + piece.phase).toFloat())
 
             floatingPiecePaint.color = Color.argb(piece.alpha, Color.red(piece.tint), Color.green(piece.tint), Color.blue(piece.tint))
             floatingPiecePaint.textSize = size
-            canvas.save()
-            canvas.rotate(rotation, x, y)
-            canvas.drawText(piece.symbol, x, y, floatingPiecePaint)
-            canvas.restore()
+            for (copy in -1..1) {
+                val drawX = x + copy * width
+                canvas.save()
+                canvas.rotate(rotation, drawX, y)
+                canvas.drawText(piece.symbol, drawX, y, floatingPiecePaint)
+                canvas.restore()
+            }
         }
     }
 
