@@ -43,6 +43,8 @@ class MainActivity : AppCompatActivity() {
                     startActivity(Intent(this, LudoActivity::class.java))
                 MenuView.GameType.MANCALA ->
                     startActivity(Intent(this, MancalaActivity::class.java))
+                MenuView.GameType.YOTE ->
+                    startActivity(Intent(this, YoteActivity::class.java))
                 else ->
                     startActivity(Intent(this, GameActivity::class.java).apply {
                         putExtra(GameActivity.EXTRA_GAME, type.name)
@@ -668,6 +670,20 @@ class MainActivity : AppCompatActivity() {
             }
         }
         root.addView(shogiDiffRow)
+        root.addView(divider())
+
+        // ── Yoté ──
+        root.addView(sectionHeader("●  YOTÉ"))
+        var yoteDiff = SettingsManager.getYoteDifficulty(ctx)
+        val (yoteDiffRow, yoteDiffVal) = settingRow("🎯", "CPU Difficulty", diffs[yoteDiff])
+        yoteDiffRow.setOnClickListener {
+            showSettingsChoiceDialog("Yoté · CPU Difficulty", diffs.take(3).toTypedArray(), yoteDiff) { i ->
+                SettingsManager.setYoteDifficulty(ctx, i)
+                yoteDiff = i
+                yoteDiffVal.text = diffs[i]
+            }
+        }
+        root.addView(yoteDiffRow)
         root.addView(divider())
 
         // ── Legal ──

@@ -25,6 +25,8 @@ internal fun isFullScreenStyledGameLabel(gameLabel: String): Boolean =
         "CONNECTFOUR",
         "LUDO",
         "MANCALA",
+        "YOTE",
+        "YOTÉ",
     )
 
 /**
@@ -75,9 +77,10 @@ class ChessChoiceView(
     private val isConnectFour = gameLabel.replace(" ", "").replace("·", "").equals("CONNECTFOUR", ignoreCase = true)
     private val isLudo = gameLabel.replace(" ", "").equals("LUDO", ignoreCase = true)
     private val isMancala = gameLabel.replace(" ", "").equals("MANCALA", ignoreCase = true)
+    private val isYote = gameLabel.replace(" ", "").replace("É", "E").equals("YOTE", ignoreCase = true)
     private val isChessFamily =
         isChess || isDraughts || isOthello || isFoxAndGeese || isGo || isShogi ||
-            isXiangqi || isTicTacToe || isConnectFour || isLudo || isMancala
+            isXiangqi || isTicTacToe || isConnectFour || isLudo || isMancala || isYote
     private val gameIconBitmap = run {
         val assetName = when {
             isChess -> "chess_home_icon.png"
@@ -92,6 +95,7 @@ class ChessChoiceView(
             isConnectFour -> "connect_four_home_icon.png"
             isLudo -> "ludo_home_icon.png"
             isMancala -> "mancala_home_icon.webp"
+            isYote -> "yote_board_rustic.webp"
             else -> null
         }
         assetName?.let {

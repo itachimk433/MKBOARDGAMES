@@ -21,6 +21,7 @@ object PausedMatchStore {
         val boardSize: Int? = null,
         val winLength: Int? = null,
         val pieceCount: Int? = null,
+        val boardVariant: Int? = null,
         val moves: List<Move>,
     )
 
@@ -41,6 +42,7 @@ object PausedMatchStore {
         boardSize: Int? = null,
         winLength: Int? = null,
         pieceCount: Int? = null,
+        boardVariant: Int? = null,
     ) {
         if (moves.isEmpty()) return
         val payload = JSONObject().apply {
@@ -50,6 +52,7 @@ object PausedMatchStore {
             boardSize?.let { put("boardSize", it) }
             winLength?.let { put("winLength", it) }
             pieceCount?.let { put("pieceCount", it) }
+            boardVariant?.let { put("boardVariant", it) }
             put("moves", encodeMoves(moves))
         }
         prefs(context).edit().putString(gameType, payload.toString()).apply()
@@ -66,6 +69,7 @@ object PausedMatchStore {
                 boardSize = payload.optionalInt("boardSize"),
                 winLength = payload.optionalInt("winLength"),
                 pieceCount = payload.optionalInt("pieceCount"),
+                boardVariant = payload.optionalInt("boardVariant"),
                 moves = decodeMoves(payload.getJSONArray("moves")),
             ).takeIf { it.moves.isNotEmpty() }
         } catch (_: Throwable) {

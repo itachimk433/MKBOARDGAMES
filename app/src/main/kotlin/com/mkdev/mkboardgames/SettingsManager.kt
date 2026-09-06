@@ -17,6 +17,7 @@ object SettingsManager {
     private const val KEY_SHOGI_DIFFICULTY = "shogi_ai_difficulty"
     private const val KEY_GO_DIFFICULTY = "go_ai_difficulty"
     private const val KEY_MANCALA_DIFFICULTY = "mancala_ai_difficulty"
+    private const val KEY_YOTE_DIFFICULTY = "yote_ai_difficulty"
     private const val KEY_MANCALA_MOVEMENT_SPEED = "mancala_movement_speed"
 
     // ── Hints keys ───────────────────────────────────────────────────────────
@@ -182,6 +183,19 @@ object SettingsManager {
         prefs(ctx).edit().putInt(KEY_MANCALA_DIFFICULTY, v.coerceIn(0, 2)).apply()
 
     fun mancalaAiDepth(ctx: Context) = mancalaAiProfileForLevel(getMancalaDifficulty(ctx)).depth
+
+    // ── Yoté ──────────────────────────────────────────────────────────────────
+    fun getYoteDifficulty(ctx: Context) =
+        prefs(ctx).getInt(KEY_YOTE_DIFFICULTY, 1).coerceIn(0, 2)
+
+    fun setYoteDifficulty(ctx: Context, v: Int) =
+        prefs(ctx).edit().putInt(KEY_YOTE_DIFFICULTY, v.coerceIn(0, 2)).apply()
+
+    fun yoteAiDepth(ctx: Context) = when (getYoteDifficulty(ctx)) {
+        0 -> 2
+        2 -> 4
+        else -> 3
+    }
 
     fun getMancalaMovementSpeed(ctx: Context) =
         prefs(ctx).getInt(KEY_MANCALA_MOVEMENT_SPEED, 1).coerceIn(1, 4)
