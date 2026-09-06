@@ -122,8 +122,9 @@ class YoteBoardView(context: Context) : View(context) {
     private fun updateGeometry(w: Int, h: Int) {
         if (w <= 0 || h <= 0) return
         val density = resources.displayMetrics.density
-        val sourceWidth = boardBitmap?.width?.toFloat() ?: if (variant == YoteBoardVariant.CARVED) 0.72f else 1.3f
-        val sourceHeight = boardBitmap?.height?.toFloat() ?: 1f
+        val sourceRect = boardBitmap?.let(::drawableSourceRect)
+        val sourceWidth = sourceRect?.width()?.toFloat() ?: if (variant == YoteBoardVariant.CARVED) 0.72f else 1.3f
+        val sourceHeight = sourceRect?.height()?.toFloat() ?: 1f
         val sourceAspect = if (boardBitmap != null) sourceWidth / sourceHeight else sourceWidth
         val maxWidth = w - 14f * density
         val maxHeight = h - 14f * density
@@ -207,7 +208,7 @@ class YoteBoardView(context: Context) : View(context) {
                 resources.displayMetrics.density * 10f,
                 Color.argb(170, 0, 0, 0),
             )
-            canvas.drawBitmap(it, null, boardRect, imagePaint)
+            canvas.drawBitmap(it, drawableSourceRect(it), boardRect, imagePaint)
             imagePaint.clearShadowLayer()
             return
         }
@@ -422,4 +423,16 @@ class YoteBoardView(context: Context) : View(context) {
         } catch (_: Throwable) {
             null
         }
+
+    private fun drawableSourceRect(bitmap: Bitmap): Rect =
+        Rect(
+            0,
+            0,
+            bitmap.width,
+            if (variant == YoteBoardVariant.RUSTIC) {
+                (bitmap.height * 0.93f).toInt()
+            } else {
+                bitmap.height
+            },
+        )
 }
