@@ -20,6 +20,7 @@ import com.mkdev.mkboardgames.engine.Position
 import com.mkdev.mkboardgames.games.mancala.MancalaAIPlayer
 import com.mkdev.mkboardgames.games.mancala.MancalaRuleEngine
 import com.mkdev.mkboardgames.ui.ChessMenuView
+import com.mkdev.mkboardgames.ui.ChessChoiceView
 import com.mkdev.mkboardgames.ui.MancalaChoiceOverlayView
 import com.mkdev.mkboardgames.ui.MancalaGameOverView
 import com.mkdev.mkboardgames.ui.MancalaRulesView
@@ -305,8 +306,23 @@ class MancalaActivity : AppCompatActivity() {
         onCancel: () -> Unit,
         onChoice: (Int) -> Unit,
     ) {
-        val overlay = MancalaChoiceOverlayView(this, title, subtitle, options)
-        overlay.onChoice = { index ->
+        val overlay = ChessChoiceView(
+            context = this,
+            title = title,
+            subtitle = subtitle,
+            choices = options.map { option ->
+                ChessChoiceView.Choice(
+                    label = option,
+                    detail = "",
+                    symbol = "",
+                    accent = android.graphics.Color.parseColor("#E3B86A"),
+                )
+            },
+            gameLabel = "M A N C A L A",
+            headerSymbol = "●",
+            fullScreenOverride = true,
+        )
+        overlay.onChoiceSelected = { index ->
             dismissMancalaOverlay()
             onChoice(index)
         }
