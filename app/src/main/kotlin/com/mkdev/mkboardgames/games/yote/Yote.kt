@@ -14,8 +14,9 @@ data class YotePiece(override val color: PieceColor) : Piece(color) {
 }
 
 /**
- * Yoté is played on a 5 × 6 board. Pieces enter from a reserve at any time,
- * and a jump capture earns the player one extra capture anywhere on the board.
+ * Yoté is played on a 5 × 6 board. Pieces enter from a reserve at any time.
+ * A jump capture earns the player one extra capture anywhere on the board and
+ * gives that player another turn.
  */
 class YoteRuleEngine : RuleEngine {
     companion object {
@@ -117,7 +118,10 @@ class YoteRuleEngine : RuleEngine {
 
         val next = state.copy(
             board = board,
-            currentTurn = mover.opponent(),
+            // A capture keeps the turn with the capturing player.  This is
+            // separate from the optional extra piece removal below: both are
+            // part of the standard Yoté capture reward.
+            currentTurn = if (matching.isCapture) mover else mover.opponent(),
             status = GameStatus.IN_PROGRESS,
             moveHistory = state.moveHistory + move.copy(
                 captures = captures,

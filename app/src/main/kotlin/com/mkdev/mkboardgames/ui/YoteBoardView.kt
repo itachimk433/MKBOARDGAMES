@@ -49,6 +49,7 @@ class YoteBoardView(context: Context) : View(context) {
     private val engine = YoteRuleEngine()
     private var selected: Position? = null
     private var boardRect = RectF()
+    private var gridRect = RectF()
     private var cellWidth = 0f
     private var cellHeight = 0f
     private var boardBitmap: Bitmap? = loadBitmap(variant.assetName)
@@ -147,8 +148,21 @@ class YoteBoardView(context: Context) : View(context) {
                 (h + fallbackHeight) / 2f,
             )
         }
-        cellWidth = boardRect.width() / YoteRuleEngine.COLUMNS
-        cellHeight = boardRect.height() / YoteRuleEngine.ROWS
+        // The rustic artwork contains a transparent border and a thick wooden
+        // frame.  The playable cells occupy only the inset rectangle inside
+        // that frame; using boardRect here shifts every piece and hitbox.
+        gridRect = if (variant == YoteBoardVariant.RUSTIC) {
+            RectF(
+                boardRect.left + boardRect.width() * 0.055f,
+                boardRect.top + boardRect.height() * 0.063f,
+                boardRect.left + boardRect.width() * 0.963f,
+                boardRect.bottom,
+            )
+        } else {
+            RectF(boardRect)
+        }
+        cellWidth = gridRect.width() / YoteRuleEngine.COLUMNS
+        cellHeight = gridRect.height() / YoteRuleEngine.ROWS
         gridPaint.strokeWidth = maxOf(1f, cellWidth * 0.018f)
         selectionPaint.strokeWidth = maxOf(2f, min(cellWidth, cellHeight) * 0.055f)
         rimPaint.strokeWidth = maxOf(1f, min(cellWidth, cellHeight) * 0.025f)
@@ -233,12 +247,12 @@ class YoteBoardView(context: Context) : View(context) {
         boardPaint.shader = null
         gridPaint.color = Color.argb(130, 63, 28, 14)
         for (row in 0..YoteRuleEngine.ROWS) {
-            val y = boardRect.top + row * cellHeight
-            canvas.drawLine(boardRect.left, y, boardRect.right, y, gridPaint)
+            val y = gridRect.top + row * cellHeight
+            canvas.drawLine(gridRect.left, y, gridRect.right, y, gridPaint)
         }
         for (column in 0..YoteRuleEngine.COLUMNS) {
-            val x = boardRect.left + column * cellWidth
-            canvas.drawLine(x, boardRect.top, x, boardRect.bottom, gridPaint)
+            val x = gridRect.left + column * cellWidth
+            canvas.drawLine(x, gridRect.top, x, gridRect.bottom, gridPaint)
         }
     }
 
@@ -262,9 +276,18 @@ class YoteBoardView(context: Context) : View(context) {
 
     private fun drawPieces(canvas: Canvas) {
         val radius = min(cellWidth, cellHeight) * 0.27f
+        val hiddenDuringAnimation = buildSet {
+            pendingMove?.from?.takeUnless { it == YoteRuleEngine.RESERVE }?.let(::add)
+            pendingMove?.captures?.forEach(::add)
+        }
         for (index in 0 until YoteRuleEngine.BOARD_CELLS) {
             val piece = gameState.board[index] as? YotePiece ?: continue
-            drawPiece(canvas, centerOf(YoteRuleEngine.positionAt(index)), radius, piece.color)
+            val position = YoteRuleEngine.positionAt(index)
+            // Do not paint the old source or captured pieces underneath the
+            // animated copy.  Otherwise a capture appears to pass through its
+            // victim and a normal move leaves a ghost at its source.
+            if (position in hiddenDuringAnimation) continue
+            drawPiece(canvas, centerOf(position), radius, piece.color)
         }
     }
 
@@ -310,8 +333,8 @@ class YoteBoardView(context: Context) : View(context) {
         for (column in 0 until YoteRuleEngine.COLUMNS) {
             canvas.drawText(
                 ('A'.code + column).toChar().toString(),
-                boardRect.left + (column + 0.5f) * cellWidth,
-                boardRect.bottom + labelPaint.textSize * 1.2f,
+                gridRect.left + (column + 0.5f) * cellWidth,
+                gridRect.bottom + labelPaint.textSize * 0.9f,
                 labelPaint,
             )
         }
@@ -401,9 +424,9 @@ class YoteBoardView(context: Context) : View(context) {
     }
 
     private fun positionAt(x: Float, y: Float): Position? {
-        if (!boardRect.contains(x, y)) return null
-        val column = ((x - boardRect.left) / cellWidth).toInt()
-        val row = ((y - boardRect.top) / cellHeight).toInt()
+        if (!gridRect.contains(x, y)) return null
+        val column = ((x - gridRect.left) / cellWidth).toInt()
+        val row = ((y - gridRect.top) / cellHeight).toInt()
         return if (row in 0 until YoteRuleEngine.ROWS && column in 0 until YoteRuleEngine.COLUMNS) {
             Position(row, column)
         } else {
@@ -413,8 +436,8 @@ class YoteBoardView(context: Context) : View(context) {
 
     private fun centerOf(position: Position): PointF =
         PointF(
-            boardRect.left + (position.col + 0.5f) * cellWidth,
-            boardRect.top + (position.row + 0.5f) * cellHeight,
+            gridRect.left + (position.col + 0.5f) * cellWidth,
+            gridRect.top + (position.row + 0.5f) * cellHeight,
         )
 
     private fun loadBitmap(assetName: String): Bitmap? =
