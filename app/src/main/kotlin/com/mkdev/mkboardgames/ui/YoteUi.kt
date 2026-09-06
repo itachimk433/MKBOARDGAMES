@@ -2,8 +2,10 @@ package com.mkdev.mkboardgames.ui
 
 import android.content.Context
 import android.graphics.*
+import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
+import com.mkdev.mkboardgames.SoundPlayer
 import kotlin.math.min
 
 class YoteGameOverView(
@@ -18,6 +20,7 @@ class YoteGameOverView(
 
 class YoteRulesView(context: Context) : View(context) {
     var onBack: (() -> Unit)? = null
+    private val backRect = RectF()
     private val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val headingPaint = Paint(Paint.ANTI_ALIAS_FLAG)
 
@@ -86,6 +89,34 @@ class YoteRulesView(context: Context) : View(context) {
             y += dp(12f)
         }
 
+        backRect.set(
+            panel.centerX() - min(panel.width() * 0.42f, dp(210f)) / 2f,
+            panel.bottom - dp(62f),
+            panel.centerX() + min(panel.width() * 0.42f, dp(210f)) / 2f,
+            panel.bottom - dp(14f),
+        )
+        val button = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = LinearGradient(
+                0f, backRect.top, 0f, backRect.bottom,
+                Color.parseColor("#F5D49A"),
+                Color.parseColor("#A76438"),
+                Shader.TileMode.CLAMP,
+            )
+            setShadowLayer(dp(5f), 0f, dp(3f), Color.BLACK)
+        }
+        canvas.drawRoundRect(backRect, dp(14f), dp(14f), button)
+        button.clearShadowLayer()
+        button.shader = null
+        button.style = Paint.Style.STROKE
+        button.strokeWidth = dp(1.5f)
+        button.color = Color.parseColor("#733A25")
+        canvas.drawRoundRect(backRect, dp(14f), dp(14f), button)
+        bodyPaint.textAlign = Paint.Align.CENTER
+        bodyPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        bodyPaint.color = Color.parseColor("#4A1714")
+        bodyPaint.textSize = min(dp(19f), backRect.height() * 0.4f)
+        val metrics = bodyPaint.fontMetrics
+        canvas.drawText("Back", backRect.centerX(), backRect.centerY() - (metrics.ascent + metrics.descent) / 2f, bodyPaint)
     }
 
     private fun drawWrapped(
@@ -116,6 +147,11 @@ class YoteRulesView(context: Context) : View(context) {
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
+        if (event.actionMasked == MotionEvent.ACTION_UP && backRect.contains(event.x, event.y)) {
+            performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+            SoundPlayer.play("ui_click")
+            onBack?.invoke()
+        }
         return true
     }
 
