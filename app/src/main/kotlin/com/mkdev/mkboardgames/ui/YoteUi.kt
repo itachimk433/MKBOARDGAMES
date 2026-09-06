@@ -17,6 +17,7 @@ class YoteGameOverView(
 )
 
 class YoteRulesView(context: Context) : View(context) {
+    var onBack: (() -> Unit)? = null
     private val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val headingPaint = Paint(Paint.ANTI_ALIAS_FLAG)
 
