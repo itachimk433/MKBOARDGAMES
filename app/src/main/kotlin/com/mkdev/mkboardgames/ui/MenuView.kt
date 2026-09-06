@@ -101,6 +101,9 @@ class MenuView(context: Context) : View(context) {
     private val foxAndGeeseHomeIconBitmap: Bitmap? = try {
         context.assets.open("fox_and_geese_home_icon.png").use { BitmapFactory.decodeStream(it) }
     } catch (e: Exception) { null }
+    private val mancalaHomeIconBitmap: Bitmap? = try {
+        context.assets.open("mancala_home_icon.webp").use { BitmapFactory.decodeStream(it) }
+    } catch (e: Exception) { null }
 
     private val bgPaint        = Paint().apply { color = Color.parseColor("#121212") }
     private val cardPaint      = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#202429") }
@@ -565,6 +568,11 @@ class MenuView(context: Context) : View(context) {
     }
 
     private fun drawMancalaMini(canvas: Canvas, left: Float, top: Float, size: Float) {
+        mancalaHomeIconBitmap?.let { bitmap ->
+            canvas.drawBitmap(bitmap, null, RectF(left, top, left + size, top + size), bitmapPaint)
+            return
+        }
+
         val board = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#6F351D") }
         val rim = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.parseColor("#B87542")
