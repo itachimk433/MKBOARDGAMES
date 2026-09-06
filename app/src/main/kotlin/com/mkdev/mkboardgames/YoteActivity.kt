@@ -316,7 +316,6 @@ class YoteActivity : AppCompatActivity() {
                 ChessChoiceView.Choice("How To Play", "Review the rules", "?", Color.parseColor("#8EC7B9")),
                 ChessChoiceView.Choice("CPU Difficulty", "Choose the challenge", "◆", Color.parseColor("#A9B6E8")),
                 ChessChoiceView.Choice("Pause & Exit", "Save this match and resume later", "Ⅱ", Color.parseColor("#E3B86A")),
-                ChessChoiceView.Choice("Back", "Return to the board", "↩", Color.parseColor("#8EC7B9")),
                 ChessChoiceView.Choice("Home", "Save and return to the catalogue", "⌂", Color.parseColor("#E58A7A")),
             ),
             onCancel = { showBoardAfterDialog() },
@@ -329,7 +328,6 @@ class YoteActivity : AppCompatActivity() {
                     savePausedMatch()
                     finish()
                 }
-                4 -> showBoardAfterDialog()
                 else -> showHome()
             }
         }
