@@ -6,7 +6,7 @@ import android.graphics.*
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
-import android.view.animation.DecelerateInterpolator
+import android.view.animation.AccelerateDecelerateInterpolator
 import android.view.animation.LinearInterpolator
 import com.mkdev.mkboardgames.engine.GameState
 import com.mkdev.mkboardgames.engine.GameStatus
@@ -15,9 +15,7 @@ import com.mkdev.mkboardgames.engine.PieceColor
 import com.mkdev.mkboardgames.engine.Position
 import com.mkdev.mkboardgames.games.yote.YotePiece
 import com.mkdev.mkboardgames.games.yote.YoteRuleEngine
-import kotlin.math.PI
 import kotlin.math.min
-import kotlin.math.sin
 
 enum class YoteBoardVariant(
     val assetName: String,
@@ -82,11 +80,15 @@ class YoteBoardView(context: Context) : View(context) {
     }
     private val selectionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
-        color = Color.parseColor("#FFE09C")
+        color = Color.WHITE
     }
     private val targetPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
-        color = Color.argb(180, 227, 184, 106)
+        color = Color.argb(220, 255, 255, 255)
+    }
+    private val captureTargetPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        color = Color.WHITE
     }
     private val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.CENTER
@@ -169,6 +171,7 @@ class YoteBoardView(context: Context) : View(context) {
         cellHeight = gridRect.height() / YoteRuleEngine.ROWS
         gridPaint.strokeWidth = maxOf(1f, cellWidth * 0.018f)
         selectionPaint.strokeWidth = maxOf(2f, min(cellWidth, cellHeight) * 0.055f)
+        captureTargetPaint.strokeWidth = maxOf(2f, min(cellWidth, cellHeight) * 0.045f)
         rimPaint.strokeWidth = maxOf(1f, min(cellWidth, cellHeight) * 0.025f)
     }
 
@@ -263,7 +266,7 @@ class YoteBoardView(context: Context) : View(context) {
     private fun drawTargets(canvas: Canvas) {
         val selectedPosition = selected ?: return
         val selectedCenter = centerOf(selectedPosition)
-        selectionPaint.color = Color.parseColor("#FFE09C")
+        selectionPaint.color = Color.WHITE
         canvas.drawCircle(
             selectedCenter.x,
             selectedCenter.y,
@@ -274,7 +277,16 @@ class YoteBoardView(context: Context) : View(context) {
             .filter { it.from == selectedPosition }
             .forEach {
                 val center = centerOf(it.to)
-                canvas.drawCircle(center.x, center.y, min(cellWidth, cellHeight) * 0.1f, targetPaint)
+                if (it.isCapture) {
+                    canvas.drawCircle(
+                        center.x,
+                        center.y,
+                        min(cellWidth, cellHeight) * 0.39f,
+                        captureTargetPaint,
+                    )
+                } else {
+                    canvas.drawCircle(center.x, center.y, min(cellWidth, cellHeight) * 0.1f, targetPaint)
+                }
             }
     }
 
@@ -282,14 +294,13 @@ class YoteBoardView(context: Context) : View(context) {
         val radius = min(cellWidth, cellHeight) * 0.27f
         val hiddenDuringAnimation = buildSet {
             pendingMove?.from?.takeUnless { it == YoteRuleEngine.RESERVE }?.let(::add)
-            pendingMove?.captures?.forEach(::add)
         }
         for (index in 0 until YoteRuleEngine.BOARD_CELLS) {
             val piece = gameState.board[index] as? YotePiece ?: continue
             val position = YoteRuleEngine.positionAt(index)
-            // Do not paint the old source or captured pieces underneath the
-            // animated copy.  Otherwise a capture appears to pass through its
-            // victim and a normal move leaves a ghost at its source.
+            // Keep the captured stone visible until the activity commits the
+            // new state, matching the capture presentation used by the other
+            // board games. Only the moving stone's source is hidden.
             if (position in hiddenDuringAnimation) continue
             drawPiece(canvas, centerOf(position), radius, piece.color)
         }
@@ -299,16 +310,8 @@ class YoteBoardView(context: Context) : View(context) {
         val move = pendingMove ?: return
         val radius = min(cellWidth, cellHeight) * 0.27f
         val x = movingFrom.x + (movingTo.x - movingFrom.x) * moveProgress
-        val arcHeight = radius * if (move.from == YoteRuleEngine.RESERVE) 1.35f else 0.55f
-        val y = movingFrom.y +
-            (movingTo.y - movingFrom.y) * moveProgress -
-            sin(moveProgress * PI).toFloat() * arcHeight
+        val y = movingFrom.y + (movingTo.y - movingFrom.y) * moveProgress
         drawPiece(canvas, PointF(x, y), radius, movingColor)
-        if (move.from == YoteRuleEngine.RESERVE) {
-            labelPaint.color = Color.argb(160, 255, 246, 226)
-            labelPaint.textSize = radius * 0.55f
-            canvas.drawText("ENTER", x, y + radius * 1.9f, labelPaint)
-        }
     }
 
     private fun drawPiece(canvas: Canvas, center: PointF, radius: Float, color: PieceColor) {
@@ -416,8 +419,8 @@ class YoteBoardView(context: Context) : View(context) {
         moveProgress = 0f
         isLocked = true
         val animator = ValueAnimator.ofFloat(0f, 1f).apply {
-            duration = if (move.from == YoteRuleEngine.RESERVE) 420L else 360L
-            interpolator = DecelerateInterpolator(1.6f)
+            duration = 280L
+            interpolator = AccelerateDecelerateInterpolator()
             addUpdateListener {
                 moveProgress = it.animatedValue as Float
                 invalidate()

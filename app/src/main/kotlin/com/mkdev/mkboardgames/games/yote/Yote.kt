@@ -149,8 +149,7 @@ class YoteRuleEngine : RuleEngine {
         return when {
             whiteOnBoard + whiteReserve == 0 -> GameStatus.BLACK_WINS
             blackOnBoard + blackReserve == 0 -> GameStatus.WHITE_WINS
-            state.hands[state.currentTurn].orEmpty().isEmpty() &&
-                allLegalMoves(state, state.currentTurn).isEmpty() ->
+            allLegalMoves(state, state.currentTurn).isEmpty() ->
                 if (allLegalMoves(state, state.currentTurn.opponent()).isNotEmpty()) {
                     if (state.currentTurn == PieceColor.WHITE) GameStatus.BLACK_WINS
                     else GameStatus.WHITE_WINS

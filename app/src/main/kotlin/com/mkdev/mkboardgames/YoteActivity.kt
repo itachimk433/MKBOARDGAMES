@@ -12,6 +12,7 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import com.mkdev.mkboardgames.engine.GameStatus
 import com.mkdev.mkboardgames.engine.Move
+import com.mkdev.mkboardgames.engine.Piece
 import com.mkdev.mkboardgames.engine.PieceColor
 import com.mkdev.mkboardgames.engine.Position
 import com.mkdev.mkboardgames.games.yote.YoteAIPlayer
@@ -24,6 +25,7 @@ import com.mkdev.mkboardgames.ui.MancalaWoodButton
 import com.mkdev.mkboardgames.ui.YoteBoardVariant
 import com.mkdev.mkboardgames.ui.YoteBoardView
 import com.mkdev.mkboardgames.ui.YoteGameOverView
+import com.mkdev.mkboardgames.ui.YotePieceStripView
 import com.mkdev.mkboardgames.ui.YoteRulesView
 import kotlinx.coroutines.*
 
@@ -51,8 +53,12 @@ class YoteActivity : AppCompatActivity() {
     private lateinit var screenRoot: FrameLayout
     private lateinit var boardView: YoteBoardView
     private lateinit var statusView: TextView
+    private lateinit var topInfoView: YotePieceStripView
+    private lateinit var bottomInfoView: YotePieceStripView
     private lateinit var autoplayButton: AutoplayButtonView
     private var activeOverlay: View? = null
+    private val capturedByWhite = mutableListOf<Piece>()
+    private val capturedByBlack = mutableListOf<Piece>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -81,6 +87,8 @@ class YoteActivity : AppCompatActivity() {
             textSize = 13f
             gravity = Gravity.CENTER
         }
+        topInfoView = YotePieceStripView(this, PieceColor.BLACK)
+        bottomInfoView = YotePieceStripView(this, PieceColor.WHITE)
         header.addView(title, LinearLayout.LayoutParams(-1, (30 * density).toInt()))
         header.addView(statusView, LinearLayout.LayoutParams(-1, (24 * density).toInt()))
 
@@ -113,7 +121,9 @@ class YoteActivity : AppCompatActivity() {
         controls.addView(menuButton, LinearLayout.LayoutParams(0, (46 * density).toInt(), 1f))
 
         gameLayout.addView(header, LinearLayout.LayoutParams(-1, (58 * density).toInt()))
+        gameLayout.addView(topInfoView, LinearLayout.LayoutParams(-1, (34 * density).toInt()))
         gameLayout.addView(boardView, LinearLayout.LayoutParams(-1, 0).apply { weight = 1f })
+        gameLayout.addView(bottomInfoView, LinearLayout.LayoutParams(-1, (34 * density).toInt()))
         gameLayout.addView(controls, LinearLayout.LayoutParams(-1, (56 * density).toInt()))
         gameRoot = gameLayout
 
@@ -378,6 +388,8 @@ class YoteActivity : AppCompatActivity() {
         autoplayEnabled = false
         autoplayMoveInProgress = false
         previousStates.clear()
+        capturedByWhite.clear()
+        capturedByBlack.clear()
         PausedMatchStore.clear(this, "YOTE")
         if (vsAI) SettingsManager.setActiveGame(this, "yote")
         gameState = engine.initialState()
@@ -388,8 +400,13 @@ class YoteActivity : AppCompatActivity() {
         showBoardAfterDialog(false)
 
         restoring?.moves?.forEach { move ->
-            previousStates.add(gameState)
-            gameState = engine.applyMove(gameState, move)
+            val previous = gameState
+            val next = engine.applyMove(gameState, move)
+            if (next !== previous) {
+                previousStates.add(previous)
+                recordCaptures(previous, next.moveHistory.lastOrNull() ?: move)
+                gameState = next
+            }
         }
         boardView.gameState = gameState
         updateHud()
@@ -447,7 +464,8 @@ class YoteActivity : AppCompatActivity() {
     }
 
     private fun commitMove(move: Move) {
-        val nextState = engine.applyMove(gameState, move)
+        val previous = gameState
+        val nextState = engine.applyMove(previous, move)
         // A cancelled animation can finish after the activity has already
         // advanced to another state. Treat that callback as stale instead of
         // leaving the board locked or showing a permanent AI-thinking label.
@@ -457,6 +475,7 @@ class YoteActivity : AppCompatActivity() {
             return
         }
         previousStates.add(gameState)
+        recordCaptures(previous, nextState.moveHistory.lastOrNull() ?: move)
         gameState = nextState
         boardView.gameState = gameState
         boardView.isLocked = gameState.status != GameStatus.IN_PROGRESS
@@ -488,6 +507,21 @@ class YoteActivity : AppCompatActivity() {
         val reserve = "W ${engine.reserveCount(gameState, PieceColor.WHITE)} · " +
             "B ${engine.reserveCount(gameState, PieceColor.BLACK)} in reserve"
         statusView.text = "$turn  ·  $reserve"
+        topInfoView.update(engine.reserveCount(gameState, PieceColor.BLACK), capturedByBlack)
+        bottomInfoView.update(engine.reserveCount(gameState, PieceColor.WHITE), capturedByWhite)
+    }
+
+    private fun recordCaptures(previous: com.mkdev.mkboardgames.engine.GameState, move: Move) {
+        val capturedPositions = buildList {
+            addAll(move.captures)
+            (move.metadata["bonusCapture"] as? Position)?.let(::add)
+        }.distinct()
+        val capturedPieces = capturedPositions.mapNotNull { previous.get(it) }
+        if (previous.currentTurn == PieceColor.WHITE) {
+            capturedByWhite.addAll(capturedPieces)
+        } else {
+            capturedByBlack.addAll(capturedPieces)
+        }
     }
 
     private fun triggerAI() {
