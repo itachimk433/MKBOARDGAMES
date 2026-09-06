@@ -47,6 +47,11 @@ class YoteBoardView(context: Context) : View(context) {
         680f / 1024f,
         780f / 1024f,
     )
+    // The carved asset has 100px pocket spacing and approximately 27px
+    // pocket radius. Keep the rendered stone inside that measured opening,
+    // including its rim and offset shadow.
+    private val carvedPocketRadiusRatio = 27f / 100f
+    private val carvedPieceRadiusRatio = 22f / 100f
 
     var gameState: GameState = YoteRuleEngine().initialState()
         set(value) {
@@ -337,7 +342,7 @@ class YoteBoardView(context: Context) : View(context) {
         canvas.drawCircle(
             selectedCenter.x,
             selectedCenter.y,
-            min(cellWidth, cellHeight) * 0.39f,
+            highlightRadius(selectionPaint.strokeWidth, 0.39f),
             selectionPaint,
         )
         engine.legalMovesFrom(gameState, selectedPosition)
@@ -348,7 +353,7 @@ class YoteBoardView(context: Context) : View(context) {
                     canvas.drawCircle(
                         center.x,
                         center.y,
-                        min(cellWidth, cellHeight) * 0.39f,
+                        highlightRadius(captureTargetPaint.strokeWidth, 0.39f),
                         captureTargetPaint,
                     )
                 } else {
@@ -358,7 +363,7 @@ class YoteBoardView(context: Context) : View(context) {
     }
 
     private fun drawPieces(canvas: Canvas) {
-        val radius = min(cellWidth, cellHeight) * 0.27f
+        val radius = pieceRadius()
         val hiddenPosition = pendingMove?.from?.takeUnless { it == YoteRuleEngine.RESERVE }
         for (index in 0 until YoteRuleEngine.BOARD_CELLS) {
             val piece = gameState.board[index] as? YotePiece ?: continue
@@ -373,7 +378,7 @@ class YoteBoardView(context: Context) : View(context) {
                 canvas.drawCircle(
                     center.x,
                     center.y,
-                    radius * 1.22f,
+                    capturableRadius(radius),
                     capturablePaint,
                 )
             }
@@ -382,7 +387,7 @@ class YoteBoardView(context: Context) : View(context) {
 
     private fun drawMovingPiece(canvas: Canvas) {
         val move = pendingMove ?: return
-        val radius = min(cellWidth, cellHeight) * 0.27f
+        val radius = pieceRadius()
         val x = movingFrom.x + (movingTo.x - movingFrom.x) * moveProgress
         val y = movingFrom.y + (movingTo.y - movingFrom.y) * moveProgress
         drawPiece(canvas, x, y, radius, movingColor)
@@ -426,6 +431,34 @@ class YoteBoardView(context: Context) : View(context) {
             Shader.TileMode.CLAMP,
         )
     }
+
+    private fun pocketRadius(): Float =
+        min(cellWidth, cellHeight) * if (variant == YoteBoardVariant.CARVED) {
+            carvedPocketRadiusRatio
+        } else {
+            0.39f
+        }
+
+    private fun pieceRadius(): Float =
+        min(cellWidth, cellHeight) * if (variant == YoteBoardVariant.CARVED) {
+            carvedPieceRadiusRatio
+        } else {
+            0.27f
+        }
+
+    private fun highlightRadius(strokeWidth: Float, rusticRatio: Float): Float =
+        if (variant == YoteBoardVariant.CARVED) {
+            (pocketRadius() - strokeWidth / 2f).coerceAtLeast(0f)
+        } else {
+            min(cellWidth, cellHeight) * rusticRatio
+        }
+
+    private fun capturableRadius(pieceRadius: Float): Float =
+        if (variant == YoteBoardVariant.CARVED) {
+            highlightRadius(capturablePaint.strokeWidth, 0f)
+        } else {
+            pieceRadius * 1.22f
+        }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.actionMasked) {
@@ -561,7 +594,11 @@ class YoteBoardView(context: Context) : View(context) {
                     }
                 }
             }
-            val hitRadius = min(cellWidth, cellHeight) * 0.48f
+            val hitRadius = if (variant == YoteBoardVariant.CARVED) {
+                pocketRadius()
+            } else {
+                min(cellWidth, cellHeight) * 0.48f
+            }
             return closest.takeIf { closestDistanceSquared <= hitRadius * hitRadius }
         }
         if (!gridRect.contains(x, y)) return null
