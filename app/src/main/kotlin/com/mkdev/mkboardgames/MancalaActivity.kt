@@ -19,9 +19,9 @@ import com.mkdev.mkboardgames.engine.PieceColor
 import com.mkdev.mkboardgames.engine.Position
 import com.mkdev.mkboardgames.games.mancala.MancalaAIPlayer
 import com.mkdev.mkboardgames.games.mancala.MancalaRuleEngine
+import com.mkdev.mkboardgames.ui.ChessMenuView
 import com.mkdev.mkboardgames.ui.MancalaChoiceOverlayView
 import com.mkdev.mkboardgames.ui.MancalaGameOverView
-import com.mkdev.mkboardgames.ui.MancalaHomeView
 import com.mkdev.mkboardgames.ui.MancalaRulesView
 import com.mkdev.mkboardgames.ui.MancalaWoodButton
 import com.mkdev.mkboardgames.ui.AutoplayButtonView
@@ -106,7 +106,6 @@ class MancalaActivity : AppCompatActivity() {
 
     private lateinit var gameRoot: View
     private lateinit var screenRoot: FrameLayout
-    private lateinit var homeView: MancalaHomeView
     private lateinit var boardView: MancalaBoardView
     private lateinit var statusView: TextView
     private lateinit var autoplayButton: AutoplayButtonView
@@ -184,12 +183,6 @@ class MancalaActivity : AppCompatActivity() {
         gameRoot = gameLayout
 
         screenRoot = FrameLayout(this)
-        homeView = MancalaHomeView(this).apply {
-            onPlay = { showModeDialog() }
-            onHowToPlay = { showRules(showModeAfter = false) }
-            onMore = { showHomeMenu() }
-            onHome = { finish() }
-        }
         gameLayout.visibility = View.GONE
         screenRoot.addView(
             gameLayout,
@@ -198,16 +191,10 @@ class MancalaActivity : AppCompatActivity() {
                 FrameLayout.LayoutParams.MATCH_PARENT,
             ),
         )
-        screenRoot.addView(
-            homeView,
-            FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT,
-            ),
-        )
         setContentView(screenRoot)
         SoundPlayer.init(this)
         SoundPlayer.movementSoundsEnabled = SettingsManager.isMovementSoundsEnabled(this)
+        showModeDialog()
 
         @Suppress("DEPRECATION")
         window.decorView.setOnSystemUiVisibilityChangeListener { visibility ->
@@ -269,32 +256,33 @@ class MancalaActivity : AppCompatActivity() {
     }
 
     private fun showModeDialog() {
-        val paused = PausedMatchStore.has(this, "MANCALA")
-        val options = buildList {
-            if (paused) add("Resume Match")
-            add("vs CPU")
-            add("2 Players")
-            add("How to Play")
+        if (::gameRoot.isInitialized) gameRoot.visibility = View.GONE
+        val menuView = ChessMenuView(
+            this,
+            PausedMatchStore.has(this, "MANCALA"),
+            gameLabel = "M A N C A L A",
+        )
+        menuView.onVsAi = {
+            dismissMancalaOverlay()
+            vsAI = true
+            showColorPickerDialog()
         }
-        showChoiceOverlay(
-            "Start Mancala",
-            "Choose how to begin.",
-            options,
-            onCancel = { if (matchStarted) showBoardAfterDialog() else showHome() },
-        ) { which ->
-            when (options[which]) {
-                "Resume Match" -> resumePausedMatch()
-                "vs CPU" -> {
-                    vsAI = true
-                    showColorPickerDialog()
-                }
-                "2 Players" -> {
-                    vsAI = false
-                    playerColor = PieceColor.WHITE
-                    startGame()
-                }
-                "How to Play" -> showRules(showModeAfter = !matchStarted)
-            }
+        menuView.onTwoPlayers = {
+            dismissMancalaOverlay()
+            vsAI = false
+            playerColor = PieceColor.WHITE
+            startGame()
+        }
+        menuView.onHowToPlay = {
+            dismissMancalaOverlay()
+            showRules(showModeAfter = !matchStarted)
+        }
+        menuView.onResumeMatch = {
+            dismissMancalaOverlay()
+            resumePausedMatch()
+        }
+        showMancalaOverlay(menuView) {
+            if (!matchStarted) finish() else showBoardAfterDialog()
         }
     }
 
@@ -506,7 +494,7 @@ class MancalaActivity : AppCompatActivity() {
     private fun showHome() {
         dismissMancalaOverlay()
         if (::gameRoot.isInitialized) gameRoot.visibility = View.GONE
-        if (::homeView.isInitialized) homeView.visibility = View.VISIBLE
+        showModeDialog()
     }
 
     private fun startGame(restoring: PausedMatchStore.Match? = null) {
@@ -714,7 +702,6 @@ class MancalaActivity : AppCompatActivity() {
     private fun showBoardAfterDialog(resumeAi: Boolean = true) {
         dismissMancalaOverlay()
         if (::gameRoot.isInitialized) gameRoot.visibility = View.VISIBLE
-        if (::homeView.isInitialized) homeView.visibility = View.GONE
         boardView.isLocked = gameState.status != GameStatus.IN_PROGRESS
         if (resumeAi) resumeComputerTurnIfNeeded()
     }
