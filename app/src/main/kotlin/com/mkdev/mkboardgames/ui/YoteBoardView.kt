@@ -32,20 +32,28 @@ class YoteBoardView(context: Context) : View(context) {
      * coordinates. These are the measured pocket centres in the source asset
      * (730 × 1024), expressed as fractions so they scale with the bitmap.
      */
-    private val carvedColumnCenters = floatArrayOf(
-        180f / 730f,
-        280f / 730f,
-        380f / 730f,
-        480f / 730f,
-        580f / 730f,
-    )
-    private val carvedRowCenters = floatArrayOf(
-        280f / 1024f,
-        380f / 1024f,
-        480f / 1024f,
-        580f / 1024f,
-        680f / 1024f,
-        780f / 1024f,
+    // Each entry is an artwork-space (x, y) centre. The photograph's
+    // perspective makes a single rectangular grid visibly drift away from
+    // the actual pockets, especially in the lower rows.
+    private val carvedPocketCenters = arrayOf(
+        floatArrayOf(
+            186f, 278f, 287f, 279f, 383f, 278f, 481f, 278f, 577f, 278f,
+        ),
+        floatArrayOf(
+            188f, 373f, 286f, 374f, 385f, 375f, 483f, 374f, 578f, 373f,
+        ),
+        floatArrayOf(
+            188f, 476f, 287f, 472f, 384f, 475f, 483f, 472f, 578f, 475f,
+        ),
+        floatArrayOf(
+            187f, 571f, 286f, 574f, 382f, 574f, 481f, 574f, 578f, 574f,
+        ),
+        floatArrayOf(
+            188f, 671f, 287f, 668f, 387f, 670f, 482f, 668f, 578f, 669f,
+        ),
+        floatArrayOf(
+            187f, 768f, 287f, 768f, 384f, 768f, 482f, 768f, 578f, 769f,
+        ),
     )
     // The carved asset has 100px pocket spacing and approximately 27px
     // pocket radius. Keep the rendered stone inside that measured opening,
@@ -208,8 +216,8 @@ class YoteBoardView(context: Context) : View(context) {
             RectF(boardRect)
         }
         if (variant == YoteBoardVariant.CARVED) {
-            cellWidth = boardRect.width() * (carvedColumnCenters[1] - carvedColumnCenters[0])
-            cellHeight = boardRect.height() * (carvedRowCenters[1] - carvedRowCenters[0])
+            cellWidth = boardRect.width() * (100f / 730f)
+            cellHeight = boardRect.height() * (100f / 1024f)
         } else {
             cellWidth = gridRect.width() / YoteRuleEngine.COLUMNS
             cellHeight = gridRect.height() / YoteRuleEngine.ROWS
@@ -614,9 +622,11 @@ class YoteBoardView(context: Context) : View(context) {
     private fun centerOf(position: Position): PointF =
         if (variant == YoteBoardVariant.CARVED) {
             // Engine row/column become artwork column/row respectively.
+            val measured = carvedPocketCenters[position.col]
+            val offset = position.row * 2
             PointF(
-                boardRect.left + boardRect.width() * carvedColumnCenters[position.row],
-                boardRect.top + boardRect.height() * carvedRowCenters[position.col],
+                boardRect.left + boardRect.width() * (measured[offset] / 730f),
+                boardRect.top + boardRect.height() * (measured[offset + 1] / 1024f),
             )
         } else {
             PointF(
