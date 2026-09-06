@@ -112,7 +112,7 @@ class YoteBoardView(context: Context) : View(context) {
     override fun onDetachedFromWindow() {
         atmosphereAnimator?.cancel()
         atmosphereAnimator = null
-        moveAnimator?.cancel()
+        cancelMoveAnimation()
         super.onDetachedFromWindow()
     }
 
@@ -388,6 +388,7 @@ class YoteBoardView(context: Context) : View(context) {
     }
 
     fun animateMove(move: Move) {
+        cancelMoveAnimation()
         val destination = centerOf(move.to)
         movingColor = gameState.currentTurn
         movingFrom = if (move.from == YoteRuleEngine.RESERVE) {
@@ -421,6 +422,26 @@ class YoteBoardView(context: Context) : View(context) {
             })
             start()
         }
+    }
+
+    /**
+     * Stops a visual move without reporting it to the activity.
+     *
+     * Android can call Animator listeners when an animator is cancelled. The
+     * listener must be removed first or a move interrupted by recents,
+     * rotation, or another animation can be committed after its state is
+     * already stale.
+     */
+    fun cancelMoveAnimation() {
+        val animator = moveAnimator
+        moveAnimator = null
+        animator?.removeAllListeners()
+        animator?.removeAllUpdateListeners()
+        animator?.cancel()
+        pendingMove = null
+        moveProgress = 0f
+        isLocked = false
+        invalidate()
     }
 
     private fun positionAt(x: Float, y: Float): Position? {

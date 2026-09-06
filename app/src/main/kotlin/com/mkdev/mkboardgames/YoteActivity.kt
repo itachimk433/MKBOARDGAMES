@@ -42,6 +42,8 @@ class YoteActivity : AppCompatActivity() {
     private var resultRecorded = false
     private var autoplayEnabled = false
     private var autoplayMoveInProgress = false
+    private var aiRequestToken = 0
+    private var aiJob: Job? = null
     private val previousStates = ArrayDeque<com.mkdev.mkboardgames.engine.GameState>()
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
@@ -135,11 +137,15 @@ class YoteActivity : AppCompatActivity() {
         super.onResume()
         activityResumed = true
         makeFullscreen()
-        if (::boardView.isInitialized) resumeComputerTurnIfNeeded()
+        if (::boardView.isInitialized) {
+            updateHud()
+            resumeComputerTurnIfNeeded()
+        }
     }
 
     override fun onPause() {
         activityResumed = false
+        if (::boardView.isInitialized) boardView.cancelMoveAnimation()
         stopAutomatedGameplay()
         super.onPause()
     }
@@ -406,6 +412,9 @@ class YoteActivity : AppCompatActivity() {
     private fun handleBoardMove(move: Move) {
         if (!matchStarted || gameState.status != GameStatus.IN_PROGRESS) return
         if (vsAI && gameState.currentTurn != playerColor && !autoplayEnabled) return
+        if (engine.allLegalMoves(gameState, gameState.currentTurn).none {
+                it.from == move.from && it.to == move.to && it.captures == move.captures
+            }) return
         val bonus = engine.availableBonusCaptures(gameState, move)
         if (bonus.isNotEmpty()) {
             boardView.isLocked = true
@@ -471,24 +480,31 @@ class YoteActivity : AppCompatActivity() {
 
     private fun triggerAI() {
         if (!activityResumed || activeOverlay != null || gameState.status != GameStatus.IN_PROGRESS ||
-            !aiControlsCurrentTurn()
+            !aiControlsCurrentTurn() || aiJob?.isActive == true
         ) return
         boardView.isLocked = true
         statusView.text = "Computer is thinking…"
         val snapshot = gameState
+        val requestToken = ++aiRequestToken
         autoplayMoveInProgress = autoplayEnabled && snapshot.currentTurn == playerColor
-        scope.launch {
-            val move = withContext(Dispatchers.Default) {
-                YoteAIPlayer(engine, SettingsManager.yoteAiDepth(this@YoteActivity)).bestMove(snapshot)
-            }
-            if (!activityResumed || snapshot != gameState || activeOverlay != null) {
-                boardView.isLocked = false
-                updateHud()
-                return@launch
-            }
-            move?.let { boardView.animateMove(it) } ?: run {
-                boardView.isLocked = false
-                updateHud()
+        aiJob = scope.launch {
+            try {
+                val move = withContext(Dispatchers.Default) {
+                    YoteAIPlayer(engine, SettingsManager.yoteAiDepth(this@YoteActivity)).bestMove(snapshot)
+                }
+                if (!activityResumed || requestToken != aiRequestToken || snapshot != gameState ||
+                    activeOverlay != null
+                ) {
+                    boardView.isLocked = false
+                    updateHud()
+                    return@launch
+                }
+                move?.let { boardView.animateMove(it) } ?: run {
+                    boardView.isLocked = false
+                    updateHud()
+                }
+            } finally {
+                if (requestToken == aiRequestToken) aiJob = null
             }
         }
     }
@@ -506,6 +522,9 @@ class YoteActivity : AppCompatActivity() {
     private fun stopAutomatedGameplay() {
         autoplayEnabled = false
         autoplayMoveInProgress = false
+        aiRequestToken++
+        aiJob?.cancel()
+        aiJob = null
         scope.coroutineContext.cancelChildren()
         if (::boardView.isInitialized) boardView.isLocked = false
         if (::autoplayButton.isInitialized) autoplayButton.setAutoplayEnabled(false, animate = false)
