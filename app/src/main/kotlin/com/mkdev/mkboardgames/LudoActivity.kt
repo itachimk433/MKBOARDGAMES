@@ -461,9 +461,15 @@ class LudoActivity : AppCompatActivity() {
         val message = """
             LUDO — Rules
 
+            Overview
+
             Roll the die and move one of your four tokens around the track. A six brings a token out of your yard and gives you another roll. Land on an opponent's token to send it home. Bring all four tokens into your home area first to win.
 
+            Match Flow
+
             Three sixes in a row forfeit the turn. An exact roll is required to reach the center. In a four-player match, every colour takes a turn clockwise. During a match against the CPU, you control one colour and the other three are automated.
+
+            Modes
 
             Normal mode is classic Ludo. Irregular mode gives every colour ${LudoEconomy.STARTER_COINS} match-only coins. Captures, tokens reaching home, and final placement reward coins. STORE abilities last for the match: Invincibility blocks one capture, Extra Move adds two spaces, and Reroll replaces the current die. CPU behaviour and profiles are visible only in Irregular mode.
         """.trimIndent()
