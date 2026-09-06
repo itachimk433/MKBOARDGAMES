@@ -127,7 +127,7 @@ class YoteRuleEngine : RuleEngine {
                     move.metadata
                 },
             ),
-            metadata = mapOf(
+            metadata = mapOf<String, Any>(
                 "lastMoveWasCapture" to matching.isCapture,
                 "lastCaptureCount" to captures.size,
                 "lastBonusCapture" to bonusCapture ?: Position(-1, -1),

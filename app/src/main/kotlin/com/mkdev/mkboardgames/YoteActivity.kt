@@ -456,6 +456,19 @@ class YoteActivity : AppCompatActivity() {
         }
     }
 
+    private fun updateHud() {
+        val turn = when {
+            gameState.status != GameStatus.IN_PROGRESS -> "Game over"
+            vsAI && gameState.currentTurn == playerColor -> "Your turn"
+            vsAI -> "Computer turn"
+            gameState.currentTurn == PieceColor.WHITE -> "White's turn"
+            else -> "Black's turn"
+        }
+        val reserve = "W ${engine.reserveCount(gameState, PieceColor.WHITE)} · " +
+            "B ${engine.reserveCount(gameState, PieceColor.BLACK)} in reserve"
+        statusView.text = "$turn  ·  $reserve"
+    }
+
     private fun triggerAI() {
         if (!activityResumed || activeOverlay != null || gameState.status != GameStatus.IN_PROGRESS ||
             !aiControlsCurrentTurn()
