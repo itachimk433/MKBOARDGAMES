@@ -46,7 +46,7 @@ class YoteBoardView(context: Context) : View(context) {
     var playerColor: PieceColor = PieceColor.WHITE
     var vsAI: Boolean = false
     var isLocked: Boolean = false
-    var onMoveMade: ((Move) -> Unit)? = null
+    var onMoveMade: ((Move, Boolean) -> Unit)? = null
     var onGameOverTapped: (() -> Unit)? = null
 
     private val engine = YoteRuleEngine()
@@ -64,6 +64,7 @@ class YoteBoardView(context: Context) : View(context) {
     private var movingColor: PieceColor = PieceColor.WHITE
     private var moveProgress = 0f
     private var moveAnimator: ValueAnimator? = null
+    private var pendingMoveFromComputer = false
 
     private val imagePaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private val boardPaint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -393,7 +394,7 @@ class YoteBoardView(context: Context) : View(context) {
         invalidate()
     }
 
-    fun animateMove(move: Move) {
+    fun animateMove(move: Move, fromComputer: Boolean = false) {
         cancelMoveAnimation()
         val destination = centerOf(move.to)
         movingColor = gameState.currentTurn
@@ -411,10 +412,10 @@ class YoteBoardView(context: Context) : View(context) {
         }
         movingTo = destination
         pendingMove = move
+        pendingMoveFromComputer = fromComputer
         moveProgress = 0f
         isLocked = true
-        moveAnimator?.cancel()
-        moveAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
+        val animator = ValueAnimator.ofFloat(0f, 1f).apply {
             duration = if (move.from == YoteRuleEngine.RESERVE) 420L else 360L
             interpolator = DecelerateInterpolator(1.6f)
             addUpdateListener {
@@ -423,16 +424,21 @@ class YoteBoardView(context: Context) : View(context) {
             }
             addListener(object : android.animation.AnimatorListenerAdapter() {
                 override fun onAnimationEnd(animation: android.animation.Animator) {
+                    if (moveAnimator !== animation) return
                     val completed = pendingMove ?: return
+                    moveAnimator = null
                     pendingMove = null
+                    val completedFromComputer = pendingMoveFromComputer
+                    pendingMoveFromComputer = false
                     moveProgress = 0f
                     isLocked = false
-                    onMoveMade?.invoke(completed)
+                    onMoveMade?.invoke(completed, completedFromComputer)
                     invalidate()
                 }
             })
-            start()
         }
+        moveAnimator = animator
+        animator.start()
     }
 
     /**
@@ -450,6 +456,7 @@ class YoteBoardView(context: Context) : View(context) {
         animator?.removeAllUpdateListeners()
         animator?.cancel()
         pendingMove = null
+        pendingMoveFromComputer = false
         moveProgress = 0f
         isLocked = false
         invalidate()

@@ -85,7 +85,7 @@ class YoteActivity : AppCompatActivity() {
         header.addView(statusView, LinearLayout.LayoutParams(-1, (24 * density).toInt()))
 
         boardView = YoteBoardView(this).apply {
-            onMoveMade = { handleBoardMove(it) }
+            onMoveMade = { move, fromComputer -> handleBoardMove(move, fromComputer) }
             onGameOverTapped = { if (activeOverlay == null) showResultDialog() }
         }
 
@@ -409,9 +409,15 @@ class YoteActivity : AppCompatActivity() {
         startGame(paused)
     }
 
-    private fun handleBoardMove(move: Move) {
+    private fun handleBoardMove(move: Move, fromComputer: Boolean) {
         if (!matchStarted || gameState.status != GameStatus.IN_PROGRESS) return
-        if (vsAI && gameState.currentTurn != playerColor && !autoplayEnabled) return
+        // Human taps are blocked during the computer's turn, but the
+        // computer's own animation must still commit through this callback.
+        if (!fromComputer && vsAI && gameState.currentTurn != playerColor && !autoplayEnabled) {
+            boardView.isLocked = false
+            updateHud()
+            return
+        }
         val bonus = engine.availableBonusCaptures(gameState, move)
         if (bonus.isNotEmpty()) {
             boardView.isLocked = true
@@ -505,7 +511,7 @@ class YoteActivity : AppCompatActivity() {
                     updateHud()
                     return@launch
                 }
-                move?.let { boardView.animateMove(it) } ?: run {
+                move?.let { boardView.animateMove(it, fromComputer = true) } ?: run {
                     boardView.isLocked = false
                     updateHud()
                 }
