@@ -30,6 +30,7 @@ class YoteBoardView(context: Context) : View(context) {
         set(value) {
             field = value
             selected = null
+            capturablePositions = emptySet()
             invalidate()
         }
 
@@ -37,6 +38,7 @@ class YoteBoardView(context: Context) : View(context) {
         set(value) {
             field = value
             boardBitmap = loadBitmap(value.assetName)
+            boardSourceRect = boardBitmap?.let(::drawableSourceRect)
             updateGeometry(width, height)
             invalidate()
         }
@@ -54,8 +56,14 @@ class YoteBoardView(context: Context) : View(context) {
     private var cellWidth = 0f
     private var cellHeight = 0f
     private var boardBitmap: Bitmap? = loadBitmap(variant.assetName)
+    private var boardSourceRect: Rect? = boardBitmap?.let(::drawableSourceRect)
     private var atmospherePhase = 0f
     private var atmosphereAnimator: ValueAnimator? = null
+    private val atmospherePaints = Array(3) { Paint(Paint.ANTI_ALIAS_FLAG) }
+    private val atmosphereShaders = arrayOfNulls<RadialGradient>(3)
+    private val atmosphereMatrices = Array(3) { Matrix() }
+    private val starsPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private var atmosphereRadius = 0f
     private var pendingMove: Move? = null
     private var movingFrom = PointF()
     private var movingTo = PointF()
@@ -63,6 +71,11 @@ class YoteBoardView(context: Context) : View(context) {
     private var moveProgress = 0f
     private var moveAnimator: ValueAnimator? = null
     private var pendingMoveFromComputer = false
+    private var pieceShaderRadius = 0f
+    private var whitePieceShader: RadialGradient? = null
+    private var blackPieceShader: RadialGradient? = null
+    private val whitePieceShaderMatrix = Matrix()
+    private val blackPieceShaderMatrix = Matrix()
 
     private val imagePaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private val boardPaint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -90,15 +103,19 @@ class YoteBoardView(context: Context) : View(context) {
         style = Paint.Style.STROKE
         color = Color.WHITE
     }
+    private val capturablePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        color = Color.rgb(255, 214, 64)
+    }
     private val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.CENTER
         typeface = Typeface.create("sans-serif-condensed", Typeface.BOLD)
     }
+    private var capturablePositions: Set<Position> = emptySet()
 
     init {
         isClickable = true
         isFocusable = true
-        setLayerType(View.LAYER_TYPE_SOFTWARE, null)
     }
 
     override fun onAttachedToWindow() {
@@ -172,6 +189,7 @@ class YoteBoardView(context: Context) : View(context) {
         gridPaint.strokeWidth = maxOf(1f, cellWidth * 0.018f)
         selectionPaint.strokeWidth = maxOf(2f, min(cellWidth, cellHeight) * 0.055f)
         captureTargetPaint.strokeWidth = maxOf(2f, min(cellWidth, cellHeight) * 0.045f)
+        capturablePaint.strokeWidth = maxOf(2.5f, min(cellWidth, cellHeight) * 0.065f)
         rimPaint.strokeWidth = maxOf(1f, min(cellWidth, cellHeight) * 0.025f)
     }
 
@@ -187,50 +205,62 @@ class YoteBoardView(context: Context) : View(context) {
     }
 
     private fun drawAtmosphere(canvas: Canvas, w: Float, h: Float) {
+        ensureAtmosphereShaders(w, h)
         canvas.drawColor(Color.parseColor("#071522"))
         val drift = atmospherePhase * w
-        listOf(
-            Triple(w * 0.16f + drift * 0.08f, h * 0.18f, Color.rgb(45, 137, 171)),
-            Triple(w * 0.86f - drift * 0.06f, h * 0.72f, Color.rgb(44, 152, 120)),
-            Triple(w * 0.5f, h * 1.02f, Color.rgb(71, 37, 134)),
-        ).forEach { (x, y, color) ->
-            val radius = min(w, h) * 0.58f
-            val glow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                shader = RadialGradient(
-                    x,
-                    y,
-                    radius,
-                    intArrayOf(
-                        Color.argb(65, Color.red(color), Color.green(color), Color.blue(color)),
-                        Color.argb(18, Color.red(color), Color.green(color), Color.blue(color)),
-                        Color.TRANSPARENT,
-                    ),
-                    floatArrayOf(0f, 0.55f, 1f),
-                    Shader.TileMode.CLAMP,
-                )
-            }
-            canvas.drawCircle(x, y, radius, glow)
-        }
-        val stars = Paint(Paint.ANTI_ALIAS_FLAG)
+        drawAtmosphereGlow(canvas, 0, w * 0.16f + drift * 0.08f, h * 0.18f)
+        drawAtmosphereGlow(canvas, 1, w * 0.86f - drift * 0.06f, h * 0.72f)
+        drawAtmosphereGlow(canvas, 2, w * 0.5f, h * 1.02f)
         repeat(34) { i ->
             val x = ((i * 83 + 41) % 1000) / 1000f * w
             val y = ((i * 47 + 19) % 960) / 1000f * h
-            stars.color = Color.argb(55 + (i % 4) * 22, 214, 241, 245)
-            canvas.drawCircle(x, y, resources.displayMetrics.density * (0.5f + i % 3 * 0.35f), stars)
+            starsPaint.color = Color.argb(55 + (i % 4) * 22, 214, 241, 245)
+            canvas.drawCircle(
+                x,
+                y,
+                resources.displayMetrics.density * (0.5f + i % 3 * 0.35f),
+                starsPaint,
+            )
         }
+    }
+
+    private fun ensureAtmosphereShaders(w: Float, h: Float) {
+        val radius = min(w, h) * 0.58f
+        if (radius == atmosphereRadius && atmosphereShaders.all { it != null }) return
+
+        atmosphereRadius = radius
+        val colors = arrayOf(
+            Color.rgb(45, 137, 171),
+            Color.rgb(44, 152, 120),
+            Color.rgb(71, 37, 134),
+        )
+        colors.forEachIndexed { index, color ->
+            atmosphereShaders[index] = RadialGradient(
+                0f,
+                0f,
+                radius,
+                intArrayOf(
+                    Color.argb(65, Color.red(color), Color.green(color), Color.blue(color)),
+                    Color.argb(18, Color.red(color), Color.green(color), Color.blue(color)),
+                    Color.TRANSPARENT,
+                ),
+                floatArrayOf(0f, 0.55f, 1f),
+                Shader.TileMode.CLAMP,
+            )
+            atmospherePaints[index].shader = atmosphereShaders[index]
+        }
+    }
+
+    private fun drawAtmosphereGlow(canvas: Canvas, index: Int, x: Float, y: Float) {
+        atmosphereMatrices[index].setTranslate(x, y)
+        atmosphereShaders[index]?.setLocalMatrix(atmosphereMatrices[index])
+        canvas.drawCircle(x, y, atmosphereRadius, atmospherePaints[index])
     }
 
     private fun drawBoard(canvas: Canvas) {
         boardBitmap?.let {
             imagePaint.alpha = 242
-            imagePaint.setShadowLayer(
-                resources.displayMetrics.density * 16f,
-                0f,
-                resources.displayMetrics.density * 10f,
-                Color.argb(170, 0, 0, 0),
-            )
-            canvas.drawBitmap(it, drawableSourceRect(it), boardRect, imagePaint)
-            imagePaint.clearShadowLayer()
+            canvas.drawBitmap(it, boardSourceRect ?: drawableSourceRect(it), boardRect, imagePaint)
             return
         }
 
@@ -264,7 +294,22 @@ class YoteBoardView(context: Context) : View(context) {
     }
 
     private fun drawTargets(canvas: Canvas) {
-        val selectedPosition = selected ?: return
+        val selectedPosition = selected
+        capturablePositions = if (
+            selectedPosition != null &&
+            pendingMove == null &&
+            gameState.status == GameStatus.IN_PROGRESS
+        ) {
+            engine.legalMovesFrom(gameState, selectedPosition)
+                .filter { it.isCapture }
+                .asSequence()
+                .flatMap { it.captures.asSequence() }
+                .toSet()
+        } else {
+            emptySet()
+        }
+
+        selectedPosition ?: return
         val selectedCenter = centerOf(selectedPosition)
         selectionPaint.color = Color.WHITE
         canvas.drawCircle(
@@ -292,17 +337,29 @@ class YoteBoardView(context: Context) : View(context) {
 
     private fun drawPieces(canvas: Canvas) {
         val radius = min(cellWidth, cellHeight) * 0.27f
-        val hiddenDuringAnimation = buildSet {
-            pendingMove?.from?.takeUnless { it == YoteRuleEngine.RESERVE }?.let(::add)
-        }
+        val hiddenPosition = pendingMove?.from?.takeUnless { it == YoteRuleEngine.RESERVE }
         for (index in 0 until YoteRuleEngine.BOARD_CELLS) {
             val piece = gameState.board[index] as? YotePiece ?: continue
             val position = YoteRuleEngine.positionAt(index)
             // Keep the captured stone visible until the activity commits the
             // new state, matching the capture presentation used by the other
             // board games. Only the moving stone's source is hidden.
-            if (position in hiddenDuringAnimation) continue
-            drawPiece(canvas, centerOf(position), radius, piece.color)
+            if (position == hiddenPosition) continue
+            drawPiece(
+                canvas,
+                gridRect.left + (position.col + 0.5f) * cellWidth,
+                gridRect.top + (position.row + 0.5f) * cellHeight,
+                radius,
+                piece.color,
+            )
+            if (position in capturablePositions) {
+                canvas.drawCircle(
+                    gridRect.left + (position.col + 0.5f) * cellWidth,
+                    gridRect.top + (position.row + 0.5f) * cellHeight,
+                    radius * 1.22f,
+                    capturablePaint,
+                )
+            }
         }
     }
 
@@ -311,30 +368,46 @@ class YoteBoardView(context: Context) : View(context) {
         val radius = min(cellWidth, cellHeight) * 0.27f
         val x = movingFrom.x + (movingTo.x - movingFrom.x) * moveProgress
         val y = movingFrom.y + (movingTo.y - movingFrom.y) * moveProgress
-        drawPiece(canvas, PointF(x, y), radius, movingColor)
+        drawPiece(canvas, x, y, radius, movingColor)
     }
 
-    private fun drawPiece(canvas: Canvas, center: PointF, radius: Float, color: PieceColor) {
-        canvas.drawCircle(center.x + radius * 0.12f, center.y + radius * 0.18f, radius * 1.03f, shadowPaint)
+    private fun drawPiece(canvas: Canvas, x: Float, y: Float, radius: Float, color: PieceColor) {
+        canvas.drawCircle(x + radius * 0.12f, y + radius * 0.18f, radius * 1.03f, shadowPaint)
         val paint = if (color == PieceColor.WHITE) whitePiecePaint else blackPiecePaint
-        paint.shader = RadialGradient(
-            center.x - radius * 0.35f,
-            center.y - radius * 0.38f,
+        ensurePieceShaders(radius)
+        val shader = if (color == PieceColor.WHITE) whitePieceShader else blackPieceShader
+        val matrix = if (color == PieceColor.WHITE) whitePieceShaderMatrix else blackPieceShaderMatrix
+        matrix.setTranslate(x - radius * 0.35f, y - radius * 0.38f)
+        shader?.setLocalMatrix(matrix)
+        paint.shader = shader
+        canvas.drawCircle(x, y, radius, paint)
+        paint.shader = null
+        rimPaint.color = if (color == PieceColor.WHITE) Color.argb(175, 255, 245, 208) else Color.argb(180, 117, 166, 174)
+        canvas.drawCircle(x, y, radius, rimPaint)
+        emptyPaint.color = if (color == PieceColor.WHITE) Color.argb(95, 255, 255, 255) else Color.argb(85, 210, 235, 238)
+        canvas.drawCircle(x - radius * 0.31f, y - radius * 0.34f, radius * 0.18f, emptyPaint)
+    }
+
+    private fun ensurePieceShaders(radius: Float) {
+        if (radius == pieceShaderRadius && whitePieceShader != null && blackPieceShader != null) return
+
+        pieceShaderRadius = radius
+        whitePieceShader = RadialGradient(
+            0f,
+            0f,
             radius * 1.35f,
-            if (color == PieceColor.WHITE) {
-                intArrayOf(Color.parseColor("#FFF8E8"), Color.parseColor("#D8B77A"), Color.parseColor("#8B542F"))
-            } else {
-                intArrayOf(Color.parseColor("#657C83"), Color.parseColor("#1D3039"), Color.parseColor("#050A0E"))
-            },
+            intArrayOf(Color.parseColor("#FFF8E8"), Color.parseColor("#D8B77A"), Color.parseColor("#8B542F")),
             floatArrayOf(0f, 0.55f, 1f),
             Shader.TileMode.CLAMP,
         )
-        canvas.drawCircle(center.x, center.y, radius, paint)
-        paint.shader = null
-        rimPaint.color = if (color == PieceColor.WHITE) Color.argb(175, 255, 245, 208) else Color.argb(180, 117, 166, 174)
-        canvas.drawCircle(center.x, center.y, radius, rimPaint)
-        emptyPaint.color = if (color == PieceColor.WHITE) Color.argb(95, 255, 255, 255) else Color.argb(85, 210, 235, 238)
-        canvas.drawCircle(center.x - radius * 0.31f, center.y - radius * 0.34f, radius * 0.18f, emptyPaint)
+        blackPieceShader = RadialGradient(
+            0f,
+            0f,
+            radius * 1.35f,
+            intArrayOf(Color.parseColor("#657C83"), Color.parseColor("#1D3039"), Color.parseColor("#050A0E")),
+            floatArrayOf(0f, 0.55f, 1f),
+            Shader.TileMode.CLAMP,
+        )
     }
 
     private fun drawLabels(canvas: Canvas) {
@@ -399,6 +472,7 @@ class YoteBoardView(context: Context) : View(context) {
 
     fun animateMove(move: Move, fromComputer: Boolean = false) {
         cancelMoveAnimation()
+        atmosphereAnimator?.pause()
         val destination = centerOf(move.to)
         movingColor = gameState.currentTurn
         movingFrom = if (move.from == YoteRuleEngine.RESERVE) {
@@ -436,6 +510,7 @@ class YoteBoardView(context: Context) : View(context) {
                     moveProgress = 0f
                     isLocked = false
                     onMoveMade?.invoke(completed, completedFromComputer)
+                    atmosphereAnimator?.resume()
                     invalidate()
                 }
             })
@@ -462,6 +537,7 @@ class YoteBoardView(context: Context) : View(context) {
         pendingMoveFromComputer = false
         moveProgress = 0f
         isLocked = false
+        atmosphereAnimator?.resume()
         invalidate()
     }
 
