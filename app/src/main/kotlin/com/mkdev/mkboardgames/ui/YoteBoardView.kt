@@ -107,10 +107,6 @@ class YoteBoardView(context: Context) : View(context) {
         style = Paint.Style.STROKE
         color = Color.rgb(255, 214, 64)
     }
-    private val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        textAlign = Paint.Align.CENTER
-        typeface = Typeface.create("sans-serif-condensed", Typeface.BOLD)
-    }
     private var capturablePositions: Set<Position> = emptySet()
 
     init {
@@ -179,7 +175,7 @@ class YoteBoardView(context: Context) : View(context) {
                 boardRect.left + boardRect.width() * 0.055f,
                 boardRect.top + boardRect.height() * 0.063f,
                 boardRect.left + boardRect.width() * 0.963f,
-                boardRect.bottom,
+                boardRect.top + boardRect.height() * 0.955f,
             )
         } else {
             RectF(boardRect)
@@ -200,7 +196,6 @@ class YoteBoardView(context: Context) : View(context) {
         drawBoard(canvas)
         drawTargets(canvas)
         drawPieces(canvas)
-        drawLabels(canvas)
         drawMovingPiece(canvas)
     }
 
@@ -410,19 +405,6 @@ class YoteBoardView(context: Context) : View(context) {
         )
     }
 
-    private fun drawLabels(canvas: Canvas) {
-        labelPaint.color = Color.argb(170, 255, 246, 226)
-        labelPaint.textSize = min(cellWidth, cellHeight) * 0.13f
-        for (column in 0 until YoteRuleEngine.COLUMNS) {
-            canvas.drawText(
-                ('A'.code + column).toChar().toString(),
-                gridRect.left + (column + 0.5f) * cellWidth,
-                gridRect.bottom + labelPaint.textSize * 0.9f,
-                labelPaint,
-            )
-        }
-    }
-
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> return true
@@ -570,10 +552,6 @@ class YoteBoardView(context: Context) : View(context) {
             0,
             0,
             bitmap.width,
-            if (variant == YoteBoardVariant.RUSTIC) {
-                (bitmap.height * 0.93f).toInt()
-            } else {
-                bitmap.height
-            },
+            bitmap.height,
         )
 }
