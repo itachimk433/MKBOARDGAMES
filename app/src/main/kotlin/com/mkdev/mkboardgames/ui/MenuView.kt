@@ -83,6 +83,9 @@ class MenuView(context: Context) : View(context) {
     private val morabarabaHomeIconBitmap: Bitmap? = try {
         context.assets.open("morabaraba_home_icon.png").use { BitmapFactory.decodeStream(it) }
     } catch (e: Exception) { null }
+    private val ticTacToeHomeIconBitmap: Bitmap? = try {
+        context.assets.open("tictactoe_home_icon.png").use { BitmapFactory.decodeStream(it) }
+    } catch (e: Exception) { null }
     private val connectFourHomeIconBitmap: Bitmap? = try {
         context.assets.open("connect_four_home_icon.png").use { BitmapFactory.decodeStream(it) }
     } catch (e: Exception) { null }
@@ -411,20 +414,20 @@ class MenuView(context: Context) : View(context) {
         drawMiniBoard(canvas, previewLeft, previewTop, previewSz, card.type)
 
         val (title, desc) = when (card.type) {
-            GameType.CHESS       -> "Chess"        to "vs AI  •  2 Players"
-            GameType.CHECKERS    -> "Draughts"     to "vs AI  •  2 Players"
+            GameType.CHESS       -> "Chess"        to "vs CPU  •  2 Players"
+            GameType.CHECKERS    -> "Draughts"     to "vs CPU  •  2 Players"
             GameType.INTERNATIONAL_DRAUGHTS ->
-                "International Draughts" to "vs AI  •  2 Players"
-            GameType.OTHELLO     -> "Othello"      to "vs AI  •  2 Players"
-            GameType.MORABARABA  -> "Morabaraba"   to "vs AI  •  2 Players"
-            GameType.TICTACTOE   -> "Tic-Tac-Toe"  to "vs AI  •  2 Players"
-            GameType.CONNECT_FOUR -> "Connect Four" to "vs AI  •  2 Players"
-            GameType.FOX_AND_GEESE -> "Fox and Geese" to "vs AI  •  2 Players"
-            GameType.LUDO         -> "Ludo"         to "vs AI  •  4 Players"
-            GameType.XIANGQI      -> "Xiangqi 象棋"  to "vs AI  •  2 Players"
-            GameType.SHOGI        -> "Shogi 将棋"    to "vs AI  •  2 Players"
-            GameType.GO           -> "Go 围棋"       to "vs AI  •  2 Players"
-            GameType.MANCALA      -> "Mancala"       to "vs AI  •  2 Players"
+                "International Draughts" to "vs CPU  •  2 Players"
+            GameType.OTHELLO     -> "Othello"      to "vs CPU  •  2 Players"
+            GameType.MORABARABA  -> "Morabaraba"   to "vs CPU  •  2 Players"
+            GameType.TICTACTOE   -> "Tic-Tac-Toe"  to "vs CPU  •  2 Players"
+            GameType.CONNECT_FOUR -> "Connect Four" to "vs CPU  •  2 Players"
+            GameType.FOX_AND_GEESE -> "Fox and Geese" to "vs CPU  •  2 Players"
+            GameType.LUDO         -> "Ludo"         to "vs CPU  •  4 Players"
+            GameType.XIANGQI      -> "Xiangqi 象棋"  to "vs CPU  •  2 Players"
+            GameType.SHOGI        -> "Shogi 将棋"    to "vs CPU  •  2 Players"
+            GameType.GO           -> "Go 围棋"       to "vs CPU  •  2 Players"
+            GameType.MANCALA      -> "Mancala"       to "vs CPU  •  2 Players"
         }
 
         val titleLines = if (title == "International Draughts") {
@@ -945,6 +948,10 @@ class MenuView(context: Context) : View(context) {
     }
 
     private fun drawTicTacToeMini(canvas: Canvas, left: Float, top: Float, size: Float) {
+        ticTacToeHomeIconBitmap?.let {
+            canvas.drawBitmap(it, null, RectF(left, top, left + size, top + size), bitmapPaint)
+            return
+        }
         val cell = size / 3f
         val lp = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.parseColor("#444444"); style = Paint.Style.STROKE

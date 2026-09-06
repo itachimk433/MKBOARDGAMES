@@ -313,7 +313,7 @@ class MorabaraBoardView(context: Context) : View(context) {
     private fun startCaptureFlash(completed: Move, myGen: Int) {
         val capturingColor = animColor ?: gameState.currentTurn
         millBannerText = if (capturingColor == playerColor) "MILL! You captured a piece"
-                         else "MILL! AI captured your piece"
+                         else "MILL! CPU captured your piece"
         showMillBanner(millBannerText)
 
         captureAlpha = 1f

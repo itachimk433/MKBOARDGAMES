@@ -562,7 +562,7 @@ class MorabarabaActivity : AppCompatActivity() {
         } else {
             val flyTag = when {
                 flyingMe  -> "✈ You can fly!"
-                aiFlying  -> "✈ AI is flying!"
+                aiFlying  -> "✈ CPU is flying!"
                 wFlying && !vsAI -> "✈ White is flying"
                 bFlying && !vsAI -> "✈ Black is flying"
                 else -> ""
@@ -597,7 +597,7 @@ class MorabarabaActivity : AppCompatActivity() {
             { showTutorial(showModeAfter = false) },
         )
         if (vsAI) {
-            choices += ChessChoiceView.Choice("AI Difficulty", "Adjust the challenge", "●", Color.parseColor("#8EC7B9"))
+            choices += ChessChoiceView.Choice("CPU Difficulty", "Adjust the challenge", "●", Color.parseColor("#8EC7B9"))
             actions += { showDifficultyDialog() }
         }
         choices += ChessChoiceView.Choice("Main Menu", if (inProgress) "Leave this match" else "Choose another game", "⌂", Color.parseColor("#E58A7A"))
@@ -637,7 +637,7 @@ class MorabarabaActivity : AppCompatActivity() {
             ChessChoiceView.Choice("Medium", if (current == 1) "Current setting" else "A balanced challenge", "II", Color.parseColor("#E3B86A")),
             ChessChoiceView.Choice("Hard", if (current == 2) "Current setting" else "A serious challenge", "III", Color.parseColor("#E58A7A")),
         )
-        showChoiceDialog("AI Difficulty", "Choose the challenge for your next move.", choices, choices.indices.map { which ->
+        showChoiceDialog("CPU Difficulty", "Choose the challenge for your next move.", choices, choices.indices.map { which ->
             {
                 val changed = which != current
                 SettingsManager.setMorabarabaDifficulty(this, which)

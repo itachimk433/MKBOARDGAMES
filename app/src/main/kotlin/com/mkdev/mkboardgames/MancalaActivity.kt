@@ -272,7 +272,7 @@ class MancalaActivity : AppCompatActivity() {
         val paused = PausedMatchStore.has(this, "MANCALA")
         val options = buildList {
             if (paused) add("Resume Match")
-            add("vs AI")
+            add("vs CPU")
             add("2 Players")
             add("How to Play")
         }
@@ -284,7 +284,7 @@ class MancalaActivity : AppCompatActivity() {
         ) { which ->
             when (options[which]) {
                 "Resume Match" -> resumePausedMatch()
-                "vs AI" -> {
+                "vs CPU" -> {
                     vsAI = true
                     showColorPickerDialog()
                 }
@@ -329,7 +329,7 @@ class MancalaActivity : AppCompatActivity() {
         showChoiceOverlay(
             "Mancala",
             "Choose an option.",
-            listOf("New Game", "How to Play", "AI Difficulty", "Back"),
+            listOf("New Game", "How to Play", "CPU Difficulty", "Back"),
             onCancel = { showHome() },
         ) { which ->
             when (which) {
@@ -377,7 +377,7 @@ class MancalaActivity : AppCompatActivity() {
             listOf(
                 "New Game / Restart",
                 "How To Play",
-                "AI Difficulty",
+                "CPU Difficulty",
                 "Movement Speed",
                 "Back",
                 "Home",
@@ -454,7 +454,7 @@ class MancalaActivity : AppCompatActivity() {
             "Back",
         )
         showChoiceOverlay(
-            "AI Difficulty",
+            "CPU Difficulty",
             "Choose the computer’s strength.",
             options,
             onCancel = { if (returnToHome) showHome() else showMenu() },
@@ -476,7 +476,7 @@ class MancalaActivity : AppCompatActivity() {
 
     private fun showDifficultyConfirmation(level: Int) {
         showChoiceOverlay(
-            "Change AI difficulty?",
+            "Change CPU difficulty?",
             "Changing difficulty will start a new game.",
             listOf("Change & Restart", "Cancel"),
             onCancel = { showMenu() },

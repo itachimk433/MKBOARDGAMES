@@ -492,9 +492,9 @@ class MainActivity : AppCompatActivity() {
         root.addView(sectionHeader("♟  CHESS"))
         var chessDiff  = SettingsManager.getChessDifficulty(ctx)
         var chessHints = SettingsManager.getChessHints(ctx)
-        val (chessDiffRow, chessDiffVal) = settingRow("🎯", "AI Difficulty", diffs[chessDiff])
+        val (chessDiffRow, chessDiffVal) = settingRow("🎯", "CPU Difficulty", diffs[chessDiff])
         chessDiffRow.setOnClickListener {
-            showSettingsChoiceDialog("Chess · AI Difficulty", diffs, chessDiff) { i ->
+            showSettingsChoiceDialog("Chess · CPU Difficulty", diffs, chessDiff) { i ->
                 SettingsManager.setChessDifficulty(ctx, i)
                 chessDiff = i
                 chessDiffVal.text = diffs[i]
@@ -515,9 +515,9 @@ class MainActivity : AppCompatActivity() {
         root.addView(sectionHeader("⬤  DRAUGHTS"))
         var checkersDiff  = SettingsManager.getCheckersDifficulty(ctx)
         var checkersHints = SettingsManager.getCheckersHints(ctx)
-        val (checkersDiffRow, checkersDiffVal) = settingRow("🎯", "AI Difficulty", diffs[checkersDiff])
+        val (checkersDiffRow, checkersDiffVal) = settingRow("🎯", "CPU Difficulty", diffs[checkersDiff])
         checkersDiffRow.setOnClickListener {
-            showSettingsChoiceDialog("Draughts · AI Difficulty", diffs, checkersDiff) { i ->
+            showSettingsChoiceDialog("Draughts · CPU Difficulty", diffs, checkersDiff) { i ->
                 SettingsManager.setCheckersDifficulty(ctx, i)
                 checkersDiff = i
                 checkersDiffVal.text = diffs[i]
@@ -538,10 +538,10 @@ class MainActivity : AppCompatActivity() {
         root.addView(sectionHeader("◉  INTERNATIONAL DRAUGHTS"))
         var internationalDraughtsDiff = SettingsManager.getInternationalDraughtsDifficulty(ctx)
         val (internationalDraughtsDiffRow, internationalDraughtsDiffVal) =
-            settingRow("🎯", "AI Difficulty", diffs[internationalDraughtsDiff])
+            settingRow("🎯", "CPU Difficulty", diffs[internationalDraughtsDiff])
         internationalDraughtsDiffRow.setOnClickListener {
             showSettingsChoiceDialog(
-                "International Draughts · AI Difficulty",
+                "International Draughts · CPU Difficulty",
                 diffs,
                 internationalDraughtsDiff,
             ) { i ->
@@ -564,9 +564,9 @@ class MainActivity : AppCompatActivity() {
         // ── Morabaraba ──
         root.addView(sectionHeader("⬡  MORABARABA"))
         var morabaraDiff = SettingsManager.getMorabarabaDifficulty(ctx)
-        val (morabaraDiffRow, morabaraDiffVal) = settingRow("🎯", "AI Difficulty", diffs[morabaraDiff])
+        val (morabaraDiffRow, morabaraDiffVal) = settingRow("🎯", "CPU Difficulty", diffs[morabaraDiff])
         morabaraDiffRow.setOnClickListener {
-            showSettingsChoiceDialog("Morabaraba · AI Difficulty", diffs, morabaraDiff) { i ->
+            showSettingsChoiceDialog("Morabaraba · CPU Difficulty", diffs, morabaraDiff) { i ->
                 SettingsManager.setMorabarabaDifficulty(ctx, i)
                 morabaraDiff = i
                 morabaraDiffVal.text = diffs[i]
@@ -580,9 +580,9 @@ class MainActivity : AppCompatActivity() {
         // ── Tic-Tac-Toe ──
         root.addView(sectionHeader("✕  TIC-TAC-TOE"))
         var tttDiff = SettingsManager.getTttDifficulty(ctx)
-        val (tttDiffRow, tttDiffVal) = settingRow("🎯", "AI Difficulty", diffs[tttDiff])
+        val (tttDiffRow, tttDiffVal) = settingRow("🎯", "CPU Difficulty", diffs[tttDiff])
         tttDiffRow.setOnClickListener {
-            showSettingsChoiceDialog("Tic-Tac-Toe · AI Difficulty", diffs, tttDiff) { i ->
+            showSettingsChoiceDialog("Tic-Tac-Toe · CPU Difficulty", diffs, tttDiff) { i ->
                 SettingsManager.setTttDifficulty(ctx, i)
                 tttDiff = i
                 tttDiffVal.text = diffs[i]
@@ -597,9 +597,9 @@ class MainActivity : AppCompatActivity() {
         root.addView(sectionHeader("●  CONNECT FOUR"))
         var connectFourDiff = SettingsManager.getConnectFourDifficulty(ctx)
         val (connectFourDiffRow, connectFourDiffVal) =
-            settingRow("🎯", "AI Difficulty", diffs[connectFourDiff])
+            settingRow("🎯", "CPU Difficulty", diffs[connectFourDiff])
         connectFourDiffRow.setOnClickListener {
-            showSettingsChoiceDialog("Connect Four · AI Difficulty", diffs, connectFourDiff) { i ->
+            showSettingsChoiceDialog("Connect Four · CPU Difficulty", diffs, connectFourDiff) { i ->
                 SettingsManager.setConnectFourDifficulty(ctx, i)
                 connectFourDiff = i
                 connectFourDiffVal.text = diffs[i]
@@ -614,9 +614,9 @@ class MainActivity : AppCompatActivity() {
         root.addView(sectionHeader("🦊  FOX & GEESE"))
         var foxAndGeeseDiff = SettingsManager.getFoxAndGeeseDifficulty(ctx)
         val (foxAndGeeseDiffRow, foxAndGeeseDiffVal) =
-            settingRow("🎯", "AI Difficulty", diffs[foxAndGeeseDiff])
+            settingRow("🎯", "CPU Difficulty", diffs[foxAndGeeseDiff])
         foxAndGeeseDiffRow.setOnClickListener {
-            showSettingsChoiceDialog("Fox & Geese · AI Difficulty", diffs, foxAndGeeseDiff) { i ->
+            showSettingsChoiceDialog("Fox & Geese · CPU Difficulty", diffs, foxAndGeeseDiff) { i ->
                 SettingsManager.setFoxAndGeeseDifficulty(ctx, i)
                 foxAndGeeseDiff = i
                 foxAndGeeseDiffVal.text = diffs[i]
@@ -631,9 +631,9 @@ class MainActivity : AppCompatActivity() {
         root.addView(sectionHeader("●  LUDO"))
         var ludoDiff = SettingsManager.getLudoDifficulty(ctx)
         val (ludoDiffRow, ludoDiffVal) =
-            settingRow("🎯", "AI Difficulty", diffs[ludoDiff])
+            settingRow("🎯", "CPU Difficulty", diffs[ludoDiff])
         ludoDiffRow.setOnClickListener {
-            showSettingsChoiceDialog("Ludo · AI Difficulty", diffs, ludoDiff) { i ->
+            showSettingsChoiceDialog("Ludo · CPU Difficulty", diffs, ludoDiff) { i ->
                 SettingsManager.setLudoDifficulty(ctx, i)
                 ludoDiff = i
                 ludoDiffVal.text = diffs[i]
@@ -645,9 +645,9 @@ class MainActivity : AppCompatActivity() {
         // ── Go ──
         root.addView(sectionHeader("⚫  GO"))
         var goDiff = SettingsManager.getGoDifficulty(ctx)
-        val (goDiffRow, goDiffVal) = settingRow("🎯", "AI Difficulty", diffs[goDiff])
+        val (goDiffRow, goDiffVal) = settingRow("🎯", "CPU Difficulty", diffs[goDiff])
         goDiffRow.setOnClickListener {
-            showSettingsChoiceDialog("Go · AI Difficulty", diffs, goDiff) { i ->
+            showSettingsChoiceDialog("Go · CPU Difficulty", diffs, goDiff) { i ->
                 SettingsManager.setGoDifficulty(ctx, i)
                 goDiff = i
                 goDiffVal.text = diffs[i]
@@ -659,9 +659,9 @@ class MainActivity : AppCompatActivity() {
         // ── Shogi ──
         root.addView(sectionHeader("将  SHOGI"))
         var shogiDiff = SettingsManager.getShogiDifficulty(ctx)
-        val (shogiDiffRow, shogiDiffVal) = settingRow("🎯", "AI Difficulty", diffs[shogiDiff])
+        val (shogiDiffRow, shogiDiffVal) = settingRow("🎯", "CPU Difficulty", diffs[shogiDiff])
         shogiDiffRow.setOnClickListener {
-            showSettingsChoiceDialog("Shogi · AI Difficulty", diffs, shogiDiff) { i ->
+            showSettingsChoiceDialog("Shogi · CPU Difficulty", diffs, shogiDiff) { i ->
                 SettingsManager.setShogiDifficulty(ctx, i)
                 shogiDiff = i
                 shogiDiffVal.text = diffs[i]
@@ -976,7 +976,7 @@ class MainActivity : AppCompatActivity() {
         wrapper.addView(statCard)
 
         AlertDialog.Builder(ctx, android.R.style.Theme_Material_Dialog_MinWidth)
-            .setTitle("Your Stats (vs AI)")
+            .setTitle("Your Stats (vs CPU)")
             .setIcon(R.drawable.ic_app_logo)
             .setView(wrapper)
             .setPositiveButton("OK", null)

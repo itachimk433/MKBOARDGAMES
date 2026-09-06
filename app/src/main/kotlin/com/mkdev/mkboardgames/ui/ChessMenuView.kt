@@ -264,7 +264,7 @@ class ChessMenuView(
 
         actions = listOf(
             MenuAction(
-                label = "vs AI",
+                label = "vs CPU",
                 detail = "Challenge the board",
                 symbol = when {
                     isChess -> "♞"

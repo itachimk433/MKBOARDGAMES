@@ -561,7 +561,7 @@ class GameActivity : AppCompatActivity() {
         val paused = PausedMatchStore.has(this, gameType)
         val options = buildList {
             if (paused) add("Resume Match")
-            add("vs AI")
+            add("vs CPU")
             add("2 Players")
             add("How to Play")
         }
@@ -572,7 +572,7 @@ class GameActivity : AppCompatActivity() {
                     return@setItems
                 }
                 when (options[which]) {
-                    "vs AI" -> { vsAI = true; showColorPickerDialog() }
+                    "vs CPU" -> { vsAI = true; showColorPickerDialog() }
                     "2 Players" -> { vsAI = false; playerColor = PieceColor.WHITE; startGame() }
                     "How to Play" -> showRules(showModeAfter = !matchStarted)
                 }
@@ -777,7 +777,7 @@ Checkmate wins the game. A player with no legal move loses, even if their King i
 OTHELLO — Rules
 
 Overview
-Othello (Reversi) is played on an 8×8 board. Each player has discs that are white on one side and black on the other. You choose your colour when starting a game vs AI.
+Othello (Reversi) is played on an 8×8 board. Each player has discs that are white on one side and black on the other. You choose your colour when starting a game vs CPU.
 
 ─────────────────────────
 
@@ -804,7 +804,7 @@ When the board is full (or no legal moves remain), the player with more discs wi
 DRAUGHTS — Rules
 
 Overview
-Played on the dark squares of an 8×8 board. You choose your colour when starting a game vs AI. Pieces start on the first 3 rows of each side.
+Played on the dark squares of an 8×8 board. You choose your colour when starting a game vs CPU. Pieces start on the first 3 rows of each side.
 
 ─────────────────────────
 
@@ -831,7 +831,7 @@ Capture all of your opponent's pieces, or leave them with no legal moves.
 INTERNATIONAL DRAUGHTS — Rules
 
 Overview
-Played on the dark squares of a 10×10 board with twenty pieces per side. You choose your colour when starting a game vs AI. White moves first.
+Played on the dark squares of a 10×10 board with twenty pieces per side. You choose your colour when starting a game vs CPU. White moves first.
 
 Moving
 Men move one square diagonally forward to an empty dark square. Men may capture forwards or backwards.
@@ -872,7 +872,7 @@ The fox wins by capturing all but one of the geese, leaving the flock with no le
 CHESS — Rules
 
 Overview
-Two players command 16 pieces each (White and Black) on an 8×8 board. You choose your colour when starting a game vs AI.
+Two players command 16 pieces each (White and Black) on an 8×8 board. You choose your colour when starting a game vs CPU.
 
 ─────────────────────────
 
@@ -1607,7 +1607,7 @@ Checkmate your opponent's King.
         val items = mutableListOf("New Game", "How to Play")
         // Othello uses a fixed AI setting; the other games expose their
         // difficulty because their search depth can be tuned safely.
-        if (vsAI && gameType != "OTHELLO") items.add("AI Difficulty")
+        if (vsAI && gameType != "OTHELLO") items.add("CPU Difficulty")
         items.add("Main Menu")
         val arr = items.toTypedArray()
         AlertDialog.Builder(this).setTitle("Menu")
@@ -1622,7 +1622,7 @@ Checkmate your opponent's King.
                             }.setNegativeButton("Cancel", null).show()
                     } else showModeDialog()
                     "How to Play"   -> showRules(showModeAfter = false)
-                    "AI Difficulty" -> showDifficultyDialog()
+                    "CPU Difficulty" -> showDifficultyDialog()
                     "Main Menu" -> if (inProgress) {
                         if (isStyledBoardGame()) {
                             showChessLeaveMatchDialog()
@@ -1665,7 +1665,7 @@ Checkmate your opponent's King.
         )
         if (vsAI && gameType != "OTHELLO") {
             choices += ChessChoiceView.Choice(
-                "AI Difficulty",
+                "CPU Difficulty",
                 "Adjust the challenge",
                 when {
                     gameType == "CHECKERS" || gameType == "INTERNATIONAL_DRAUGHTS" -> "◉"
@@ -1804,7 +1804,7 @@ Checkmate your opponent's King.
         )
         val view = ChessChoiceView(
             this,
-            title = "AI Difficulty",
+            title = "CPU Difficulty",
             subtitle = "Choose the challenge for your next move.",
             choices = levels,
             gameLabel = styledGameLabel(),

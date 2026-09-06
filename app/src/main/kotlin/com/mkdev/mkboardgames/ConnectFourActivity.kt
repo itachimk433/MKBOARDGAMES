@@ -533,14 +533,14 @@ Control the centre columns, build threats in more than one direction, and block 
         hideBoardWhileDialogIsOpen()
         val inProgress = gameState.status == GameStatus.IN_PROGRESS && moveHistory.isNotEmpty()
         val items = mutableListOf("New Game", "How to Play")
-        if (vsAI) items.add("AI Difficulty")
+        if (vsAI) items.add("CPU Difficulty")
         items.add("Main Menu")
         StyledDialogs.showChoices(this, "Menu", "Choose what to do next.",
             items.map { item ->
                 when (item) {
                     "New Game" -> StyledDialogs.choice(item, if (inProgress) "Start over and forfeit" else "Begin a fresh match", "↻", "#E3B86A")
                     "How to Play" -> StyledDialogs.choice(item, "Review the essentials", "?", "#A9B6E8")
-                    "AI Difficulty" -> StyledDialogs.choice(item, "Adjust the challenge", "●", "#8EC7B9")
+                    "CPU Difficulty" -> StyledDialogs.choice(item, "Adjust the challenge", "●", "#8EC7B9")
                     else -> StyledDialogs.choice(item, if (inProgress) "Leave this match" else "Choose another game", "⌂", "#E58A7A")
                 }
             }, 520f, "C O N N E C T · F O U R", onCancel = { showBoardAfterDialog() }) { which, menu ->
@@ -560,7 +560,7 @@ Control the centre columns, build threats in more than one direction, and block 
                         }
                 } else showModeDialog()
                 "How to Play" -> showRules(false)
-                "AI Difficulty" -> showDifficultyDialog()
+                "CPU Difficulty" -> showDifficultyDialog()
                 "Main Menu" -> if (inProgress) {
                     StyledDialogs.showChoices(this, "Leave Match?", "Pause to resume later, or leave to forfeit.",
                         listOf(
@@ -587,7 +587,7 @@ Control the centre columns, build threats in more than one direction, and block 
         hideBoardWhileDialogIsOpen()
         val labels = arrayOf("Easy", "Medium", "Hard")
         val current = SettingsManager.getConnectFourDifficulty(this)
-        StyledDialogs.showChoices(this, "AI Difficulty", "Adjust the challenge.",
+        StyledDialogs.showChoices(this, "CPU Difficulty", "Adjust the challenge.",
             labels.mapIndexed { index, label ->
                 StyledDialogs.choice(label, if (index == current) "Current setting" else "Computer strength", listOf("I", "II", "III")[index], listOf("#8EC7B9", "#E3B86A", "#E58A7A")[index])
             }, 520f, "C O N N E C T · F O U R", onCancel = { showBoardAfterDialog() }) { which, dialog ->
