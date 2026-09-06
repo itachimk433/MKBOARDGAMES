@@ -15,8 +15,8 @@ data class YotePiece(override val color: PieceColor) : Piece(color) {
 
 /**
  * Yoté is played on a 5 × 6 board. Pieces enter from a reserve at any time.
- * A jump capture earns the player one extra capture anywhere on the board and
- * gives that player another turn.
+ * A jump capture removes the jumped piece and requires one additional
+ * opponent-piece removal anywhere on the board when one is available.
  */
 class YoteRuleEngine : RuleEngine {
     companion object {
@@ -82,6 +82,17 @@ class YoteRuleEngine : RuleEngine {
         } ?: legal.firstOrNull { it.from == move.from && it.to == move.to }
             ?: return state
 
+        val bonusCapture = move.metadata["bonusCapture"] as? Position
+        val bonusOptions = if (matching.isCapture) {
+            availableBonusCaptures(state, matching)
+        } else {
+            emptyList()
+        }
+        // Yoté's second removal is part of the capture, not an optional
+        // follow-up.  Reject a primary capture until the caller supplies it.
+        if (bonusOptions.isNotEmpty() && bonusCapture == null) return state
+        if (bonusCapture != null && bonusCapture !in bonusOptions) return state
+
         val board = state.board.copyOf()
         val hands = state.hands.mapValues { (_, pieces) -> pieces.toList() }.toMutableMap()
         val captures = matching.captures.toMutableList()
@@ -107,7 +118,6 @@ class YoteRuleEngine : RuleEngine {
             }
         }
 
-        val bonusCapture = move.metadata["bonusCapture"] as? Position
         if (matching.isCapture && bonusCapture != null && bonusCapture !in captures) {
             val bonusIndex = indexOf(bonusCapture)
             if (bonusIndex >= 0 && board[bonusIndex]?.color == mover.opponent()) {
@@ -118,10 +128,7 @@ class YoteRuleEngine : RuleEngine {
 
         val next = state.copy(
             board = board,
-            // A capture keeps the turn with the capturing player.  This is
-            // separate from the optional extra piece removal below: both are
-            // part of the standard Yoté capture reward.
-            currentTurn = if (matching.isCapture) mover else mover.opponent(),
+            currentTurn = mover.opponent(),
             status = GameStatus.IN_PROGRESS,
             moveHistory = state.moveHistory + move.copy(
                 captures = captures,
@@ -149,17 +156,6 @@ class YoteRuleEngine : RuleEngine {
         return when {
             whiteOnBoard + whiteReserve == 0 -> GameStatus.BLACK_WINS
             blackOnBoard + blackReserve == 0 -> GameStatus.WHITE_WINS
-            allLegalMoves(state, state.currentTurn).isEmpty() ->
-                if (allLegalMoves(state, state.currentTurn.opponent()).isNotEmpty()) {
-                    if (state.currentTurn == PieceColor.WHITE) GameStatus.BLACK_WINS
-                    else GameStatus.WHITE_WINS
-                } else if (whiteOnBoard > blackOnBoard) {
-                    GameStatus.WHITE_WINS
-                } else if (blackOnBoard > whiteOnBoard) {
-                    GameStatus.BLACK_WINS
-                } else {
-                    GameStatus.DRAW
-                }
             else -> GameStatus.IN_PROGRESS
         }
     }

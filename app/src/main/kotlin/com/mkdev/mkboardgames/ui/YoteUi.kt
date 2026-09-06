@@ -71,8 +71,8 @@ class YoteRulesView(context: Context) : View(context) {
         val sections = listOf(
             "SETUP" to "Yoté uses a 5 × 6 board. Each player has twelve stones in reserve. White moves first.",
             "ENTER OR MOVE" to "On a turn, either enter one reserve stone onto any empty space, or move one of your stones one square orthogonally.",
-            "CAPTURE" to "Jump over an adjacent opponent stone into an empty space to capture it. A jump capture also lets you remove one additional opponent stone anywhere on the board.",
-            "WINNING" to "Capture all of the opponent’s stones, including the stones still in their reserve, or leave them with no legal move.",
+            "CAPTURE" to "Jump over an adjacent opponent stone into an empty space to capture it. A jump capture also requires you to remove one additional opponent stone anywhere on the board when one remains.",
+            "WINNING" to "Capture all of the opponent’s stones, including the stones still in their reserve.",
             "BOARD VARIANTS" to "Choose either the carved reservoir board or the rustic pebble board before the match. The chosen board stays fixed for that game.",
         )
         sections.forEach { (heading, body) ->

@@ -26,6 +26,28 @@ enum class YoteBoardVariant(
 }
 
 class YoteBoardView(context: Context) : View(context) {
+    /*
+     * The carved artwork is a portrait board. Its five pocket columns and six
+     * pocket rows are transposed relative to the engine's 5-row × 6-column
+     * coordinates. These are the measured pocket centres in the source asset
+     * (730 × 1024), expressed as fractions so they scale with the bitmap.
+     */
+    private val carvedColumnCenters = floatArrayOf(
+        180f / 730f,
+        280f / 730f,
+        380f / 730f,
+        480f / 730f,
+        580f / 730f,
+    )
+    private val carvedRowCenters = floatArrayOf(
+        280f / 1024f,
+        380f / 1024f,
+        480f / 1024f,
+        580f / 1024f,
+        680f / 1024f,
+        780f / 1024f,
+    )
+
     var gameState: GameState = YoteRuleEngine().initialState()
         set(value) {
             field = value
@@ -180,8 +202,13 @@ class YoteBoardView(context: Context) : View(context) {
         } else {
             RectF(boardRect)
         }
-        cellWidth = gridRect.width() / YoteRuleEngine.COLUMNS
-        cellHeight = gridRect.height() / YoteRuleEngine.ROWS
+        if (variant == YoteBoardVariant.CARVED) {
+            cellWidth = boardRect.width() * (carvedColumnCenters[1] - carvedColumnCenters[0])
+            cellHeight = boardRect.height() * (carvedRowCenters[1] - carvedRowCenters[0])
+        } else {
+            cellWidth = gridRect.width() / YoteRuleEngine.COLUMNS
+            cellHeight = gridRect.height() / YoteRuleEngine.ROWS
+        }
         gridPaint.strokeWidth = maxOf(1f, cellWidth * 0.018f)
         selectionPaint.strokeWidth = maxOf(2f, min(cellWidth, cellHeight) * 0.055f)
         captureTargetPaint.strokeWidth = maxOf(2f, min(cellWidth, cellHeight) * 0.045f)
@@ -340,17 +367,12 @@ class YoteBoardView(context: Context) : View(context) {
             // new state, matching the capture presentation used by the other
             // board games. Only the moving stone's source is hidden.
             if (position == hiddenPosition) continue
-            drawPiece(
-                canvas,
-                gridRect.left + (position.col + 0.5f) * cellWidth,
-                gridRect.top + (position.row + 0.5f) * cellHeight,
-                radius,
-                piece.color,
-            )
+            val center = centerOf(position)
+            drawPiece(canvas, center.x, center.y, radius, piece.color)
             if (position in capturablePositions) {
                 canvas.drawCircle(
-                    gridRect.left + (position.col + 0.5f) * cellWidth,
-                    gridRect.top + (position.row + 0.5f) * cellHeight,
+                    center.x,
+                    center.y,
                     radius * 1.22f,
                     capturablePaint,
                 )
@@ -524,6 +546,24 @@ class YoteBoardView(context: Context) : View(context) {
     }
 
     private fun positionAt(x: Float, y: Float): Position? {
+        if (variant == YoteBoardVariant.CARVED) {
+            var closest: Position? = null
+            var closestDistanceSquared = Float.MAX_VALUE
+            for (row in 0 until YoteRuleEngine.ROWS) {
+                for (column in 0 until YoteRuleEngine.COLUMNS) {
+                    val center = centerOf(Position(row, column))
+                    val dx = x - center.x
+                    val dy = y - center.y
+                    val distanceSquared = dx * dx + dy * dy
+                    if (distanceSquared < closestDistanceSquared) {
+                        closestDistanceSquared = distanceSquared
+                        closest = Position(row, column)
+                    }
+                }
+            }
+            val hitRadius = min(cellWidth, cellHeight) * 0.48f
+            return closest.takeIf { closestDistanceSquared <= hitRadius * hitRadius }
+        }
         if (!gridRect.contains(x, y)) return null
         val column = ((x - gridRect.left) / cellWidth).toInt()
         val row = ((y - gridRect.top) / cellHeight).toInt()
@@ -535,10 +575,18 @@ class YoteBoardView(context: Context) : View(context) {
     }
 
     private fun centerOf(position: Position): PointF =
-        PointF(
-            gridRect.left + (position.col + 0.5f) * cellWidth,
-            gridRect.top + (position.row + 0.5f) * cellHeight,
-        )
+        if (variant == YoteBoardVariant.CARVED) {
+            // Engine row/column become artwork column/row respectively.
+            PointF(
+                boardRect.left + boardRect.width() * carvedColumnCenters[position.row],
+                boardRect.top + boardRect.height() * carvedRowCenters[position.col],
+            )
+        } else {
+            PointF(
+                gridRect.left + (position.col + 0.5f) * cellWidth,
+                gridRect.top + (position.row + 0.5f) * cellHeight,
+            )
+        }
 
     private fun loadBitmap(assetName: String): Bitmap? =
         try {
