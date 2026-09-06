@@ -242,7 +242,7 @@ class MancalaActivity : AppCompatActivity() {
         if (!matchStarted) {
             @Suppress("DEPRECATION") super.onBackPressed()
         } else {
-            showMenu()
+            showLeaveMatchDialog()
         }
     }
 
@@ -371,6 +371,34 @@ class MancalaActivity : AppCompatActivity() {
         callback?.invoke()
     }
 
+    private fun showLeaveMatchDialog() {
+        stopAutomatedGameplay()
+        boardView.isLocked = true
+        showChoiceOverlay(
+            "Leave Match?",
+            "Pause to resume later, or leave to forfeit this game.",
+            listOf(
+                "Pause & Exit",
+                "Leave Match",
+                "Keep Playing",
+            ),
+            onCancel = { showBoardAfterDialog() },
+        ) { which ->
+            when (which) {
+                0 -> {
+                    savePausedMatch()
+                    finish()
+                }
+                1 -> {
+                    clearPausedMatch()
+                    if (vsAI) SettingsManager.recordForfeit(this)
+                    finish()
+                }
+                else -> showBoardAfterDialog()
+            }
+        }
+    }
+
     private fun showMenu() {
         if (boardView.isMoveAnimating) return
         stopAutomatedGameplay()
@@ -383,7 +411,6 @@ class MancalaActivity : AppCompatActivity() {
                 "How To Play",
                 "CPU Difficulty",
                 "Movement Speed",
-                "Back",
                 "Home",
             ),
             onCancel = { showBoardAfterDialog() },
@@ -393,7 +420,6 @@ class MancalaActivity : AppCompatActivity() {
                 1 -> showRules(false)
                 2 -> showDifficultyMenu(returnToHome = false)
                 3 -> showMovementSpeedMenu()
-                4 -> showBoardAfterDialog()
                 else -> showHomeConfirmation()
             }
         }

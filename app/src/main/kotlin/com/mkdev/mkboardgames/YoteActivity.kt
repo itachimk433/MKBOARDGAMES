@@ -177,7 +177,7 @@ class YoteActivity : AppCompatActivity() {
         } else if (gameState.status != GameStatus.IN_PROGRESS) {
             showResultDialog()
         } else {
-            showMenu()
+            showLeaveMatchDialog()
         }
     }
 
@@ -304,6 +304,34 @@ class YoteActivity : AppCompatActivity() {
         callback?.invoke()
     }
 
+    private fun showLeaveMatchDialog() {
+        stopAutomatedGameplay()
+        boardView.isLocked = true
+        showChoiceOverlay(
+            "Leave Match?",
+            "Pause to resume later, or leave to forfeit this game.",
+            listOf(
+                ChessChoiceView.Choice("Pause & Exit", "Save and resume later", "Ⅱ", Color.parseColor("#E3B86A")),
+                ChessChoiceView.Choice("Leave Match", "Forfeit this game", "⚑", Color.parseColor("#E58A7A")),
+                ChessChoiceView.Choice("Keep Playing", "Return to the board", "↩", Color.parseColor("#A9B6E8")),
+            ),
+            onCancel = { showBoardAfterDialog() },
+        ) {
+            when (it) {
+                0 -> {
+                    savePausedMatch()
+                    finish()
+                }
+                1 -> {
+                    PausedMatchStore.clear(this, "YOTE")
+                    if (vsAI) SettingsManager.recordForfeit(this)
+                    finish()
+                }
+                else -> showBoardAfterDialog()
+            }
+        }
+    }
+
     private fun showMenu() {
         boardView.isLocked = true
         autoplayEnabled = false
@@ -315,7 +343,6 @@ class YoteActivity : AppCompatActivity() {
                 ChessChoiceView.Choice("New Game / Restart", "Start a fresh Yoté match", "↻", Color.parseColor("#E3B86A")),
                 ChessChoiceView.Choice("How To Play", "Review the rules", "?", Color.parseColor("#8EC7B9")),
                 ChessChoiceView.Choice("CPU Difficulty", "Choose the challenge", "◆", Color.parseColor("#A9B6E8")),
-                ChessChoiceView.Choice("Pause & Exit", "Save this match and resume later", "Ⅱ", Color.parseColor("#E3B86A")),
                 ChessChoiceView.Choice("Home", "Save and return to the catalogue", "⌂", Color.parseColor("#E58A7A")),
             ),
             onCancel = { showBoardAfterDialog() },
@@ -324,10 +351,6 @@ class YoteActivity : AppCompatActivity() {
                 0 -> showRestartConfirmation()
                 1 -> showRules(false)
                 2 -> showDifficultyMenu()
-                3 -> {
-                    savePausedMatch()
-                    finish()
-                }
                 else -> showHome()
             }
         }
