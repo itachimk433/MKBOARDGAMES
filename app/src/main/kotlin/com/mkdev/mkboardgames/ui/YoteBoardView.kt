@@ -6,6 +6,7 @@ import android.graphics.*
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
+import android.view.animation.DecelerateInterpolator
 import android.view.animation.LinearInterpolator
 import com.mkdev.mkboardgames.engine.GameState
 import com.mkdev.mkboardgames.engine.GameStatus
@@ -14,7 +15,9 @@ import com.mkdev.mkboardgames.engine.PieceColor
 import com.mkdev.mkboardgames.engine.Position
 import com.mkdev.mkboardgames.games.yote.YotePiece
 import com.mkdev.mkboardgames.games.yote.YoteRuleEngine
+import kotlin.math.PI
 import kotlin.math.min
+import kotlin.math.sin
 
 enum class YoteBoardVariant(
     val assetName: String,
@@ -295,7 +298,10 @@ class YoteBoardView(context: Context) : View(context) {
         val move = pendingMove ?: return
         val radius = min(cellWidth, cellHeight) * 0.27f
         val x = movingFrom.x + (movingTo.x - movingFrom.x) * moveProgress
-        val y = movingFrom.y + (movingTo.y - movingFrom.y) * moveProgress
+        val arcHeight = radius * if (move.from == YoteRuleEngine.RESERVE) 1.35f else 0.55f
+        val y = movingFrom.y +
+            (movingTo.y - movingFrom.y) * moveProgress -
+            sin(moveProgress * PI).toFloat() * arcHeight
         drawPiece(canvas, PointF(x, y), radius, movingColor)
         if (move.from == YoteRuleEngine.RESERVE) {
             labelPaint.color = Color.argb(160, 255, 246, 226)
@@ -394,7 +400,11 @@ class YoteBoardView(context: Context) : View(context) {
         movingFrom = if (move.from == YoteRuleEngine.RESERVE) {
             PointF(
                 boardRect.centerX(),
-                if (movingColor == PieceColor.WHITE) boardRect.bottom + cellHeight else boardRect.top - cellHeight,
+                if (movingColor == PieceColor.WHITE) {
+                    boardRect.bottom + min(cellWidth, cellHeight) * 0.48f
+                } else {
+                    boardRect.top - min(cellWidth, cellHeight) * 0.48f
+                },
             )
         } else {
             centerOf(move.from)
@@ -405,7 +415,8 @@ class YoteBoardView(context: Context) : View(context) {
         isLocked = true
         moveAnimator?.cancel()
         moveAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
-            duration = 260L
+            duration = if (move.from == YoteRuleEngine.RESERVE) 420L else 360L
+            interpolator = DecelerateInterpolator(1.6f)
             addUpdateListener {
                 moveProgress = it.animatedValue as Float
                 invalidate()

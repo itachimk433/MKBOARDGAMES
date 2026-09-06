@@ -412,9 +412,6 @@ class YoteActivity : AppCompatActivity() {
     private fun handleBoardMove(move: Move) {
         if (!matchStarted || gameState.status != GameStatus.IN_PROGRESS) return
         if (vsAI && gameState.currentTurn != playerColor && !autoplayEnabled) return
-        if (engine.allLegalMoves(gameState, gameState.currentTurn).none {
-                it.from == move.from && it.to == move.to && it.captures == move.captures
-            }) return
         val bonus = engine.availableBonusCaptures(gameState, move)
         if (bonus.isNotEmpty()) {
             boardView.isLocked = true
@@ -444,8 +441,17 @@ class YoteActivity : AppCompatActivity() {
     }
 
     private fun commitMove(move: Move) {
+        val nextState = engine.applyMove(gameState, move)
+        // A cancelled animation can finish after the activity has already
+        // advanced to another state. Treat that callback as stale instead of
+        // leaving the board locked or showing a permanent AI-thinking label.
+        if (nextState === gameState) {
+            boardView.isLocked = false
+            updateHud()
+            return
+        }
         previousStates.add(gameState)
-        gameState = engine.applyMove(gameState, move)
+        gameState = nextState
         boardView.gameState = gameState
         boardView.isLocked = gameState.status != GameStatus.IN_PROGRESS
         updateHud()
