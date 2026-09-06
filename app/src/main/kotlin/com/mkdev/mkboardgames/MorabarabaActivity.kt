@@ -735,6 +735,7 @@ class MorabarabaActivity : AppCompatActivity() {
                 { launchReplay(resultLabel) },
             ),
             520f,
+            fullScreen = false,
         )
     }
 
