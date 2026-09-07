@@ -559,7 +559,7 @@ class ChessChoiceView(
 
     private fun drawChoiceInfo(canvas: Canvas, hit: ChoiceHit) {
         canvas.drawColor(Color.argb(165, 0, 0, 0))
-        val panelWidth = min(width - 44f * unit, 340f * unit)
+        val panelWidth = (width - 44f * unit).coerceAtMost(340f * unit)
         val panelHeight = 164f * unit
         val panel = RectF(
             (width - panelWidth) / 2f,

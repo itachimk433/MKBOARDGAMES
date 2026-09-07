@@ -219,9 +219,9 @@ class YoteActivity : AppCompatActivity() {
         title: String,
         subtitle: String,
         choices: List<ChessChoiceView.Choice>,
+        gridChoices: Boolean = false,
         onCancel: () -> Unit,
         onChoice: (Int) -> Unit,
-        gridChoices: Boolean = false,
     ) {
         val overlay = ChessChoiceView(
             this,
