@@ -53,6 +53,7 @@ class YoteActivity : AppCompatActivity() {
     private lateinit var topInfoView: YotePieceStripView
     private lateinit var bottomInfoView: YotePieceStripView
     private lateinit var autoplayButton: AutoplayButtonView
+    private lateinit var undoButton: MancalaWoodButton
     private var activeOverlay: View? = null
     private val capturedByWhite = mutableListOf<Piece>()
     private val capturedByBlack = mutableListOf<Piece>()
@@ -114,7 +115,12 @@ class YoteActivity : AppCompatActivity() {
             style = MancalaWoodButton.Style.GOLD
             onClick = { if (!boardView.isLocked) showMenu() }
         }
+        undoButton = MancalaWoodButton(this, "Undo").apply {
+            style = MancalaWoodButton.Style.BLUE
+            onClick = { undoMove() }
+        }
         controls.addView(autoplayButton, LinearLayout.LayoutParams(0, (46 * density).toInt(), 1f))
+        controls.addView(undoButton, LinearLayout.LayoutParams(0, (46 * density).toInt(), 1f))
         controls.addView(menuButton, LinearLayout.LayoutParams(0, (46 * density).toInt(), 1f))
 
         gameLayout.addView(header, LinearLayout.LayoutParams(-1, (58 * density).toInt()))
@@ -485,6 +491,39 @@ class YoteActivity : AppCompatActivity() {
         } else {
             autoplayMoveInProgress = false
             if (vsAI && aiControlsCurrentTurn()) triggerAI()
+        }
+    }
+
+    private fun undoMove() {
+        if (previousStates.isEmpty() || boardView.isLocked) return
+
+        stopAutomatedGameplay()
+        val steps = if (vsAI && gameState.currentTurn == playerColor && previousStates.size >= 2) {
+            2
+        } else {
+            1
+        }
+        repeat(steps) {
+            if (previousStates.isNotEmpty()) {
+                gameState = previousStates.removeLast()
+            }
+        }
+        rebuildCapturedPieces()
+        boardView.gameState = gameState
+        boardView.isLocked = gameState.status != GameStatus.IN_PROGRESS
+        updateHud()
+        resumeComputerTurnIfNeeded()
+    }
+
+    private fun rebuildCapturedPieces() {
+        capturedByWhite.clear()
+        capturedByBlack.clear()
+        var replayState = engine.initialState()
+        gameState.moveHistory.forEach { move ->
+            val nextState = engine.applyMove(replayState, move)
+            if (nextState === replayState) return@forEach
+            recordCaptures(replayState, nextState.moveHistory.lastOrNull() ?: move)
+            replayState = nextState
         }
     }
 

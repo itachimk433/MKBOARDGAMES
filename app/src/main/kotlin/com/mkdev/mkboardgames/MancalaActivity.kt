@@ -567,9 +567,10 @@ class MancalaActivity : AppCompatActivity() {
     }
 
     private fun showHome() {
+        stopAutomatedGameplay()
         dismissMancalaOverlay()
         if (::gameRoot.isInitialized) gameRoot.visibility = View.GONE
-        showModeDialog()
+        finish()
     }
 
     private fun startGame(restoring: PausedMatchStore.Match? = null) {
