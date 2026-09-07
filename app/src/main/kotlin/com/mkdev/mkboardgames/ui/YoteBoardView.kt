@@ -17,79 +17,13 @@ import com.mkdev.mkboardgames.games.yote.YotePiece
 import com.mkdev.mkboardgames.games.yote.YoteRuleEngine
 import kotlin.math.min
 
-enum class YoteBoardVariant(
-    val assetName: String,
-    val label: String,
-) {
-    CARVED("yote_board_carved.webp", "Carved Reservoir"),
-    RUSTIC("yote_board_rustic.webp", "Rustic Pebble"),
-}
-
-enum class YoteCarvedStyle(
-    val assetName: String,
-    val label: String,
-    val sourceRect: Rect,
-    val pocketCenters: Array<FloatArray>,
-    val pocketStepX: Float,
-    val pocketStepY: Float,
-) {
-    CLASSIC(
-        assetName = "yote_board_carved.webp",
-        label = "Carved Reservoir",
-        sourceRect = Rect(70, 76, 660, 950),
-        pocketCenters = arrayOf(
-            floatArrayOf(186f, 269f, 287f, 270f, 383f, 269f, 481f, 269f, 577f, 269f),
-            floatArrayOf(188f, 364f, 286f, 365f, 385f, 366f, 483f, 365f, 578f, 364f),
-            floatArrayOf(188f, 467f, 287f, 463f, 384f, 466f, 483f, 463f, 578f, 466f),
-            floatArrayOf(187f, 562f, 286f, 565f, 382f, 565f, 481f, 565f, 578f, 565f),
-            floatArrayOf(188f, 662f, 287f, 659f, 387f, 661f, 482f, 659f, 578f, 660f),
-            floatArrayOf(187f, 759f, 287f, 759f, 384f, 759f, 482f, 759f, 578f, 760f),
-        ),
-        pocketStepX = 100f,
-        pocketStepY = 100f,
-    ),
-    RESERVOIR(
-        assetName = "yote_board_carved_reservoir.webp",
-        label = "Carved Reservoir II",
-        sourceRect = Rect(0, 0, 858, 1271),
-        pocketCenters = arrayOf(
-            floatArrayOf(168f, 280f, 315f, 280f, 455f, 280f, 597f, 280f, 736f, 280f),
-            floatArrayOf(168f, 418f, 315f, 418f, 455f, 418f, 597f, 418f, 736f, 418f),
-            floatArrayOf(168f, 566f, 315f, 566f, 455f, 566f, 597f, 566f, 736f, 566f),
-            floatArrayOf(168f, 706f, 315f, 706f, 455f, 706f, 597f, 706f, 736f, 706f),
-            floatArrayOf(168f, 851f, 315f, 851f, 455f, 851f, 597f, 851f, 736f, 851f),
-            floatArrayOf(168f, 991f, 315f, 991f, 455f, 991f, 597f, 991f, 736f, 991f),
-        ),
-        pocketStepX = 142f,
-        pocketStepY = 142f,
-    ),
-}
-
 class YoteBoardView(context: Context) : View(context) {
-    // The carved asset has 100px pocket spacing and approximately 27px
-    // pocket radius. Keep the rendered stone inside that measured opening,
-    // including its rim and offset shadow.
-    private val carvedPocketRadiusRatio = 27f / 100f
-    private val carvedPieceRadiusRatio = 20f / 100f
-
     var gameState: GameState = YoteRuleEngine().initialState()
         set(value) {
             field = value
             selected = null
             capturablePositions = emptySet()
             invalidate()
-        }
-
-    var variant: YoteBoardVariant = YoteBoardVariant.CARVED
-        set(value) {
-            field = value
-            reloadBoardArtwork()
-        }
-
-    var carvedStyle: YoteCarvedStyle = YoteCarvedStyle.CLASSIC
-        set(value) {
-            field = value
-            reloadBoardArtwork()
         }
 
     var playerColor: PieceColor = PieceColor.WHITE
@@ -104,7 +38,7 @@ class YoteBoardView(context: Context) : View(context) {
     private var gridRect = RectF()
     private var cellWidth = 0f
     private var cellHeight = 0f
-    private var boardBitmap: Bitmap? = loadBitmap(artworkAssetName())
+    private var boardBitmap: Bitmap? = loadBitmap(RUSTIC_BOARD_ASSET)
     private var boardSourceRect: Rect? = boardBitmap?.let(::drawableSourceRect)
     private var atmospherePhase = 0f
     private var atmosphereAnimator: ValueAnimator? = null
@@ -158,6 +92,16 @@ class YoteBoardView(context: Context) : View(context) {
     }
     private var capturablePositions: Set<Position> = emptySet()
 
+    companion object {
+        private const val RUSTIC_BOARD_ASSET = "yote_board_rustic.webp"
+
+        // Measured from the actual board artwork rather than inferred from the
+        // image bounds. The lines are the boundaries of the six columns and
+        // five rows, so every stone is drawn at the centre of its real square.
+        private val RUSTIC_COLUMN_LINES = floatArrayOf(65f, 237f, 416f, 598f, 781f, 960f, 1135f)
+        private val RUSTIC_ROW_LINES = floatArrayOf(53f, 212f, 373f, 534f, 694f, 855f)
+    }
+
     init {
         isClickable = true
         isFocusable = true
@@ -190,19 +134,14 @@ class YoteBoardView(context: Context) : View(context) {
 
     private fun updateGeometry(w: Int, h: Int) {
         if (w <= 0 || h <= 0) return
-        val density = resources.displayMetrics.density
         val sourceRect = boardBitmap?.let(::drawableSourceRect)
-        val sourceWidth = sourceRect?.width()?.toFloat()
-            ?: if (variant == YoteBoardVariant.CARVED) carvedStyle.sourceRect.width().toFloat() else 1.3f
-        val sourceHeight = sourceRect?.height()?.toFloat()
-            ?: if (variant == YoteBoardVariant.CARVED) carvedStyle.sourceRect.height().toFloat() else 1f
-        val sourceAspect = if (boardBitmap != null) sourceWidth / sourceHeight else sourceWidth
-        // Match the full-bleed image treatment used by Shogi. The carved
-        // artwork already contains its own transparent and wooden margins;
-        // adding another inset makes the board unnecessarily small.
-        val artworkInset = if (variant == YoteBoardVariant.CARVED) 0f else 14f * density
-        val maxWidth = w - artworkInset
-        val maxHeight = h - artworkInset
+        val sourceWidth = sourceRect?.width()?.toFloat() ?: 1200f
+        val sourceHeight = sourceRect?.height()?.toFloat() ?: 919f
+        val sourceAspect = sourceWidth / sourceHeight
+        // Use every pixel available to the board view. The activity hides the
+        // system bars, so this is the full-screen Rustic Rubble play area.
+        val maxWidth = w.toFloat()
+        val maxHeight = h.toFloat()
         val scale = min(maxWidth / sourceWidth, maxHeight / sourceHeight)
         val drawWidth = sourceWidth * scale
         val drawHeight = sourceHeight * scale
@@ -222,26 +161,14 @@ class YoteBoardView(context: Context) : View(context) {
                 (h + fallbackHeight) / 2f,
             )
         }
-        // The rustic artwork contains a transparent border and a thick wooden
-        // frame.  The playable cells occupy only the inset rectangle inside
-        // that frame; using boardRect here shifts every piece and hitbox.
-        gridRect = if (variant == YoteBoardVariant.RUSTIC) {
-            RectF(
-                boardRect.left + boardRect.width() * 0.055f,
-                boardRect.top + boardRect.height() * 0.063f,
-                boardRect.left + boardRect.width() * 0.963f,
-                boardRect.top + boardRect.height() * 0.955f,
-            )
-        } else {
-            RectF(boardRect)
-        }
-        if (variant == YoteBoardVariant.CARVED) {
-            cellWidth = boardRect.width() * (carvedStyle.pocketStepX / carvedStyle.sourceRect.width())
-            cellHeight = boardRect.height() * (carvedStyle.pocketStepY / carvedStyle.sourceRect.height())
-        } else {
-            cellWidth = gridRect.width() / YoteRuleEngine.COLUMNS
-            cellHeight = gridRect.height() / YoteRuleEngine.ROWS
-        }
+        gridRect.set(
+            boardRect.left + boardRect.width() * RUSTIC_COLUMN_LINES.first() / sourceWidth,
+            boardRect.top + boardRect.height() * RUSTIC_ROW_LINES.first() / sourceHeight,
+            boardRect.left + boardRect.width() * RUSTIC_COLUMN_LINES.last() / sourceWidth,
+            boardRect.top + boardRect.height() * RUSTIC_ROW_LINES.last() / sourceHeight,
+        )
+        cellWidth = gridRect.width() / YoteRuleEngine.COLUMNS
+        cellHeight = gridRect.height() / YoteRuleEngine.ROWS
         gridPaint.strokeWidth = maxOf(1f, cellWidth * 0.018f)
         selectionPaint.strokeWidth = maxOf(2f, min(cellWidth, cellHeight) * 0.055f)
         captureTargetPaint.strokeWidth = maxOf(2f, min(cellWidth, cellHeight) * 0.045f)
@@ -370,7 +297,7 @@ class YoteBoardView(context: Context) : View(context) {
         canvas.drawCircle(
             selectedCenter.x,
             selectedCenter.y,
-            highlightRadius(selectionPaint.strokeWidth, 0.39f),
+            highlightRadius(0.39f),
             selectionPaint,
         )
         engine.legalMovesFrom(gameState, selectedPosition)
@@ -381,7 +308,7 @@ class YoteBoardView(context: Context) : View(context) {
                     canvas.drawCircle(
                         center.x,
                         center.y,
-                        highlightRadius(captureTargetPaint.strokeWidth, 0.39f),
+                        highlightRadius(0.39f),
                         captureTargetPaint,
                     )
                 } else {
@@ -422,19 +349,7 @@ class YoteBoardView(context: Context) : View(context) {
     }
 
     private fun drawPiece(canvas: Canvas, x: Float, y: Float, radius: Float, color: PieceColor) {
-        if (variant == YoteBoardVariant.CARVED) {
-            // Keep the visual footprint inside the photographed pocket. The
-            // old offset shadow made a correctly centred stone look shifted
-            // down and right onto the intervening wooden block.
-            canvas.drawCircle(
-                x + radius * 0.04f,
-                y + radius * 0.08f,
-                radius * 0.98f,
-                shadowPaint,
-            )
-        } else {
-            canvas.drawCircle(x + radius * 0.12f, y + radius * 0.18f, radius * 1.03f, shadowPaint)
-        }
+        canvas.drawCircle(x + radius * 0.12f, y + radius * 0.18f, radius * 1.03f, shadowPaint)
         val paint = if (color == PieceColor.WHITE) whitePiecePaint else blackPiecePaint
         ensurePieceShaders(radius)
         val shader = if (color == PieceColor.WHITE) whitePieceShader else blackPieceShader
@@ -472,33 +387,14 @@ class YoteBoardView(context: Context) : View(context) {
         )
     }
 
-    private fun pocketRadius(): Float =
-        min(cellWidth, cellHeight) * if (variant == YoteBoardVariant.CARVED) {
-            carvedPocketRadiusRatio
-        } else {
-            0.39f
-        }
-
     private fun pieceRadius(): Float =
-        min(cellWidth, cellHeight) * if (variant == YoteBoardVariant.CARVED) {
-            carvedPieceRadiusRatio
-        } else {
-            0.27f
-        }
+        min(cellWidth, cellHeight) * 0.27f
 
-    private fun highlightRadius(strokeWidth: Float, rusticRatio: Float): Float =
-        if (variant == YoteBoardVariant.CARVED) {
-            (pocketRadius() - strokeWidth / 2f).coerceAtLeast(0f)
-        } else {
-            min(cellWidth, cellHeight) * rusticRatio
-        }
+    private fun highlightRadius(rusticRatio: Float): Float =
+        min(cellWidth, cellHeight) * rusticRatio
 
     private fun capturableRadius(pieceRadius: Float): Float =
-        if (variant == YoteBoardVariant.CARVED) {
-            highlightRadius(capturablePaint.strokeWidth, 0f)
-        } else {
-            pieceRadius * 1.22f
-        }
+        pieceRadius * 1.22f
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.actionMasked) {
@@ -619,32 +515,12 @@ class YoteBoardView(context: Context) : View(context) {
     }
 
     private fun positionAt(x: Float, y: Float): Position? {
-        if (variant == YoteBoardVariant.CARVED) {
-            var closest: Position? = null
-            var closestDistanceSquared = Float.MAX_VALUE
-            for (row in 0 until YoteRuleEngine.ROWS) {
-                for (column in 0 until YoteRuleEngine.COLUMNS) {
-                    val center = centerOf(Position(row, column))
-                    val dx = x - center.x
-                    val dy = y - center.y
-                    val distanceSquared = dx * dx + dy * dy
-                    if (distanceSquared < closestDistanceSquared) {
-                        closestDistanceSquared = distanceSquared
-                        closest = Position(row, column)
-                    }
-                }
-            }
-            val hitRadius = if (variant == YoteBoardVariant.CARVED) {
-                pocketRadius()
-            } else {
-                min(cellWidth, cellHeight) * 0.48f
-            }
-            return closest.takeIf { closestDistanceSquared <= hitRadius * hitRadius }
-        }
         if (!gridRect.contains(x, y)) return null
-        val column = ((x - gridRect.left) / cellWidth).toInt()
-        val row = ((y - gridRect.top) / cellHeight).toInt()
-        return if (row in 0 until YoteRuleEngine.ROWS && column in 0 until YoteRuleEngine.COLUMNS) {
+        val artworkX = (x - boardRect.left) / boardRect.width() * 1200f
+        val artworkY = (y - boardRect.top) / boardRect.height() * 919f
+        val column = (0 until YoteRuleEngine.COLUMNS).firstOrNull { artworkX < RUSTIC_COLUMN_LINES[it + 1] }
+        val row = (0 until YoteRuleEngine.ROWS).firstOrNull { artworkY < RUSTIC_ROW_LINES[it + 1] }
+        return if (row != null && column != null) {
             Position(row, column)
         } else {
             null
@@ -652,33 +528,14 @@ class YoteBoardView(context: Context) : View(context) {
     }
 
     private fun centerOf(position: Position): PointF =
-        if (variant == YoteBoardVariant.CARVED) {
-            // Engine row/column become artwork column/row respectively.
-            val measured = carvedStyle.pocketCenters[position.col]
-            val offset = position.row * 2
-            PointF(
-                boardRect.left + boardRect.width() *
-                    ((measured[offset] - carvedStyle.sourceRect.left) / carvedStyle.sourceRect.width()),
-                boardRect.top + boardRect.height() *
-                    ((measured[offset + 1] - carvedStyle.sourceRect.top) /
-                        carvedStyle.sourceRect.height()),
-            )
-        } else {
-            PointF(
-                gridRect.left + (position.col + 0.5f) * cellWidth,
-                gridRect.top + (position.row + 0.5f) * cellHeight,
-            )
-        }
-
-    private fun artworkAssetName(): String =
-        if (variant == YoteBoardVariant.CARVED) carvedStyle.assetName else variant.assetName
-
-    private fun reloadBoardArtwork() {
-        boardBitmap = loadBitmap(artworkAssetName())
-        boardSourceRect = boardBitmap?.let(::drawableSourceRect)
-        updateGeometry(width, height)
-        invalidate()
-    }
+        PointF(
+            boardRect.left + boardRect.width() *
+                ((RUSTIC_COLUMN_LINES[position.col] + RUSTIC_COLUMN_LINES[position.col + 1]) / 2f) /
+                1200f,
+            boardRect.top + boardRect.height() *
+                ((RUSTIC_ROW_LINES[position.row] + RUSTIC_ROW_LINES[position.row + 1]) / 2f) /
+                919f,
+        )
 
     private fun loadBitmap(assetName: String): Bitmap? =
         try {
@@ -688,9 +545,5 @@ class YoteBoardView(context: Context) : View(context) {
         }
 
     private fun drawableSourceRect(bitmap: Bitmap): Rect =
-        if (variant == YoteBoardVariant.CARVED) {
-            Rect(carvedStyle.sourceRect)
-        } else {
-            Rect(0, 0, bitmap.width, bitmap.height)
-        }
+        Rect(0, 0, bitmap.width, bitmap.height)
 }
