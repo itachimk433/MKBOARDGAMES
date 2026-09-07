@@ -2,6 +2,7 @@ package com.mkdev.mkboardgames
 
 import android.graphics.Color
 import android.os.Bundle
+import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
 import android.widget.FrameLayout
@@ -230,21 +231,34 @@ class YoteActivity : AppCompatActivity() {
             choices,
             gameLabel = "Y O T É",
             headerSymbol = "●",
-            fullScreenOverride = true,
+            fullScreenOverride = !gridChoices,
             gridChoices = gridChoices,
+            compactGrid = gridChoices,
         )
         overlay.onChoiceSelected = {
             dismissOverlay()
             onChoice(it)
         }
-        showOverlay(overlay, onCancel)
+        showOverlay(overlay, onCancel, bottomAligned = gridChoices)
     }
 
-    private fun showOverlay(view: View, onCancel: () -> Unit = { showBoardAfterDialog() }) {
+    private fun showOverlay(
+        view: View,
+        onCancel: () -> Unit = { showBoardAfterDialog() },
+        bottomAligned: Boolean = false,
+    ) {
         dismissOverlay()
         activeOverlay = view
         view.tag = onCancel
-        screenRoot.addView(view, FrameLayout.LayoutParams(-1, -1))
+        screenRoot.addView(
+            view,
+            FrameLayout.LayoutParams(
+                -1,
+                if (bottomAligned) FrameLayout.LayoutParams.WRAP_CONTENT else -1,
+            ).apply {
+                if (bottomAligned) gravity = Gravity.BOTTOM
+            },
+        )
         view.requestFocus()
     }
 

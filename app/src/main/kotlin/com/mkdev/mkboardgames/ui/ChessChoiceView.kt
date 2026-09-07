@@ -43,6 +43,7 @@ class ChessChoiceView(
     private val headerSymbol: String = "●",
     fullScreenOverride: Boolean? = null,
     private val gridChoices: Boolean = false,
+    private val compactGrid: Boolean = false,
 ) : View(context) {
 
     data class Choice(
@@ -234,9 +235,13 @@ class ChessChoiceView(
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val rows = if (gridChoices) (hits.size + 1) / 2 else hits.size
-        val desiredHeight = (178f + rows * 104f) * unit
+        val desiredHeight = if (compactGrid) {
+            (84f + rows * 50f) * unit
+        } else {
+            (178f + rows * 104f) * unit
+        }
         val measuredWidth = MeasureSpec.getSize(widthMeasureSpec)
-        val measuredHeight = if (fullScreen && MeasureSpec.getMode(heightMeasureSpec) != MeasureSpec.UNSPECIFIED) {
+        val measuredHeight = if (!compactGrid && fullScreen && MeasureSpec.getMode(heightMeasureSpec) != MeasureSpec.UNSPECIFIED) {
             MeasureSpec.getSize(heightMeasureSpec)
         } else {
             resolveSize(desiredHeight.toInt(), heightMeasureSpec)
@@ -246,18 +251,22 @@ class ChessChoiceView(
 
     override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
         val rows = if (gridChoices) (hits.size + 1) / 2 else hits.size
-        val contentHeight = (178f + rows * 104f) * unit
-        contentOffset = if (fullScreen) {
+        val contentHeight = if (compactGrid) {
+            (84f + rows * 50f) * unit
+        } else {
+            (178f + rows * 104f) * unit
+        }
+        contentOffset = if (fullScreen && !compactGrid) {
             ((height - contentHeight) / 2f).coerceAtLeast(0f)
         } else {
             0f
         }
-        val sidePadding = 22f * unit
-        val top = contentOffset + 153f * unit
-        val cardHeight = 88f * unit
-        val gap = 12f * unit
+        val sidePadding = (if (compactGrid) 12f else 22f) * unit
+        val top = contentOffset + (if (compactGrid) 70f else 153f) * unit
+        val cardHeight = (if (compactGrid) 44f else 88f) * unit
+        val gap = (if (compactGrid) 6f else 12f) * unit
         if (gridChoices) {
-            val columnGap = 10f * unit
+            val columnGap = (if (compactGrid) 6f else 10f) * unit
             val cardWidth = (width - sidePadding * 2f - columnGap) / 2f
             hits.forEachIndexed { index, hit ->
                 val row = index / 2
@@ -322,6 +331,7 @@ class ChessChoiceView(
         }
 
         when {
+            compactGrid -> drawCompactGridHeader(canvas, width)
             isChessFamily -> drawChessFamilyHeader(canvas, width, contentOffset)
             isMorabaraba -> drawMorabarabaHeader(canvas, width, contentOffset)
             else -> drawHeader(canvas, width, contentOffset)
@@ -374,6 +384,16 @@ class ChessChoiceView(
         canvas.drawText(title, center, topOffset + 99f * unit, titlePaint)
         subtitlePaint.color = Color.parseColor("#D6E8FF")
         canvas.drawText(subtitle, center, topOffset + 125f * unit, subtitlePaint)
+    }
+
+    private fun drawCompactGridHeader(canvas: Canvas, width: Float) {
+        val center = width / 2f
+        titlePaint.color = Color.WHITE
+        titlePaint.textSize = 18f * textScale
+        canvas.drawText(title, center, 27f * unit, titlePaint)
+        subtitlePaint.color = Color.parseColor("#D6E8FF")
+        subtitlePaint.textSize = 10f * textScale
+        canvas.drawText(subtitle, center, 47f * unit, subtitlePaint)
     }
 
     private fun drawDraughtsHeader(canvas: Canvas, width: Float, topOffset: Float) {
@@ -537,16 +557,26 @@ class ChessChoiceView(
         val top = rect.top + if (pressed) 2f * unit else 0f
 
         iconPaint.color = Color.parseColor("#63301F")
-        iconPaint.textSize = 21f * textScale
-        canvas.drawText(hit.choice.symbol, rect.centerX(), top + 31f * unit, iconPaint)
+        iconPaint.textSize = if (compactGrid) 15f * textScale else 21f * textScale
+        canvas.drawText(
+            hit.choice.symbol,
+            rect.centerX(),
+            top + (if (compactGrid) 18f else 31f) * unit,
+            iconPaint,
+        )
         labelPaint.color = Color.parseColor("#4A1714")
-        labelPaint.textSize = 16f * textScale
-        canvas.drawText(hit.choice.label, rect.centerX(), top + 62f * unit, labelPaint)
+        labelPaint.textSize = if (compactGrid) 13f * textScale else 16f * textScale
+        canvas.drawText(
+            hit.choice.label,
+            rect.centerX(),
+            top + (if (compactGrid) 36f else 62f) * unit,
+            labelPaint,
+        )
 
         canvas.drawCircle(
             hit.infoRect.centerX(),
             hit.infoRect.centerY(),
-            9f * unit,
+            (if (compactGrid) 7f else 9f) * unit,
             infoCirclePaint,
         )
         canvas.drawText(
