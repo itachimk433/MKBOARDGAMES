@@ -296,8 +296,10 @@ class YoteBoardView(context: Context) : View(context) {
 
     private fun drawCoordinates(canvas: Canvas) {
         if (cellWidth <= 0f || cellHeight <= 0f) return
-        val textSize = (min(cellWidth, cellHeight) * 0.18f)
-            .coerceIn(resources.displayMetrics.density * 10f, resources.displayMetrics.density * 18f)
+        val coordinateScale = 1f / 1.4f
+        val density = resources.displayMetrics.density
+        val textSize = (min(cellWidth, cellHeight) * 0.18f * coordinateScale)
+            .coerceIn(density * 10f * coordinateScale, density * 18f * coordinateScale)
         val gapX = (cellWidth * 0.18f).coerceAtLeast(resources.displayMetrics.density * 8f)
         val gapY = (cellHeight * 0.22f).coerceAtLeast(resources.displayMetrics.density * 8f)
         coordinatePaint.textSize = textSize

@@ -697,6 +697,13 @@ class YoteActivity : AppCompatActivity() {
 
     private fun stopAutoplayForLoop() {
         stopAutomatedGameplay()
+        // Autoplay controls both sides, so after a loop the next side is the
+        // side the user must take over. Otherwise the board still rejects
+        // taps for the original CPU side and leaves the HUD on "CPU Turn".
+        playerColor = gameState.currentTurn
+        boardView.playerColor = playerColor
+        boardView.isLocked = false
+        updateHud()
         Toast.makeText(this, "Loop detected, manual play required", Toast.LENGTH_LONG).show()
     }
 
