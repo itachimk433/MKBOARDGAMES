@@ -120,9 +120,12 @@ class MancalaActivity : AppCompatActivity() {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.parseColor("#120D0B"))
         }
-        hudView = StandardGameHudView(this).apply {
+        hudView = StandardGameHudView(
+            this,
+            showHistoryControls = false,
+            labelOffsetDp = -18f,
+        ).apply {
             onBack = { onBackPressed() }
-            onUndo = { undoMove() }
             onMenu = { if (!boardView.isMoveAnimating) showMenu() }
         }
 
@@ -771,13 +774,13 @@ class MancalaActivity : AppCompatActivity() {
         val turn = when {
             gameState.status != GameStatus.IN_PROGRESS -> "Game over"
             vsAI && gameState.currentTurn == playerColor -> "Your turn"
-            vsAI -> "Computer turn"
+            vsAI -> "CPU Turn"
             gameState.currentTurn == PieceColor.WHITE -> "South's turn"
             else -> "North's turn"
         }
         hudView.setInfo(
             turn,
-            undo = previousStates.isNotEmpty(),
+            undo = false,
             accentColor = if (gameState.currentTurn == PieceColor.WHITE) {
                 Color.WHITE
             } else {

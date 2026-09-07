@@ -63,7 +63,7 @@ class YoteActivity : AppCompatActivity() {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.parseColor("#071522"))
         }
-        hudView = StandardGameHudView(this).apply {
+        hudView = StandardGameHudView(this, labelTextSizeSp = 12f).apply {
             onBack = { onBackPressed() }
             onUndo = { undoMove() }
             onMenu = { if (!boardView.isLocked) showMenu() }
@@ -510,10 +510,17 @@ class YoteActivity : AppCompatActivity() {
             gameState.currentTurn == PieceColor.WHITE -> "White's turn"
             else -> "Black's turn"
         }
-        val reserve = "W ${engine.reserveCount(gameState, PieceColor.WHITE)} · " +
-            "B ${engine.reserveCount(gameState, PieceColor.BLACK)} in reserve"
+        val displayTurn = if (
+            gameState.status == GameStatus.IN_PROGRESS &&
+            vsAI &&
+            gameState.currentTurn != playerColor
+        ) {
+            "CPU Turn"
+        } else {
+            turn
+        }
         hudView.setInfo(
-            "$turn  ·  $reserve",
+            displayTurn,
             undo = previousStates.isNotEmpty(),
             accentColor = if (gameState.currentTurn == PieceColor.WHITE) {
                 Color.WHITE

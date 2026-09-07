@@ -16,7 +16,12 @@ import com.mkdev.mkboardgames.SoundPlayer
  * ConnectFourActivity so every game presents Back, Undo, Redo, and Menu in
  * the same places.
  */
-class StandardGameHudView(context: Context) : View(context) {
+class StandardGameHudView(
+    context: Context,
+    private val showHistoryControls: Boolean = true,
+    labelTextSizeSp: Float = 15f,
+    private val labelOffsetDp: Float = 0f,
+) : View(context) {
     var onBack: (() -> Unit)? = null
     var onUndo: (() -> Unit)? = null
     var onRedo: (() -> Unit)? = null
@@ -35,7 +40,7 @@ class StandardGameHudView(context: Context) : View(context) {
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.CENTER
         isFakeBoldText = true
-        textSize = 15f * sp.coerceAtMost(3f)
+        textSize = labelTextSizeSp * sp.coerceAtMost(3f)
     }
     private val detailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#7FC8F8")
@@ -86,8 +91,13 @@ class StandardGameHudView(context: Context) : View(context) {
         val buttonHeight = 28f * dp
         val top = (h - buttonHeight) / 2f
         backRect.set(6f * dp, top, 6f * dp + buttonWidth, top + buttonHeight)
-        undoRect.set(w - buttonWidth * 3.3f, top, w - buttonWidth * 2.2f, top + buttonHeight)
-        redoRect.set(w - buttonWidth * 2.15f, top, w - buttonWidth * 1.1f, top + buttonHeight)
+        if (showHistoryControls) {
+            undoRect.set(w - buttonWidth * 3.3f, top, w - buttonWidth * 2.2f, top + buttonHeight)
+            redoRect.set(w - buttonWidth * 2.15f, top, w - buttonWidth * 1.1f, top + buttonHeight)
+        } else {
+            undoRect.setEmpty()
+            redoRect.setEmpty()
+        }
         menuRect.set(w - buttonWidth * 1.05f, top, w - 4f * dp, top + buttonHeight)
     }
 
@@ -98,11 +108,11 @@ class StandardGameHudView(context: Context) : View(context) {
                     SoundPlayer.play("ui_click")
                     onBack?.invoke()
                 }
-                undoRect.contains(event.x, event.y) && canUndo -> {
+                showHistoryControls && undoRect.contains(event.x, event.y) && canUndo -> {
                     SoundPlayer.play("ui_click")
                     onUndo?.invoke()
                 }
-                redoRect.contains(event.x, event.y) && canRedo -> {
+                showHistoryControls && redoRect.contains(event.x, event.y) && canRedo -> {
                     SoundPlayer.play("ui_click")
                     onRedo?.invoke()
                 }
@@ -119,29 +129,46 @@ class StandardGameHudView(context: Context) : View(context) {
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
         canvas.drawRect(0f, height - dp, width.toFloat(), height.toFloat(), divPaint)
         val radius = 5f * dp
-        listOf(backRect, undoRect, redoRect, menuRect).forEach {
+        val controls = if (showHistoryControls) {
+            listOf(backRect, undoRect, redoRect, menuRect)
+        } else {
+            listOf(backRect, menuRect)
+        }
+        controls.forEach {
             canvas.drawRoundRect(it, radius, radius, buttonBackgroundPaint)
         }
         canvas.drawText("← Back", backRect.centerX(), backRect.centerY() + buttonPaint.textSize * 0.36f, buttonPaint)
-        canvas.drawText(
-            "Undo",
-            undoRect.centerX(),
-            undoRect.centerY() + buttonPaint.textSize * 0.36f,
-            if (canUndo) buttonPaint else disabledButtonPaint,
-        )
-        canvas.drawText(
-            "Redo",
-            redoRect.centerX(),
-            redoRect.centerY() + buttonPaint.textSize * 0.36f,
-            if (canRedo) buttonPaint else disabledButtonPaint,
-        )
+        if (showHistoryControls) {
+            canvas.drawText(
+                "Undo",
+                undoRect.centerX(),
+                undoRect.centerY() + buttonPaint.textSize * 0.36f,
+                if (canUndo) buttonPaint else disabledButtonPaint,
+            )
+            canvas.drawText(
+                "Redo",
+                redoRect.centerX(),
+                redoRect.centerY() + buttonPaint.textSize * 0.36f,
+                if (canRedo) buttonPaint else disabledButtonPaint,
+            )
+        }
         canvas.drawText("Menu", menuRect.centerX(), menuRect.centerY() + buttonPaint.textSize * 0.36f, buttonPaint)
 
         textPaint.color = labelColor
         val centerX = width / 2f
-        canvas.drawText(label, centerX, height / 2f - textPaint.textSize * 0.15f, textPaint)
+        canvas.drawText(
+            label,
+            centerX + labelOffsetDp * dp,
+            height / 2f - textPaint.textSize * 0.15f,
+            textPaint,
+        )
         if (detail.isNotEmpty()) {
-            canvas.drawText(detail, centerX, height / 2f + detailPaint.textSize * 1.1f, detailPaint)
+            canvas.drawText(
+                detail,
+                centerX + labelOffsetDp * dp,
+                height / 2f + detailPaint.textSize * 1.1f,
+                detailPaint,
+            )
         }
     }
 }
