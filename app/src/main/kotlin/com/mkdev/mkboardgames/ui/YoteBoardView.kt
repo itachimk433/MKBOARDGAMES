@@ -58,6 +58,9 @@ class YoteBoardView(context: Context) : View(context) {
     // The carved bitmap includes transparent padding around the photographed
     // board. Render the board itself instead of scaling that padding.
     private val carvedArtworkRect = Rect(70, 76, 660, 950)
+    // The bitmap's circular recesses sit a few artwork pixels above the
+    // first-pass visual measurement once the board is rendered on-device.
+    private val carvedPocketVerticalOffset = -4f
     // The carved asset has 100px pocket spacing and approximately 27px
     // pocket radius. Keep the rendered stone inside that measured opening,
     // including its rim and offset shadow.
@@ -647,7 +650,8 @@ class YoteBoardView(context: Context) : View(context) {
                 boardRect.left + boardRect.width() *
                     ((measured[offset] - carvedArtworkRect.left) / carvedArtworkRect.width()),
                 boardRect.top + boardRect.height() *
-                    ((measured[offset + 1] - carvedArtworkRect.top) / carvedArtworkRect.height()),
+                    ((measured[offset + 1] - carvedArtworkRect.top + carvedPocketVerticalOffset) /
+                        carvedArtworkRect.height()),
             )
         } else {
             PointF(
