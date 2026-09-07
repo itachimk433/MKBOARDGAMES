@@ -14,3 +14,9 @@ If GitHub Actions reports a workflow path at `.github/workflows/...`, verify tha
 **Why:** The Android build workflow only reran after the branch was restored to the commit layout with root-level `.github` and `app` directories.
 
 **How to apply:** Before pushing build fixes, compare `git ls-tree --full-tree HEAD` with the workflow run’s checkout paths and verify the remote branch points to the intended project layout.
+
+Automatic workspace syncing can leave a nested project copy without its own `.git` remote. Treat an explicit clone with a confirmed GitHub `origin` as authoritative for fetch, commit, and push operations.
+
+**Why:** A nested copy accepted local commits but only exposed the workspace backup remote, so the first retry could not reach GitHub.
+
+**How to apply:** Confirm `git rev-parse --show-toplevel` and `git remote -v` immediately before pushing; use the explicit clone when either points to the outer workspace or backup remote.
