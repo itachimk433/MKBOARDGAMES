@@ -7,6 +7,7 @@ import com.mkdev.mkboardgames.engine.Piece
 import com.mkdev.mkboardgames.engine.PieceColor
 import com.mkdev.mkboardgames.engine.Position
 import com.mkdev.mkboardgames.engine.RuleEngine
+import kotlin.random.Random
 
 data class OnitamaPiece(
     override val color: PieceColor,
@@ -57,6 +58,7 @@ class OnitamaRuleEngine : RuleEngine {
         const val WHITE_CARDS = "whiteCards"
         const val BLACK_CARDS = "blackCards"
         const val SIDE_CARD = "sideCard"
+        const val SETUP_SEED = "setupSeed"
         val WHITE_TEMPLE = Position(4, 2)
         val BLACK_TEMPLE = Position(0, 2)
 
@@ -68,6 +70,37 @@ class OnitamaRuleEngine : RuleEngine {
     }
 
     override fun initialState(): GameState {
+        return fixedInitialState()
+    }
+
+    /**
+     * Creates an official five-card deal from the complete 16-card deck.
+     *
+     * The seed is stored in metadata so pause/resume and replay reconstruct
+     * the exact same opening deal instead of silently changing the cards.
+     */
+    fun initialState(seed: Long): GameState {
+        val dealt = OnitamaCards.all.map { it.id }.shuffled(Random(seed))
+        return createInitialState(
+            whiteCards = dealt.take(2),
+            blackCards = dealt.drop(2).take(2),
+            sideCard = dealt[4],
+            setupSeed = seed,
+        )
+    }
+
+    private fun fixedInitialState(): GameState = createInitialState(
+        whiteCards = STARTING_WHITE_CARDS,
+        blackCards = STARTING_BLACK_CARDS,
+        sideCard = STARTING_SIDE_CARD,
+    )
+
+    private fun createInitialState(
+        whiteCards: List<String>,
+        blackCards: List<String>,
+        sideCard: String,
+        setupSeed: Long? = null,
+    ): GameState {
         val board = arrayOfNulls<Piece>(BOARD_CELLS)
         listOf(0, 1, 3, 4).forEach { col ->
             board[col] = OnitamaPiece(PieceColor.BLACK, isMaster = false)
@@ -75,16 +108,18 @@ class OnitamaRuleEngine : RuleEngine {
         }
         board[2] = OnitamaPiece(PieceColor.BLACK, isMaster = true)
         board[4 * BOARD_SIZE + 2] = OnitamaPiece(PieceColor.WHITE, isMaster = true)
+        val metadata = mutableMapOf<String, Any>(
+            WHITE_CARDS to whiteCards,
+            BLACK_CARDS to blackCards,
+            SIDE_CARD to sideCard,
+        )
+        setupSeed?.let { metadata[SETUP_SEED] = it }
         return GameState(
             board = board,
             boardSize = BOARD_SIZE,
             currentTurn = PieceColor.WHITE,
             status = GameStatus.IN_PROGRESS,
-            metadata = mapOf(
-                WHITE_CARDS to STARTING_WHITE_CARDS,
-                BLACK_CARDS to STARTING_BLACK_CARDS,
-                SIDE_CARD to STARTING_SIDE_CARD,
-            ),
+            metadata = metadata,
         )
     }
 

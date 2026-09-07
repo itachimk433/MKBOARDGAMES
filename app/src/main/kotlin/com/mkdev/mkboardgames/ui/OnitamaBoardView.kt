@@ -85,7 +85,6 @@ class OnitamaBoardView(context: Context) : View(context) {
     }
 
     override fun onDraw(canvas: Canvas) {
-        canvas.drawColor(Color.parseColor("#071522"))
         boardBitmap?.let { canvas.drawBitmap(it, null, boardRect, imagePaint) }
         if (boardBitmap == null) {
             val boardPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#E9E0C8") }

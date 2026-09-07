@@ -21,6 +21,7 @@ import com.mkdev.mkboardgames.ui.ChessMenuView
 import com.mkdev.mkboardgames.ui.ChessRulesView
 import com.mkdev.mkboardgames.ui.OnitamaBoardView
 import com.mkdev.mkboardgames.ui.OnitamaCardStripView
+import com.mkdev.mkboardgames.ui.OnitamaAtmosphereView
 import com.mkdev.mkboardgames.ui.StandardGameHudView
 import com.mkdev.mkboardgames.ui.StyledDialogs
 import kotlinx.coroutines.*
@@ -95,13 +96,16 @@ class OnitamaActivity : AppCompatActivity() {
 
         val gameLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor("#071522"))
             addView(hudView, LinearLayout.LayoutParams(-1, (62f * density).toInt()))
             addView(topCards, LinearLayout.LayoutParams(-1, (98f * density).toInt()))
             addView(boardView, LinearLayout.LayoutParams(-1, 0).apply { weight = 1f })
             addView(bottomCards, LinearLayout.LayoutParams(-1, (98f * density).toInt()))
         }
         val gameFrame = FrameLayout(this).apply {
+            addView(
+                OnitamaAtmosphereView(this@OnitamaActivity),
+                FrameLayout.LayoutParams(-1, -1),
+            )
             addView(gameLayout, FrameLayout.LayoutParams(-1, -1))
             addView(
                 autoplayButton,
@@ -121,42 +125,37 @@ class OnitamaActivity : AppCompatActivity() {
     }
 
     private fun showModeDialog() {
-        val paused = PausedMatchStore.load(this, "ONITAMA")
-        if (paused != null) {
-            showChoiceOverlay(
-                "Resume Onitama?",
-                "An unfinished match is waiting for you.",
-                listOf(
-                    ChessChoiceView.Choice("Resume Match", "Continue where you left off", "▶", Color.parseColor("#E3B86A")),
-                    ChessChoiceView.Choice("New Match", "Discard the saved match", "↻", Color.parseColor("#8EC7B9")),
-                ),
-                onCancel = { finish() },
-            ) {
-                if (it == 0) {
-                    vsAI = paused.vsAI
-                    playerColor = runCatching { PieceColor.valueOf(paused.playerColor) }.getOrDefault(PieceColor.WHITE)
-                    startGame(paused)
-                } else {
-                    PausedMatchStore.clear(this, "ONITAMA")
-                    showModeDialog()
-                }
-            }
-            return
+        gameRoot.visibility = View.GONE
+        val menu = ChessMenuView(
+            this,
+            PausedMatchStore.has(this, "ONITAMA"),
+            gameLabel = "O N I T A M A",
+        )
+        menu.onVsAi = {
+            dismissOverlay()
+            vsAI = true
+            showColorPicker()
         }
-        showChoiceOverlay(
-            "Choose your match",
-            "Master the five-card battlefield.",
-            listOf(
-                ChessChoiceView.Choice("Vs CPU", "Challenge the computer", "◆", Color.parseColor("#E3B86A")),
-                ChessChoiceView.Choice("Two Players", "Pass and play", "Ⅱ", Color.parseColor("#8EC7B9")),
-            ),
-            onCancel = { finish() },
-        ) {
-            if (it == 0) showColorPicker() else {
-                vsAI = false
-                playerColor = PieceColor.WHITE
-                startGame()
+        menu.onTwoPlayers = {
+            dismissOverlay()
+            vsAI = false
+            playerColor = PieceColor.WHITE
+            startGame()
+        }
+        menu.onHowToPlay = {
+            dismissOverlay()
+            showRules(showModeAfter = !matchStarted)
+        }
+        menu.onResumeMatch = {
+            dismissOverlay()
+            PausedMatchStore.load(this, "ONITAMA")?.let { paused ->
+                vsAI = paused.vsAI
+                playerColor = runCatching { PieceColor.valueOf(paused.playerColor) }.getOrDefault(PieceColor.WHITE)
+                startGame(paused)
             }
+        }
+        showOverlay(menu) {
+            if (matchStarted) showBoardAfterDialog() else finish()
         }
     }
 
@@ -186,7 +185,8 @@ class OnitamaActivity : AppCompatActivity() {
         autoplayButton.visibility = if (vsAI) View.VISIBLE else View.GONE
         autoplayButton.setAutoplayEnabled(false, animate = false)
         if (vsAI) SettingsManager.setActiveGame(this, "onitama")
-        gameState = engine.initialState()
+        val setupSeed = restoring?.setupSeed ?: System.nanoTime()
+        gameState = restoring?.setupSeed?.let(engine::initialState) ?: engine.initialState(setupSeed)
         boardView.playerColor = playerColor
         boardView.vsAI = vsAI
         boardView.gameState = gameState
@@ -509,12 +509,23 @@ class OnitamaActivity : AppCompatActivity() {
             putExtra(ReplayActivity.EXTRA_GAME_TYPE, "ONITAMA")
             putExtra(ReplayActivity.EXTRA_MOVES_JSON, ReplayActivity.buildMovesJson(gameState.moveHistory))
             putExtra(ReplayActivity.EXTRA_RESULT, resultLabel)
+            putExtra(
+                ReplayActivity.EXTRA_ONITAMA_SETUP_SEED,
+                (gameState.metadata[OnitamaRuleEngine.SETUP_SEED] as? Long) ?: Long.MIN_VALUE,
+            )
         })
     }
 
     private fun savePausedMatch() {
         if (gameState.moveHistory.isNotEmpty() && gameState.status == GameStatus.IN_PROGRESS) {
-            PausedMatchStore.save(this, "ONITAMA", vsAI, playerColor.name, gameState.moveHistory)
+            PausedMatchStore.save(
+                this,
+                "ONITAMA",
+                vsAI,
+                playerColor.name,
+                gameState.moveHistory,
+                setupSeed = gameState.metadata[OnitamaRuleEngine.SETUP_SEED] as? Long,
+            )
         }
     }
 

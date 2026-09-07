@@ -46,7 +46,7 @@ class OnitamaCardStripView(
     override fun onDraw(canvas: Canvas) {
         val w = width.toFloat()
         val h = height.toFloat()
-        canvas.drawColor(Color.argb(175, 7, 21, 34))
+        canvas.drawColor(Color.argb(150, 7, 21, 34))
 
         textPaint.textAlign = Paint.Align.LEFT
         textPaint.textSize = 9f * density
@@ -111,6 +111,9 @@ class OnitamaCardStripView(
         textPaint.color = Color.parseColor("#FFE09C")
         canvas.drawText(card.name.uppercase(), rect.centerX(), rect.top + 17f * density, textPaint)
         drawPattern(canvas, rect, card)
+        smallPaint.textSize = min(7f * density, rect.width() * 0.075f)
+        smallPaint.color = Color.argb(175, 214, 232, 255)
+        canvas.drawText("ART PLACEHOLDER", rect.centerX(), rect.bottom - 7f * density, smallPaint)
     }
 
     private fun drawPattern(canvas: Canvas, rect: RectF, card: OnitamaCard) {

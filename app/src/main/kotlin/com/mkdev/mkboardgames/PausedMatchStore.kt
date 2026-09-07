@@ -23,6 +23,7 @@ object PausedMatchStore {
         val pieceCount: Int? = null,
         val boardVariant: Int? = null,
         val boardStyle: Int? = null,
+        val setupSeed: Long? = null,
         val moves: List<Move>,
     )
 
@@ -45,6 +46,7 @@ object PausedMatchStore {
         pieceCount: Int? = null,
         boardVariant: Int? = null,
         boardStyle: Int? = null,
+        setupSeed: Long? = null,
     ) {
         if (moves.isEmpty()) return
         val payload = JSONObject().apply {
@@ -56,6 +58,7 @@ object PausedMatchStore {
             pieceCount?.let { put("pieceCount", it) }
             boardVariant?.let { put("boardVariant", it) }
             boardStyle?.let { put("boardStyle", it) }
+            setupSeed?.let { put("setupSeed", it) }
             put("moves", encodeMoves(moves))
         }
         prefs(context).edit().putString(gameType, payload.toString()).apply()
@@ -74,6 +77,7 @@ object PausedMatchStore {
                 pieceCount = payload.optionalInt("pieceCount"),
                 boardVariant = payload.optionalInt("boardVariant"),
                 boardStyle = payload.optionalInt("boardStyle"),
+                setupSeed = payload.optionalLong("setupSeed"),
                 moves = decodeMoves(payload.getJSONArray("moves")),
             ).takeIf { it.moves.isNotEmpty() }
         } catch (_: Throwable) {
@@ -188,4 +192,7 @@ object PausedMatchStore {
 
     private fun JSONObject.optionalInt(key: String): Int? =
         if (has(key) && !isNull(key)) optInt(key) else null
+
+    private fun JSONObject.optionalLong(key: String): Long? =
+        if (has(key) && !isNull(key)) optLong(key) else null
 }

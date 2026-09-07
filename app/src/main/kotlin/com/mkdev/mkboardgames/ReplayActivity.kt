@@ -58,6 +58,7 @@ class ReplayActivity : AppCompatActivity() {
         const val EXTRA_MOVES_JSON = "moves_json"
         const val EXTRA_GAME_TYPE  = "game_type"
         const val EXTRA_RESULT     = "game_result"
+        const val EXTRA_ONITAMA_SETUP_SEED = "onitama_setup_seed"
         const val EXTRA_BOARD_SIZE = "board_size"   // for TicTacToe
         const val EXTRA_MORABARABA_PIECE_COUNT = "morabaraba_piece_count"
         private val MOVE_METADATA_KEYS = arrayOf(
@@ -239,6 +240,7 @@ class ReplayActivity : AppCompatActivity() {
         resultText        = intent.getStringExtra(EXTRA_RESULT)     ?: ""
         val ticBoardSize  = intent.getIntExtra(EXTRA_BOARD_SIZE, 3)
         val morabarabaPieceCount = intent.getIntExtra(EXTRA_MORABARABA_PIECE_COUNT, 12)
+        val onitamaSetupSeed = intent.getLongExtra(EXTRA_ONITAMA_SETUP_SEED, Long.MIN_VALUE)
 
         val isTicTacToe  = gameType == "TICTACTOE"
         val isConnectFour = gameType == "CONNECTFOUR"
@@ -265,7 +267,12 @@ class ReplayActivity : AppCompatActivity() {
 
         // Reconstruct every board state from the move list
         moves = parseMoves(movesJson)
-        val allStates  = mutableListOf(engine.initialState())
+        val initialState = if (isOnitama && onitamaSetupSeed != Long.MIN_VALUE) {
+            (engine as OnitamaRuleEngine).initialState(onitamaSetupSeed)
+        } else {
+            engine.initialState()
+        }
+        val allStates  = mutableListOf(initialState)
         val allLabels  = mutableListOf("Start")
         for ((idx, move) in moves.withIndex()) {
             val actor = if (isLudo) {
