@@ -32,27 +32,27 @@ class YoteBoardView(context: Context) : View(context) {
      * coordinates. These are the measured pocket centres in the source asset
      * (730 × 1024), expressed as fractions so they scale with the bitmap.
      */
-    // Each entry is an artwork-space (x, y) centre. The photograph's
-    // perspective makes a single rectangular grid visibly drift away from
-    // the actual pockets, especially in the lower rows.
+    // Each entry is an artwork-space (x, y) centre of the visible circular
+    // recess, measured from the rendered board artwork rather than from the
+    // intervening square blocks.
     private val carvedPocketCenters = arrayOf(
         floatArrayOf(
-            186f, 278f, 287f, 279f, 383f, 278f, 481f, 278f, 577f, 278f,
+            185f, 278f, 284f, 278f, 383f, 278f, 482f, 278f, 580f, 278f,
         ),
         floatArrayOf(
-            188f, 373f, 286f, 374f, 385f, 375f, 483f, 374f, 578f, 373f,
+            185f, 375f, 284f, 375f, 383f, 375f, 482f, 375f, 580f, 375f,
         ),
         floatArrayOf(
-            188f, 476f, 287f, 472f, 384f, 475f, 483f, 472f, 578f, 475f,
+            185f, 475f, 284f, 475f, 383f, 475f, 482f, 475f, 580f, 475f,
         ),
         floatArrayOf(
-            187f, 571f, 286f, 574f, 382f, 574f, 481f, 574f, 578f, 574f,
+            185f, 574f, 284f, 574f, 383f, 574f, 482f, 574f, 580f, 574f,
         ),
         floatArrayOf(
-            188f, 671f, 287f, 668f, 387f, 670f, 482f, 668f, 578f, 669f,
+            185f, 673f, 284f, 673f, 383f, 673f, 482f, 673f, 580f, 673f,
         ),
         floatArrayOf(
-            187f, 768f, 287f, 768f, 384f, 768f, 482f, 768f, 578f, 769f,
+            185f, 771f, 284f, 771f, 383f, 771f, 482f, 771f, 580f, 771f,
         ),
     )
     // The carved bitmap includes transparent padding around the photographed
