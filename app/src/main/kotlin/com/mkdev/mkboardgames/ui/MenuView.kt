@@ -105,7 +105,7 @@ class MenuView(context: Context) : View(context) {
         context.assets.open("mancala_home_icon.webp").use { BitmapFactory.decodeStream(it) }
     } catch (e: Exception) { null }
     private val yoteBoardBitmap: Bitmap? = try {
-        context.assets.open("yote_board_rustic.webp").use { BitmapFactory.decodeStream(it) }
+        context.assets.open("yote_home_icon.webp").use { BitmapFactory.decodeStream(it) }
     } catch (e: Exception) { null }
 
     private val bgPaint        = Paint().apply { color = Color.parseColor("#121212") }

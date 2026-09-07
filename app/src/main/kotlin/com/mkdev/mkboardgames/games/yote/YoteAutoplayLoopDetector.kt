@@ -21,7 +21,7 @@ class YoteAutoplayLoopDetector(
     }
 
     fun record(move: Move): Boolean {
-        recentMoves.addLast(move)
+        recentMoves.add(move)
         val maxHistory = maxCycleLength * repeatsRequired
         while (recentMoves.size > maxHistory) {
             recentMoves.removeFirst()

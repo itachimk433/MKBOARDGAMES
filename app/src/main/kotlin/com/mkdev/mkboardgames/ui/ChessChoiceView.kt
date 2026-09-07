@@ -99,7 +99,7 @@ class ChessChoiceView(
             isConnectFour -> "connect_four_home_icon.png"
             isLudo -> "ludo_home_icon.png"
             isMancala -> "mancala_home_icon.webp"
-            isYote -> "yote_board_rustic.webp"
+            isYote -> "yote_home_icon.webp"
             else -> null
         }
         assetName?.let {
