@@ -90,7 +90,9 @@ class OnitamaBoardView(context: Context) : View(context) {
             val boardPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#E9E0C8") }
             canvas.drawRect(gridRect, boardPaint)
         }
-        drawTargets(canvas)
+        if (pendingMove == null) {
+            drawTargets(canvas)
+        }
         drawPieces(canvas)
         drawMovingPiece(canvas)
     }
@@ -114,10 +116,11 @@ class OnitamaBoardView(context: Context) : View(context) {
     }
 
     private fun drawPieces(canvas: Canvas) {
-        val hidden = pendingMove?.from
+        val hiddenFrom = pendingMove?.from
+        val hiddenTo = pendingMove?.to
         for (index in 0 until OnitamaRuleEngine.BOARD_CELLS) {
             val position = Position(index / OnitamaRuleEngine.BOARD_SIZE, index % OnitamaRuleEngine.BOARD_SIZE)
-            if (position == hidden) continue
+            if (position == hiddenFrom || position == hiddenTo) continue
             (gameState.get(position) as? OnitamaPiece)?.let { drawPiece(canvas, centerOf(position), cellSize() * if (it.isMaster) 0.31f else 0.27f, it) }
         }
     }
@@ -213,7 +216,7 @@ class OnitamaBoardView(context: Context) : View(context) {
             interpolator = AccelerateDecelerateInterpolator()
             addUpdateListener {
                 moveProgress = it.animatedValue as Float
-                invalidate()
+                postInvalidateOnAnimation()
             }
             addListener(object : android.animation.AnimatorListenerAdapter() {
                 override fun onAnimationEnd(animation: android.animation.Animator) {
@@ -230,6 +233,11 @@ class OnitamaBoardView(context: Context) : View(context) {
             })
             start()
         }
+    }
+
+    override fun onDetachedFromWindow() {
+        cancelMoveAnimation()
+        super.onDetachedFromWindow()
     }
 
     fun cancelMoveAnimation() {

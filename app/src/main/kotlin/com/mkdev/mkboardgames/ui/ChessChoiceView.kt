@@ -102,7 +102,7 @@ class ChessChoiceView(
             isLudo -> "ludo_home_icon.png"
             isMancala -> "mancala_home_icon.webp"
             isYote -> "yote_home_icon.webp"
-            isOnitama -> "onitama_board.webp"
+            isOnitama -> "onitama_card_eel.webp"
             else -> null
         }
         assetName?.let {
@@ -223,13 +223,12 @@ class ChessChoiceView(
         interpolator = LinearInterpolator()
         addUpdateListener {
             atmospherePhase = it.animatedValue as Float
-            invalidate()
+            postInvalidateOnAnimation()
         }
     }
 
     init {
         isClickable = true
-        setLayerType(View.LAYER_TYPE_SOFTWARE, null)
         hits.forEach { scales[it.index] = 1f }
     }
 

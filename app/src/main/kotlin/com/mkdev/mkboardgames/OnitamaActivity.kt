@@ -379,7 +379,7 @@ class OnitamaActivity : AppCompatActivity() {
         val rules = ChessRulesView(
             this,
             "Onitama",
-            "Onitama is a fast martial-arts duel on a 5 × 5 board. Each player commands one Master and four Students. Capture the opposing Master or step onto the opposing Temple Arch to win.\n\nEach turn, choose one of your two movement cards and move one piece exactly according to that pattern. Then exchange the used card with the shared side card. The card you used becomes the new side card.\n\nYour pieces may not move off the board or land on a friendly piece. The Master is a piece too, so it may use either card. The side card is always available to the next player after the exchange.",
+            "Overview\nOnitama is a fast martial-arts duel on a 5 × 5 board. Each player commands one Master and four Students. White moves first.\n\nMoving\nChoose one of your two movement cards. Select one of your pieces, then choose a highlighted destination. A move must follow the card exactly, stay on the board, and land on an empty square or an opposing piece.\n\nCards & Swapping\nAfter moving, the card you used is exchanged with the shared side card. The used card becomes the new side card and is available to the next player.\n\nCapturing\nA piece may capture an opposing piece by landing on its square. The Master is a piece too and may use either card. Your pieces may never land on a friendly piece.\n\nWinning\nCapture the opposing Master or move your Master onto the opposing Temple Arch. The match ends immediately when either victory condition is reached.",
             gameLabel = "O N I T A M A",
             headerSymbol = "◆",
         )

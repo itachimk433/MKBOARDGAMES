@@ -87,7 +87,7 @@ class ChessMenuView(
             isLudo -> "ludo_home_icon.png"
             isMancala -> "mancala_home_icon.webp"
             isYote -> "yote_home_icon.webp"
-            isOnitama -> "onitama_board.webp"
+            isOnitama -> "onitama_card_eel.webp"
             else -> null
         }
         assetName?.let {
@@ -212,7 +212,7 @@ class ChessMenuView(
         interpolator = LinearInterpolator()
         addUpdateListener {
             backgroundPhase = it.animatedValue as Float
-            invalidate()
+            postInvalidateOnAnimation()
         }
     }
 
@@ -228,7 +228,6 @@ class ChessMenuView(
 
     init {
         isClickable = true
-        setLayerType(View.LAYER_TYPE_SOFTWARE, null)
     }
 
     override fun onAttachedToWindow() {

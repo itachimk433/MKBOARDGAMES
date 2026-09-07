@@ -208,7 +208,7 @@ private class ChessMancalaRulesView(
             isXiangqi -> "xiangqi_home_icon.png"
             isConnectFour -> "connect_four_home_icon.png"
             isLudo -> "ludo_home_icon.png"
-            isOnitama -> "onitama_board.webp"
+            isOnitama -> "onitama_card_eel.webp"
             else -> null
         }
         assetName?.let {
@@ -232,7 +232,7 @@ private class ChessMancalaRulesView(
         interpolator = LinearInterpolator()
         addUpdateListener {
             atmospherePhase = it.animatedValue as Float
-            invalidate()
+            postInvalidateOnAnimation()
         }
     }
 
@@ -243,9 +243,9 @@ private class ChessMancalaRulesView(
             isDraughts -> "Draughts how to play"
             isOthello -> "Othello how to play"
             isMorabaraba -> "Morabaraba how to play"
+            isOnitama -> "Onitama how to play"
             else -> "Chess how to play"
         }
-        setLayerType(LAYER_TYPE_SOFTWARE, null)
     }
 
     override fun onAttachedToWindow() {
@@ -475,6 +475,7 @@ private class ChessMancalaRulesView(
             "Flipping",
             "Passing",
             "Winning",
+            "Cards & Swapping",
         )
         val sections = mutableListOf<Pair<String, String>>()
         var currentHeading: String? = null
@@ -501,6 +502,14 @@ private class ChessMancalaRulesView(
             }
         }
         flush()
-        return sections
+        if (sections.isNotEmpty()) return sections
+
+        return rulesText
+            .split(Regex("\\n\\s*\\n"))
+            .mapIndexedNotNull { index, paragraph ->
+                paragraph.trim().takeIf { it.isNotEmpty() }?.let {
+                    "RULE ${index + 1}" to it
+                }
+            }
     }
 }

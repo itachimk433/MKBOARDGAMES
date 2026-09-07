@@ -20,12 +20,8 @@ class OnitamaAtmosphereView(context: Context) : View(context) {
         interpolator = LinearInterpolator()
         addUpdateListener {
             phase = it.animatedValue as Float
-            invalidate()
+            postInvalidateOnAnimation()
         }
-    }
-
-    init {
-        setLayerType(LAYER_TYPE_SOFTWARE, null)
     }
 
     override fun onAttachedToWindow() {
