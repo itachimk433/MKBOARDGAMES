@@ -62,7 +62,7 @@ class YoteBoardView(context: Context) : View(context) {
     // pocket radius. Keep the rendered stone inside that measured opening,
     // including its rim and offset shadow.
     private val carvedPocketRadiusRatio = 27f / 100f
-    private val carvedPieceRadiusRatio = 22f / 100f
+    private val carvedPieceRadiusRatio = 20f / 100f
 
     var gameState: GameState = YoteRuleEngine().initialState()
         set(value) {
@@ -409,7 +409,19 @@ class YoteBoardView(context: Context) : View(context) {
     }
 
     private fun drawPiece(canvas: Canvas, x: Float, y: Float, radius: Float, color: PieceColor) {
-        canvas.drawCircle(x + radius * 0.12f, y + radius * 0.18f, radius * 1.03f, shadowPaint)
+        if (variant == YoteBoardVariant.CARVED) {
+            // Keep the visual footprint inside the photographed pocket. The
+            // old offset shadow made a correctly centred stone look shifted
+            // down and right onto the intervening wooden block.
+            canvas.drawCircle(
+                x + radius * 0.04f,
+                y + radius * 0.08f,
+                radius * 0.98f,
+                shadowPaint,
+            )
+        } else {
+            canvas.drawCircle(x + radius * 0.12f, y + radius * 0.18f, radius * 1.03f, shadowPaint)
+        }
         val paint = if (color == PieceColor.WHITE) whitePiecePaint else blackPiecePaint
         ensurePieceShaders(radius)
         val shader = if (color == PieceColor.WHITE) whitePieceShader else blackPieceShader
