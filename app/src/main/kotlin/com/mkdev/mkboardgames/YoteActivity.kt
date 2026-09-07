@@ -221,6 +221,7 @@ class YoteActivity : AppCompatActivity() {
         choices: List<ChessChoiceView.Choice>,
         onCancel: () -> Unit,
         onChoice: (Int) -> Unit,
+        gridChoices: Boolean = false,
     ) {
         val overlay = ChessChoiceView(
             this,
@@ -230,6 +231,7 @@ class YoteActivity : AppCompatActivity() {
             gameLabel = "Y O T É",
             headerSymbol = "●",
             fullScreenOverride = true,
+            gridChoices = gridChoices,
         )
         overlay.onChoiceSelected = {
             dismissOverlay()
@@ -427,12 +429,14 @@ class YoteActivity : AppCompatActivity() {
         }
         showChoiceOverlay(
             "Double Capture",
-            "Yoté rewards a jump with one extra capture anywhere on the board.",
+            "Choose one extra opponent stone to remove.",
             choices,
             onCancel = { showBonusCapturePicker(move, positions) },
-        ) { index ->
-            commitMove(engine.completeBonusCapture(gameState, move, positions[index]))
-        }
+            onChoice = { index ->
+                commitMove(engine.completeBonusCapture(gameState, move, positions[index]))
+            },
+            gridChoices = true,
+        )
     }
 
     private fun commitMove(move: Move) {

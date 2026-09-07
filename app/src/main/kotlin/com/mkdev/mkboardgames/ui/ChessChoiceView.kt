@@ -42,6 +42,7 @@ class ChessChoiceView(
     private val gameLabel: String = "C H E S S",
     private val headerSymbol: String = "●",
     fullScreenOverride: Boolean? = null,
+    private val gridChoices: Boolean = false,
 ) : View(context) {
 
     data class Choice(
@@ -57,6 +58,7 @@ class ChessChoiceView(
         val choice: Choice,
         val index: Int,
         var rect: RectF = RectF(),
+        var infoRect: RectF = RectF(),
     )
 
     private val density = resources.displayMetrics.density
@@ -158,6 +160,39 @@ class ChessChoiceView(
         textSize = 10f * textScale
     }
     private val gameIconPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+    private val infoCirclePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#5D2C27")
+    }
+    private val infoTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#FFE9B5")
+        textAlign = Paint.Align.CENTER
+        isFakeBoldText = true
+        textSize = 12f * textScale
+    }
+    private val infoPanelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#152C3E")
+    }
+    private val infoPanelBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 1.5f * unit
+        color = Color.parseColor("#E3B86A")
+    }
+    private val infoPanelTitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
+        textAlign = Paint.Align.CENTER
+        isFakeBoldText = true
+        textSize = 18f * textScale
+    }
+    private val infoPanelDetailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#D6E8FF")
+        textAlign = Paint.Align.CENTER
+        textSize = 13f * textScale
+    }
+    private val infoPanelHintPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#9FB5B8")
+        textAlign = Paint.Align.CENTER
+        textSize = 10f * textScale
+    }
 
     private val hits = choices.mapIndexed { index, choice -> ChoiceHit(choice, index) }
     private val scales = HashMap<Int, Float>()
@@ -165,6 +200,8 @@ class ChessChoiceView(
     private var animator: ValueAnimator? = null
     private var downX = 0f
     private var downY = 0f
+    private var pressedInfoIndex: Int? = null
+    private var infoIndex: Int? = null
     private var contentOffset = 0f
     private var atmospherePhase = 0f
     private val chessFamilyBackdrop = ChessFamilyBackdrop(unit)
@@ -196,7 +233,8 @@ class ChessChoiceView(
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        val desiredHeight = (178f + hits.size * 104f) * unit
+        val rows = if (gridChoices) (hits.size + 1) / 2 else hits.size
+        val desiredHeight = (178f + rows * 104f) * unit
         val measuredWidth = MeasureSpec.getSize(widthMeasureSpec)
         val measuredHeight = if (fullScreen && MeasureSpec.getMode(heightMeasureSpec) != MeasureSpec.UNSPECIFIED) {
             MeasureSpec.getSize(heightMeasureSpec)
@@ -207,7 +245,8 @@ class ChessChoiceView(
     }
 
     override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
-        val contentHeight = (178f + hits.size * 104f) * unit
+        val rows = if (gridChoices) (hits.size + 1) / 2 else hits.size
+        val contentHeight = (178f + rows * 104f) * unit
         contentOffset = if (fullScreen) {
             ((height - contentHeight) / 2f).coerceAtLeast(0f)
         } else {
@@ -217,9 +256,28 @@ class ChessChoiceView(
         val top = contentOffset + 153f * unit
         val cardHeight = 88f * unit
         val gap = 12f * unit
-        hits.forEachIndexed { index, hit ->
-            val cardTop = top + index * (cardHeight + gap)
-            hit.rect = RectF(sidePadding, cardTop, width - sidePadding, cardTop + cardHeight)
+        if (gridChoices) {
+            val columnGap = 10f * unit
+            val cardWidth = (width - sidePadding * 2f - columnGap) / 2f
+            hits.forEachIndexed { index, hit ->
+                val row = index / 2
+                val column = index % 2
+                val left = sidePadding + column * (cardWidth + columnGap)
+                val cardTop = top + row * (cardHeight + gap)
+                hit.rect = RectF(left, cardTop, left + cardWidth, cardTop + cardHeight)
+                hit.infoRect = RectF(
+                    hit.rect.right - 30f * unit,
+                    hit.rect.top + 6f * unit,
+                    hit.rect.right - 6f * unit,
+                    hit.rect.top + 30f * unit,
+                )
+            }
+        } else {
+            hits.forEachIndexed { index, hit ->
+                val cardTop = top + index * (cardHeight + gap)
+                hit.rect = RectF(sidePadding, cardTop, width - sidePadding, cardTop + cardHeight)
+                hit.infoRect.setEmpty()
+            }
         }
     }
 
@@ -269,6 +327,7 @@ class ChessChoiceView(
             else -> drawHeader(canvas, width, contentOffset)
         }
         hits.forEach { drawChoice(canvas, it) }
+        infoIndex?.let { drawChoiceInfo(canvas, hits[it]) }
     }
 
     private fun drawChessHeader(canvas: Canvas, width: Float, topOffset: Float) {
@@ -437,6 +496,10 @@ class ChessChoiceView(
     }
 
     private fun drawChoice(canvas: Canvas, hit: ChoiceHit) {
+        if (gridChoices) {
+            drawGridChoice(canvas, hit)
+            return
+        }
         if (isChessFamily || isMorabaraba) {
             if (isMorabaraba) drawOthelloChoice(canvas, hit) else drawChessChoice(canvas, hit)
             return
@@ -465,6 +528,50 @@ class ChessChoiceView(
             drawCenteredChoiceText(canvas, rect, hit.choice)
         }
         canvas.restore()
+    }
+
+    private fun drawGridChoice(canvas: Canvas, hit: ChoiceHit) {
+        val rect = hit.rect
+        val pressed = pressedIndex == hit.index
+        drawChessWoodButton(canvas, rect, pressed, unit)
+        val top = rect.top + if (pressed) 2f * unit else 0f
+
+        iconPaint.color = Color.parseColor("#63301F")
+        iconPaint.textSize = 21f * textScale
+        canvas.drawText(hit.choice.symbol, rect.centerX(), top + 31f * unit, iconPaint)
+        labelPaint.color = Color.parseColor("#4A1714")
+        labelPaint.textSize = 16f * textScale
+        canvas.drawText(hit.choice.label, rect.centerX(), top + 62f * unit, labelPaint)
+
+        canvas.drawCircle(
+            hit.infoRect.centerX(),
+            hit.infoRect.centerY(),
+            9f * unit,
+            infoCirclePaint,
+        )
+        canvas.drawText(
+            "i",
+            hit.infoRect.centerX(),
+            hit.infoRect.centerY() - (infoTextPaint.ascent() + infoTextPaint.descent()) / 2f,
+            infoTextPaint,
+        )
+    }
+
+    private fun drawChoiceInfo(canvas: Canvas, hit: ChoiceHit) {
+        canvas.drawColor(Color.argb(165, 0, 0, 0))
+        val panelWidth = min(width - 44f * unit, 340f * unit)
+        val panelHeight = 164f * unit
+        val panel = RectF(
+            (width - panelWidth) / 2f,
+            (height - panelHeight) / 2f,
+            (width + panelWidth) / 2f,
+            (height + panelHeight) / 2f,
+        )
+        canvas.drawRoundRect(panel, 14f * unit, 14f * unit, infoPanelPaint)
+        canvas.drawRoundRect(panel, 14f * unit, 14f * unit, infoPanelBorderPaint)
+        canvas.drawText(hit.choice.label, panel.centerX(), panel.top + 42f * unit, infoPanelTitlePaint)
+        canvas.drawText(hit.choice.detail, panel.centerX(), panel.top + 82f * unit, infoPanelDetailPaint)
+        canvas.drawText("Tap anywhere to close", panel.centerX(), panel.bottom - 24f * unit, infoPanelHintPaint)
     }
 
     private fun drawDraughtsChoice(canvas: Canvas, hit: ChoiceHit) {
@@ -557,11 +664,24 @@ class ChessChoiceView(
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
+        if (infoIndex != null) {
+            if (event.actionMasked == MotionEvent.ACTION_UP) {
+                infoIndex = null
+                invalidate()
+            }
+            return true
+        }
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 downX = event.x
                 downY = event.y
-                pressedIndex = hits.firstOrNull { it.rect.contains(event.x, event.y) }?.index
+                val hit = hits.firstOrNull { it.rect.contains(event.x, event.y) }
+                pressedInfoIndex = if (gridChoices && hit?.infoRect?.contains(event.x, event.y) == true) {
+                    hit.index
+                } else {
+                    null
+                }
+                pressedIndex = if (pressedInfoIndex == null) hit?.index else null
                 pressedIndex?.let { performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY) }
                 invalidate()
                 return true
@@ -569,12 +689,23 @@ class ChessChoiceView(
             MotionEvent.ACTION_MOVE -> {
                 if (kotlin.math.hypot((event.x - downX).toDouble(), (event.y - downY).toDouble()) > 18f * unit) {
                     if (!isChessFamily && !isMorabaraba) pressedIndex?.let { animateScale(it, 1f) }
+                    pressedInfoIndex = null
                     pressedIndex = null
                     invalidate()
                 }
                 return true
             }
             MotionEvent.ACTION_UP -> {
+                val selectedInfo = pressedInfoIndex
+                pressedInfoIndex = null
+                if (selectedInfo != null) {
+                    if (hits[selectedInfo].infoRect.contains(event.x, event.y)) {
+                        infoIndex = selectedInfo
+                    }
+                    pressedIndex = null
+                    invalidate()
+                    return true
+                }
                 val selected = pressedIndex
                 if (!isChessFamily && !isMorabaraba) selected?.let { animateScale(it, 1f) }
                 if (selected != null && hits[selected].rect.contains(event.x, event.y)) {
@@ -587,6 +718,7 @@ class ChessChoiceView(
             }
             MotionEvent.ACTION_CANCEL -> {
                 if (!isChessFamily && !isMorabaraba) pressedIndex?.let { animateScale(it, 1f) }
+                pressedInfoIndex = null
                 pressedIndex = null
                 invalidate()
                 return true
