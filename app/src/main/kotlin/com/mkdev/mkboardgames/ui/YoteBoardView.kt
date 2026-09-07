@@ -15,7 +15,9 @@ import com.mkdev.mkboardgames.engine.PieceColor
 import com.mkdev.mkboardgames.engine.Position
 import com.mkdev.mkboardgames.games.yote.YotePiece
 import com.mkdev.mkboardgames.games.yote.YoteRuleEngine
+import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.sin
 
 class YoteBoardView(context: Context) : View(context) {
     var gameState: GameState = YoteRuleEngine().initialState()
@@ -31,6 +33,7 @@ class YoteBoardView(context: Context) : View(context) {
     var isLocked: Boolean = false
     var onMoveMade: ((Move, Boolean) -> Unit)? = null
     var onGameOverTapped: (() -> Unit)? = null
+    var onBoardTapped: (() -> Boolean)? = null
 
     private val engine = YoteRuleEngine()
     private var selected: Position? = null
@@ -54,6 +57,10 @@ class YoteBoardView(context: Context) : View(context) {
     private var moveProgress = 0f
     private var moveAnimator: ValueAnimator? = null
     private var pendingMoveFromComputer = false
+    private data class CaptureFlash(val position: Position, val color: PieceColor)
+    private var captureFlashes: List<CaptureFlash> = emptyList()
+    private var captureFlashProgress = 1f
+    private var captureFlashAnimator: ValueAnimator? = null
     private var pieceShaderRadius = 0f
     private var whitePieceShader: RadialGradient? = null
     private var blackPieceShader: RadialGradient? = null
@@ -67,8 +74,17 @@ class YoteBoardView(context: Context) : View(context) {
         strokeCap = Paint.Cap.ROUND
     }
     private val emptyPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val coordinatePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textAlign = Paint.Align.CENTER
+        isFakeBoldText = true
+    }
     private val whitePiecePaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val blackPiecePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val captureFlashPiecePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val captureFlashRingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+    }
     private val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(115, 0, 0, 0) }
     private val rimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
@@ -125,6 +141,7 @@ class YoteBoardView(context: Context) : View(context) {
         atmosphereAnimator?.cancel()
         atmosphereAnimator = null
         cancelMoveAnimation()
+        cancelCaptureFlash()
         super.onDetachedFromWindow()
     }
 
@@ -181,8 +198,10 @@ class YoteBoardView(context: Context) : View(context) {
         val h = height.toFloat()
         drawAtmosphere(canvas, w, h)
         drawBoard(canvas)
+        drawCoordinates(canvas)
         drawTargets(canvas)
         drawPieces(canvas)
+        drawCaptureFlashes(canvas)
         drawMovingPiece(canvas)
     }
 
@@ -275,6 +294,43 @@ class YoteBoardView(context: Context) : View(context) {
         }
     }
 
+    private fun drawCoordinates(canvas: Canvas) {
+        if (cellWidth <= 0f || cellHeight <= 0f) return
+        val textSize = (min(cellWidth, cellHeight) * 0.18f)
+            .coerceIn(resources.displayMetrics.density * 10f, resources.displayMetrics.density * 18f)
+        val gapX = (cellWidth * 0.18f).coerceAtLeast(resources.displayMetrics.density * 8f)
+        val gapY = (cellHeight * 0.22f).coerceAtLeast(resources.displayMetrics.density * 8f)
+        coordinatePaint.textSize = textSize
+        coordinatePaint.color = Color.parseColor("#5B2D1E")
+        coordinatePaint.setShadowLayer(
+            resources.displayMetrics.density * 1.5f,
+            0f,
+            resources.displayMetrics.density * 0.7f,
+            Color.argb(170, 255, 242, 213),
+        )
+
+        for (column in 0 until YoteRuleEngine.COLUMNS) {
+            val x = gridRect.left + (column + 0.5f) * cellWidth
+            drawCenteredCoordinate(canvas, ('A'.code + column).toChar().toString(), x, gridRect.top - gapY)
+            drawCenteredCoordinate(canvas, ('A'.code + column).toChar().toString(), x, gridRect.bottom + gapY)
+        }
+        for (row in 0 until YoteRuleEngine.ROWS) {
+            val y = gridRect.top + (row + 0.5f) * cellHeight
+            drawCenteredCoordinate(canvas, (row + 1).toString(), gridRect.left - gapX, y)
+            drawCenteredCoordinate(canvas, (row + 1).toString(), gridRect.right + gapX, y)
+        }
+        coordinatePaint.clearShadowLayer()
+    }
+
+    private fun drawCenteredCoordinate(canvas: Canvas, label: String, x: Float, y: Float) {
+        canvas.drawText(
+            label,
+            x,
+            y - (coordinatePaint.ascent() + coordinatePaint.descent()) / 2f,
+            coordinatePaint,
+        )
+    }
+
     private fun drawTargets(canvas: Canvas) {
         val selectedPosition = selected
         capturablePositions = if (
@@ -337,6 +393,45 @@ class YoteBoardView(context: Context) : View(context) {
                     capturablePaint,
                 )
             }
+        }
+    }
+
+    private fun drawCaptureFlashes(canvas: Canvas) {
+        if (captureFlashes.isEmpty()) return
+        val progress = captureFlashProgress.coerceIn(0f, 1f)
+        val pulse = max(0f, sin(progress * Math.PI.toFloat() * 4f))
+        val fade = 1f - progress
+        val radius = pieceRadius()
+
+        captureFlashes.forEach { flash ->
+            val center = centerOf(flash.position)
+            val color = if (flash.color == PieceColor.WHITE) {
+                Color.rgb(255, 232, 174)
+            } else {
+                Color.rgb(134, 205, 219)
+            }
+            captureFlashPiecePaint.color = color
+            captureFlashPiecePaint.alpha = ((70f + pulse * 115f) * fade).toInt().coerceIn(0, 255)
+            canvas.drawCircle(
+                center.x,
+                center.y,
+                radius * (1.02f - progress * 0.22f),
+                captureFlashPiecePaint,
+            )
+
+            captureFlashRingPaint.color = Color.argb(
+                ((80f + pulse * 175f) * fade).toInt().coerceIn(0, 255),
+                255,
+                238,
+                166,
+            )
+            captureFlashRingPaint.strokeWidth = max(2f, radius * (0.08f + pulse * 0.06f))
+            canvas.drawCircle(
+                center.x,
+                center.y,
+                radius * (1.06f + pulse * 0.2f + progress * 0.3f),
+                captureFlashRingPaint,
+            )
         }
     }
 
@@ -404,6 +499,7 @@ class YoteBoardView(context: Context) : View(context) {
                     onGameOverTapped?.invoke()
                     return true
                 }
+                if (onBoardTapped?.invoke() == true) return true
                 if (isLocked || pendingMove != null) return true
                 val tapped = positionAt(event.x, event.y) ?: return true
                 if (vsAI && gameState.currentTurn != playerColor) return true
@@ -490,6 +586,44 @@ class YoteBoardView(context: Context) : View(context) {
         }
         moveAnimator = animator
         animator.start()
+    }
+
+    fun flashCapturedPieces(pieces: List<Pair<Position, PieceColor>>) {
+        cancelCaptureFlash()
+        captureFlashes = pieces
+            .distinctBy { it.first }
+            .map { (position, color) -> CaptureFlash(position, color) }
+        if (captureFlashes.isEmpty()) return
+
+        captureFlashProgress = 0f
+        captureFlashAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = 560L
+            interpolator = LinearInterpolator()
+            addUpdateListener {
+                captureFlashProgress = it.animatedValue as Float
+                invalidate()
+            }
+            addListener(object : android.animation.AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: android.animation.Animator) {
+                    if (captureFlashAnimator !== animation) return
+                    captureFlashAnimator = null
+                    captureFlashes = emptyList()
+                    captureFlashProgress = 1f
+                    invalidate()
+                }
+            })
+            start()
+        }
+    }
+
+    private fun cancelCaptureFlash() {
+        val animator = captureFlashAnimator
+        captureFlashAnimator = null
+        animator?.removeAllListeners()
+        animator?.removeAllUpdateListeners()
+        animator?.cancel()
+        captureFlashes = emptyList()
+        captureFlashProgress = 1f
     }
 
     /**

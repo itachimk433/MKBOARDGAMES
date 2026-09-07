@@ -54,6 +54,7 @@ class ChessChoiceView(
     )
 
     var onChoiceSelected: ((Int) -> Unit)? = null
+    var onDismissRequested: (() -> Unit)? = null
 
     private data class ChoiceHit(
         val choice: Choice,
@@ -194,6 +195,11 @@ class ChessChoiceView(
         textAlign = Paint.Align.CENTER
         textSize = 10f * textScale
     }
+    private val closeButtonPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val closeButtonTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textAlign = Paint.Align.CENTER
+        isFakeBoldText = true
+    }
 
     private val hits = choices.mapIndexed { index, choice -> ChoiceHit(choice, index) }
     private val scales = HashMap<Int, Float>()
@@ -203,6 +209,8 @@ class ChessChoiceView(
     private var downY = 0f
     private var pressedInfoIndex: Int? = null
     private var infoIndex: Int? = null
+    private var pressedClose = false
+    private val closeRect = RectF()
     private var contentOffset = 0f
     private var atmospherePhase = 0f
     private val chessFamilyBackdrop = ChessFamilyBackdrop(unit)
@@ -287,6 +295,16 @@ class ChessChoiceView(
                 hit.rect = RectF(sidePadding, cardTop, width - sidePadding, cardTop + cardHeight)
                 hit.infoRect.setEmpty()
             }
+        }
+        if (compactGrid) {
+            closeRect.set(
+                width - 52f * unit,
+                4f * unit,
+                width - 4f * unit,
+                52f * unit,
+            )
+        } else {
+            closeRect.setEmpty()
         }
     }
 
@@ -394,6 +412,17 @@ class ChessChoiceView(
         subtitlePaint.color = Color.parseColor("#D6E8FF")
         subtitlePaint.textSize = 10f * textScale
         canvas.drawText(subtitle, center, 47f * unit, subtitlePaint)
+        closeButtonPaint.color = Color.argb(150, 7, 21, 34)
+        canvas.drawCircle(closeRect.centerX(), closeRect.centerY(), 19f * unit, closeButtonPaint)
+        closeButtonTextPaint.color = Color.parseColor("#F8E6C2")
+        closeButtonTextPaint.textSize = 20f * textScale
+        canvas.drawText(
+            "×",
+            closeRect.centerX(),
+            closeRect.centerY() -
+                (closeButtonTextPaint.ascent() + closeButtonTextPaint.descent()) / 2f,
+            closeButtonTextPaint,
+        )
     }
 
     private fun drawDraughtsHeader(canvas: Canvas, width: Float, topOffset: Float) {
@@ -705,6 +734,12 @@ class ChessChoiceView(
             MotionEvent.ACTION_DOWN -> {
                 downX = event.x
                 downY = event.y
+                pressedClose = compactGrid && closeRect.contains(event.x, event.y)
+                if (pressedClose) {
+                    performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                    invalidate()
+                    return true
+                }
                 val hit = hits.firstOrNull { it.rect.contains(event.x, event.y) }
                 pressedInfoIndex = if (gridChoices && hit?.infoRect?.contains(event.x, event.y) == true) {
                     hit.index
@@ -720,12 +755,23 @@ class ChessChoiceView(
                 if (kotlin.math.hypot((event.x - downX).toDouble(), (event.y - downY).toDouble()) > 18f * unit) {
                     if (!isChessFamily && !isMorabaraba) pressedIndex?.let { animateScale(it, 1f) }
                     pressedInfoIndex = null
+                    pressedClose = false
                     pressedIndex = null
                     invalidate()
                 }
                 return true
             }
             MotionEvent.ACTION_UP -> {
+                if (pressedClose) {
+                    val shouldDismiss = closeRect.contains(event.x, event.y)
+                    pressedClose = false
+                    if (shouldDismiss) {
+                        SoundPlayer.play("ui_click")
+                        onDismissRequested?.invoke()
+                    }
+                    invalidate()
+                    return true
+                }
                 val selectedInfo = pressedInfoIndex
                 pressedInfoIndex = null
                 if (selectedInfo != null) {
@@ -749,6 +795,7 @@ class ChessChoiceView(
             MotionEvent.ACTION_CANCEL -> {
                 if (!isChessFamily && !isMorabaraba) pressedIndex?.let { animateScale(it, 1f) }
                 pressedInfoIndex = null
+                pressedClose = false
                 pressedIndex = null
                 invalidate()
                 return true

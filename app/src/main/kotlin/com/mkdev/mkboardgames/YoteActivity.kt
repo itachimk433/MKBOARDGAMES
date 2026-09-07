@@ -55,6 +55,8 @@ class YoteActivity : AppCompatActivity() {
     private var activeOverlay: View? = null
     private val capturedByWhite = mutableListOf<Piece>()
     private val capturedByBlack = mutableListOf<Piece>()
+    private var pendingBonusCaptureMove: Move? = null
+    private var pendingBonusCapturePositions: List<Position> = emptyList()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -76,6 +78,15 @@ class YoteActivity : AppCompatActivity() {
         boardView = YoteBoardView(this).apply {
             onMoveMade = { move, fromComputer -> handleBoardMove(move, fromComputer) }
             onGameOverTapped = { if (activeOverlay == null) showResultDialog() }
+            onBoardTapped = {
+                val pendingMove = pendingBonusCaptureMove
+                if (pendingMove != null && activeOverlay == null) {
+                    showBonusCapturePicker(pendingMove, pendingBonusCapturePositions)
+                    true
+                } else {
+                    false
+                }
+            }
         }
 
         autoplayButton = AutoplayButtonView(this).apply {
@@ -223,6 +234,7 @@ class YoteActivity : AppCompatActivity() {
         subtitle: String,
         choices: List<ChessChoiceView.Choice>,
         gridChoices: Boolean = false,
+        onDismiss: (() -> Unit)? = null,
         onCancel: () -> Unit,
         onChoice: (Int) -> Unit,
     ) {
@@ -240,6 +252,10 @@ class YoteActivity : AppCompatActivity() {
         overlay.onChoiceSelected = {
             dismissOverlay()
             onChoice(it)
+        }
+        overlay.onDismissRequested = {
+            dismissOverlay()
+            onDismiss?.invoke()
         }
         showOverlay(overlay, bottomAligned = gridChoices, onCancel = onCancel)
     }
@@ -382,6 +398,8 @@ class YoteActivity : AppCompatActivity() {
         previousStates.clear()
         capturedByWhite.clear()
         capturedByBlack.clear()
+        pendingBonusCaptureMove = null
+        pendingBonusCapturePositions = emptyList()
         PausedMatchStore.clear(this, "YOTE")
         autoplayButton.visibility = if (vsAI) View.VISIBLE else View.GONE
         autoplayButton.setAutoplayEnabled(false, animate = false)
@@ -437,6 +455,9 @@ class YoteActivity : AppCompatActivity() {
     }
 
     private fun showBonusCapturePicker(move: Move, positions: List<Position>) {
+        boardView.isLocked = true
+        pendingBonusCaptureMove = move
+        pendingBonusCapturePositions = positions
         val choices = positions.map { position ->
             ChessChoiceView.Choice(
                 label = coordinate(position),
@@ -449,9 +470,13 @@ class YoteActivity : AppCompatActivity() {
             "Double Capture",
             "Choose one extra opponent stone to remove.",
             choices,
+            onDismiss = { boardView.isLocked = false },
             onCancel = { showBonusCapturePicker(move, positions) },
             onChoice = { index ->
-                commitMove(engine.completeBonusCapture(gameState, move, positions[index]))
+                val completedMove = engine.completeBonusCapture(gameState, move, positions[index])
+                pendingBonusCaptureMove = null
+                pendingBonusCapturePositions = emptyList()
+                screenRoot.post { commitMove(completedMove) }
             },
             gridChoices = true,
         )
@@ -469,6 +494,15 @@ class YoteActivity : AppCompatActivity() {
             return
         }
         previousStates.add(gameState)
+        val capturedPositions = buildList {
+            addAll(move.captures)
+            (move.metadata["bonusCapture"] as? Position)?.let(::add)
+        }.distinct()
+        boardView.flashCapturedPieces(
+            capturedPositions.mapNotNull { position ->
+                previous.get(position)?.let { piece -> position to piece.color }
+            },
+        )
         recordCaptures(previous, nextState.moveHistory.lastOrNull() ?: move)
         gameState = nextState
         boardView.gameState = gameState
