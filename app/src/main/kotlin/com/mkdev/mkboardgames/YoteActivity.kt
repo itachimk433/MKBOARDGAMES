@@ -239,13 +239,13 @@ class YoteActivity : AppCompatActivity() {
             dismissOverlay()
             onChoice(it)
         }
-        showOverlay(overlay, onCancel, bottomAligned = gridChoices)
+        showOverlay(overlay, bottomAligned = gridChoices, onCancel = onCancel)
     }
 
     private fun showOverlay(
         view: View,
-        onCancel: () -> Unit = { showBoardAfterDialog() },
         bottomAligned: Boolean = false,
+        onCancel: () -> Unit = { showBoardAfterDialog() },
     ) {
         dismissOverlay()
         activeOverlay = view
