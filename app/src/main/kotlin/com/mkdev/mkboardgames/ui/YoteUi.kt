@@ -8,16 +8,6 @@ import android.view.View
 import com.mkdev.mkboardgames.SoundPlayer
 import kotlin.math.min
 
-class YoteGameOverView(
-    context: Context,
-    message: String,
-) : MancalaChoiceOverlayView(
-    context,
-    "GAME OVER",
-    message,
-    listOf("Play Again", "Main Menu"),
-)
-
 class YoteRulesView(context: Context) : View(context) {
     var onBack: (() -> Unit)? = null
     private val backRect = RectF()

@@ -20,10 +20,9 @@ import com.mkdev.mkboardgames.games.yote.YoteRuleEngine
 import com.mkdev.mkboardgames.ui.AutoplayButtonView
 import com.mkdev.mkboardgames.ui.ChessChoiceView
 import com.mkdev.mkboardgames.ui.ChessMenuView
-import com.mkdev.mkboardgames.ui.MancalaChoiceOverlayView
 import com.mkdev.mkboardgames.ui.MancalaWoodButton
+import com.mkdev.mkboardgames.ui.StyledDialogs
 import com.mkdev.mkboardgames.ui.YoteBoardView
-import com.mkdev.mkboardgames.ui.YoteGameOverView
 import com.mkdev.mkboardgames.ui.YotePieceStripView
 import com.mkdev.mkboardgames.ui.YoteRulesView
 import kotlinx.coroutines.*
@@ -166,6 +165,7 @@ class YoteActivity : AppCompatActivity() {
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
+        if (StyledDialogs.handleBackPressed()) return
         if (activeOverlay != null) {
             cancelOverlay()
         } else if (boardView.isLocked) {
@@ -576,13 +576,22 @@ class YoteActivity : AppCompatActivity() {
             GameStatus.DRAW -> "It's a draw!"
             GameStatus.IN_PROGRESS -> return
         }
-        val overlay = YoteGameOverView(this, message)
-        overlay.onClose = { showBoardAfterDialog() }
-        overlay.onChoice = {
-            dismissOverlay()
-            if (it == 0) startGame() else showHome()
+        StyledDialogs.showChoices(
+            this,
+            "Game Over",
+            message,
+            listOf(
+                StyledDialogs.choice("Play Again", "Start a fresh game", "↻", "#E3B86A"),
+                StyledDialogs.choice("Main Menu", "Choose another match", "⌂", "#E58A7A"),
+            ),
+            420f,
+            "Y O T É",
+            onCancel = { showBoardAfterDialog() },
+            fullScreen = false,
+        ) { which, dialog ->
+            dialog.dismiss()
+            if (which == 0) startGame() else showHome()
         }
-        showOverlay(overlay) { showBoardAfterDialog() }
     }
 
     private fun showBoardAfterDialog(resumeAi: Boolean = true) {

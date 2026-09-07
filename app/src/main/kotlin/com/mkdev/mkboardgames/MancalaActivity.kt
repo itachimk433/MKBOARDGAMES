@@ -21,11 +21,10 @@ import com.mkdev.mkboardgames.games.mancala.MancalaAIPlayer
 import com.mkdev.mkboardgames.games.mancala.MancalaRuleEngine
 import com.mkdev.mkboardgames.ui.ChessMenuView
 import com.mkdev.mkboardgames.ui.ChessChoiceView
-import com.mkdev.mkboardgames.ui.MancalaChoiceOverlayView
-import com.mkdev.mkboardgames.ui.MancalaGameOverView
 import com.mkdev.mkboardgames.ui.MancalaRulesView
 import com.mkdev.mkboardgames.ui.MancalaWoodButton
 import com.mkdev.mkboardgames.ui.AutoplayButtonView
+import com.mkdev.mkboardgames.ui.StyledDialogs
 import kotlinx.coroutines.*
 import kotlin.math.*
 import kotlin.random.Random
@@ -230,6 +229,7 @@ class MancalaActivity : AppCompatActivity() {
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
+        if (StyledDialogs.handleBackPressed()) return
         if (::boardView.isInitialized && boardView.isMoveAnimating) return
         if (gameState.status != GameStatus.IN_PROGRESS) {
             leaveCompletedGameToHome()
@@ -291,7 +291,10 @@ class MancalaActivity : AppCompatActivity() {
         showChoiceOverlay(
             "Choose your side",
             "South moves first. Pick the side you control.",
-            listOf("South", "North"),
+            listOf(
+                StyledDialogs.choice("South", "Moves first", "●", "#E3B86A"),
+                StyledDialogs.choice("North", "Moves second", "○", "#A9B6E8"),
+            ),
             onCancel = { showModeDialog() },
         ) { which ->
             playerColor = if (which == 0) PieceColor.WHITE else PieceColor.BLACK
@@ -302,7 +305,7 @@ class MancalaActivity : AppCompatActivity() {
     private fun showChoiceOverlay(
         title: String,
         subtitle: String,
-        options: List<String>,
+        options: List<ChessChoiceView.Choice>,
         onCancel: () -> Unit,
         onChoice: (Int) -> Unit,
     ) {
@@ -310,14 +313,7 @@ class MancalaActivity : AppCompatActivity() {
             context = this,
             title = title,
             subtitle = subtitle,
-            choices = options.map { option ->
-                ChessChoiceView.Choice(
-                    label = option,
-                    detail = "",
-                    symbol = "",
-                    accent = android.graphics.Color.parseColor("#E3B86A"),
-                )
-            },
+            choices = options,
             gameLabel = "M A N C A L A",
             headerSymbol = "●",
             fullScreenOverride = true,
@@ -333,7 +329,12 @@ class MancalaActivity : AppCompatActivity() {
         showChoiceOverlay(
             "Mancala",
             "Choose an option.",
-            listOf("New Game", "How to Play", "CPU Difficulty", "Back"),
+            listOf(
+                StyledDialogs.choice("New Game", "Start a fresh Mancala match", "↻", "#E3B86A"),
+                StyledDialogs.choice("How To Play", "Review the rules", "?", "#8EC7B9"),
+                StyledDialogs.choice("CPU Difficulty", "Choose the challenge", "◆", "#A9B6E8"),
+                StyledDialogs.choice("Back", "Return to the home screen", "⌂", "#E58A7A"),
+            ),
             onCancel = { showHome() },
         ) { which ->
             when (which) {
@@ -378,9 +379,9 @@ class MancalaActivity : AppCompatActivity() {
             "Leave Match?",
             "Pause to resume later, or leave to forfeit this game.",
             listOf(
-                "Pause & Exit",
-                "Leave Match",
-                "Keep Playing",
+                StyledDialogs.choice("Pause & Exit", "Save and resume later", "Ⅱ", "#E3B86A"),
+                StyledDialogs.choice("Leave Match", "Forfeit this game", "⚑", "#E58A7A"),
+                StyledDialogs.choice("Keep Playing", "Return to the board", "↩", "#A9B6E8"),
             ),
             onCancel = { showBoardAfterDialog() },
         ) { which ->
@@ -407,11 +408,11 @@ class MancalaActivity : AppCompatActivity() {
             "Game Menu",
             "What would you like to do?",
             listOf(
-                "New Game / Restart",
-                "How To Play",
-                "CPU Difficulty",
-                "Movement Speed",
-                "Home",
+                StyledDialogs.choice("New Game / Restart", "Start a fresh Mancala match", "↻", "#E3B86A"),
+                StyledDialogs.choice("How To Play", "Review the rules", "?", "#8EC7B9"),
+                StyledDialogs.choice("CPU Difficulty", "Choose the challenge", "◆", "#A9B6E8"),
+                StyledDialogs.choice("Movement Speed", "Set stone animation speed", "»", "#8EC7B9"),
+                StyledDialogs.choice("Home", "Save and return to the catalogue", "⌂", "#E58A7A"),
             ),
             onCancel = { showBoardAfterDialog() },
         ) { which ->
@@ -428,8 +429,16 @@ class MancalaActivity : AppCompatActivity() {
     private fun showMovementSpeedMenu() {
         val current = SettingsManager.getMancalaMovementSpeed(this)
         val options = (1..4).map { multiplier ->
-            "${multiplier}x${if (multiplier == current) "  ✓" else ""}"
-        } + "Back"
+            val label = "${multiplier}x${if (multiplier == current) "  ✓" else ""}"
+            val detail = when (multiplier) {
+                1 -> "Relaxed stone movement"
+                2 -> "Balanced stone movement"
+                3 -> "Quick stone movement"
+                else -> "Fastest stone movement"
+            }
+            val symbol = "I".repeat(multiplier)
+            StyledDialogs.choice(label, detail, symbol, "#8EC7B9")
+        } + StyledDialogs.choice("Back", "Return to the game menu", "↩", "#A9B6E8")
         showChoiceOverlay(
             "Movement Speed",
             "Choose how quickly stones move around the board.",
@@ -451,7 +460,10 @@ class MancalaActivity : AppCompatActivity() {
         showChoiceOverlay(
             "Restart this game?",
             "Your current progress will be lost.",
-            listOf("Restart", "Cancel"),
+            listOf(
+                StyledDialogs.choice("Restart", "Begin from the opening position", "↻", "#E3B86A"),
+                StyledDialogs.choice("Cancel", "Keep the current match", "↩", "#A9B6E8"),
+            ),
             onCancel = { showMenu() },
         ) { which ->
             if (which == 0) startGame() else showMenu()
@@ -462,7 +474,10 @@ class MancalaActivity : AppCompatActivity() {
         showChoiceOverlay(
             "Go to home screen?",
             "Your current match will be saved so you can resume it later.",
-            listOf("Go Home", "Stay in Game"),
+            listOf(
+                StyledDialogs.choice("Go Home", "Save and return to the catalogue", "⌂", "#E58A7A"),
+                StyledDialogs.choice("Stay in Game", "Keep the current match", "↩", "#A9B6E8"),
+            ),
             onCancel = { showMenu() },
         ) { which ->
             if (which == 0) {
@@ -478,10 +493,25 @@ class MancalaActivity : AppCompatActivity() {
     private fun showDifficultyMenu(returnToHome: Boolean) {
         val current = SettingsManager.getMancalaDifficulty(this)
         val options = listOf(
-            "Easy${if (current == 0) "  ✓" else ""}",
-            "Medium${if (current == 1) "  ✓" else ""}",
-            "Hard${if (current == 2) "  ✓" else ""}",
-            "Back",
+            StyledDialogs.choice(
+                "Easy${if (current == 0) "  ✓" else ""}",
+                "A relaxed opponent",
+                "I",
+                "#8EC7B9",
+            ),
+            StyledDialogs.choice(
+                "Medium${if (current == 1) "  ✓" else ""}",
+                "A balanced match",
+                "II",
+                "#E3B86A",
+            ),
+            StyledDialogs.choice(
+                "Hard${if (current == 2) "  ✓" else ""}",
+                "A sharper opponent",
+                "III",
+                "#E58A7A",
+            ),
+            StyledDialogs.choice("Back", "Return to the previous menu", "↩", "#A9B6E8"),
         )
         showChoiceOverlay(
             "CPU Difficulty",
@@ -508,7 +538,10 @@ class MancalaActivity : AppCompatActivity() {
         showChoiceOverlay(
             "Change CPU difficulty?",
             "Changing difficulty will start a new game.",
-            listOf("Change & Restart", "Cancel"),
+            listOf(
+                StyledDialogs.choice("Change & Restart", "Apply the new challenge", "↻", "#E3B86A"),
+                StyledDialogs.choice("Cancel", "Keep the current difficulty", "↩", "#A9B6E8"),
+            ),
             onCancel = { showMenu() },
         ) { which ->
             if (which == 0) {
@@ -690,10 +723,20 @@ class MancalaActivity : AppCompatActivity() {
             GameStatus.DRAW -> "It's a draw!"
             else -> return
         }
-        val overlay = MancalaGameOverView(this, message)
-        overlay.onClose = { showBoardAfterDialog() }
-        overlay.onChoice = { which ->
-            dismissMancalaOverlay()
+        StyledDialogs.showChoices(
+            this,
+            "Game Over",
+            message,
+            listOf(
+                StyledDialogs.choice("Play Again", "Start a fresh game", "↻", "#E3B86A"),
+                StyledDialogs.choice("Main Menu", "Choose another match", "⌂", "#E58A7A"),
+            ),
+            420f,
+            "M A N C A L A",
+            onCancel = { showBoardAfterDialog() },
+            fullScreen = false,
+        ) { which, dialog ->
+            dialog.dismiss()
             if (which == 0) {
                 startGame()
             } else {
@@ -701,7 +744,6 @@ class MancalaActivity : AppCompatActivity() {
                 finish()
             }
         }
-        showMancalaOverlay(overlay) { showBoardAfterDialog() }
     }
 
     private fun leaveCompletedGameToHome() {

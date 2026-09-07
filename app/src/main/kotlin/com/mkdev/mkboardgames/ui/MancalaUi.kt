@@ -718,16 +718,6 @@ open class MancalaChoiceOverlayView(
     }
 }
 
-class MancalaGameOverView(
-    context: Context,
-    message: String,
-) : MancalaChoiceOverlayView(
-    context,
-    "GAME OVER",
-    message,
-    listOf("Play Again", "Main Menu"),
-)
-
 class MancalaRulesView(context: Context) : View(context) {
     var onBack: (() -> Unit)? = null
     private val backRect = RectF()
