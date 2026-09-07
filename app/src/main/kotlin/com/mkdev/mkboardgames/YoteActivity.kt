@@ -1,5 +1,6 @@
 package com.mkdev.mkboardgames
 
+import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
 import android.view.Gravity
@@ -107,6 +108,7 @@ class YoteActivity : AppCompatActivity() {
 
         screenRoot = FrameLayout(this)
         gameLayout.visibility = View.GONE
+        autoplayButton.visibility = View.GONE
         screenRoot.addView(gameLayout, FrameLayout.LayoutParams(-1, -1))
         setContentView(screenRoot)
         SoundPlayer.init(this)
@@ -381,6 +383,8 @@ class YoteActivity : AppCompatActivity() {
         capturedByWhite.clear()
         capturedByBlack.clear()
         PausedMatchStore.clear(this, "YOTE")
+        autoplayButton.visibility = if (vsAI) View.VISIBLE else View.GONE
+        autoplayButton.setAutoplayEnabled(false, animate = false)
         if (vsAI) SettingsManager.setActiveGame(this, "yote")
         gameState = engine.initialState()
         boardView.playerColor = playerColor
@@ -643,6 +647,12 @@ class YoteActivity : AppCompatActivity() {
             GameStatus.DRAW -> "It's a draw!"
             GameStatus.IN_PROGRESS -> return
         }
+        val resultLabel = when (gameState.status) {
+            GameStatus.WHITE_WINS -> "White wins"
+            GameStatus.BLACK_WINS -> "Black wins"
+            GameStatus.DRAW -> "Draw"
+            GameStatus.IN_PROGRESS -> return
+        }
         StyledDialogs.showChoices(
             this,
             "Game Over",
@@ -650,15 +660,29 @@ class YoteActivity : AppCompatActivity() {
             listOf(
                 StyledDialogs.choice("Play Again", "Start a fresh game", "↻", "#E3B86A"),
                 StyledDialogs.choice("Main Menu", "Choose another match", "⌂", "#E58A7A"),
+                StyledDialogs.choice("Watch Replay", "Review the moves", "▶", "#A9B6E8"),
             ),
-            420f,
+            520f,
             "Y O T É",
             onCancel = { showBoardAfterDialog() },
             fullScreen = false,
         ) { which, dialog ->
             dialog.dismiss()
-            if (which == 0) startGame() else showHome()
+            when (which) {
+                0 -> startGame()
+                1 -> showHome()
+                else -> launchReplay(resultLabel)
+            }
         }
+    }
+
+    private fun launchReplay(resultLabel: String) {
+        showBoardAfterDialog()
+        startActivity(Intent(this, ReplayActivity::class.java).apply {
+            putExtra(ReplayActivity.EXTRA_GAME_TYPE, "YOTE")
+            putExtra(ReplayActivity.EXTRA_MOVES_JSON, ReplayActivity.buildMovesJson(gameState.moveHistory))
+            putExtra(ReplayActivity.EXTRA_RESULT, resultLabel)
+        })
     }
 
     private fun showBoardAfterDialog(resumeAi: Boolean = true) {

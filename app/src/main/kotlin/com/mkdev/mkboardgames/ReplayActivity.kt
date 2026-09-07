@@ -33,6 +33,7 @@ import com.mkdev.mkboardgames.games.shogi.ShogiRuleEngine
 import com.mkdev.mkboardgames.games.tictactoe.TicTacToePiece
 import com.mkdev.mkboardgames.games.tictactoe.TicTacToeRuleEngine
 import com.mkdev.mkboardgames.games.xiangqi.XiangqiRuleEngine
+import com.mkdev.mkboardgames.games.yote.YoteRuleEngine
 import com.mkdev.mkboardgames.ui.BoardView
 import com.mkdev.mkboardgames.ui.BoardStyleSwitchView
 import com.mkdev.mkboardgames.ui.ChessBoardStyle
@@ -45,6 +46,7 @@ import com.mkdev.mkboardgames.ui.MorabaraBoardView
 import com.mkdev.mkboardgames.ui.OthelloBoardStyle
 import com.mkdev.mkboardgames.ui.ShogiBoardStyle
 import com.mkdev.mkboardgames.ui.XiangqiBoardStyle
+import com.mkdev.mkboardgames.ui.YoteBoardView
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -76,6 +78,15 @@ class ReplayActivity : AppCompatActivity() {
                     obj.put("caps", caps)
                 }
                 if (m.promotionType != null) obj.put("promo", m.promotionType)
+                (m.metadata["bonusCapture"] as? Position)?.let { bonus ->
+                    obj.put(
+                        "bonusCapture",
+                        JSONObject().apply {
+                            put("r", bonus.row)
+                            put("c", bonus.col)
+                        },
+                    )
+                }
                 for (key in MOVE_METADATA_KEYS) {
                     val value = m.metadata[key]
                     if (value is Int || value is String || value is Boolean) obj.put(key, value)
@@ -100,8 +111,14 @@ class ReplayActivity : AppCompatActivity() {
                         caps += Position(c.getInt("r"), c.getInt("c"))
                     }
                 }
-                val promo = if (obj.has("promo")) obj.getString("promo") else null
                 val metadata = mutableMapOf<String, Any>()
+                obj.optJSONObject("bonusCapture")?.let { bonus ->
+                    metadata["bonusCapture"] = Position(
+                        bonus.getInt("r"),
+                        bonus.getInt("c"),
+                    )
+                }
+                val promo = if (obj.has("promo")) obj.getString("promo") else null
                 for (key in MOVE_METADATA_KEYS) {
                     if (!obj.has(key) || obj.isNull(key)) continue
                     when (val value = obj.get(key)) {
@@ -130,6 +147,7 @@ class ReplayActivity : AppCompatActivity() {
     private var connectBoardView: ConnectReplayBoard? = null
     private var moraBoardView: MorabaraBoardView?  = null
     private var ludoBoardView: LudoBoardView? = null
+    private var yoteBoardView: YoteBoardView? = null
     private lateinit var seekBar:      SeekBar
     private lateinit var controlsView: ReplayControlsView
     private lateinit var infoView:     ReplayInfoView
@@ -223,6 +241,7 @@ class ReplayActivity : AppCompatActivity() {
         val isConnectFour = gameType == "CONNECTFOUR"
         val isMorabaraba = gameType == "MORABARABA"
         val isLudo = gameType == "LUDO"
+        val isYote = gameType == "YOTE"
 
         val engine: RuleEngine = when (gameType) {
             "TICTACTOE"  -> TicTacToeRuleEngine(ticBoardSize, ticBoardSize)
@@ -235,6 +254,7 @@ class ReplayActivity : AppCompatActivity() {
             "XIANGQI" -> XiangqiRuleEngine()
             "SHOGI" -> ShogiRuleEngine()
             "GO" -> GoRuleEngine()
+            "YOTE" -> YoteRuleEngine()
             else         -> ChessRuleEngine()
         }
 
@@ -364,6 +384,16 @@ class ReplayActivity : AppCompatActivity() {
                 }
                 ludoBoardView = lbv
                 root.addView(lbv, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0).apply { weight = 1f })
+            }
+            isYote -> {
+                val ybv = YoteBoardView(this).apply {
+                    gameState = states.first()
+                    isLocked = true
+                    onMoveMade = null
+                    onGameOverTapped = { showReplayResultDialog() }
+                }
+                yoteBoardView = ybv
+                root.addView(ybv, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0).apply { weight = 1f })
             }
             else -> {
                 val bv = BoardView(this).apply {
@@ -524,6 +554,20 @@ class ReplayActivity : AppCompatActivity() {
                     lbv.isLocked = true
                 }
             }
+            yoteBoardView?.let { ybv ->
+                ybv.cancelMoveAnimation()
+                ybv.gameState = states[cursor - 1]
+                ybv.isLocked = true
+                val targetCursor = cursor
+                ybv.onMoveMade = { _, _ ->
+                    if (cursor == targetCursor) {
+                        ybv.onMoveMade = null
+                        ybv.gameState = states[targetCursor]
+                        ybv.isLocked = true
+                    }
+                }
+                ybv.animateMove(move)
+            }
         } else {
             cursor              = newCursor
             boardView?.let {
@@ -536,6 +580,12 @@ class ReplayActivity : AppCompatActivity() {
             connectBoardView?.showState(states[cursor])
             moraBoardView?.let { it.gameState = states[cursor]; it.isLocked = true }
             ludoBoardView?.let { it.gameState = states[cursor]; it.isLocked = true }
+            yoteBoardView?.let {
+                it.cancelMoveAnimation()
+                it.onMoveMade = null
+                it.gameState = states[cursor]
+                it.isLocked = true
+            }
             seekBar.progress    = cursor
             val label = moveLabels.getOrElse(cursor) { "Move $cursor" }
             infoView.update(label, cursor, states.size - 1, resultText)
@@ -586,6 +636,7 @@ class ReplayActivity : AppCompatActivity() {
         "MORABARABA" -> "Morabaraba"
         "TICTACTOE" -> "Tic-Tac-Toe"
         "CONNECTFOUR" -> "Connect Four"
+        "YOTE" -> "Yoté"
         else -> "Replay"
     }
 
