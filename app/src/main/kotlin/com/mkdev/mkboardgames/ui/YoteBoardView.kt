@@ -181,8 +181,12 @@ class YoteBoardView(context: Context) : View(context) {
         val sourceWidth = sourceRect?.width()?.toFloat() ?: if (variant == YoteBoardVariant.CARVED) 0.72f else 1.3f
         val sourceHeight = sourceRect?.height()?.toFloat() ?: 1f
         val sourceAspect = if (boardBitmap != null) sourceWidth / sourceHeight else sourceWidth
-        val maxWidth = w - 14f * density
-        val maxHeight = h - 14f * density
+        // Match the full-bleed image treatment used by Shogi. The carved
+        // artwork already contains its own transparent and wooden margins;
+        // adding another inset makes the board unnecessarily small.
+        val artworkInset = if (variant == YoteBoardVariant.CARVED) 0f else 14f * density
+        val maxWidth = w - artworkInset
+        val maxHeight = h - artworkInset
         val scale = min(maxWidth / sourceWidth, maxHeight / sourceHeight)
         val drawWidth = sourceWidth * scale
         val drawHeight = sourceHeight * scale
