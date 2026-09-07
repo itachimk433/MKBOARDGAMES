@@ -55,6 +55,9 @@ class YoteBoardView(context: Context) : View(context) {
             187f, 768f, 287f, 768f, 384f, 768f, 482f, 768f, 578f, 769f,
         ),
     )
+    // The carved bitmap includes transparent padding around the photographed
+    // board. Render the board itself instead of scaling that padding.
+    private val carvedArtworkRect = Rect(70, 76, 660, 950)
     // The carved asset has 100px pocket spacing and approximately 27px
     // pocket radius. Keep the rendered stone inside that measured opening,
     // including its rim and offset shadow.
@@ -220,8 +223,8 @@ class YoteBoardView(context: Context) : View(context) {
             RectF(boardRect)
         }
         if (variant == YoteBoardVariant.CARVED) {
-            cellWidth = boardRect.width() * (100f / 730f)
-            cellHeight = boardRect.height() * (100f / 1024f)
+            cellWidth = boardRect.width() * (100f / carvedArtworkRect.width())
+            cellHeight = boardRect.height() * (100f / carvedArtworkRect.height())
         } else {
             cellWidth = gridRect.width() / YoteRuleEngine.COLUMNS
             cellHeight = gridRect.height() / YoteRuleEngine.ROWS
@@ -629,8 +632,10 @@ class YoteBoardView(context: Context) : View(context) {
             val measured = carvedPocketCenters[position.col]
             val offset = position.row * 2
             PointF(
-                boardRect.left + boardRect.width() * (measured[offset] / 730f),
-                boardRect.top + boardRect.height() * (measured[offset + 1] / 1024f),
+                boardRect.left + boardRect.width() *
+                    ((measured[offset] - carvedArtworkRect.left) / carvedArtworkRect.width()),
+                boardRect.top + boardRect.height() *
+                    ((measured[offset + 1] - carvedArtworkRect.top) / carvedArtworkRect.height()),
             )
         } else {
             PointF(
@@ -647,10 +652,14 @@ class YoteBoardView(context: Context) : View(context) {
         }
 
     private fun drawableSourceRect(bitmap: Bitmap): Rect =
-        Rect(
-            0,
-            0,
-            bitmap.width,
-            bitmap.height,
-        )
+        if (bitmap.width == 730 && bitmap.height == 1024) {
+            Rect(carvedArtworkRect)
+        } else {
+            Rect(
+                0,
+                0,
+                bitmap.width,
+                bitmap.height,
+            )
+        }
 }
