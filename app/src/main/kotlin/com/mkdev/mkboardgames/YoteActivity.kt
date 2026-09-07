@@ -1,14 +1,11 @@
 package com.mkdev.mkboardgames
 
 import android.graphics.Color
-import android.graphics.Typeface
 import android.os.Bundle
-import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.LinearLayout
-import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import com.mkdev.mkboardgames.engine.GameStatus
 import com.mkdev.mkboardgames.engine.Move
@@ -20,7 +17,7 @@ import com.mkdev.mkboardgames.games.yote.YoteRuleEngine
 import com.mkdev.mkboardgames.ui.AutoplayButtonView
 import com.mkdev.mkboardgames.ui.ChessChoiceView
 import com.mkdev.mkboardgames.ui.ChessMenuView
-import com.mkdev.mkboardgames.ui.MancalaWoodButton
+import com.mkdev.mkboardgames.ui.StandardGameHudView
 import com.mkdev.mkboardgames.ui.StyledDialogs
 import com.mkdev.mkboardgames.ui.YoteBoardView
 import com.mkdev.mkboardgames.ui.YotePieceStripView
@@ -48,12 +45,11 @@ class YoteActivity : AppCompatActivity() {
 
     private lateinit var gameRoot: View
     private lateinit var screenRoot: FrameLayout
+    private lateinit var hudView: StandardGameHudView
     private lateinit var boardView: YoteBoardView
-    private lateinit var statusView: TextView
     private lateinit var topInfoView: YotePieceStripView
     private lateinit var bottomInfoView: YotePieceStripView
     private lateinit var autoplayButton: AutoplayButtonView
-    private lateinit var undoButton: MancalaWoodButton
     private var activeOverlay: View? = null
     private val capturedByWhite = mutableListOf<Piece>()
     private val capturedByBlack = mutableListOf<Piece>()
@@ -67,51 +63,20 @@ class YoteActivity : AppCompatActivity() {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.parseColor("#071522"))
         }
-        val header = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setPadding((12 * density).toInt(), (5 * density).toInt(), (12 * density).toInt(), (3 * density).toInt())
-        }
-        val title = TextView(this).apply {
-            text = "YOTÉ"
-            setTextColor(Color.parseColor("#E7C995"))
-            textSize = 20f
-            gravity = Gravity.CENTER
-            typeface = Typeface.DEFAULT_BOLD
-            letterSpacing = 0.18f
-        }
-        statusView = TextView(this).apply {
-            setTextColor(Color.parseColor("#D4C8BD"))
-            textSize = 13f
-            gravity = Gravity.CENTER
-        }
-        undoButton = MancalaWoodButton(this, "Undo").apply {
-            style = MancalaWoodButton.Style.BLUE
-            onClick = { undoMove() }
+        hudView = StandardGameHudView(this).apply {
+            onBack = { onBackPressed() }
+            onUndo = { undoMove() }
+            onMenu = { if (!boardView.isLocked) showMenu() }
         }
         topInfoView = YotePieceStripView(this, PieceColor.BLACK)
         bottomInfoView = YotePieceStripView(this, PieceColor.WHITE)
-        header.addView(title, LinearLayout.LayoutParams(-1, (26 * density).toInt()))
-        val statusRow = FrameLayout(this)
-        statusRow.addView(statusView, FrameLayout.LayoutParams(-1, (24 * density).toInt()))
-        statusRow.addView(
-            undoButton,
-            FrameLayout.LayoutParams((78 * density).toInt(), (24 * density).toInt()).apply {
-                gravity = Gravity.END
-            },
-        )
-        header.addView(statusRow, LinearLayout.LayoutParams(-1, (24 * density).toInt()))
 
         boardView = YoteBoardView(this).apply {
             onMoveMade = { move, fromComputer -> handleBoardMove(move, fromComputer) }
             onGameOverTapped = { if (activeOverlay == null) showResultDialog() }
         }
 
-        val controls = LinearLayout(this).apply {
-            gravity = Gravity.CENTER
-            setPadding((8 * density).toInt(), (3 * density).toInt(), (8 * density).toInt(), (5 * density).toInt())
-        }
-        autoplayButton = AutoplayButtonView(this, circularStyle = false).apply {
+        autoplayButton = AutoplayButtonView(this).apply {
             onAutoplayChanged = { enabled ->
                 if (vsAI) {
                     autoplayEnabled = enabled
@@ -123,18 +88,20 @@ class YoteActivity : AppCompatActivity() {
                 }
             }
         }
-        val menuButton = MancalaWoodButton(this, "Menu").apply {
-            style = MancalaWoodButton.Style.GOLD
-            onClick = { if (!boardView.isLocked) showMenu() }
-        }
-        controls.addView(autoplayButton, LinearLayout.LayoutParams(0, (46 * density).toInt(), 1f))
-        controls.addView(menuButton, LinearLayout.LayoutParams(0, (46 * density).toInt(), 1f))
 
-        gameLayout.addView(header, LinearLayout.LayoutParams(-1, (58 * density).toInt()))
+        gameLayout.addView(hudView, LinearLayout.LayoutParams(-1, (56 * density).toInt()))
         gameLayout.addView(topInfoView, LinearLayout.LayoutParams(-1, (34 * density).toInt()))
         gameLayout.addView(boardView, LinearLayout.LayoutParams(-1, 0).apply { weight = 1f })
         gameLayout.addView(bottomInfoView, LinearLayout.LayoutParams(-1, (34 * density).toInt()))
-        gameLayout.addView(controls, LinearLayout.LayoutParams(-1, (56 * density).toInt()))
+        gameLayout.addView(
+            autoplayButton,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                (76 * density).toInt(),
+            ).apply {
+                gravity = android.view.Gravity.CENTER_HORIZONTAL
+            },
+        )
         gameRoot = gameLayout
 
         screenRoot = FrameLayout(this)
@@ -485,6 +452,7 @@ class YoteActivity : AppCompatActivity() {
         boardView.gameState = gameState
         boardView.isLocked = gameState.status != GameStatus.IN_PROGRESS
         updateHud()
+        playYoteMoveSound(move)
         if (gameState.status != GameStatus.IN_PROGRESS) {
             autoplayEnabled = false
             autoplayMoveInProgress = false
@@ -544,9 +512,36 @@ class YoteActivity : AppCompatActivity() {
         }
         val reserve = "W ${engine.reserveCount(gameState, PieceColor.WHITE)} · " +
             "B ${engine.reserveCount(gameState, PieceColor.BLACK)} in reserve"
-        statusView.text = "$turn  ·  $reserve"
+        hudView.setInfo(
+            "$turn  ·  $reserve",
+            undo = previousStates.isNotEmpty(),
+            accentColor = if (gameState.currentTurn == PieceColor.WHITE) {
+                Color.WHITE
+            } else {
+                Color.parseColor("#FFD54F")
+            },
+        )
         topInfoView.update(engine.reserveCount(gameState, PieceColor.BLACK), capturedByBlack)
         bottomInfoView.update(engine.reserveCount(gameState, PieceColor.WHITE), capturedByWhite)
+    }
+
+    private fun playYoteMoveSound(move: Move) {
+        when (gameState.status) {
+            GameStatus.WHITE_WINS, GameStatus.BLACK_WINS -> {
+                SoundPlayer.play("game_end")
+                return
+            }
+            GameStatus.DRAW -> {
+                SoundPlayer.play("game_draw")
+                return
+            }
+            GameStatus.IN_PROGRESS -> Unit
+        }
+        if (move.captures.isNotEmpty() || move.metadata["bonusCapture"] != null) {
+            SoundPlayer.playMovement("checkers_capture")
+        } else {
+            SoundPlayer.playMovement("checkers_move")
+        }
     }
 
     private fun recordCaptures(previous: com.mkdev.mkboardgames.engine.GameState, move: Move) {
@@ -567,7 +562,7 @@ class YoteActivity : AppCompatActivity() {
             !aiControlsCurrentTurn() || aiJob?.isActive == true
         ) return
         boardView.isLocked = true
-        statusView.text = "Computer is thinking…"
+        hudView.setThinking(true)
         val snapshot = gameState
         val requestToken = ++aiRequestToken
         autoplayMoveInProgress = autoplayEnabled && snapshot.currentTurn == playerColor
@@ -611,6 +606,7 @@ class YoteActivity : AppCompatActivity() {
         aiJob = null
         scope.coroutineContext.cancelChildren()
         if (::boardView.isInitialized) boardView.isLocked = false
+        if (::hudView.isInitialized) hudView.setThinking(false)
         if (::autoplayButton.isInitialized) autoplayButton.setAutoplayEnabled(false, animate = false)
     }
 

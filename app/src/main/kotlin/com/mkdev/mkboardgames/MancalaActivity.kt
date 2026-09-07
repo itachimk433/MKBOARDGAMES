@@ -10,7 +10,6 @@ import android.view.*
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.FrameLayout
 import android.widget.LinearLayout
-import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import com.mkdev.mkboardgames.engine.GameState
 import com.mkdev.mkboardgames.engine.GameStatus
@@ -22,8 +21,8 @@ import com.mkdev.mkboardgames.games.mancala.MancalaRuleEngine
 import com.mkdev.mkboardgames.ui.ChessMenuView
 import com.mkdev.mkboardgames.ui.ChessChoiceView
 import com.mkdev.mkboardgames.ui.MancalaRulesView
-import com.mkdev.mkboardgames.ui.MancalaWoodButton
 import com.mkdev.mkboardgames.ui.AutoplayButtonView
+import com.mkdev.mkboardgames.ui.StandardGameHudView
 import com.mkdev.mkboardgames.ui.StyledDialogs
 import kotlinx.coroutines.*
 import kotlin.math.*
@@ -107,7 +106,7 @@ class MancalaActivity : AppCompatActivity() {
     private lateinit var gameRoot: View
     private lateinit var screenRoot: FrameLayout
     private lateinit var boardView: MancalaBoardView
-    private lateinit var statusView: TextView
+    private lateinit var hudView: StandardGameHudView
     private lateinit var autoplayButton: AutoplayButtonView
     private var activeMancalaOverlay: View? = null
 
@@ -121,26 +120,11 @@ class MancalaActivity : AppCompatActivity() {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.parseColor("#120D0B"))
         }
-        val header = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setPadding(12 * dp.toInt(), 5 * dp.toInt(), 12 * dp.toInt(), 3 * dp.toInt())
+        hudView = StandardGameHudView(this).apply {
+            onBack = { onBackPressed() }
+            onUndo = { undoMove() }
+            onMenu = { if (!boardView.isMoveAnimating) showMenu() }
         }
-        val title = TextView(this).apply {
-            text = "MANCALA"
-            setTextColor(Color.parseColor("#E7C995"))
-            textSize = 20f
-            gravity = Gravity.CENTER
-            typeface = Typeface.DEFAULT_BOLD
-            letterSpacing = 0.18f
-        }
-        statusView = TextView(this).apply {
-            setTextColor(Color.parseColor("#D4C8BD"))
-            textSize = 13f
-            gravity = Gravity.CENTER
-        }
-        header.addView(title, LinearLayout.LayoutParams(-1, 30 * dp.toInt()))
-        header.addView(statusView, LinearLayout.LayoutParams(-1, 24 * dp.toInt()))
 
         boardView = MancalaBoardView(this)
         boardView.onPitTapped = { handlePitTap(it) }
@@ -148,11 +132,7 @@ class MancalaActivity : AppCompatActivity() {
             if (!boardView.isMoveAnimating) showResultDialog()
         }
 
-        val controls = LinearLayout(this).apply {
-            gravity = Gravity.CENTER
-            setPadding(8 * dp.toInt(), 3 * dp.toInt(), 8 * dp.toInt(), 5 * dp.toInt())
-        }
-        autoplayButton = AutoplayButtonView(this, circularStyle = false)
+        autoplayButton = AutoplayButtonView(this)
         autoplayButton.onAutoplayChanged = { enabled ->
             if (vsAI) {
                 autoplayEnabled = enabled
@@ -167,19 +147,17 @@ class MancalaActivity : AppCompatActivity() {
                 }
             }
         }
-        val menu = actionButton("Menu")
-        menu.setOnClickListener {
-            if (!boardView.isMoveAnimating) showMenu()
-        }
-        controls.addView(
-            autoplayButton,
-            LinearLayout.LayoutParams(0, 46 * dp.toInt(), 1f),
-        )
-        controls.addView(menu, LinearLayout.LayoutParams(0, 46 * dp.toInt(), 1f))
-
-        gameLayout.addView(header, LinearLayout.LayoutParams(-1, 58 * dp.toInt()))
+        gameLayout.addView(hudView, LinearLayout.LayoutParams(-1, 56 * dp.toInt()))
         gameLayout.addView(boardView, LinearLayout.LayoutParams(-1, 0).apply { weight = 1f })
-        gameLayout.addView(controls, LinearLayout.LayoutParams(-1, 56 * dp.toInt()))
+        gameLayout.addView(
+            autoplayButton,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                76 * dp.toInt(),
+            ).apply {
+                gravity = Gravity.CENTER_HORIZONTAL
+            },
+        )
         gameRoot = gameLayout
 
         screenRoot = FrameLayout(this)
@@ -202,10 +180,6 @@ class MancalaActivity : AppCompatActivity() {
                 window.decorView.postDelayed({ makeFullscreen() }, 200)
             }
         }
-    }
-
-    private fun actionButton(label: String) = MancalaWoodButton(this, label).apply {
-        style = MancalaWoodButton.Style.GOLD
     }
 
     override fun onResume() {
@@ -640,6 +614,7 @@ class MancalaActivity : AppCompatActivity() {
         }
         boardView.setGameState(gameState)
         updateHud()
+        SoundPlayer.playMovement("checkers_move")
         if (gameState.status != GameStatus.IN_PROGRESS) {
             autoplayEnabled = false
             autoplayMoveInProgress = false
@@ -659,7 +634,7 @@ class MancalaActivity : AppCompatActivity() {
             !aiControlsCurrentTurn()
         ) return
         boardView.isLocked = true
-        statusView.text = "Computer is thinking…"
+        hudView.setThinking(true)
         val snapshot = gameState
         val autoplayingPlayerTurn = autoplayEnabled && snapshot.currentTurn == playerColor
         scope.launch {
@@ -697,6 +672,7 @@ class MancalaActivity : AppCompatActivity() {
             boardView.isLocked = false
             boardView.onMoveAnimationFinished = null
         }
+        if (::hudView.isInitialized) hudView.setThinking(false)
         if (::autoplayButton.isInitialized) {
             autoplayButton.setAutoplayEnabled(false, animate = false)
         }
@@ -799,7 +775,15 @@ class MancalaActivity : AppCompatActivity() {
             gameState.currentTurn == PieceColor.WHITE -> "South's turn"
             else -> "North's turn"
         }
-        statusView.text = turn
+        hudView.setInfo(
+            turn,
+            undo = previousStates.isNotEmpty(),
+            accentColor = if (gameState.currentTurn == PieceColor.WHITE) {
+                Color.WHITE
+            } else {
+                Color.parseColor("#FFD54F")
+            },
+        )
     }
 
     inner class MancalaBoardView(context: Context) : View(context) {
