@@ -25,39 +25,46 @@ enum class YoteBoardVariant(
     RUSTIC("yote_board_rustic.webp", "Rustic Pebble"),
 }
 
+enum class YoteCarvedStyle(
+    val assetName: String,
+    val label: String,
+    val sourceRect: Rect,
+    val pocketCenters: Array<FloatArray>,
+    val pocketStepX: Float,
+    val pocketStepY: Float,
+) {
+    CLASSIC(
+        assetName = "yote_board_carved.webp",
+        label = "Carved Reservoir",
+        sourceRect = Rect(70, 76, 660, 950),
+        pocketCenters = arrayOf(
+            floatArrayOf(186f, 269f, 287f, 270f, 383f, 269f, 481f, 269f, 577f, 269f),
+            floatArrayOf(188f, 364f, 286f, 365f, 385f, 366f, 483f, 365f, 578f, 364f),
+            floatArrayOf(188f, 467f, 287f, 463f, 384f, 466f, 483f, 463f, 578f, 466f),
+            floatArrayOf(187f, 562f, 286f, 565f, 382f, 565f, 481f, 565f, 578f, 565f),
+            floatArrayOf(188f, 662f, 287f, 659f, 387f, 661f, 482f, 659f, 578f, 660f),
+            floatArrayOf(187f, 759f, 287f, 759f, 384f, 759f, 482f, 759f, 578f, 760f),
+        ),
+        pocketStepX = 100f,
+        pocketStepY = 100f,
+    ),
+    RESERVOIR(
+        assetName = "yote_board_carved_reservoir.webp",
+        label = "Carved Reservoir II",
+        sourceRect = Rect(0, 0, 858, 1271),
+        pocketCenters = arrayOf(
+            floatArrayOf(270f, 394f, 270f, 532f, 270f, 680f, 270f, 820f, 270f, 965f, 270f, 1105f),
+            floatArrayOf(417f, 394f, 417f, 532f, 417f, 680f, 417f, 820f, 417f, 965f, 417f, 1105f),
+            floatArrayOf(557f, 394f, 557f, 532f, 557f, 680f, 557f, 820f, 557f, 965f, 557f, 1105f),
+            floatArrayOf(699f, 394f, 699f, 532f, 699f, 680f, 699f, 820f, 699f, 965f, 699f, 1105f),
+            floatArrayOf(838f, 394f, 838f, 532f, 838f, 680f, 838f, 820f, 838f, 965f, 838f, 1105f),
+        ),
+        pocketStepX = 142f,
+        pocketStepY = 142f,
+    ),
+}
+
 class YoteBoardView(context: Context) : View(context) {
-    /*
-     * The carved artwork is a portrait board. Its five pocket columns and six
-     * pocket rows are transposed relative to the engine's 5-row × 6-column
-     * coordinates. These are the measured pocket centres in the source asset
-     * (730 × 1024), expressed as fractions so they scale with the bitmap.
-     */
-    // Each entry is an artwork-space (x, y) centre of the visible circular
-    // recess, measured from the rendered board artwork rather than from the
-    // intervening square blocks.
-    private val carvedPocketCenters = arrayOf(
-        floatArrayOf(
-            186f, 269f, 287f, 270f, 383f, 269f, 481f, 269f, 577f, 269f,
-        ),
-        floatArrayOf(
-            188f, 364f, 286f, 365f, 385f, 366f, 483f, 365f, 578f, 364f,
-        ),
-        floatArrayOf(
-            188f, 467f, 287f, 463f, 384f, 466f, 483f, 463f, 578f, 466f,
-        ),
-        floatArrayOf(
-            187f, 562f, 286f, 565f, 382f, 565f, 481f, 565f, 578f, 565f,
-        ),
-        floatArrayOf(
-            188f, 662f, 287f, 659f, 387f, 661f, 482f, 659f, 578f, 660f,
-        ),
-        floatArrayOf(
-            187f, 759f, 287f, 759f, 384f, 759f, 482f, 759f, 578f, 760f,
-        ),
-    )
-    // The carved bitmap includes transparent padding around the photographed
-    // board. Render the board itself instead of scaling that padding.
-    private val carvedArtworkRect = Rect(70, 76, 660, 950)
     // The carved asset has 100px pocket spacing and approximately 27px
     // pocket radius. Keep the rendered stone inside that measured opening,
     // including its rim and offset shadow.
@@ -75,10 +82,13 @@ class YoteBoardView(context: Context) : View(context) {
     var variant: YoteBoardVariant = YoteBoardVariant.CARVED
         set(value) {
             field = value
-            boardBitmap = loadBitmap(value.assetName)
-            boardSourceRect = boardBitmap?.let(::drawableSourceRect)
-            updateGeometry(width, height)
-            invalidate()
+            reloadBoardArtwork()
+        }
+
+    var carvedStyle: YoteCarvedStyle = YoteCarvedStyle.CLASSIC
+        set(value) {
+            field = value
+            reloadBoardArtwork()
         }
 
     var playerColor: PieceColor = PieceColor.WHITE
@@ -93,7 +103,7 @@ class YoteBoardView(context: Context) : View(context) {
     private var gridRect = RectF()
     private var cellWidth = 0f
     private var cellHeight = 0f
-    private var boardBitmap: Bitmap? = loadBitmap(variant.assetName)
+    private var boardBitmap: Bitmap? = loadBitmap(artworkAssetName())
     private var boardSourceRect: Rect? = boardBitmap?.let(::drawableSourceRect)
     private var atmospherePhase = 0f
     private var atmosphereAnimator: ValueAnimator? = null
@@ -181,8 +191,10 @@ class YoteBoardView(context: Context) : View(context) {
         if (w <= 0 || h <= 0) return
         val density = resources.displayMetrics.density
         val sourceRect = boardBitmap?.let(::drawableSourceRect)
-        val sourceWidth = sourceRect?.width()?.toFloat() ?: if (variant == YoteBoardVariant.CARVED) 0.72f else 1.3f
-        val sourceHeight = sourceRect?.height()?.toFloat() ?: 1f
+        val sourceWidth = sourceRect?.width()?.toFloat()
+            ?: if (variant == YoteBoardVariant.CARVED) carvedStyle.sourceRect.width().toFloat() else 1.3f
+        val sourceHeight = sourceRect?.height()?.toFloat()
+            ?: if (variant == YoteBoardVariant.CARVED) carvedStyle.sourceRect.height().toFloat() else 1f
         val sourceAspect = if (boardBitmap != null) sourceWidth / sourceHeight else sourceWidth
         // Match the full-bleed image treatment used by Shogi. The carved
         // artwork already contains its own transparent and wooden margins;
@@ -223,8 +235,8 @@ class YoteBoardView(context: Context) : View(context) {
             RectF(boardRect)
         }
         if (variant == YoteBoardVariant.CARVED) {
-            cellWidth = boardRect.width() * (100f / carvedArtworkRect.width())
-            cellHeight = boardRect.height() * (100f / carvedArtworkRect.height())
+            cellWidth = boardRect.width() * (carvedStyle.pocketStepX / carvedStyle.sourceRect.width())
+            cellHeight = boardRect.height() * (carvedStyle.pocketStepY / carvedStyle.sourceRect.height())
         } else {
             cellWidth = gridRect.width() / YoteRuleEngine.COLUMNS
             cellHeight = gridRect.height() / YoteRuleEngine.ROWS
@@ -641,14 +653,14 @@ class YoteBoardView(context: Context) : View(context) {
     private fun centerOf(position: Position): PointF =
         if (variant == YoteBoardVariant.CARVED) {
             // Engine row/column become artwork column/row respectively.
-            val measured = carvedPocketCenters[position.col]
+            val measured = carvedStyle.pocketCenters[position.col]
             val offset = position.row * 2
             PointF(
                 boardRect.left + boardRect.width() *
-                    ((measured[offset] - carvedArtworkRect.left) / carvedArtworkRect.width()),
+                    ((measured[offset] - carvedStyle.sourceRect.left) / carvedStyle.sourceRect.width()),
                 boardRect.top + boardRect.height() *
-                    ((measured[offset + 1] - carvedArtworkRect.top) /
-                        carvedArtworkRect.height()),
+                    ((measured[offset + 1] - carvedStyle.sourceRect.top) /
+                        carvedStyle.sourceRect.height()),
             )
         } else {
             PointF(
@@ -656,6 +668,16 @@ class YoteBoardView(context: Context) : View(context) {
                 gridRect.top + (position.row + 0.5f) * cellHeight,
             )
         }
+
+    private fun artworkAssetName(): String =
+        if (variant == YoteBoardVariant.CARVED) carvedStyle.assetName else variant.assetName
+
+    private fun reloadBoardArtwork() {
+        boardBitmap = loadBitmap(artworkAssetName())
+        boardSourceRect = boardBitmap?.let(::drawableSourceRect)
+        updateGeometry(width, height)
+        invalidate()
+    }
 
     private fun loadBitmap(assetName: String): Bitmap? =
         try {
@@ -665,14 +687,9 @@ class YoteBoardView(context: Context) : View(context) {
         }
 
     private fun drawableSourceRect(bitmap: Bitmap): Rect =
-        if (bitmap.width == 730 && bitmap.height == 1024) {
-            Rect(carvedArtworkRect)
+        if (variant == YoteBoardVariant.CARVED) {
+            Rect(carvedStyle.sourceRect)
         } else {
-            Rect(
-                0,
-                0,
-                bitmap.width,
-                bitmap.height,
-            )
+            Rect(0, 0, bitmap.width, bitmap.height)
         }
 }

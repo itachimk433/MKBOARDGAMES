@@ -18,12 +18,14 @@ import com.mkdev.mkboardgames.engine.Position
 import com.mkdev.mkboardgames.games.yote.YoteAIPlayer
 import com.mkdev.mkboardgames.games.yote.YoteRuleEngine
 import com.mkdev.mkboardgames.ui.AutoplayButtonView
+import com.mkdev.mkboardgames.ui.BoardStyleSwitchView
 import com.mkdev.mkboardgames.ui.ChessChoiceView
 import com.mkdev.mkboardgames.ui.ChessMenuView
 import com.mkdev.mkboardgames.ui.MancalaChoiceOverlayView
 import com.mkdev.mkboardgames.ui.MancalaWoodButton
 import com.mkdev.mkboardgames.ui.YoteBoardVariant
 import com.mkdev.mkboardgames.ui.YoteBoardView
+import com.mkdev.mkboardgames.ui.YoteCarvedStyle
 import com.mkdev.mkboardgames.ui.YoteGameOverView
 import com.mkdev.mkboardgames.ui.YotePieceStripView
 import com.mkdev.mkboardgames.ui.YoteRulesView
@@ -37,6 +39,7 @@ class YoteActivity : AppCompatActivity() {
     private val engine = YoteRuleEngine()
     private var gameState = engine.initialState()
     private var variant = YoteBoardVariant.CARVED
+    private var carvedStyle = YoteCarvedStyle.CLASSIC
     private var vsAI = true
     private var playerColor = PieceColor.WHITE
     private var matchStarted = false
@@ -52,6 +55,8 @@ class YoteActivity : AppCompatActivity() {
     private lateinit var gameRoot: View
     private lateinit var screenRoot: FrameLayout
     private lateinit var boardView: YoteBoardView
+    private lateinit var boardStyleSwitch: BoardStyleSwitchView
+    private lateinit var boardStyleRow: LinearLayout
     private lateinit var statusView: TextView
     private lateinit var topInfoView: YotePieceStripView
     private lateinit var bottomInfoView: YotePieceStripView
@@ -96,6 +101,22 @@ class YoteActivity : AppCompatActivity() {
             onMoveMade = { move, fromComputer -> handleBoardMove(move, fromComputer) }
             onGameOverTapped = { if (activeOverlay == null) showResultDialog() }
         }
+        boardStyleSwitch = BoardStyleSwitchView(this).apply {
+            setStyleCount(YoteCarvedStyle.entries.size)
+            onStyleChanged = { styleIndex ->
+                carvedStyle = YoteCarvedStyle.entries
+                    .getOrElse(styleIndex) { YoteCarvedStyle.CLASSIC }
+                boardView.carvedStyle = carvedStyle
+            }
+        }
+        boardStyleRow = LinearLayout(this).apply {
+            gravity = Gravity.CENTER
+            visibility = View.GONE
+            addView(
+                boardStyleSwitch,
+                LinearLayout.LayoutParams((118 * density).toInt(), (44 * density).toInt()),
+            )
+        }
 
         val controls = LinearLayout(this).apply {
             gravity = Gravity.CENTER
@@ -121,6 +142,7 @@ class YoteActivity : AppCompatActivity() {
         controls.addView(menuButton, LinearLayout.LayoutParams(0, (46 * density).toInt(), 1f))
 
         gameLayout.addView(header, LinearLayout.LayoutParams(-1, (58 * density).toInt()))
+        gameLayout.addView(boardStyleRow, LinearLayout.LayoutParams(-1, (44 * density).toInt()))
         gameLayout.addView(topInfoView, LinearLayout.LayoutParams(-1, (34 * density).toInt()))
         gameLayout.addView(boardView, LinearLayout.LayoutParams(-1, 0).apply { weight = 1f })
         gameLayout.addView(bottomInfoView, LinearLayout.LayoutParams(-1, (34 * density).toInt()))
@@ -415,9 +437,12 @@ class YoteActivity : AppCompatActivity() {
         if (vsAI) SettingsManager.setActiveGame(this, "yote")
         gameState = engine.initialState()
         boardView.variant = variant
+        boardView.carvedStyle = carvedStyle
         boardView.playerColor = playerColor
         boardView.vsAI = vsAI
         boardView.gameState = gameState
+        boardStyleSwitch.setSelectedIndex(carvedStyle.ordinal, animate = false)
+        boardStyleRow.visibility = if (variant == YoteBoardVariant.CARVED) View.VISIBLE else View.GONE
         showBoardAfterDialog(false)
 
         restoring?.moves?.forEach { move ->
@@ -444,6 +469,7 @@ class YoteActivity : AppCompatActivity() {
         vsAI = paused.vsAI
         playerColor = runCatching { PieceColor.valueOf(paused.playerColor) }.getOrDefault(PieceColor.WHITE)
         variant = YoteBoardVariant.entries.getOrElse(paused.boardVariant ?: 0) { YoteBoardVariant.CARVED }
+        carvedStyle = YoteCarvedStyle.entries.getOrElse(paused.boardStyle ?: 0) { YoteCarvedStyle.CLASSIC }
         startGame(paused)
     }
 
@@ -648,6 +674,7 @@ class YoteActivity : AppCompatActivity() {
                 playerColor.name,
                 gameState.moveHistory,
                 boardVariant = variant.ordinal,
+                boardStyle = carvedStyle.ordinal,
             )
         }
     }
