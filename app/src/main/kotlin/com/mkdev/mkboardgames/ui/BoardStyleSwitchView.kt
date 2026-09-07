@@ -28,6 +28,14 @@ class BoardStyleSwitchView(context: Context) : View(context) {
     private var styleCount = 2
     private var selectedIndex = 0
     private var animator: ValueAnimator? = null
+    private val fadeRunnable = Runnable {
+        if (visibility == View.VISIBLE) {
+            animate()
+                .alpha(0f)
+                .setDuration(900L)
+                .start()
+        }
+    }
 
     private val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val trackEdgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -45,7 +53,28 @@ class BoardStyleSwitchView(context: Context) : View(context) {
         isClickable = true
         isFocusable = true
         contentDescription = "Board style"
-        setOnClickListener { toggleStyle() }
+        setOnClickListener {
+            reveal()
+            toggleStyle()
+        }
+    }
+
+    fun scheduleFade() {
+        removeCallbacks(fadeRunnable)
+        animate().cancel()
+        if (visibility != View.VISIBLE) return
+        alpha = 1f
+        postDelayed(fadeRunnable, 5_000L)
+    }
+
+    fun reveal() {
+        if (visibility != View.VISIBLE) return
+        removeCallbacks(fadeRunnable)
+        animate()
+            .alpha(1f)
+            .setDuration(220L)
+            .start()
+        postDelayed(fadeRunnable, 5_000L)
     }
 
     fun setStyleCount(count: Int) {
@@ -83,9 +112,22 @@ class BoardStyleSwitchView(context: Context) : View(context) {
     }
 
     override fun onDetachedFromWindow() {
+        removeCallbacks(fadeRunnable)
         animator?.cancel()
         animator = null
         super.onDetachedFromWindow()
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        scheduleFade()
+    }
+
+    override fun onVisibilityChanged(changedView: View, visibility: Int) {
+        super.onVisibilityChanged(changedView, visibility)
+        if (changedView === this) {
+            if (visibility == View.VISIBLE) scheduleFade() else removeCallbacks(fadeRunnable)
+        }
     }
 
     override fun onDraw(canvas: Canvas) {

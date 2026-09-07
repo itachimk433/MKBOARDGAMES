@@ -412,7 +412,7 @@ class MancalaActivity : AppCompatActivity() {
                 StyledDialogs.choice("How To Play", "Review the rules", "?", "#8EC7B9"),
                 StyledDialogs.choice("CPU Difficulty", "Choose the challenge", "◆", "#A9B6E8"),
                 StyledDialogs.choice("Movement Speed", "Set stone animation speed", "»", "#8EC7B9"),
-                StyledDialogs.choice("Home", "Save and return to the catalogue", "⌂", "#E58A7A"),
+                StyledDialogs.choice("Home", "Return to the catalogue", "⌂", "#E58A7A"),
             ),
             onCancel = { showBoardAfterDialog() },
         ) { which ->
@@ -473,15 +473,15 @@ class MancalaActivity : AppCompatActivity() {
     private fun showHomeConfirmation() {
         showChoiceOverlay(
             "Go to home screen?",
-            "Your current match will be saved so you can resume it later.",
+            "Your current match will be lost.",
             listOf(
-                StyledDialogs.choice("Go Home", "Save and return to the catalogue", "⌂", "#E58A7A"),
+                StyledDialogs.choice("Go Home", "Return to the catalogue", "⌂", "#E58A7A"),
                 StyledDialogs.choice("Stay in Game", "Keep the current match", "↩", "#A9B6E8"),
             ),
             onCancel = { showMenu() },
         ) { which ->
             if (which == 0) {
-                savePausedMatch()
+                clearPausedMatch()
                 matchStarted = false
                 showHome()
             } else {

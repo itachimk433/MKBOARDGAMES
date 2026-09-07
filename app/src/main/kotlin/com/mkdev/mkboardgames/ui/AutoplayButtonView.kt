@@ -38,6 +38,14 @@ class AutoplayButtonView(
     private var pressed = false
     private var borderAnimator: ValueAnimator? = null
     private var borderProgress = 0f
+    private val fadeRunnable = Runnable {
+        if (!enabled && visibility == View.VISIBLE) {
+            animate()
+                .alpha(0f)
+                .setDuration(900L)
+                .start()
+        }
+    }
 
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -82,15 +90,40 @@ class AutoplayButtonView(
     fun setAutoplayEnabled(value: Boolean, animate: Boolean = true) {
         enabled = value
         updateContentDescription()
-        if (value) startBorderAnimation() else stopBorderAnimation()
+        if (value) {
+            reveal()
+            startBorderAnimation()
+        } else {
+            stopBorderAnimation()
+            scheduleFade()
+        }
         if (!animate) invalidate()
     }
 
     private fun toggleAutoplay() {
         SoundPlayer.play("ui_click")
+        reveal()
         val next = !enabled
         setAutoplayEnabled(next)
         onAutoplayChanged?.invoke(next)
+    }
+
+    private fun scheduleFade() {
+        removeCallbacks(fadeRunnable)
+        animate().cancel()
+        if (visibility != View.VISIBLE) return
+        alpha = 1f
+        if (enabled) return
+        postDelayed(fadeRunnable, 4_000L)
+    }
+
+    private fun reveal() {
+        if (visibility != View.VISIBLE) return
+        removeCallbacks(fadeRunnable)
+        animate()
+            .alpha(1f)
+            .setDuration(220L)
+            .start()
     }
 
     private fun updateContentDescription() {
@@ -142,6 +175,7 @@ class AutoplayButtonView(
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                reveal()
                 pressed = true
                 performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
                 invalidate()
@@ -172,9 +206,22 @@ class AutoplayButtonView(
     }
 
     override fun onDetachedFromWindow() {
+        removeCallbacks(fadeRunnable)
         borderAnimator?.cancel()
         borderAnimator = null
         super.onDetachedFromWindow()
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        scheduleFade()
+    }
+
+    override fun onVisibilityChanged(changedView: View, visibility: Int) {
+        super.onVisibilityChanged(changedView, visibility)
+        if (changedView === this) {
+            if (visibility == View.VISIBLE) scheduleFade() else removeCallbacks(fadeRunnable)
+        }
     }
 
     override fun onDraw(canvas: Canvas) {

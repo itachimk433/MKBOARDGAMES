@@ -85,10 +85,22 @@ class YoteActivity : AppCompatActivity() {
             textSize = 13f
             gravity = Gravity.CENTER
         }
+        undoButton = MancalaWoodButton(this, "Undo").apply {
+            style = MancalaWoodButton.Style.BLUE
+            onClick = { undoMove() }
+        }
         topInfoView = YotePieceStripView(this, PieceColor.BLACK)
         bottomInfoView = YotePieceStripView(this, PieceColor.WHITE)
-        header.addView(title, LinearLayout.LayoutParams(-1, (30 * density).toInt()))
-        header.addView(statusView, LinearLayout.LayoutParams(-1, (24 * density).toInt()))
+        header.addView(title, LinearLayout.LayoutParams(-1, (26 * density).toInt()))
+        val statusRow = FrameLayout(this)
+        statusRow.addView(statusView, FrameLayout.LayoutParams(-1, (24 * density).toInt()))
+        statusRow.addView(
+            undoButton,
+            FrameLayout.LayoutParams((78 * density).toInt(), (24 * density).toInt()).apply {
+                gravity = Gravity.END
+            },
+        )
+        header.addView(statusRow, LinearLayout.LayoutParams(-1, (24 * density).toInt()))
 
         boardView = YoteBoardView(this).apply {
             onMoveMade = { move, fromComputer -> handleBoardMove(move, fromComputer) }
@@ -115,12 +127,7 @@ class YoteActivity : AppCompatActivity() {
             style = MancalaWoodButton.Style.GOLD
             onClick = { if (!boardView.isLocked) showMenu() }
         }
-        undoButton = MancalaWoodButton(this, "Undo").apply {
-            style = MancalaWoodButton.Style.BLUE
-            onClick = { undoMove() }
-        }
         controls.addView(autoplayButton, LinearLayout.LayoutParams(0, (46 * density).toInt(), 1f))
-        controls.addView(undoButton, LinearLayout.LayoutParams(0, (46 * density).toInt(), 1f))
         controls.addView(menuButton, LinearLayout.LayoutParams(0, (46 * density).toInt(), 1f))
 
         gameLayout.addView(header, LinearLayout.LayoutParams(-1, (58 * density).toInt()))
@@ -322,7 +329,7 @@ class YoteActivity : AppCompatActivity() {
                 ChessChoiceView.Choice("New Game / Restart", "Start a fresh Yoté match", "↻", Color.parseColor("#E3B86A")),
                 ChessChoiceView.Choice("How To Play", "Review the rules", "?", Color.parseColor("#8EC7B9")),
                 ChessChoiceView.Choice("CPU Difficulty", "Choose the challenge", "◆", Color.parseColor("#A9B6E8")),
-                ChessChoiceView.Choice("Home", "Save and return to the catalogue", "⌂", Color.parseColor("#E58A7A")),
+                ChessChoiceView.Choice("Home", "Return to the catalogue", "⌂", Color.parseColor("#E58A7A")),
             ),
             onCancel = { showBoardAfterDialog() },
         ) {
