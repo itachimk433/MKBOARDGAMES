@@ -37,30 +37,27 @@ class YoteBoardView(context: Context) : View(context) {
     // intervening square blocks.
     private val carvedPocketCenters = arrayOf(
         floatArrayOf(
-            185f, 278f, 284f, 278f, 383f, 278f, 482f, 278f, 580f, 278f,
+            182f, 274f, 283f, 275f, 379f, 274f, 477f, 274f, 573f, 274f,
         ),
         floatArrayOf(
-            185f, 375f, 284f, 375f, 383f, 375f, 482f, 375f, 580f, 375f,
+            184f, 369f, 282f, 370f, 381f, 371f, 479f, 370f, 574f, 369f,
         ),
         floatArrayOf(
-            185f, 475f, 284f, 475f, 383f, 475f, 482f, 475f, 580f, 475f,
+            184f, 472f, 283f, 468f, 380f, 471f, 479f, 468f, 574f, 471f,
         ),
         floatArrayOf(
-            185f, 574f, 284f, 574f, 383f, 574f, 482f, 574f, 580f, 574f,
+            183f, 567f, 282f, 570f, 378f, 570f, 477f, 570f, 574f, 570f,
         ),
         floatArrayOf(
-            185f, 673f, 284f, 673f, 383f, 673f, 482f, 673f, 580f, 673f,
+            184f, 667f, 283f, 664f, 383f, 666f, 478f, 664f, 574f, 665f,
         ),
         floatArrayOf(
-            185f, 771f, 284f, 771f, 383f, 771f, 482f, 771f, 580f, 771f,
+            183f, 764f, 283f, 764f, 380f, 764f, 478f, 764f, 574f, 765f,
         ),
     )
     // The carved bitmap includes transparent padding around the photographed
     // board. Render the board itself instead of scaling that padding.
     private val carvedArtworkRect = Rect(70, 76, 660, 950)
-    // The bitmap's circular recesses sit a few artwork pixels above the
-    // first-pass visual measurement once the board is rendered on-device.
-    private val carvedPocketVerticalOffset = -4f
     // The carved asset has 100px pocket spacing and approximately 27px
     // pocket radius. Keep the rendered stone inside that measured opening,
     // including its rim and offset shadow.
@@ -650,7 +647,7 @@ class YoteBoardView(context: Context) : View(context) {
                 boardRect.left + boardRect.width() *
                     ((measured[offset] - carvedArtworkRect.left) / carvedArtworkRect.width()),
                 boardRect.top + boardRect.height() *
-                    ((measured[offset + 1] - carvedArtworkRect.top + carvedPocketVerticalOffset) /
+                    ((measured[offset + 1] - carvedArtworkRect.top) /
                         carvedArtworkRect.height()),
             )
         } else {
