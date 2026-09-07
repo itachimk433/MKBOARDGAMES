@@ -45,6 +45,8 @@ class MainActivity : AppCompatActivity() {
                     startActivity(Intent(this, MancalaActivity::class.java))
                 MenuView.GameType.YOTE ->
                     startActivity(Intent(this, YoteActivity::class.java))
+                MenuView.GameType.ONITAMA ->
+                    startActivity(Intent(this, OnitamaActivity::class.java))
                 else ->
                     startActivity(Intent(this, GameActivity::class.java).apply {
                         putExtra(GameActivity.EXTRA_GAME, type.name)

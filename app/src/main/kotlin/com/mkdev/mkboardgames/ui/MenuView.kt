@@ -40,7 +40,7 @@ class MenuView(context: Context) : View(context) {
 
     enum class GameType {
         CHESS, CHECKERS, INTERNATIONAL_DRAUGHTS, OTHELLO, MORABARABA, TICTACTOE, CONNECT_FOUR,
-        FOX_AND_GEESE, LUDO, XIANGQI, SHOGI, GO, MANCALA, YOTE
+        FOX_AND_GEESE, LUDO, XIANGQI, SHOGI, GO, MANCALA, YOTE, ONITAMA
     }
 
     private data class Card(val type: GameType, var rect: RectF = RectF())
@@ -51,7 +51,7 @@ class MenuView(context: Context) : View(context) {
         Card(GameType.TICTACTOE), Card(GameType.CONNECT_FOUR),
         Card(GameType.FOX_AND_GEESE), Card(GameType.LUDO),
         Card(GameType.XIANGQI), Card(GameType.SHOGI), Card(GameType.GO),
-        Card(GameType.MANCALA), Card(GameType.YOTE)
+        Card(GameType.MANCALA), Card(GameType.YOTE), Card(GameType.ONITAMA)
     )
 
     private val dp = context.resources.displayMetrics.density
@@ -106,6 +106,9 @@ class MenuView(context: Context) : View(context) {
     } catch (e: Exception) { null }
     private val yoteBoardBitmap: Bitmap? = try {
         context.assets.open("yote_home_icon.webp").use { BitmapFactory.decodeStream(it) }
+    } catch (e: Exception) { null }
+    private val onitamaBoardBitmap: Bitmap? = try {
+        context.assets.open("onitama_board.webp").use { BitmapFactory.decodeStream(it) }
     } catch (e: Exception) { null }
 
     private val bgPaint        = Paint().apply { color = Color.parseColor("#121212") }
@@ -435,6 +438,7 @@ class MenuView(context: Context) : View(context) {
             GameType.GO           -> "Go 围棋"       to "vs CPU  •  2 Players"
             GameType.MANCALA      -> "Mancala"       to "vs CPU  •  2 Players"
             GameType.YOTE         -> "Yoté"          to "vs CPU  •  2 Players"
+            GameType.ONITAMA      -> "Onitama"       to "vs CPU  •  2 Players"
         }
 
         val titleLines = if (title == "International Draughts") {
@@ -569,6 +573,34 @@ class MenuView(context: Context) : View(context) {
             GameType.GO -> drawGoMini(canvas, left, top, size)
             GameType.MANCALA -> drawMancalaMini(canvas, left, top, size)
             GameType.YOTE -> drawYoteMini(canvas, left, top, size)
+            GameType.ONITAMA -> drawOnitamaMini(canvas, left, top, size)
+        }
+    }
+
+    private fun drawOnitamaMini(canvas: Canvas, left: Float, top: Float, size: Float) {
+        onitamaBoardBitmap?.let {
+            canvas.drawBitmap(it, null, RectF(left, top, left + size, top + size), bitmapPaint)
+            return
+        }
+        val board = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#E9E0C8") }
+        val line = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#26343A")
+            style = Paint.Style.STROKE
+            strokeWidth = maxOf(1f, size * 0.018f)
+        }
+        canvas.drawRect(left, top, left + size, top + size, board)
+        for (i in 0..5) {
+            val offset = size * i / 5f
+            canvas.drawLine(left + offset, top, left + offset, top + size, line)
+            canvas.drawLine(left, top + offset, left + size, top + offset, line)
+        }
+        val white = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#E4B96C") }
+        val black = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#216176") }
+        listOf(0 to 0, 0 to 1, 0 to 2, 0 to 3, 0 to 4).forEach { (row, col) ->
+            canvas.drawCircle(left + (col + 0.5f) * size / 5f, top + (row + 0.5f) * size / 5f, size * 0.055f, black)
+        }
+        listOf(4 to 0, 4 to 1, 4 to 2, 4 to 3, 4 to 4).forEach { (row, col) ->
+            canvas.drawCircle(left + (col + 0.5f) * size / 5f, top + (row + 0.5f) * size / 5f, size * 0.055f, white)
         }
     }
 

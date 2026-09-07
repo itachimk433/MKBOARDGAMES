@@ -47,6 +47,8 @@ import com.mkdev.mkboardgames.ui.OthelloBoardStyle
 import com.mkdev.mkboardgames.ui.ShogiBoardStyle
 import com.mkdev.mkboardgames.ui.XiangqiBoardStyle
 import com.mkdev.mkboardgames.ui.YoteBoardView
+import com.mkdev.mkboardgames.games.onitama.OnitamaRuleEngine
+import com.mkdev.mkboardgames.ui.OnitamaBoardView
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -60,7 +62,7 @@ class ReplayActivity : AppCompatActivity() {
         const val EXTRA_MORABARABA_PIECE_COUNT = "morabaraba_piece_count"
         private val MOVE_METADATA_KEYS = arrayOf(
             "dice", "player", "token", "targetProgress", "drop", "promote", "pass",
-            "pawnDouble", "enPassant", "castle",
+            "pawnDouble", "enPassant", "castle", "card",
         )
 
         fun buildMovesJson(moves: List<Move>): String {
@@ -148,6 +150,7 @@ class ReplayActivity : AppCompatActivity() {
     private var moraBoardView: MorabaraBoardView?  = null
     private var ludoBoardView: LudoBoardView? = null
     private var yoteBoardView: YoteBoardView? = null
+    private var onitamaBoardView: OnitamaBoardView? = null
     private lateinit var seekBar:      SeekBar
     private lateinit var controlsView: ReplayControlsView
     private lateinit var infoView:     ReplayInfoView
@@ -242,6 +245,7 @@ class ReplayActivity : AppCompatActivity() {
         val isMorabaraba = gameType == "MORABARABA"
         val isLudo = gameType == "LUDO"
         val isYote = gameType == "YOTE"
+        val isOnitama = gameType == "ONITAMA"
 
         val engine: RuleEngine = when (gameType) {
             "TICTACTOE"  -> TicTacToeRuleEngine(ticBoardSize, ticBoardSize)
@@ -255,6 +259,7 @@ class ReplayActivity : AppCompatActivity() {
             "SHOGI" -> ShogiRuleEngine()
             "GO" -> GoRuleEngine()
             "YOTE" -> YoteRuleEngine()
+            "ONITAMA" -> OnitamaRuleEngine()
             else         -> ChessRuleEngine()
         }
 
@@ -281,7 +286,7 @@ class ReplayActivity : AppCompatActivity() {
         moveLabels = allLabels
 
         // Build per-state capture snapshots (not meaningful for TicTacToe or Othello)
-        val hasCaptures = !isTicTacToe && !isConnectFour && gameType != "OTHELLO" && !isLudo
+        val hasCaptures = !isTicTacToe && !isConnectFour && gameType != "OTHELLO" && !isLudo && !isOnitama
         val snaps = mutableListOf(CaptureSnapshot(emptyList(), emptyList()))
         if (hasCaptures) {
             if (gameType == "SHOGI") {
@@ -394,6 +399,16 @@ class ReplayActivity : AppCompatActivity() {
                 }
                 yoteBoardView = ybv
                 root.addView(ybv, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0).apply { weight = 1f })
+            }
+            isOnitama -> {
+                val obv = OnitamaBoardView(this).apply {
+                    gameState = states.first()
+                    selectedCardId = (engine as OnitamaRuleEngine).cards(states.first(), PieceColor.WHITE).firstOrNull()?.id
+                    isLocked = true
+                    onGameOverTapped = { showReplayResultDialog() }
+                }
+                onitamaBoardView = obv
+                root.addView(obv, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0).apply { weight = 1f })
             }
             else -> {
                 val bv = BoardView(this).apply {
@@ -568,6 +583,20 @@ class ReplayActivity : AppCompatActivity() {
                 }
                 ybv.animateMove(move)
             }
+            onitamaBoardView?.let { obv ->
+                obv.cancelMoveAnimation()
+                obv.gameState = states[cursor - 1]
+                obv.isLocked = true
+                val targetCursor = cursor
+                obv.onMoveMade = { _, _ ->
+                    if (cursor == targetCursor) {
+                        obv.onMoveMade = null
+                        obv.gameState = states[targetCursor]
+                        obv.isLocked = true
+                    }
+                }
+                obv.animateMove(move, fromComputer = true)
+            }
         } else {
             cursor              = newCursor
             boardView?.let {
@@ -581,6 +610,12 @@ class ReplayActivity : AppCompatActivity() {
             moraBoardView?.let { it.gameState = states[cursor]; it.isLocked = true }
             ludoBoardView?.let { it.gameState = states[cursor]; it.isLocked = true }
             yoteBoardView?.let {
+                it.cancelMoveAnimation()
+                it.onMoveMade = null
+                it.gameState = states[cursor]
+                it.isLocked = true
+            }
+            onitamaBoardView?.let {
                 it.cancelMoveAnimation()
                 it.onMoveMade = null
                 it.gameState = states[cursor]
@@ -637,6 +672,7 @@ class ReplayActivity : AppCompatActivity() {
         "TICTACTOE" -> "Tic-Tac-Toe"
         "CONNECTFOUR" -> "Connect Four"
         "YOTE" -> "Yoté"
+        "ONITAMA" -> "Onitama"
         else -> "Replay"
     }
 
