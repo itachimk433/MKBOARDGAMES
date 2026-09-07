@@ -301,13 +301,7 @@ class YoteBoardView(context: Context) : View(context) {
         val gapX = (cellWidth * 0.18f).coerceAtLeast(resources.displayMetrics.density * 8f)
         val gapY = (cellHeight * 0.22f).coerceAtLeast(resources.displayMetrics.density * 8f)
         coordinatePaint.textSize = textSize
-        coordinatePaint.color = Color.parseColor("#5B2D1E")
-        coordinatePaint.setShadowLayer(
-            resources.displayMetrics.density * 1.5f,
-            0f,
-            resources.displayMetrics.density * 0.7f,
-            Color.argb(170, 255, 242, 213),
-        )
+        coordinatePaint.color = Color.WHITE
 
         for (column in 0 until YoteRuleEngine.COLUMNS) {
             val x = gridRect.left + (column + 0.5f) * cellWidth
@@ -319,7 +313,6 @@ class YoteBoardView(context: Context) : View(context) {
             drawCenteredCoordinate(canvas, (row + 1).toString(), gridRect.left - gapX, y)
             drawCenteredCoordinate(canvas, (row + 1).toString(), gridRect.right + gapX, y)
         }
-        coordinatePaint.clearShadowLayer()
     }
 
     private fun drawCenteredCoordinate(canvas: Canvas, label: String, x: Float, y: Float) {

@@ -8,12 +8,14 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.mkdev.mkboardgames.engine.GameStatus
 import com.mkdev.mkboardgames.engine.Move
 import com.mkdev.mkboardgames.engine.Piece
 import com.mkdev.mkboardgames.engine.PieceColor
 import com.mkdev.mkboardgames.engine.Position
+import com.mkdev.mkboardgames.games.yote.YoteAutoplayLoopDetector
 import com.mkdev.mkboardgames.games.yote.YoteAIPlayer
 import com.mkdev.mkboardgames.games.yote.YoteRuleEngine
 import com.mkdev.mkboardgames.ui.AutoplayButtonView
@@ -42,6 +44,7 @@ class YoteActivity : AppCompatActivity() {
     private var autoplayMoveInProgress = false
     private var aiRequestToken = 0
     private var aiJob: Job? = null
+    private val autoplayLoopDetector = YoteAutoplayLoopDetector()
     private val previousStates = ArrayDeque<com.mkdev.mkboardgames.engine.GameState>()
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
@@ -57,6 +60,7 @@ class YoteActivity : AppCompatActivity() {
     private val capturedByBlack = mutableListOf<Piece>()
     private var pendingBonusCaptureMove: Move? = null
     private var pendingBonusCapturePositions: List<Position> = emptyList()
+    private var pendingBonusCaptureFromComputer = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -81,7 +85,11 @@ class YoteActivity : AppCompatActivity() {
             onBoardTapped = {
                 val pendingMove = pendingBonusCaptureMove
                 if (pendingMove != null && activeOverlay == null) {
-                    showBonusCapturePicker(pendingMove, pendingBonusCapturePositions)
+                    showBonusCapturePicker(
+                        pendingMove,
+                        pendingBonusCapturePositions,
+                        pendingBonusCaptureFromComputer,
+                    )
                     true
                 } else {
                     false
@@ -93,6 +101,7 @@ class YoteActivity : AppCompatActivity() {
             onAutoplayChanged = { enabled ->
                 if (vsAI) {
                     autoplayEnabled = enabled
+                    if (!enabled) autoplayLoopDetector.reset()
                     if (enabled && matchStarted && gameState.status == GameStatus.IN_PROGRESS &&
                         !boardView.isLocked && aiControlsCurrentTurn()
                     ) {
@@ -400,6 +409,7 @@ class YoteActivity : AppCompatActivity() {
         capturedByBlack.clear()
         pendingBonusCaptureMove = null
         pendingBonusCapturePositions = emptyList()
+        pendingBonusCaptureFromComputer = false
         PausedMatchStore.clear(this, "YOTE")
         autoplayButton.visibility = if (vsAI) View.VISIBLE else View.GONE
         autoplayButton.setAutoplayEnabled(false, animate = false)
@@ -448,16 +458,21 @@ class YoteActivity : AppCompatActivity() {
         val bonus = engine.availableBonusCaptures(gameState, move)
         if (bonus.isNotEmpty()) {
             boardView.isLocked = true
-            showBonusCapturePicker(move, bonus)
+            showBonusCapturePicker(move, bonus, fromComputer)
         } else {
-            commitMove(move)
+            commitMove(move, fromComputer)
         }
     }
 
-    private fun showBonusCapturePicker(move: Move, positions: List<Position>) {
+    private fun showBonusCapturePicker(
+        move: Move,
+        positions: List<Position>,
+        fromComputer: Boolean,
+    ) {
         boardView.isLocked = true
         pendingBonusCaptureMove = move
         pendingBonusCapturePositions = positions
+        pendingBonusCaptureFromComputer = fromComputer
         val choices = positions.map { position ->
             ChessChoiceView.Choice(
                 label = coordinate(position),
@@ -471,18 +486,19 @@ class YoteActivity : AppCompatActivity() {
             "Choose one extra opponent stone to remove.",
             choices,
             onDismiss = { boardView.isLocked = false },
-            onCancel = { showBonusCapturePicker(move, positions) },
+            onCancel = { showBonusCapturePicker(move, positions, fromComputer) },
             onChoice = { index ->
                 val completedMove = engine.completeBonusCapture(gameState, move, positions[index])
                 pendingBonusCaptureMove = null
                 pendingBonusCapturePositions = emptyList()
-                screenRoot.post { commitMove(completedMove) }
+                pendingBonusCaptureFromComputer = false
+                screenRoot.post { commitMove(completedMove, fromComputer) }
             },
             gridChoices = true,
         )
     }
 
-    private fun commitMove(move: Move) {
+    private fun commitMove(move: Move, fromComputer: Boolean = false) {
         val previous = gameState
         val nextState = engine.applyMove(previous, move)
         // A cancelled animation can finish after the activity has already
@@ -521,7 +537,12 @@ class YoteActivity : AppCompatActivity() {
             }
         } else {
             autoplayMoveInProgress = false
-            if (vsAI && aiControlsCurrentTurn()) triggerAI()
+            val loopDetected = autoplayEnabled && fromComputer && autoplayLoopDetector.record(move)
+            if (loopDetected) {
+                stopAutoplayForLoop()
+            } else if (vsAI && aiControlsCurrentTurn()) {
+                triggerAI()
+            }
         }
     }
 
@@ -664,6 +685,7 @@ class YoteActivity : AppCompatActivity() {
     private fun stopAutomatedGameplay() {
         autoplayEnabled = false
         autoplayMoveInProgress = false
+        autoplayLoopDetector.reset()
         aiRequestToken++
         aiJob?.cancel()
         aiJob = null
@@ -671,6 +693,11 @@ class YoteActivity : AppCompatActivity() {
         if (::boardView.isInitialized) boardView.isLocked = false
         if (::hudView.isInitialized) hudView.setThinking(false)
         if (::autoplayButton.isInitialized) autoplayButton.setAutoplayEnabled(false, animate = false)
+    }
+
+    private fun stopAutoplayForLoop() {
+        stopAutomatedGameplay()
+        Toast.makeText(this, "Loop detected, manual play required", Toast.LENGTH_LONG).show()
     }
 
     private fun showResultDialog() {
