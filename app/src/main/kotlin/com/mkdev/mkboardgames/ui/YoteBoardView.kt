@@ -37,22 +37,22 @@ class YoteBoardView(context: Context) : View(context) {
     // intervening square blocks.
     private val carvedPocketCenters = arrayOf(
         floatArrayOf(
-            182f, 274f, 283f, 275f, 379f, 274f, 477f, 274f, 573f, 274f,
+            186f, 269f, 287f, 270f, 383f, 269f, 481f, 269f, 577f, 269f,
         ),
         floatArrayOf(
-            184f, 369f, 282f, 370f, 381f, 371f, 479f, 370f, 574f, 369f,
+            188f, 364f, 286f, 365f, 385f, 366f, 483f, 365f, 578f, 364f,
         ),
         floatArrayOf(
-            184f, 472f, 283f, 468f, 380f, 471f, 479f, 468f, 574f, 471f,
+            188f, 467f, 287f, 463f, 384f, 466f, 483f, 463f, 578f, 466f,
         ),
         floatArrayOf(
-            183f, 567f, 282f, 570f, 378f, 570f, 477f, 570f, 574f, 570f,
+            187f, 562f, 286f, 565f, 382f, 565f, 481f, 565f, 578f, 565f,
         ),
         floatArrayOf(
-            184f, 667f, 283f, 664f, 383f, 666f, 478f, 664f, 574f, 665f,
+            188f, 662f, 287f, 659f, 387f, 661f, 482f, 659f, 578f, 660f,
         ),
         floatArrayOf(
-            183f, 764f, 283f, 764f, 380f, 764f, 478f, 764f, 574f, 765f,
+            187f, 759f, 287f, 759f, 384f, 759f, 482f, 759f, 578f, 760f,
         ),
     )
     // The carved bitmap includes transparent padding around the photographed
