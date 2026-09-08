@@ -211,7 +211,7 @@ private class ChessMancalaRulesView(
             isXiangqi -> "xiangqi_home_icon.png"
             isConnectFour -> "connect_four_home_icon.png"
             isLudo -> "ludo_home_icon.png"
-            isOnitama -> "onitama_card_eel.webp"
+            isOnitama -> "onitama_home_icon.webp"
             else -> null
         }
         assetName?.let {

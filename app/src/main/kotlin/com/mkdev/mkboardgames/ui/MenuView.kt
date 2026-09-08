@@ -107,8 +107,8 @@ class MenuView(context: Context) : View(context) {
     private val yoteBoardBitmap: Bitmap? = try {
         context.assets.open("yote_home_icon.webp").use { BitmapFactory.decodeStream(it) }
     } catch (e: Exception) { null }
-    private val onitamaBoardBitmap: Bitmap? = try {
-        context.assets.open("onitama_board.webp").use { BitmapFactory.decodeStream(it) }
+    private val onitamaHomeIconBitmap: Bitmap? = try {
+        context.assets.open("onitama_home_icon.webp").use { BitmapFactory.decodeStream(it) }
     } catch (e: Exception) { null }
 
     private val bgPaint        = Paint().apply { color = Color.parseColor("#121212") }
@@ -578,7 +578,7 @@ class MenuView(context: Context) : View(context) {
     }
 
     private fun drawOnitamaMini(canvas: Canvas, left: Float, top: Float, size: Float) {
-        onitamaBoardBitmap?.let {
+        onitamaHomeIconBitmap?.let {
             canvas.drawBitmap(it, null, RectF(left, top, left + size, top + size), bitmapPaint)
             return
         }
