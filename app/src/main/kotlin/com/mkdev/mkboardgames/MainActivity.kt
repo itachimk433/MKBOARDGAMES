@@ -1042,7 +1042,7 @@ class MainActivity : AppCompatActivity() {
             .setPositiveButton("OK", null)
             .setNeutralButton("Reset") { _, _ ->
                 AlertDialog.Builder(ctx).setTitle("Reset Stats?")
-                    .setMessage("This clears all wins, losses, draws and forfeits.")
+                    .setMessage("This clears all wins, losses, draws and forfeits for the current mode.")
                     .setPositiveButton("Reset") { _, _ -> SettingsManager.resetStats(ctx) }
                     .setNegativeButton("Cancel", null).show()
             }

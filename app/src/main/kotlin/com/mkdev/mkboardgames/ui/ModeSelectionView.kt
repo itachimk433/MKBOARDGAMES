@@ -2,10 +2,7 @@ package com.mkdev.mkboardgames.ui
 
 import android.animation.ValueAnimator
 import android.content.Context
-import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.Paint
-import android.graphics.RectF
+import android.graphics.*
 import android.view.MotionEvent
 import android.view.View
 import com.mkdev.mkboardgames.GameMode
@@ -30,16 +27,24 @@ class ModeSelectionView(context: Context) : View(context) {
     private var loadingMode: GameMode? = null
     private var loadingAngle = 0f
     private var loadingAnimator: ValueAnimator? = null
+    private var normalScale = 1f
+    private var irregularScale = 1f
 
-    private val backgroundPaint = Paint().apply {
-        color = Color.parseColor("#121212")
+    private val backgroundBitmap: Bitmap? = try {
+        context.assets.open("mode_selection_background.webp").use { BitmapFactory.decodeStream(it) }
+    } catch (_: Exception) {
+        null
     }
-    private val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    private val backgroundPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+    private val backgroundScrimPaint = Paint().apply {
+        color = Color.argb(58, 0, 0, 0)
+    }
+    private val modeIconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
         textAlign = Paint.Align.CENTER
         isFakeBoldText = true
-        textSize = 28f * textScale
-        letterSpacing = 0.06f
+        textSize = 38f * textScale
+        setShadowLayer(3f * unit, 0f, 2f * unit, Color.argb(220, 0, 0, 0))
     }
     private val sectionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#F7D99B")
@@ -48,20 +53,22 @@ class ModeSelectionView(context: Context) : View(context) {
         textSize = 11f * textScale
         letterSpacing = 0.12f
     }
-    private val symbolPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#63301F")
-        textAlign = Paint.Align.CENTER
-        isFakeBoldText = true
-        textSize = 21f * textScale
-    }
-    private val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#4A1714")
+    private val modeTitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
         textAlign = Paint.Align.CENTER
         isFakeBoldText = true
         textSize = 14f * textScale
+        setShadowLayer(2f * unit, 0f, 1f * unit, Color.argb(230, 0, 0, 0))
     }
+    private val modeDescriptionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#BDBDBD")
+        textAlign = Paint.Align.CENTER
+        textSize = 10f * textScale
+        setShadowLayer(1.5f * unit, 0f, 1f * unit, Color.argb(210, 0, 0, 0))
+    }
+    private val brownWoodCardRenderer = BrownWoodCardRenderer(unit)
     private val loadingRingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#4A1714")
+        color = Color.parseColor("#63301F")
         style = Paint.Style.STROKE
         strokeWidth = 2.5f * unit
         strokeCap = Paint.Cap.ROUND
@@ -81,10 +88,12 @@ class ModeSelectionView(context: Context) : View(context) {
     override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
         val buttonWidth = min(width - 48f * unit, 360f * unit)
         val left = (width - buttonWidth) / 2f
-        val buttonHeight = 82f * unit
+        val buttonHeight = 136f * unit
         val gap = 12f * unit
         val totalHeight = buttonHeight * 2f + gap
-        val firstTop = (height - totalHeight) / 2f
+        val firstTop = (height * 0.235f).coerceAtMost(
+            (height - totalHeight - 12f * unit).coerceAtLeast(12f * unit),
+        )
         normalRect.set(left, firstTop, left + buttonWidth, firstTop + buttonHeight)
         irregularRect.set(
             left,
@@ -96,29 +105,58 @@ class ModeSelectionView(context: Context) : View(context) {
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), backgroundPaint)
+        val bitmap = backgroundBitmap
+        if (bitmap == null) {
+            canvas.drawColor(Color.parseColor("#121212"))
+        } else {
+            val scale = maxOf(
+                width.toFloat() / bitmap.width.toFloat(),
+                height.toFloat() / bitmap.height.toFloat(),
+            )
+            val scaledWidth = bitmap.width * scale
+            val scaledHeight = bitmap.height * scale
+            val left = (width - scaledWidth) / 2f
+            val top = (height - scaledHeight) / 2f
+            canvas.drawBitmap(
+                bitmap,
+                null,
+                RectF(left, top, left + scaledWidth, top + scaledHeight),
+                backgroundPaint,
+            )
+            canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), backgroundScrimPaint)
+        }
 
         val centerX = width / 2f
-        canvas.drawText("MK BOARD GAMES", centerX, height * 0.17f, titlePaint)
-        canvas.drawText("SELECT MODE", centerX, height * 0.285f, sectionPaint)
+        canvas.drawText("SELECT MODE", centerX, height * 0.205f, sectionPaint)
 
-        drawModeButton(canvas, normalRect, GameMode.NORMAL, "♟️", "Play")
-        drawModeButton(canvas, irregularRect, GameMode.IRREGULAR, "♟️♟️", "Play (IRREGULAR MODE)")
+        drawModeCard(canvas, normalRect, GameMode.NORMAL, "♟️", "Play", "Standard rules")
+        drawModeCard(
+            canvas,
+            irregularRect,
+            GameMode.IRREGULAR,
+            "♟️♟️",
+            "Play (IRREGULAR MODE)",
+            "Irregular rules",
+        )
     }
 
-    private fun drawModeButton(
+    private fun drawModeCard(
         canvas: Canvas,
         rect: RectF,
         mode: GameMode,
         symbol: String,
         label: String,
+        description: String,
     ) {
-        val pressed = pressedMode == mode
-        drawChessWoodButton(canvas, rect, pressed, unit)
-        val offset = if (pressed) 2f * unit else 0f
-        canvas.drawText(symbol, rect.centerX(), rect.top + 27f * unit + offset, symbolPaint)
-        canvas.drawText(label, rect.centerX(), rect.top + 58f * unit + offset, labelPaint)
+        val scale = if (mode == GameMode.NORMAL) normalScale else irregularScale
+        canvas.save()
+        canvas.scale(scale, scale, rect.centerX(), rect.centerY())
+        brownWoodCardRenderer.draw(canvas, rect, pressedMode == mode)
+        canvas.drawText(symbol, rect.centerX(), rect.top + 52f * unit, modeIconPaint)
+        canvas.drawText(label, rect.centerX(), rect.top + 101f * unit, modeTitlePaint)
+        canvas.drawText(description, rect.centerX(), rect.top + 119f * unit, modeDescriptionPaint)
         if (loadingMode == mode) drawLoadingRing(canvas, rect)
+        canvas.restore()
     }
 
     private fun drawLoadingRing(canvas: Canvas, rect: RectF) {
@@ -134,6 +172,19 @@ class ModeSelectionView(context: Context) : View(context) {
         )
     }
 
+    private fun animateCardScale(mode: GameMode, target: Float) {
+        val from = if (mode == GameMode.NORMAL) normalScale else irregularScale
+        ValueAnimator.ofFloat(from, target).apply {
+            duration = if (target < 1f) 70L else 110L
+            addUpdateListener {
+                if (mode == GameMode.NORMAL) normalScale = it.animatedValue as Float
+                else irregularScale = it.animatedValue as Float
+                invalidate()
+            }
+            start()
+        }
+    }
+
     override fun onTouchEvent(event: MotionEvent): Boolean {
         if (loadingMode != null) return true
 
@@ -144,6 +195,7 @@ class ModeSelectionView(context: Context) : View(context) {
                     irregularRect.contains(event.x, event.y) -> GameMode.IRREGULAR
                     else -> null
                 }
+                pressedMode?.let { animateCardScale(it, 0.96f) }
                 invalidate()
                 return true
             }
@@ -153,6 +205,7 @@ class ModeSelectionView(context: Context) : View(context) {
                 if (current != null) {
                     val rect = if (current == GameMode.NORMAL) normalRect else irregularRect
                     if (!rect.contains(event.x, event.y)) {
+                        animateCardScale(current, 1f)
                         pressedMode = null
                         invalidate()
                     }
@@ -168,6 +221,7 @@ class ModeSelectionView(context: Context) : View(context) {
                     null -> null
                 }
                 pressedMode = null
+                selected?.let { animateCardScale(it, 1f) }
                 invalidate()
                 if (selected != null && rect?.contains(event.x, event.y) == true) {
                     SoundPlayer.play("ui_click")
@@ -191,6 +245,7 @@ class ModeSelectionView(context: Context) : View(context) {
             }
 
             MotionEvent.ACTION_CANCEL -> {
+                pressedMode?.let { animateCardScale(it, 1f) }
                 pressedMode = null
                 invalidate()
                 return true

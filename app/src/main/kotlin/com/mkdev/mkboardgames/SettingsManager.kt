@@ -76,10 +76,10 @@ object SettingsManager {
 
     // ── Active game tag ───────────────────────────────────────────────────────
     fun setActiveGame(ctx: Context, gameTag: String) =
-        sharedPrefs(ctx).edit().putString(KEY_ACTIVE_GAME, gameTag).apply()
+        prefs(ctx).edit().putString(KEY_ACTIVE_GAME, gameTag).apply()
 
     private fun activeGame(ctx: Context) =
-        sharedPrefs(ctx).getString(KEY_ACTIVE_GAME, "overall") ?: "overall"
+        prefs(ctx).getString(KEY_ACTIVE_GAME, "overall") ?: "overall"
 
     // ── Chess ────────────────────────────────────────────────────────────────
     data class ChessAiProfile(val depth: Int, val timeLimitMs: Long, val quiesceDepth: Int)
@@ -355,50 +355,50 @@ object SettingsManager {
     data class Stats(val wins: Int, val losses: Int, val draws: Int, val forfeits: Int)
 
     fun getStats(ctx: Context) = Stats(
-        wins     = sharedPrefs(ctx).getInt(KEY_STATS_WINS,     0),
-        losses   = sharedPrefs(ctx).getInt(KEY_STATS_LOSSES,   0),
-        draws    = sharedPrefs(ctx).getInt(KEY_STATS_DRAWS,    0),
-        forfeits = sharedPrefs(ctx).getInt(KEY_STATS_FORFEITS, 0)
+        wins     = prefs(ctx).getInt(KEY_STATS_WINS,     0),
+        losses   = prefs(ctx).getInt(KEY_STATS_LOSSES,   0),
+        draws    = prefs(ctx).getInt(KEY_STATS_DRAWS,    0),
+        forfeits = prefs(ctx).getInt(KEY_STATS_FORFEITS, 0)
     )
 
     fun getGameStats(ctx: Context, game: String) = Stats(
-        wins     = sharedPrefs(ctx).getInt(winKey(game),     0),
-        losses   = sharedPrefs(ctx).getInt(lossKey(game),    0),
-        draws    = sharedPrefs(ctx).getInt(drawKey(game),    0),
-        forfeits = sharedPrefs(ctx).getInt(forfeitKey(game), 0)
+        wins     = prefs(ctx).getInt(winKey(game),     0),
+        losses   = prefs(ctx).getInt(lossKey(game),    0),
+        draws    = prefs(ctx).getInt(drawKey(game),    0),
+        forfeits = prefs(ctx).getInt(forfeitKey(game), 0)
     )
 
     // ── Record outcomes — updates both global AND per-game counters ───────────
 
     fun recordWin(ctx: Context) {
         val game = activeGame(ctx)
-        sharedPrefs(ctx).edit()
-            .putInt(KEY_STATS_WINS,    sharedPrefs(ctx).getInt(KEY_STATS_WINS,    0) + 1)
-            .putInt(winKey(game),      sharedPrefs(ctx).getInt(winKey(game),      0) + 1)
+        prefs(ctx).edit()
+            .putInt(KEY_STATS_WINS,    prefs(ctx).getInt(KEY_STATS_WINS,    0) + 1)
+            .putInt(winKey(game),      prefs(ctx).getInt(winKey(game),      0) + 1)
             .apply()
     }
 
     fun recordLoss(ctx: Context) {
         val game = activeGame(ctx)
-        sharedPrefs(ctx).edit()
-            .putInt(KEY_STATS_LOSSES,  sharedPrefs(ctx).getInt(KEY_STATS_LOSSES,  0) + 1)
-            .putInt(lossKey(game),     sharedPrefs(ctx).getInt(lossKey(game),     0) + 1)
+        prefs(ctx).edit()
+            .putInt(KEY_STATS_LOSSES,  prefs(ctx).getInt(KEY_STATS_LOSSES,  0) + 1)
+            .putInt(lossKey(game),     prefs(ctx).getInt(lossKey(game),     0) + 1)
             .apply()
     }
 
     fun recordDraw(ctx: Context) {
         val game = activeGame(ctx)
-        sharedPrefs(ctx).edit()
-            .putInt(KEY_STATS_DRAWS,   sharedPrefs(ctx).getInt(KEY_STATS_DRAWS,   0) + 1)
-            .putInt(drawKey(game),     sharedPrefs(ctx).getInt(drawKey(game),     0) + 1)
+        prefs(ctx).edit()
+            .putInt(KEY_STATS_DRAWS,   prefs(ctx).getInt(KEY_STATS_DRAWS,   0) + 1)
+            .putInt(drawKey(game),     prefs(ctx).getInt(drawKey(game),     0) + 1)
             .apply()
     }
 
     fun recordForfeit(ctx: Context) {
         val game = activeGame(ctx)
-        sharedPrefs(ctx).edit()
-            .putInt(KEY_STATS_FORFEITS, sharedPrefs(ctx).getInt(KEY_STATS_FORFEITS, 0) + 1)
-            .putInt(forfeitKey(game),   sharedPrefs(ctx).getInt(forfeitKey(game),   0) + 1)
+        prefs(ctx).edit()
+            .putInt(KEY_STATS_FORFEITS, prefs(ctx).getInt(KEY_STATS_FORFEITS, 0) + 1)
+            .putInt(forfeitKey(game),   prefs(ctx).getInt(forfeitKey(game),   0) + 1)
             .apply()
     }
 
@@ -408,7 +408,7 @@ object SettingsManager {
     }
 
     fun resetStats(ctx: Context) {
-        val edit = sharedPrefs(ctx).edit()
+        val edit = prefs(ctx).edit()
         edit.putInt(KEY_STATS_WINS, 0).putInt(KEY_STATS_LOSSES, 0)
             .putInt(KEY_STATS_DRAWS, 0).putInt(KEY_STATS_FORFEITS, 0)
         for (g in listOf(
