@@ -609,6 +609,7 @@ class OnitamaActivity : AppCompatActivity() {
 
     @Suppress("DEPRECATION")
     override fun onBackPressed() {
+        if (StyledDialogs.handleBackPressed()) return
         if (activeOverlay != null) {
             val callback = activeOverlay?.tag as? (() -> Unit)
             dismissOverlay(revealGame = false)

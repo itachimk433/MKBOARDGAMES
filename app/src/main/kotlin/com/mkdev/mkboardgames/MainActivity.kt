@@ -11,11 +11,15 @@ import android.widget.*
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.mkdev.mkboardgames.ui.MenuView
+import com.mkdev.mkboardgames.ui.ModeSelectionView
 
 class MainActivity : AppCompatActivity() {
 
     private var activeSettingsDialog: AlertDialog? = null
     private var menuView: MenuView? = null
+    private lateinit var screenRoot: FrameLayout
+    private var showingGameMenu = false
+    private var selectedGameMode = GameMode.NORMAL
 
     private companion object {
         const val SUPPORT_EMAIL = "mkdev4360@gmail.com"
@@ -28,42 +32,11 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         makeFullscreen()
-
-        val menu = MenuView(this)
-        menuView = menu
-        menu.onGameSelected = { type ->
-            when (type) {
-                MenuView.GameType.MORABARABA ->
-                    startActivity(Intent(this, MorabarabaActivity::class.java))
-                MenuView.GameType.TICTACTOE ->
-                    startActivity(Intent(this, TicTacToeActivity::class.java))
-                MenuView.GameType.CONNECT_FOUR ->
-                    startActivity(Intent(this, ConnectFourActivity::class.java))
-                MenuView.GameType.LUDO ->
-                    startActivity(Intent(this, LudoActivity::class.java))
-                MenuView.GameType.MANCALA ->
-                    startActivity(Intent(this, MancalaActivity::class.java))
-                MenuView.GameType.YOTE ->
-                    startActivity(Intent(this, YoteActivity::class.java))
-                MenuView.GameType.ONITAMA ->
-                    startActivity(Intent(this, OnitamaActivity::class.java))
-                else ->
-                    startActivity(Intent(this, GameActivity::class.java).apply {
-                        putExtra(GameActivity.EXTRA_GAME, type.name)
-                    })
-            }
-        }
-        menu.onSettingsClicked = { showSettings() }
-        menu.onLogoTapped      = { showStatsDialog() }
         SoundPlayer.init(this)
 
-        val root = android.widget.LinearLayout(this).apply {
-            orientation = android.widget.LinearLayout.VERTICAL
-        }
-        root.addView(menu, android.widget.LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, 0).apply { weight = 1f })
-
-        setContentView(root)
+        screenRoot = FrameLayout(this)
+        setContentView(screenRoot)
+        showModeSelection()
 
 
 
@@ -72,6 +45,76 @@ class MainActivity : AppCompatActivity() {
             if (visibility and View.SYSTEM_UI_FLAG_FULLSCREEN == 0)
                 window.decorView.postDelayed({ makeFullscreen() }, 200)
         }
+    }
+
+    private fun showModeSelection() {
+        activeSettingsDialog?.dismiss()
+        activeSettingsDialog = null
+        showingGameMenu = false
+        menuView = null
+
+        val modeSelection = ModeSelectionView(this).apply {
+            onModeSelected = { mode ->
+                selectedGameMode = mode
+                showGameMenu()
+            }
+            onSettingsClicked = { showSettings() }
+            onLogoTapped = { showStatsDialog() }
+        }
+        screenRoot.removeAllViews()
+        screenRoot.addView(modeSelection, FrameLayout.LayoutParams(-1, -1))
+    }
+
+    private fun showGameMenu() {
+        showingGameMenu = true
+        val menu = MenuView(this)
+        menuView = menu
+        menu.onGameSelected = { type -> launchGame(type) }
+        menu.onSettingsClicked = { showSettings() }
+        menu.onLogoTapped = { showStatsDialog() }
+        screenRoot.removeAllViews()
+        screenRoot.addView(menu, FrameLayout.LayoutParams(-1, -1))
+    }
+
+    private fun launchGame(type: MenuView.GameType) {
+        val modeExtra = selectedGameMode.name
+        when (type) {
+            MenuView.GameType.MORABARABA ->
+                startActivity(Intent(this, MorabarabaActivity::class.java).withGameMode(modeExtra))
+            MenuView.GameType.TICTACTOE ->
+                startActivity(Intent(this, TicTacToeActivity::class.java).withGameMode(modeExtra))
+            MenuView.GameType.CONNECT_FOUR ->
+                startActivity(Intent(this, ConnectFourActivity::class.java).withGameMode(modeExtra))
+            MenuView.GameType.LUDO ->
+                startActivity(Intent(this, LudoActivity::class.java).withGameMode(modeExtra))
+            MenuView.GameType.MANCALA ->
+                startActivity(Intent(this, MancalaActivity::class.java).withGameMode(modeExtra))
+            MenuView.GameType.YOTE ->
+                startActivity(Intent(this, YoteActivity::class.java).withGameMode(modeExtra))
+            MenuView.GameType.ONITAMA ->
+                startActivity(Intent(this, OnitamaActivity::class.java).withGameMode(modeExtra))
+            else ->
+                startActivity(Intent(this, GameActivity::class.java).apply {
+                    putExtra(GameActivity.EXTRA_GAME, type.name)
+                    putExtra(GameMode.EXTRA_MODE, modeExtra)
+                })
+        }
+    }
+
+    private fun Intent.withGameMode(mode: String): Intent =
+        apply { putExtra(GameMode.EXTRA_MODE, mode) }
+
+    @Suppress("DEPRECATION")
+    override fun onBackPressed() {
+        if (activeSettingsDialog?.isShowing == true) {
+            activeSettingsDialog?.dismiss()
+            return
+        }
+        if (showingGameMenu) {
+            showModeSelection()
+            return
+        }
+        super.onBackPressed()
     }
 
     override fun onResume() { super.onResume(); makeFullscreen() }
