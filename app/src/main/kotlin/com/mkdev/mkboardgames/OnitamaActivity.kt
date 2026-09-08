@@ -58,6 +58,7 @@ class OnitamaActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        SettingsManager.setCurrentModeFromIntent(this, intent)
         makeFullscreen()
         SoundPlayer.init(this)
         val density = resources.displayMetrics.density

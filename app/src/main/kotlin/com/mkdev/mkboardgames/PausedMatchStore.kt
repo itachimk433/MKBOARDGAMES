@@ -32,8 +32,15 @@ object PausedMatchStore {
     private fun prefs(context: Context) =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
+    private fun storageKey(context: Context, gameType: String): String =
+        if (SettingsManager.currentMode(context) == GameMode.IRREGULAR) {
+            "IRREGULAR_$gameType"
+        } else {
+            gameType
+        }
+
     fun has(context: Context, gameType: String): Boolean =
-        prefs(context).contains(gameType)
+        prefs(context).contains(storageKey(context, gameType))
 
     fun save(
         context: Context,
@@ -61,11 +68,11 @@ object PausedMatchStore {
             setupSeed?.let { put("setupSeed", it) }
             put("moves", encodeMoves(moves))
         }
-        prefs(context).edit().putString(gameType, payload.toString()).apply()
+        prefs(context).edit().putString(storageKey(context, gameType), payload.toString()).apply()
     }
 
     fun load(context: Context, gameType: String): Match? {
-        val raw = prefs(context).getString(gameType, null) ?: return null
+        val raw = prefs(context).getString(storageKey(context, gameType), null) ?: return null
         return try {
             val payload = JSONObject(raw)
             Match(
@@ -87,7 +94,7 @@ object PausedMatchStore {
     }
 
     fun clear(context: Context, gameType: String) {
-        prefs(context).edit().remove(gameType).apply()
+        prefs(context).edit().remove(storageKey(context, gameType)).apply()
     }
 
     private fun encodeMoves(moves: List<Move>): JSONArray =

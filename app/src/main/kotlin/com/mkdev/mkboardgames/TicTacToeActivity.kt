@@ -53,6 +53,7 @@ class TicTacToeActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        SettingsManager.setCurrentModeFromIntent(this, intent)
         makeFullscreen()
 
         val dp   = resources.displayMetrics.density

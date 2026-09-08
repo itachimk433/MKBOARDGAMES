@@ -5,6 +5,8 @@ import android.content.Context
 object SettingsManager {
 
     private const val PREFS = "nexboard_prefs"
+    private const val IRREGULAR_PREFS = "nexboard_irregular_prefs"
+    private const val KEY_GAME_MODE = "game_mode"
 
     // ── Difficulty keys ──────────────────────────────────────────────────────
     private const val KEY_CHESS_DIFFICULTY      = "chess_ai_difficulty"
@@ -52,14 +54,32 @@ object SettingsManager {
     // active game tag — set at the start of every vs-AI game
     private const val KEY_ACTIVE_GAME = "active_game_tag"
 
-    private fun prefs(ctx: Context) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    private fun sharedPrefs(ctx: Context) =
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
+    private fun prefs(ctx: Context) =
+        ctx.getSharedPreferences(
+            if (currentMode(ctx) == GameMode.IRREGULAR) IRREGULAR_PREFS else PREFS,
+            Context.MODE_PRIVATE,
+        )
+
+    fun currentMode(ctx: Context): GameMode =
+        GameMode.fromName(sharedPrefs(ctx).getString(KEY_GAME_MODE, GameMode.NORMAL.name))
+
+    fun setCurrentMode(ctx: Context, mode: GameMode) {
+        sharedPrefs(ctx).edit().putString(KEY_GAME_MODE, mode.name).apply()
+    }
+
+    fun setCurrentModeFromIntent(ctx: Context, intent: android.content.Intent) {
+        setCurrentMode(ctx, GameMode.fromName(intent.getStringExtra(GameMode.EXTRA_MODE)))
+    }
 
     // ── Active game tag ───────────────────────────────────────────────────────
     fun setActiveGame(ctx: Context, gameTag: String) =
-        prefs(ctx).edit().putString(KEY_ACTIVE_GAME, gameTag).apply()
+        sharedPrefs(ctx).edit().putString(KEY_ACTIVE_GAME, gameTag).apply()
 
     private fun activeGame(ctx: Context) =
-        prefs(ctx).getString(KEY_ACTIVE_GAME, "overall") ?: "overall"
+        sharedPrefs(ctx).getString(KEY_ACTIVE_GAME, "overall") ?: "overall"
 
     // ── Chess ────────────────────────────────────────────────────────────────
     data class ChessAiProfile(val depth: Int, val timeLimitMs: Long, val quiesceDepth: Int)
@@ -335,50 +355,50 @@ object SettingsManager {
     data class Stats(val wins: Int, val losses: Int, val draws: Int, val forfeits: Int)
 
     fun getStats(ctx: Context) = Stats(
-        wins     = prefs(ctx).getInt(KEY_STATS_WINS,     0),
-        losses   = prefs(ctx).getInt(KEY_STATS_LOSSES,   0),
-        draws    = prefs(ctx).getInt(KEY_STATS_DRAWS,    0),
-        forfeits = prefs(ctx).getInt(KEY_STATS_FORFEITS, 0)
+        wins     = sharedPrefs(ctx).getInt(KEY_STATS_WINS,     0),
+        losses   = sharedPrefs(ctx).getInt(KEY_STATS_LOSSES,   0),
+        draws    = sharedPrefs(ctx).getInt(KEY_STATS_DRAWS,    0),
+        forfeits = sharedPrefs(ctx).getInt(KEY_STATS_FORFEITS, 0)
     )
 
     fun getGameStats(ctx: Context, game: String) = Stats(
-        wins     = prefs(ctx).getInt(winKey(game),     0),
-        losses   = prefs(ctx).getInt(lossKey(game),    0),
-        draws    = prefs(ctx).getInt(drawKey(game),    0),
-        forfeits = prefs(ctx).getInt(forfeitKey(game), 0)
+        wins     = sharedPrefs(ctx).getInt(winKey(game),     0),
+        losses   = sharedPrefs(ctx).getInt(lossKey(game),    0),
+        draws    = sharedPrefs(ctx).getInt(drawKey(game),    0),
+        forfeits = sharedPrefs(ctx).getInt(forfeitKey(game), 0)
     )
 
     // ── Record outcomes — updates both global AND per-game counters ───────────
 
     fun recordWin(ctx: Context) {
         val game = activeGame(ctx)
-        prefs(ctx).edit()
-            .putInt(KEY_STATS_WINS,    prefs(ctx).getInt(KEY_STATS_WINS,    0) + 1)
-            .putInt(winKey(game),      prefs(ctx).getInt(winKey(game),      0) + 1)
+        sharedPrefs(ctx).edit()
+            .putInt(KEY_STATS_WINS,    sharedPrefs(ctx).getInt(KEY_STATS_WINS,    0) + 1)
+            .putInt(winKey(game),      sharedPrefs(ctx).getInt(winKey(game),      0) + 1)
             .apply()
     }
 
     fun recordLoss(ctx: Context) {
         val game = activeGame(ctx)
-        prefs(ctx).edit()
-            .putInt(KEY_STATS_LOSSES,  prefs(ctx).getInt(KEY_STATS_LOSSES,  0) + 1)
-            .putInt(lossKey(game),     prefs(ctx).getInt(lossKey(game),     0) + 1)
+        sharedPrefs(ctx).edit()
+            .putInt(KEY_STATS_LOSSES,  sharedPrefs(ctx).getInt(KEY_STATS_LOSSES,  0) + 1)
+            .putInt(lossKey(game),     sharedPrefs(ctx).getInt(lossKey(game),     0) + 1)
             .apply()
     }
 
     fun recordDraw(ctx: Context) {
         val game = activeGame(ctx)
-        prefs(ctx).edit()
-            .putInt(KEY_STATS_DRAWS,   prefs(ctx).getInt(KEY_STATS_DRAWS,   0) + 1)
-            .putInt(drawKey(game),     prefs(ctx).getInt(drawKey(game),     0) + 1)
+        sharedPrefs(ctx).edit()
+            .putInt(KEY_STATS_DRAWS,   sharedPrefs(ctx).getInt(KEY_STATS_DRAWS,   0) + 1)
+            .putInt(drawKey(game),     sharedPrefs(ctx).getInt(drawKey(game),     0) + 1)
             .apply()
     }
 
     fun recordForfeit(ctx: Context) {
         val game = activeGame(ctx)
-        prefs(ctx).edit()
-            .putInt(KEY_STATS_FORFEITS, prefs(ctx).getInt(KEY_STATS_FORFEITS, 0) + 1)
-            .putInt(forfeitKey(game),   prefs(ctx).getInt(forfeitKey(game),   0) + 1)
+        sharedPrefs(ctx).edit()
+            .putInt(KEY_STATS_FORFEITS, sharedPrefs(ctx).getInt(KEY_STATS_FORFEITS, 0) + 1)
+            .putInt(forfeitKey(game),   sharedPrefs(ctx).getInt(forfeitKey(game),   0) + 1)
             .apply()
     }
 
@@ -388,7 +408,7 @@ object SettingsManager {
     }
 
     fun resetStats(ctx: Context) {
-        val edit = prefs(ctx).edit()
+        val edit = sharedPrefs(ctx).edit()
         edit.putInt(KEY_STATS_WINS, 0).putInt(KEY_STATS_LOSSES, 0)
             .putInt(KEY_STATS_DRAWS, 0).putInt(KEY_STATS_FORFEITS, 0)
         for (g in listOf(
@@ -404,6 +424,7 @@ object SettingsManager {
 
     // ── Privacy consent ───────────────────────────────────────────────────────
     private const val KEY_CONSENT = "privacy_policy_accepted"
-    fun hasConsentAccepted(ctx: Context) = prefs(ctx).getBoolean(KEY_CONSENT, false)
-    fun setConsentAccepted(ctx: Context) = prefs(ctx).edit().putBoolean(KEY_CONSENT, true).apply()
+    fun hasConsentAccepted(ctx: Context) = sharedPrefs(ctx).getBoolean(KEY_CONSENT, false)
+    fun setConsentAccepted(ctx: Context) =
+        sharedPrefs(ctx).edit().putBoolean(KEY_CONSENT, true).apply()
 }

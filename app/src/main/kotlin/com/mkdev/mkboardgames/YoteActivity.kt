@@ -64,6 +64,7 @@ class YoteActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        SettingsManager.setCurrentModeFromIntent(this, intent)
         makeFullscreen()
         val density = resources.displayMetrics.density
 

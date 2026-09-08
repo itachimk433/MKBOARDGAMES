@@ -89,6 +89,7 @@ class LudoActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        SettingsManager.setCurrentModeFromIntent(this, intent)
         makeFullscreen()
         SoundPlayer.init(this)
         SettingsManager.activateGameTheme(this, "ludo")

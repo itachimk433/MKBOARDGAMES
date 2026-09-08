@@ -56,10 +56,9 @@ class MainActivity : AppCompatActivity() {
         val modeSelection = ModeSelectionView(this).apply {
             onModeSelected = { mode ->
                 selectedGameMode = mode
+                SettingsManager.setCurrentMode(this@MainActivity, mode)
                 showGameMenu()
             }
-            onSettingsClicked = { showSettings() }
-            onLogoTapped = { showStatsDialog() }
         }
         screenRoot.removeAllViews()
         screenRoot.addView(modeSelection, FrameLayout.LayoutParams(-1, -1))
