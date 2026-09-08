@@ -87,7 +87,7 @@ class ChessMenuView(
             isLudo -> "ludo_home_icon.png"
             isMancala -> "mancala_home_icon.webp"
             isYote -> "yote_home_icon.webp"
-            isOnitama -> "onitama_card_eel.webp"
+            isOnitama -> "onitama_home_icon.webp"
             else -> null
         }
         assetName?.let {

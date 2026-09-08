@@ -161,11 +161,6 @@ class YoteActivity : AppCompatActivity() {
         super.onPause()
     }
 
-    override fun onTaskRemoved(rootIntent: Intent?) {
-        if (!isFinishing) savePausedMatch()
-        super.onTaskRemoved(rootIntent)
-    }
-
     override fun onDestroy() {
         stopAutomatedGameplay()
         scope.cancel()

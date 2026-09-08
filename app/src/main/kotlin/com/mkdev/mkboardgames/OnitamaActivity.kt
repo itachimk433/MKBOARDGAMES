@@ -602,11 +602,6 @@ class OnitamaActivity : AppCompatActivity() {
         super.onPause()
     }
 
-    override fun onTaskRemoved(rootIntent: Intent?) {
-        if (!isFinishing) savePausedMatch()
-        super.onTaskRemoved(rootIntent)
-    }
-
     override fun onDestroy() {
         scope.cancel()
         super.onDestroy()
