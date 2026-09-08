@@ -258,7 +258,10 @@ class OnitamaActivity : AppCompatActivity() {
                     updateHud()
                     return@launch
                 }
-                move?.let { boardView.animateMove(it, fromComputer = true) } ?: run {
+                move?.let {
+                    selectCardForMove(it)
+                    boardView.animateMove(it, fromComputer = true)
+                } ?: run {
                     boardView.isLocked = false
                     updateHud()
                 }
@@ -270,6 +273,19 @@ class OnitamaActivity : AppCompatActivity() {
 
     private fun aiControlsCurrentTurn(): Boolean =
         vsAI && (gameState.currentTurn != playerColor || autoplayEnabled)
+
+    private fun selectCardForMove(move: Move) {
+        val cardId = move.metadata["card"] as? String ?: return
+        val cards = engine.cards(gameState, gameState.currentTurn)
+        val selectedIndex = cards.indexOfFirst { it.id == cardId }
+        if (selectedIndex < 0) return
+        if (gameState.currentTurn == PieceColor.WHITE) {
+            whiteCardIndex = selectedIndex
+        } else {
+            blackCardIndex = selectedIndex
+        }
+        syncCards()
+    }
 
     private fun syncCards() {
         topCards.cards = engine.cards(gameState, PieceColor.BLACK)
@@ -379,7 +395,7 @@ class OnitamaActivity : AppCompatActivity() {
         val rules = ChessRulesView(
             this,
             "Onitama",
-            "Overview\nOnitama is a fast martial-arts duel on a 5 × 5 board. Each player commands one Master and four Students. White moves first.\n\nMoving\nChoose one of your two movement cards. Select one of your pieces, then choose a highlighted destination. A move must follow the card exactly, stay on the board, and land on an empty square or an opposing piece.\n\nCards & Swapping\nAfter moving, the card you used is exchanged with the shared side card. The used card becomes the new side card and is available to the next player.\n\nCapturing\nA piece may capture an opposing piece by landing on its square. The Master is a piece too and may use either card. Your pieces may never land on a friendly piece.\n\nWinning\nCapture the opposing Master or move your Master onto the opposing Temple Arch. The match ends immediately when either victory condition is reached.",
+            "Overview\nOnitama is a fast martial-arts duel on a 5 × 5 board. Each player commands one Master and four Students. White moves first.\n\nMoving\nChoose one of your two movement cards. Select one of your pieces, then choose a highlighted destination. A move must follow the card exactly, stay on the board, and land on an empty square or an opposing piece.\n\nCards & Swapping\nAfter moving, swap the card you used with the shared SIDE card. The old SIDE card joins your hand, while the card you used becomes the new SIDE card. Your newly received card can be used on a later turn.\n\nCapturing\nA piece may capture an opposing piece by landing on its square. The Master is a piece too and may use either card. Your pieces may never land on a friendly piece.\n\nWinning\nCapture the opposing Master or move your Master onto the opposing Temple Arch. The match ends immediately when either victory condition is reached.",
             gameLabel = "O N I T A M A",
             headerSymbol = "◆",
         )

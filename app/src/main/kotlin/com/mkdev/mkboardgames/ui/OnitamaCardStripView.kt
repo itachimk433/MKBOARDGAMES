@@ -76,7 +76,7 @@ class OnitamaCardStripView(
             textPaint.textAlign = Paint.Align.CENTER
             textPaint.textSize = 7f * density
             textPaint.color = Color.argb(175, 228, 241, 240)
-            canvas.drawText("SIDE", rect.centerX(), 16f * density, textPaint)
+            canvas.drawText("SIDE • SWAP IN", rect.centerX(), 16f * density, textPaint)
             drawCard(canvas, rect, card, false)
         }
 
@@ -100,8 +100,16 @@ class OnitamaCardStripView(
                 runCatching { getContext().assets.open(asset).use(BitmapFactory::decodeStream) }.getOrNull()
             }
             if (bitmap != null) {
-                val inset = 3f * density
-                canvas.drawBitmap(bitmap, null, RectF(rect.left + inset, rect.top + inset, rect.right - inset, rect.bottom - inset), imagePaint)
+                val path = Path().apply {
+                    addRoundRect(rect, 8f * density, 8f * density, Path.Direction.CW)
+                }
+                canvas.save()
+                canvas.clipPath(path)
+                canvas.drawBitmap(bitmap, null, rect, imagePaint)
+                canvas.restore()
+                borderPaint.color = if (selected) Color.parseColor("#FFE09C") else Color.argb(120, 180, 213, 207)
+                borderPaint.strokeWidth = if (selected) 2f * density else density
+                canvas.drawRoundRect(rect, 8f * density, 8f * density, borderPaint)
                 return
             }
         }
