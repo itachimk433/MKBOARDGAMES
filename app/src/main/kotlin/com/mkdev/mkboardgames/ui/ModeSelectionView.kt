@@ -1,5 +1,6 @@
 package com.mkdev.mkboardgames.ui
 
+import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
@@ -26,18 +27,19 @@ class ModeSelectionView(context: Context) : View(context) {
     private val normalRect = RectF()
     private val irregularRect = RectF()
     private var pressedMode: GameMode? = null
+    private var loadingMode: GameMode? = null
+    private var loadingAngle = 0f
+    private var loadingAnimator: ValueAnimator? = null
 
+    private val backgroundPaint = Paint().apply {
+        color = Color.parseColor("#121212")
+    }
     private val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
         textAlign = Paint.Align.CENTER
         isFakeBoldText = true
         textSize = 28f * textScale
         letterSpacing = 0.06f
-    }
-    private val subtitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(205, 220, 235, 244)
-        textAlign = Paint.Align.CENTER
-        textSize = 13f * textScale
     }
     private val sectionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#F7D99B")
@@ -58,10 +60,22 @@ class ModeSelectionView(context: Context) : View(context) {
         isFakeBoldText = true
         textSize = 14f * textScale
     }
+    private val loadingRingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#4A1714")
+        style = Paint.Style.STROKE
+        strokeWidth = 2.5f * unit
+        strokeCap = Paint.Cap.ROUND
+    }
 
     init {
         isClickable = true
         SoundPlayer.init(context)
+    }
+
+    override fun onDetachedFromWindow() {
+        loadingAnimator?.cancel()
+        loadingAnimator = null
+        super.onDetachedFromWindow()
     }
 
     override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
@@ -69,7 +83,8 @@ class ModeSelectionView(context: Context) : View(context) {
         val left = (width - buttonWidth) / 2f
         val buttonHeight = 82f * unit
         val gap = 12f * unit
-        val firstTop = height * 0.34f
+        val totalHeight = buttonHeight * 2f + gap
+        val firstTop = (height - totalHeight) / 2f
         normalRect.set(left, firstTop, left + buttonWidth, firstTop + buttonHeight)
         irregularRect.set(
             left,
@@ -81,15 +96,14 @@ class ModeSelectionView(context: Context) : View(context) {
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        drawChessAtmosphere(canvas, width.toFloat(), height.toFloat(), unit, rounded = false)
+        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), backgroundPaint)
 
         val centerX = width / 2f
         canvas.drawText("MK BOARD GAMES", centerX, height * 0.17f, titlePaint)
-        canvas.drawText("Choose how you want to play", centerX, height * 0.205f, subtitlePaint)
         canvas.drawText("SELECT MODE", centerX, height * 0.285f, sectionPaint)
 
-        drawModeButton(canvas, normalRect, GameMode.NORMAL, "♟", "Play")
-        drawModeButton(canvas, irregularRect, GameMode.IRREGULAR, "✦", "Play (IRREGULAR MODE)")
+        drawModeButton(canvas, normalRect, GameMode.NORMAL, "♟️", "Play")
+        drawModeButton(canvas, irregularRect, GameMode.IRREGULAR, "♟️♟️", "Play (IRREGULAR MODE)")
     }
 
     private fun drawModeButton(
@@ -99,13 +113,30 @@ class ModeSelectionView(context: Context) : View(context) {
         symbol: String,
         label: String,
     ) {
-        drawChessWoodButton(canvas, rect, pressedMode == mode, unit)
-        val offset = if (pressedMode == mode) 2f * unit else 0f
+        val pressed = pressedMode == mode
+        drawChessWoodButton(canvas, rect, pressed, unit)
+        val offset = if (pressed) 2f * unit else 0f
         canvas.drawText(symbol, rect.centerX(), rect.top + 27f * unit + offset, symbolPaint)
         canvas.drawText(label, rect.centerX(), rect.top + 58f * unit + offset, labelPaint)
+        if (loadingMode == mode) drawLoadingRing(canvas, rect)
+    }
+
+    private fun drawLoadingRing(canvas: Canvas, rect: RectF) {
+        val radius = 8f * unit
+        val centerX = rect.right - 17f * unit
+        val centerY = rect.top + 17f * unit
+        canvas.drawArc(
+            RectF(centerX - radius, centerY - radius, centerX + radius, centerY + radius),
+            loadingAngle,
+            285f,
+            false,
+            loadingRingPaint,
+        )
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
+        if (loadingMode != null) return true
+
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 pressedMode = when {
@@ -140,7 +171,21 @@ class ModeSelectionView(context: Context) : View(context) {
                 invalidate()
                 if (selected != null && rect?.contains(event.x, event.y) == true) {
                     SoundPlayer.play("ui_click")
-                    onModeSelected?.invoke(selected)
+                    loadingMode = selected
+                    loadingAnimator?.cancel()
+                    loadingAnimator = ValueAnimator.ofFloat(0f, 360f).apply {
+                        duration = 700L
+                        repeatCount = ValueAnimator.INFINITE
+                        addUpdateListener {
+                            loadingAngle = it.animatedValue as Float
+                            invalidate()
+                        }
+                        start()
+                    }
+                    postDelayed({
+                        if (loadingMode == selected) onModeSelected?.invoke(selected)
+                    }, 260L)
+                    invalidate()
                 }
                 return true
             }

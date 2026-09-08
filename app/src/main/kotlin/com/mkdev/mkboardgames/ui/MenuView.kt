@@ -28,9 +28,12 @@ class MenuView(context: Context) : View(context) {
     var isWoodGameCardStyleEnabled: Boolean = true
         set(v) { field = v; invalidate() }
 
+    private var currentGameMode = com.mkdev.mkboardgames.GameMode.NORMAL
+
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
         isLightMode = com.mkdev.mkboardgames.SettingsManager.isLightMode(context)
+        currentGameMode = com.mkdev.mkboardgames.SettingsManager.currentMode(context)
         val brownHomeStyle =
             com.mkdev.mkboardgames.SettingsManager.isBrownHomeStyleEnabled(context)
         isHomeBackgroundEnabled = brownHomeStyle
@@ -379,7 +382,12 @@ class MenuView(context: Context) : View(context) {
         canvas.restore()
 
         canvas.drawText("MK BOARD GAMES", w / 2f, h * 0.168f, titlePaint)
-        canvas.drawText("Your board game hub", w / 2f, h * 0.198f, subPaint)
+        val modeSubtitle = if (currentGameMode == com.mkdev.mkboardgames.GameMode.IRREGULAR) {
+            "(IRREGULAR)"
+        } else {
+            "Your board game hub"
+        }
+        canvas.drawText(modeSubtitle, w / 2f, h * 0.198f, subPaint)
         accentPaint.style = Paint.Style.STROKE; accentPaint.strokeWidth = 1.5f * dp
         canvas.drawLine(w * 0.40f, h * 0.205f, w * 0.60f, h * 0.205f, accentPaint)
         accentPaint.style = Paint.Style.FILL
