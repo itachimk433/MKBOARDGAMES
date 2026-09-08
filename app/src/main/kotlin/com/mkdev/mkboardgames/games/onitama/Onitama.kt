@@ -30,21 +30,21 @@ object OnitamaCards {
      * side of the mat. Black mirrors both axes when using a card.
      */
     val all: List<OnitamaCard> = listOf(
-        OnitamaCard("tiger", "Tiger", listOf(Position(-2, 0), Position(1, 0))),
+        OnitamaCard("tiger", "Tiger", listOf(Position(-2, 0), Position(1, 0)), "onitama_card_tiger.webp"),
         OnitamaCard("dragon", "Dragon", listOf(Position(-1, -2), Position(-1, 2), Position(1, -1), Position(1, 1)), "onitama_card_dragon.webp"),
-        OnitamaCard("frog", "Frog", listOf(Position(-1, -1), Position(0, -2), Position(1, 1))),
-        OnitamaCard("rabbit", "Rabbit", listOf(Position(-1, 1), Position(0, 2), Position(1, -1))),
-        OnitamaCard("crab", "Crab", listOf(Position(-1, 0), Position(0, -2), Position(0, 2))),
-        OnitamaCard("elephant", "Elephant", listOf(Position(-1, -1), Position(-1, 1), Position(0, -1), Position(0, 1))),
-        OnitamaCard("goose", "Goose", listOf(Position(-1, -1), Position(0, -1), Position(0, 1), Position(1, 1))),
-        OnitamaCard("rooster", "Rooster", listOf(Position(-1, 1), Position(0, -1), Position(0, 1), Position(1, -1))),
+        OnitamaCard("frog", "Frog", listOf(Position(-1, -1), Position(0, -2), Position(1, 1)), "onitama_card_frog.webp"),
+        OnitamaCard("rabbit", "Rabbit", listOf(Position(-1, 1), Position(0, 2), Position(1, -1)), "onitama_card_rabbit.webp"),
+        OnitamaCard("crab", "Crab", listOf(Position(-1, 0), Position(0, -2), Position(0, 2)), "onitama_card_crab.webp"),
+        OnitamaCard("elephant", "Elephant", listOf(Position(-1, -1), Position(-1, 1), Position(0, -1), Position(0, 1)), "onitama_card_elephant.webp"),
+        OnitamaCard("goose", "Goose", listOf(Position(-1, -1), Position(0, -1), Position(0, 1), Position(1, 1)), "onitama_card_goose.webp"),
+        OnitamaCard("rooster", "Rooster", listOf(Position(-1, 1), Position(0, -1), Position(0, 1), Position(1, -1)), "onitama_card_rooster.webp"),
         OnitamaCard("monkey", "Monkey", listOf(Position(-1, -1), Position(-1, 1), Position(1, -1), Position(1, 1)), "onitama_card_monkey.webp"),
         OnitamaCard("mantis", "Mantis", listOf(Position(-1, -1), Position(-1, 1), Position(1, 0)), "onitama_card_mantis.webp"),
-        OnitamaCard("horse", "Horse", listOf(Position(0, -1), Position(-1, 0), Position(1, 0))),
-        OnitamaCard("ox", "Ox", listOf(Position(-1, 0), Position(0, 1), Position(1, 0))),
-        OnitamaCard("crane", "Crane", listOf(Position(-1, 0), Position(1, -1), Position(1, 1))),
-        OnitamaCard("boar", "Boar", listOf(Position(-1, 0), Position(0, -1), Position(0, 1))),
-        OnitamaCard("cobra", "Cobra", listOf(Position(-1, 1), Position(0, -1), Position(1, 1))),
+        OnitamaCard("horse", "Horse", listOf(Position(0, -1), Position(-1, 0), Position(1, 0)), "onitama_card_horse.webp"),
+        OnitamaCard("ox", "Ox", listOf(Position(-1, 0), Position(0, 1), Position(1, 0)), "onitama_card_ox.webp"),
+        OnitamaCard("crane", "Crane", listOf(Position(-1, 0), Position(1, -1), Position(1, 1)), "onitama_card_crane.webp"),
+        OnitamaCard("boar", "Boar", listOf(Position(-1, 0), Position(0, -1), Position(0, 1)), "onitama_card_boar.webp"),
+        OnitamaCard("cobra", "Cobra", listOf(Position(-1, 1), Position(0, -1), Position(1, 1)), "onitama_card_cobra.webp"),
         OnitamaCard("eel", "Eel", listOf(Position(-1, -1), Position(0, 1), Position(1, -1)), "onitama_card_eel.webp"),
     )
 
