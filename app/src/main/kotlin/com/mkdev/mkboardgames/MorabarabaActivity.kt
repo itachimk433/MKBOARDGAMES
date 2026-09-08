@@ -144,6 +144,12 @@ class MorabarabaActivity : AppCompatActivity() {
         if (!isFinishing) savePausedMatch()
         super.onPause()
     }
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        if (!isFinishing) savePausedMatch()
+        super.onTaskRemoved(rootIntent)
+    }
+
     override fun onWindowFocusChanged(h: Boolean) { super.onWindowFocusChanged(h); if (h) makeFullscreen() }
     override fun onDestroy() {
         stopAutomatedGameplay()

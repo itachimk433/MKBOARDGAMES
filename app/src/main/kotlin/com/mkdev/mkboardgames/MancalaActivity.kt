@@ -4,6 +4,7 @@ import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
 import android.content.Context
+import android.content.Intent
 import android.graphics.*
 import android.os.Bundle
 import android.view.*
@@ -197,6 +198,11 @@ class MancalaActivity : AppCompatActivity() {
         if (::boardView.isInitialized) stopAutomatedGameplay()
         if (!isFinishing) savePausedMatch()
         super.onPause()
+    }
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        if (!isFinishing) savePausedMatch()
+        super.onTaskRemoved(rootIntent)
     }
 
     override fun onDestroy() {

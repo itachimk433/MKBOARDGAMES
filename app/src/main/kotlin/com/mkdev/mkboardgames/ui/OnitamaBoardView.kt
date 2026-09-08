@@ -46,6 +46,9 @@ class OnitamaBoardView(context: Context) : View(context) {
     }.getOrNull()
     private val boardRect = RectF()
     private val gridRect = RectF()
+    private var boardScale = 1f
+    private val columnBoundaries = floatArrayOf(168f, 324f, 468f, 618f, 765f, 917f)
+    private val rowBoundaries = floatArrayOf(353f, 502f, 644f, 789f, 931f, 1074f)
     private val imagePaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private val gridPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
@@ -72,16 +75,17 @@ class OnitamaBoardView(context: Context) : View(context) {
         val sourceWidth = boardBitmap?.width?.toFloat() ?: 1086f
         val sourceHeight = boardBitmap?.height?.toFloat() ?: 1448f
         val scale = min(w / sourceWidth, h / sourceHeight)
+        boardScale = scale
         val drawWidth = sourceWidth * scale
         val drawHeight = sourceHeight * scale
         boardRect.set((w - drawWidth) / 2f, (h - drawHeight) / 2f, (w + drawWidth) / 2f, (h + drawHeight) / 2f)
-        val left = boardRect.left + boardRect.width() * 0.166f
-        val right = boardRect.left + boardRect.width() * 0.835f
-        val top = boardRect.top + boardRect.height() * 0.242f
-        val bottom = boardRect.top + boardRect.height() * 0.758f
+        val left = boardRect.left + columnBoundaries.first() * scale
+        val right = boardRect.left + columnBoundaries.last() * scale
+        val top = boardRect.top + rowBoundaries.first() * scale
+        val bottom = boardRect.top + rowBoundaries.last() * scale
         gridRect.set(left, top, right, bottom)
         gridPaint.strokeWidth = maxOf(1f, min(gridRect.width(), gridRect.height()) * 0.008f)
-        selectedPaint.strokeWidth = maxOf(1f, min(gridRect.width(), gridRect.height()) * 0.015f)
+        selectedPaint.strokeWidth = maxOf(1f, cellSize() * 0.0375f)
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -107,7 +111,7 @@ class OnitamaBoardView(context: Context) : View(context) {
         canvas.drawCircle(
             center.x,
             center.y,
-            pieceRadius + maxOf(2f, cellSize() * 0.015f),
+            pieceRadius + selectedPaint.strokeWidth / 2f + maxOf(1f, boardScale),
             selectedPaint,
         )
         val card = selectedCardId ?: return
@@ -168,16 +172,28 @@ class OnitamaBoardView(context: Context) : View(context) {
 
     private fun centerOf(position: Position): PointF =
         PointF(
-            gridRect.left + (position.col + 0.5f) * gridRect.width() / OnitamaRuleEngine.BOARD_SIZE,
-            gridRect.top + (position.row + 0.5f) * gridRect.height() / OnitamaRuleEngine.BOARD_SIZE,
+            boardRect.left + (columnBoundaries[position.col] + columnBoundaries[position.col + 1]) * 0.5f * boardScale,
+            boardRect.top + (rowBoundaries[position.row] + rowBoundaries[position.row + 1]) * 0.5f * boardScale,
         )
 
-    private fun cellSize(): Float = min(gridRect.width(), gridRect.height()) / OnitamaRuleEngine.BOARD_SIZE
+    private fun cellSize(): Float {
+        val averageColumnSize = (columnBoundaries.last() - columnBoundaries.first()) /
+            OnitamaRuleEngine.BOARD_SIZE
+        val averageRowSize = (rowBoundaries.last() - rowBoundaries.first()) /
+            OnitamaRuleEngine.BOARD_SIZE
+        return min(averageColumnSize, averageRowSize) * boardScale
+    }
 
     private fun positionAt(x: Float, y: Float): Position? {
         if (!gridRect.contains(x, y)) return null
-        val col = ((x - gridRect.left) / (gridRect.width() / OnitamaRuleEngine.BOARD_SIZE)).toInt()
-        val row = ((y - gridRect.top) / (gridRect.height() / OnitamaRuleEngine.BOARD_SIZE)).toInt()
+        val sourceX = (x - boardRect.left) / boardScale
+        val sourceY = (y - boardRect.top) / boardScale
+        val col = (0 until OnitamaRuleEngine.BOARD_SIZE)
+            .firstOrNull { sourceX >= columnBoundaries[it] && sourceX < columnBoundaries[it + 1] }
+            ?: return null
+        val row = (0 until OnitamaRuleEngine.BOARD_SIZE)
+            .firstOrNull { sourceY >= rowBoundaries[it] && sourceY < rowBoundaries[it + 1] }
+            ?: return null
         return Position(row, col).takeIf { it.isValid(OnitamaRuleEngine.BOARD_SIZE) }
     }
 

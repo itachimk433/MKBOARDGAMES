@@ -366,6 +366,11 @@ class GameActivity : AppCompatActivity() {
         super.onPause()
     }
 
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        if (!isFinishing) savePausedMatch()
+        super.onTaskRemoved(rootIntent)
+    }
+
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus); if (hasFocus) makeFullscreen()
     }

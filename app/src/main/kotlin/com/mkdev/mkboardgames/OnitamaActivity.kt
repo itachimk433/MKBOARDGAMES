@@ -436,14 +436,14 @@ class OnitamaActivity : AppCompatActivity() {
             fullScreenOverride = true,
         )
         overlay.onChoiceSelected = {
-            dismissOverlay()
+            dismissOverlay(revealGame = false)
             onChoice(it)
         }
         showOverlay(overlay, onCancel = onCancel)
     }
 
     private fun showOverlay(view: View, onCancel: () -> Unit) {
-        dismissOverlay()
+        dismissOverlay(revealGame = false)
         activeOverlay = view
         view.tag = onCancel
         screenRoot.addView(view, FrameLayout.LayoutParams(-1, -1))
@@ -451,10 +451,10 @@ class OnitamaActivity : AppCompatActivity() {
         gameRoot.visibility = View.GONE
     }
 
-    private fun dismissOverlay() {
+    private fun dismissOverlay(revealGame: Boolean = true) {
         activeOverlay?.let { screenRoot.removeView(it) }
         activeOverlay = null
-        gameRoot.visibility = View.VISIBLE
+        if (revealGame) gameRoot.visibility = View.VISIBLE
     }
 
     private fun showBoardAfterDialog(resumeAi: Boolean = true) {
@@ -602,6 +602,11 @@ class OnitamaActivity : AppCompatActivity() {
         super.onPause()
     }
 
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        if (!isFinishing) savePausedMatch()
+        super.onTaskRemoved(rootIntent)
+    }
+
     override fun onDestroy() {
         scope.cancel()
         super.onDestroy()
@@ -611,7 +616,7 @@ class OnitamaActivity : AppCompatActivity() {
     override fun onBackPressed() {
         if (activeOverlay != null) {
             val callback = activeOverlay?.tag as? (() -> Unit)
-            dismissOverlay()
+            dismissOverlay(revealGame = false)
             callback?.invoke()
         } else if (matchStarted && gameState.status == GameStatus.IN_PROGRESS) {
             showLeaveMatchDialog()
