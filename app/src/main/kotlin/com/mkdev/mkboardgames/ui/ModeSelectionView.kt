@@ -43,7 +43,7 @@ class ModeSelectionView(context: Context) : View(context) {
         color = Color.WHITE
         textAlign = Paint.Align.CENTER
         isFakeBoldText = true
-        textSize = 38f * textScale
+        textSize = 23f * textScale
         setShadowLayer(3f * unit, 0f, 2f * unit, Color.argb(220, 0, 0, 0))
     }
     private val sectionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -57,13 +57,13 @@ class ModeSelectionView(context: Context) : View(context) {
         color = Color.WHITE
         textAlign = Paint.Align.CENTER
         isFakeBoldText = true
-        textSize = 14f * textScale
+        textSize = 12f * textScale
         setShadowLayer(2f * unit, 0f, 1f * unit, Color.argb(230, 0, 0, 0))
     }
     private val modeDescriptionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#BDBDBD")
         textAlign = Paint.Align.CENTER
-        textSize = 10f * textScale
+        textSize = 8f * textScale
         setShadowLayer(1.5f * unit, 0f, 1f * unit, Color.argb(210, 0, 0, 0))
     }
     private val brownWoodCardRenderer = BrownWoodCardRenderer(unit)
@@ -86,12 +86,13 @@ class ModeSelectionView(context: Context) : View(context) {
     }
 
     override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
-        val buttonWidth = min(width - 48f * unit, 360f * unit)
+        val originalButtonWidth = min(width - 48f * unit, 360f * unit)
+        val buttonWidth = originalButtonWidth / 1.5f
         val left = (width - buttonWidth) / 2f
-        val buttonHeight = 136f * unit
-        val gap = 12f * unit
+        val buttonHeight = 136f / 3f * unit
+        val gap = 10f * unit
         val totalHeight = buttonHeight * 2f + gap
-        val firstTop = (height * 0.235f).coerceAtMost(
+        val firstTop = (height * 0.16f).coerceAtMost(
             (height - totalHeight - 12f * unit).coerceAtLeast(12f * unit),
         )
         normalRect.set(left, firstTop, left + buttonWidth, firstTop + buttonHeight)
@@ -127,7 +128,7 @@ class ModeSelectionView(context: Context) : View(context) {
         }
 
         val centerX = width / 2f
-        canvas.drawText("SELECT MODE", centerX, height * 0.205f, sectionPaint)
+        canvas.drawText("SELECT MODE", centerX, height * 0.13f, sectionPaint)
 
         drawModeCard(canvas, normalRect, GameMode.NORMAL, "♟️", "Play", "Standard rules")
         drawModeCard(
@@ -152,9 +153,11 @@ class ModeSelectionView(context: Context) : View(context) {
         canvas.save()
         canvas.scale(scale, scale, rect.centerX(), rect.centerY())
         brownWoodCardRenderer.draw(canvas, rect, pressedMode == mode)
-        canvas.drawText(symbol, rect.centerX(), rect.top + 52f * unit, modeIconPaint)
-        canvas.drawText(label, rect.centerX(), rect.top + 101f * unit, modeTitlePaint)
-        canvas.drawText(description, rect.centerX(), rect.top + 119f * unit, modeDescriptionPaint)
+        val iconCenterX = rect.left + 32f * unit
+        val textCenterX = rect.left + 32f * unit + (rect.width() - 32f * unit) / 2f
+        canvas.drawText(symbol, iconCenterX, rect.centerY() + 8f * unit, modeIconPaint)
+        canvas.drawText(label, textCenterX, rect.centerY() + 1f * unit, modeTitlePaint)
+        canvas.drawText(description, textCenterX, rect.centerY() + 14f * unit, modeDescriptionPaint)
         if (loadingMode == mode) drawLoadingRing(canvas, rect)
         canvas.restore()
     }
