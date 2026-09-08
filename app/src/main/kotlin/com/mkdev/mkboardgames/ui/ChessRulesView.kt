@@ -26,6 +26,7 @@ class ChessRulesView(
 ) : LinearLayout(context) {
 
     var onDone: (() -> Unit)? = null
+    var onViewCards: (() -> Unit)? = null
 
     private val density = resources.displayMetrics.density
     private val isChess = isChessStyledLabel(gameLabel)
@@ -59,6 +60,7 @@ class ChessRulesView(
         setBackgroundColor(Color.TRANSPARENT)
         addView(ChessMancalaRulesView(context, rulesText, gameLabel, headerSymbol).apply {
             onBack = { onDone?.invoke() }
+            onViewCards = { this@ChessRulesView.onViewCards?.invoke() }
         }, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
     }
 
@@ -177,6 +179,7 @@ private class ChessMancalaRulesView(
     private val headerSymbol: String,
 ) : View(context) {
     var onBack: (() -> Unit)? = null
+    var onViewCards: (() -> Unit)? = null
 
     private val density = resources.displayMetrics.density
     private val isChess = isChessStyledLabel(gameLabel)
@@ -221,6 +224,7 @@ private class ChessMancalaRulesView(
     }
     private val chessFamilyBackdrop = ChessFamilyBackdrop(density)
     private val backRect = RectF()
+    private val viewCardsRect = RectF()
     private val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val headingPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -355,7 +359,7 @@ private class ChessMancalaRulesView(
 
         val contentLeft = panel.left + dp(28f)
         val contentWidth = panel.width() - dp(56f)
-        val contentBottom = panel.bottom - dp(82f)
+        val contentBottom = panel.bottom - if (isOnitama) dp(140f) else dp(82f)
         val lineHeight = dp(15f)
         var y = panel.top + dp(122f)
         headingPaint.color = Color.parseColor("#FFE09C")
@@ -383,7 +387,16 @@ private class ChessMancalaRulesView(
             panel.centerX() + buttonWidth / 2f,
             panel.bottom - dp(14f),
         )
-        drawBackButton(canvas, backRect)
+        if (isOnitama) {
+            viewCardsRect.set(
+                panel.centerX() - buttonWidth / 2f,
+                panel.bottom - dp(122f),
+                panel.centerX() + buttonWidth / 2f,
+                panel.bottom - dp(74f),
+            )
+            drawBackButton(canvas, viewCardsRect, "View Cards")
+        }
+        drawBackButton(canvas, backRect, "Back")
     }
 
     private fun drawWrapped(
@@ -420,7 +433,7 @@ private class ChessMancalaRulesView(
         return y
     }
 
-    private fun drawBackButton(canvas: Canvas, rect: RectF) {
+    private fun drawBackButton(canvas: Canvas, rect: RectF, label: String) {
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = LinearGradient(
                 0f,
@@ -445,11 +458,17 @@ private class ChessMancalaRulesView(
         bodyPaint.color = Color.parseColor("#4A1714")
         bodyPaint.textSize = minOf(dp(19f), rect.height() * 0.4f)
         val metrics = bodyPaint.fontMetrics
-        canvas.drawText("Back", rect.centerX(), rect.centerY() - (metrics.ascent + metrics.descent) / 2f, bodyPaint)
+        canvas.drawText(label, rect.centerX(), rect.centerY() - (metrics.ascent + metrics.descent) / 2f, bodyPaint)
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        if (event.actionMasked == MotionEvent.ACTION_UP && backRect.contains(event.x, event.y)) {
+        if (event.actionMasked == MotionEvent.ACTION_UP &&
+            isOnitama && viewCardsRect.contains(event.x, event.y)
+        ) {
+            performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+            SoundPlayer.play("ui_click")
+            onViewCards?.invoke()
+        } else if (event.actionMasked == MotionEvent.ACTION_UP && backRect.contains(event.x, event.y)) {
             performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
             SoundPlayer.play("ui_click")
             onBack?.invoke()

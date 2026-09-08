@@ -20,6 +20,7 @@ import com.mkdev.mkboardgames.ui.ChessChoiceView
 import com.mkdev.mkboardgames.ui.ChessMenuView
 import com.mkdev.mkboardgames.ui.ChessRulesView
 import com.mkdev.mkboardgames.ui.OnitamaBoardView
+import com.mkdev.mkboardgames.ui.OnitamaCardsView
 import com.mkdev.mkboardgames.ui.OnitamaCardStripView
 import com.mkdev.mkboardgames.ui.OnitamaAtmosphereView
 import com.mkdev.mkboardgames.ui.StandardGameHudView
@@ -403,8 +404,18 @@ class OnitamaActivity : AppCompatActivity() {
             dismissOverlay()
             if (showModeAfter) showModeDialog() else showBoardAfterDialog()
         }
+        rules.onViewCards = { showCards(showModeAfter) }
         showOverlay(rules) {
             if (showModeAfter) showModeDialog() else showBoardAfterDialog()
+        }
+    }
+
+    private fun showCards(showModeAfter: Boolean) {
+        val cards = OnitamaCardsView(this).apply {
+            onBack = { showRules(showModeAfter) }
+        }
+        showOverlay(cards) {
+            showRules(showModeAfter)
         }
     }
 
