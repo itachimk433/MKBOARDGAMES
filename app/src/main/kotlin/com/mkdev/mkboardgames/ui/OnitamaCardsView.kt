@@ -7,6 +7,7 @@ import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
 import android.widget.*
+import com.mkdev.mkboardgames.SoundPlayer
 import com.mkdev.mkboardgames.games.onitama.OnitamaCards
 
 /**
@@ -107,13 +108,13 @@ class OnitamaCardsView(
             bottomMargin = dp(8f)
         })
 
-        scroll.addView(cardList, ScrollView.LayoutParams(-1, -2))
+        scroll.addView(cardList, FrameLayout.LayoutParams(-1, -2))
         panel.addView(scroll, LinearLayout.LayoutParams(-1, 0).apply {
             weight = 1f
             topMargin = dp(8f)
         })
 
-        addView(panel, LayoutParams(-1, -1).apply {
+        addView(panel, FrameLayout.LayoutParams(-1, -1).apply {
             setMargins(dp(22f), dp(24f), dp(22f), dp(24f))
         })
     }
