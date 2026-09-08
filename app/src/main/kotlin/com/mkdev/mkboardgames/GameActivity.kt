@@ -362,6 +362,7 @@ class GameActivity : AppCompatActivity() {
         activityResumed = false
         stopAutoplayAndAiThinking()
         SoundPlayer.stopAll()
+        if (!isFinishing) savePausedMatch()
         super.onPause()
     }
 
@@ -509,6 +510,12 @@ class GameActivity : AppCompatActivity() {
 
     private fun pauseMatchAndExit() {
         stopAutoplayAndAiThinking()
+        savePausedMatch()
+        finish()
+    }
+
+    private fun savePausedMatch() {
+        if (gameState.status != GameStatus.IN_PROGRESS || gameState.moveHistory.isEmpty()) return
         PausedMatchStore.save(
             this,
             gameType = gameType,
@@ -516,7 +523,6 @@ class GameActivity : AppCompatActivity() {
             playerColor = playerColor.name,
             moves = gameState.moveHistory,
         )
-        finish()
     }
 
     private fun clearPausedMatch() = PausedMatchStore.clear(this, gameType)

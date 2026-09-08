@@ -157,6 +157,7 @@ class YoteActivity : AppCompatActivity() {
         activityResumed = false
         if (::boardView.isInitialized) boardView.cancelMoveAnimation()
         stopAutomatedGameplay()
+        if (!isFinishing) savePausedMatch()
         super.onPause()
     }
 

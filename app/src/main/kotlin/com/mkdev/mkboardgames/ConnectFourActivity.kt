@@ -151,6 +151,7 @@ class ConnectFourActivity : AppCompatActivity() {
         activityResumed = false
         stopAutomatedGameplay()
         SoundPlayer.stopAll()
+        if (!isFinishing) savePausedMatch()
         super.onPause()
     }
 
@@ -227,6 +228,12 @@ class ConnectFourActivity : AppCompatActivity() {
 
     private fun pauseMatchAndExit() {
         stopAutomatedGameplay()
+        savePausedMatch()
+        finish()
+    }
+
+    private fun savePausedMatch() {
+        if (gameState.status != GameStatus.IN_PROGRESS || gameState.moveHistory.isEmpty()) return
         PausedMatchStore.save(
             this,
             gameType = "CONNECT_FOUR",
@@ -234,7 +241,6 @@ class ConnectFourActivity : AppCompatActivity() {
             playerColor = playerColor.name,
             moves = gameState.moveHistory,
         )
-        finish()
     }
 
     private fun clearPausedMatch() = PausedMatchStore.clear(this, "CONNECT_FOUR")

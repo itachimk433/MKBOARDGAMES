@@ -54,7 +54,7 @@ class OnitamaBoardView(context: Context) : View(context) {
     private val targetPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val selectedPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
-        color = Color.parseColor("#FFE09C")
+        color = Color.parseColor("#42B7E8")
     }
     private val piecePaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val rimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
@@ -81,7 +81,7 @@ class OnitamaBoardView(context: Context) : View(context) {
         val bottom = boardRect.top + boardRect.height() * 0.758f
         gridRect.set(left, top, right, bottom)
         gridPaint.strokeWidth = maxOf(1f, min(gridRect.width(), gridRect.height()) * 0.008f)
-        selectedPaint.strokeWidth = maxOf(2f, min(gridRect.width(), gridRect.height()) * 0.03f)
+        selectedPaint.strokeWidth = maxOf(1f, min(gridRect.width(), gridRect.height()) * 0.015f)
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -100,7 +100,16 @@ class OnitamaBoardView(context: Context) : View(context) {
     private fun drawTargets(canvas: Canvas) {
         val selectedPosition = selected ?: return
         val center = centerOf(selectedPosition)
-        canvas.drawCircle(center.x, center.y, cellSize() * 0.39f, selectedPaint)
+        val selectedPiece = gameState.get(selectedPosition) as? OnitamaPiece
+        val pieceRadius = selectedPiece?.let {
+            cellSize() * if (it.isMaster) 0.31f else 0.27f
+        } ?: cellSize() * 0.27f
+        canvas.drawCircle(
+            center.x,
+            center.y,
+            pieceRadius + maxOf(2f, cellSize() * 0.015f),
+            selectedPaint,
+        )
         val card = selectedCardId ?: return
         engine.legalMovesFrom(gameState, selectedPosition)
             .filter { it.metadata["card"] == card }
@@ -135,15 +144,15 @@ class OnitamaBoardView(context: Context) : View(context) {
             },
             floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP,
         )
-        canvas.drawCircle(center.x + radius * 0.08f, center.y + radius * 0.1f, radius, piecePaint)
+        canvas.drawCircle(center.x, center.y, radius, piecePaint)
         piecePaint.shader = null
         rimPaint.color = if (piece.isMaster) Color.parseColor("#FFE09C") else Color.argb(175, 255, 255, 255)
         rimPaint.strokeWidth = maxOf(1f, radius * 0.11f)
-        canvas.drawCircle(center.x + radius * 0.08f, center.y + radius * 0.1f, radius, rimPaint)
+        canvas.drawCircle(center.x, center.y, radius, rimPaint)
         if (piece.isMaster) {
             textPaint.textSize = radius * 0.72f
             textPaint.color = if (piece.color == PieceColor.WHITE) Color.parseColor("#5A2B17") else Color.parseColor("#E5F2F1")
-            canvas.drawText("M", center.x + radius * 0.08f, center.y + radius * 0.25f, textPaint)
+            canvas.drawText("M", center.x, center.y + radius * 0.25f, textPaint)
         }
     }
 

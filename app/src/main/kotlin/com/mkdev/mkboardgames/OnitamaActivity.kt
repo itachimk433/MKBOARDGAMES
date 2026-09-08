@@ -480,10 +480,12 @@ class OnitamaActivity : AppCompatActivity() {
         ) {
             when (it) {
                 0 -> {
+                    gameRoot.visibility = View.GONE
                     savePausedMatch()
                     finish()
                 }
                 1 -> {
+                    gameRoot.visibility = View.GONE
                     PausedMatchStore.clear(this, "ONITAMA")
                     if (vsAI) SettingsManager.recordForfeit(this)
                     finish()
@@ -569,6 +571,7 @@ class OnitamaActivity : AppCompatActivity() {
 
     private fun showHome() {
         stopAutomatedGameplay()
+        gameRoot.visibility = View.GONE
         PausedMatchStore.clear(this, "ONITAMA")
         finish()
     }
@@ -595,7 +598,7 @@ class OnitamaActivity : AppCompatActivity() {
         activityResumed = false
         aiRequestToken++
         aiJob?.cancel()
-        savePausedMatch()
+        if (!isFinishing) savePausedMatch()
         super.onPause()
     }
 

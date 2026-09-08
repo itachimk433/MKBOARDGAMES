@@ -141,6 +141,7 @@ class MorabarabaActivity : AppCompatActivity() {
         activityResumed = false
         stopAutomatedGameplay()
         SoundPlayer.stopAll()
+        if (!isFinishing) savePausedMatch()
         super.onPause()
     }
     override fun onWindowFocusChanged(h: Boolean) { super.onWindowFocusChanged(h); if (h) makeFullscreen() }
@@ -186,6 +187,12 @@ class MorabarabaActivity : AppCompatActivity() {
 
     private fun pauseMatchAndExit() {
         stopAutomatedGameplay()
+        savePausedMatch()
+        finish()
+    }
+
+    private fun savePausedMatch() {
+        if (gameState.status != GameStatus.IN_PROGRESS || gameState.moveHistory.isEmpty()) return
         PausedMatchStore.save(
             this,
             gameType = "MORABARABA",
@@ -194,7 +201,6 @@ class MorabarabaActivity : AppCompatActivity() {
             pieceCount = pieceCount,
             moves = gameState.moveHistory,
         )
-        finish()
     }
 
     private fun clearPausedMatch() = PausedMatchStore.clear(this, "MORABARABA")

@@ -195,6 +195,7 @@ class MancalaActivity : AppCompatActivity() {
     override fun onPause() {
         activityResumed = false
         if (::boardView.isInitialized) stopAutomatedGameplay()
+        if (!isFinishing) savePausedMatch()
         super.onPause()
     }
 
