@@ -12,21 +12,27 @@ import kotlin.math.min
 /**
  * The first screen shown when the app opens.
  *
- * This screen only chooses the ruleset context. The app logo and Settings
- * belong to the game catalogue and are intentionally not rendered here.
+ * This screen chooses the ruleset context and provides the app-level settings
+ * entry. The game catalogue owns its separate gameplay settings surface.
  */
 class ModeSelectionView(context: Context) : View(context) {
 
     var onModeSelected: ((GameMode) -> Unit)? = null
+    var onSettingsClicked: (() -> Unit)? = null
 
     private val unit = resources.displayMetrics.density.coerceAtLeast(1f)
     private val textScale = resources.displayMetrics.scaledDensity.coerceAtMost(2f)
     private val normalRect = RectF()
     private val irregularRect = RectF()
+    private val settingsRect = RectF()
+    private val settingsTouchRect = RectF()
     private var pressedMode: GameMode? = null
+    private var pressedSettings = false
     private var loadingMode: GameMode? = null
     private var loadingAngle = 0f
     private var loadingAnimator: ValueAnimator? = null
+    private var settingsRotation = 0f
+    private var settingsAnimator: ValueAnimator? = null
     private var normalScale = 1f
     private var irregularScale = 1f
 
@@ -73,6 +79,27 @@ class ModeSelectionView(context: Context) : View(context) {
         strokeWidth = 2.5f * unit
         strokeCap = Paint.Cap.ROUND
     }
+    private val settingsButtonPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(218, 34, 18, 13)
+    }
+    private val settingsButtonEdgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#D3A05F")
+        style = Paint.Style.STROKE
+        strokeWidth = 1.1f * unit
+    }
+    private val settingsGearPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#F7D99B")
+        style = Paint.Style.FILL
+    }
+    private val settingsGearEdgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#85502D")
+        style = Paint.Style.STROKE
+        strokeWidth = 1f * unit
+    }
+    private val settingsGearHolePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#321718")
+        style = Paint.Style.FILL
+    }
 
     init {
         isClickable = true
@@ -82,14 +109,16 @@ class ModeSelectionView(context: Context) : View(context) {
     override fun onDetachedFromWindow() {
         loadingAnimator?.cancel()
         loadingAnimator = null
+        settingsAnimator?.cancel()
+        settingsAnimator = null
         super.onDetachedFromWindow()
     }
 
     override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
         val originalButtonWidth = min(width - 48f * unit, 360f * unit)
-        val buttonWidth = originalButtonWidth / 1.5f
+        val buttonWidth = originalButtonWidth / 1.5f * 1.1f
         val left = (width - buttonWidth) / 2f
-        val buttonHeight = 136f / 3f * unit
+        val buttonHeight = 136f / 3f * 1.1f * unit
         val gap = 10f * unit
         val totalHeight = buttonHeight * 2f + gap
         val firstTop = (height * 0.16f).coerceAtMost(
@@ -101,6 +130,16 @@ class ModeSelectionView(context: Context) : View(context) {
             normalRect.bottom + gap,
             left + buttonWidth,
             normalRect.bottom + gap + buttonHeight,
+        )
+        val settingsSize = 34f * unit
+        val settingsLeft = width - settingsSize - 14f * unit
+        val settingsTop = height - settingsSize - 18f * unit
+        settingsRect.set(settingsLeft, settingsTop, settingsLeft + settingsSize, settingsTop + settingsSize)
+        settingsTouchRect.set(
+            settingsLeft - 8f * unit,
+            settingsTop - 8f * unit,
+            settingsLeft + settingsSize + 8f * unit,
+            settingsTop + settingsSize + 8f * unit,
         )
     }
 
@@ -139,6 +178,7 @@ class ModeSelectionView(context: Context) : View(context) {
             "Play (IRREGULAR MODE)",
             "Irregular rules",
         )
+        drawSettings(canvas)
     }
 
     private fun drawModeCard(
@@ -175,6 +215,56 @@ class ModeSelectionView(context: Context) : View(context) {
         )
     }
 
+    private fun drawSettings(canvas: Canvas) {
+        val centerX = settingsRect.centerX()
+        val centerY = settingsRect.centerY()
+        if (pressedSettings) {
+            val pressedPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.argb(62, 247, 217, 155)
+            }
+            canvas.drawRoundRect(settingsTouchRect, 10f * unit, 10f * unit, pressedPaint)
+        }
+
+        canvas.drawCircle(centerX, centerY, 17f * unit, settingsButtonPaint)
+        canvas.drawCircle(centerX, centerY, 17f * unit, settingsButtonEdgePaint)
+
+        canvas.save()
+        canvas.rotate(settingsRotation, centerX, centerY)
+        val gearPath = Path()
+        val teeth = 8
+        val points = teeth * 4
+        val outerRadius = 12.5f * unit
+        val innerRadius = 9.2f * unit
+        for (i in 0 until points) {
+            val angle = (-Math.PI / 2.0 + (Math.PI * 2.0 * i / points)).toFloat()
+            val radius = when (i % 4) {
+                1, 2 -> outerRadius
+                else -> innerRadius
+            }
+            val x = centerX + kotlin.math.cos(angle) * radius
+            val y = centerY + kotlin.math.sin(angle) * radius
+            if (i == 0) gearPath.moveTo(x, y) else gearPath.lineTo(x, y)
+        }
+        gearPath.close()
+        canvas.drawPath(gearPath, settingsGearPaint)
+        canvas.drawPath(gearPath, settingsGearEdgePaint)
+        canvas.drawCircle(centerX, centerY, 4.2f * unit, settingsGearHolePaint)
+        canvas.restore()
+    }
+
+    private fun animateSettingsSpin() {
+        settingsAnimator?.cancel()
+        settingsAnimator = ValueAnimator.ofFloat(settingsRotation, settingsRotation + 360f).apply {
+            duration = 650L
+            interpolator = android.view.animation.DecelerateInterpolator()
+            addUpdateListener {
+                settingsRotation = it.animatedValue as Float
+                invalidate()
+            }
+            start()
+        }
+    }
+
     private fun animateCardScale(mode: GameMode, target: Float) {
         val from = if (mode == GameMode.NORMAL) normalScale else irregularScale
         ValueAnimator.ofFloat(from, target).apply {
@@ -193,10 +283,15 @@ class ModeSelectionView(context: Context) : View(context) {
 
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
-                pressedMode = when {
-                    normalRect.contains(event.x, event.y) -> GameMode.NORMAL
-                    irregularRect.contains(event.x, event.y) -> GameMode.IRREGULAR
-                    else -> null
+                pressedSettings = settingsTouchRect.contains(event.x, event.y)
+                pressedMode = if (pressedSettings) {
+                    null
+                } else {
+                    when {
+                        normalRect.contains(event.x, event.y) -> GameMode.NORMAL
+                        irregularRect.contains(event.x, event.y) -> GameMode.IRREGULAR
+                        else -> null
+                    }
                 }
                 pressedMode?.let { animateCardScale(it, 0.96f) }
                 invalidate()
@@ -204,6 +299,11 @@ class ModeSelectionView(context: Context) : View(context) {
             }
 
             MotionEvent.ACTION_MOVE -> {
+                if (pressedSettings && !settingsTouchRect.contains(event.x, event.y)) {
+                    pressedSettings = false
+                    invalidate()
+                    return true
+                }
                 val current = pressedMode
                 if (current != null) {
                     val rect = if (current == GameMode.NORMAL) normalRect else irregularRect
@@ -217,6 +317,17 @@ class ModeSelectionView(context: Context) : View(context) {
             }
 
             MotionEvent.ACTION_UP -> {
+                if (pressedSettings) {
+                    val selectedSettings = settingsTouchRect.contains(event.x, event.y)
+                    pressedSettings = false
+                    if (selectedSettings) {
+                        SoundPlayer.play("ui_click")
+                        animateSettingsSpin()
+                        postDelayed({ onSettingsClicked?.invoke() }, 180L)
+                    }
+                    invalidate()
+                    return true
+                }
                 val selected = pressedMode
                 val rect = when (selected) {
                     GameMode.NORMAL -> normalRect
@@ -248,6 +359,7 @@ class ModeSelectionView(context: Context) : View(context) {
             }
 
             MotionEvent.ACTION_CANCEL -> {
+                pressedSettings = false
                 pressedMode?.let { animateCardScale(it, 1f) }
                 pressedMode = null
                 invalidate()

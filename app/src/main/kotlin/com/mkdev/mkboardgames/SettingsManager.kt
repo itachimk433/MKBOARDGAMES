@@ -271,7 +271,7 @@ object SettingsManager {
     // ── Home background ──────────────────────────────────────────────────────
     private const val KEY_HOME_BACKGROUND = "home_background"
     fun isHomeBackgroundEnabled(ctx: Context) =
-        prefs(ctx).getBoolean(KEY_HOME_BACKGROUND, false)
+        prefs(ctx).getBoolean(KEY_HOME_BACKGROUND, true)
     fun setHomeBackgroundEnabled(ctx: Context, v: Boolean) =
         prefs(ctx).edit().putBoolean(KEY_HOME_BACKGROUND, v).apply()
 
@@ -282,7 +282,8 @@ object SettingsManager {
     fun setWoodGameCardStyleEnabled(ctx: Context, v: Boolean) =
         prefs(ctx).edit().putBoolean(KEY_WOOD_GAME_CARDS, v).apply()
     fun isBrownHomeStyleEnabled(ctx: Context) =
-        isHomeBackgroundEnabled(ctx) && isWoodGameCardStyleEnabled(ctx)
+        prefs(ctx).getBoolean(KEY_HOME_BACKGROUND, true) &&
+            prefs(ctx).getBoolean(KEY_WOOD_GAME_CARDS, true)
     fun setBrownHomeStyleEnabled(ctx: Context, v: Boolean) =
         prefs(ctx).edit()
             .putBoolean(KEY_HOME_BACKGROUND, v)

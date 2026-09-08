@@ -59,6 +59,7 @@ class MainActivity : AppCompatActivity() {
                 SettingsManager.setCurrentMode(this@MainActivity, mode)
                 showGameMenu()
             }
+            onSettingsClicked = { showGeneralSettings() }
         }
         screenRoot.removeAllViews()
         screenRoot.addView(modeSelection, FrameLayout.LayoutParams(-1, -1))
@@ -124,6 +125,269 @@ class MainActivity : AppCompatActivity() {
     }
 
     // ─── Settings ─────────────────────────────────────────────────────────────
+
+    private fun showGeneralSettings() {
+        activeSettingsDialog?.dismiss()
+        activeSettingsDialog = null
+
+        val ctx = this
+        val dp = resources.displayMetrics.density
+        val wrapper = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            background = android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                intArrayOf(
+                    Color.parseColor("#102C32"),
+                    Color.parseColor("#0B1D25"),
+                    Color.parseColor("#061321"),
+                ),
+            )
+            setLayerType(View.LAYER_TYPE_SOFTWARE, null)
+        }
+        val header = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            background = android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                intArrayOf(
+                    Color.parseColor("#4A1714"),
+                    Color.parseColor("#6A2D2B"),
+                    Color.parseColor("#321718"),
+                ),
+            ).apply {
+                cornerRadius = 16f * dp
+                setStroke((1.2f * dp).toInt(), Color.parseColor("#C8894C"))
+            }
+            elevation = 6f * dp
+            setPadding((18 * dp).toInt(), (15 * dp).toInt(), (18 * dp).toInt(), (13 * dp).toInt())
+        }
+        header.addView(TextView(ctx).apply {
+            text = "⚙  SETTINGS"
+            setTextColor(Color.parseColor("#F7D99B"))
+            setTypeface(typeface, Typeface.BOLD)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
+            letterSpacing = 0.08f
+            setShadowLayer(2f * dp, 0f, 1f * dp, Color.argb(180, 20, 4, 3))
+        })
+        header.addView(TextView(ctx).apply {
+            text = "Privacy, terms and support"
+            setTextColor(Color.parseColor("#F5DCC0"))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+            setPadding(0, (4 * dp).toInt(), 0, 0)
+        })
+        wrapper.addView(header, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+        ).also {
+            it.setMargins((10 * dp).toInt(), (2 * dp).toInt(), (10 * dp).toInt(), (8 * dp).toInt())
+        })
+
+        val scroll = ScrollView(ctx)
+        val root = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding((12 * dp).toInt(), (4 * dp).toInt(), (12 * dp).toInt(), (20 * dp).toInt())
+        }
+        scroll.addView(root)
+        wrapper.addView(scroll)
+
+        fun divider() = View(ctx).apply {
+            background = android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
+                intArrayOf(Color.TRANSPARENT, Color.parseColor("#85502D"), Color.TRANSPARENT),
+            )
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                (1 * dp).toInt(),
+            ).also {
+                it.setMargins((12 * dp).toInt(), (2 * dp).toInt(), (12 * dp).toInt(), (2 * dp).toInt())
+            }
+        }
+
+        fun legalRow(icon: String, label: String): LinearLayout =
+            LinearLayout(ctx).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                background = android.graphics.drawable.GradientDrawable(
+                    android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                    intArrayOf(
+                        Color.parseColor("#21454A"),
+                        Color.parseColor("#16353B"),
+                        Color.parseColor("#102C32"),
+                    ),
+                ).apply {
+                    cornerRadius = 12f * dp
+                    setStroke((1f * dp).toInt(), Color.parseColor("#2C5960"))
+                }
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                ).also {
+                    it.setMargins((2 * dp).toInt(), (5 * dp).toInt(), (2 * dp).toInt(), (5 * dp).toInt())
+                }
+                minimumHeight = (58 * dp).toInt()
+                setPadding((10 * dp).toInt(), (9 * dp).toInt(), (12 * dp).toInt(), (9 * dp).toInt())
+                isClickable = true
+                isFocusable = true
+                setOnTouchListener { v, e ->
+                    when (e.action) {
+                        MotionEvent.ACTION_DOWN ->
+                            v.animate().scaleX(0.97f).scaleY(0.97f).setDuration(60L).start()
+                        MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL ->
+                            v.animate().scaleX(1f).scaleY(1f).setDuration(110L).start()
+                    }
+                    false
+                }
+                addView(TextView(ctx).apply {
+                    text = icon
+                    setTextColor(Color.parseColor("#F7D99B"))
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
+                    gravity = Gravity.CENTER
+                    layoutParams = LinearLayout.LayoutParams(
+                        (36 * dp).toInt(),
+                        (36 * dp).toInt(),
+                    ).also { it.marginEnd = (11 * dp).toInt() }
+                    background = android.graphics.drawable.GradientDrawable().apply {
+                        shape = android.graphics.drawable.GradientDrawable.OVAL
+                        setColor(Color.parseColor("#321718"))
+                        setStroke((1f * dp).toInt(), Color.parseColor("#C8894C"))
+                    }
+                })
+                addView(TextView(ctx).apply {
+                    text = label
+                    setTextColor(Color.parseColor("#FFF8E8"))
+                    setTypeface(typeface, Typeface.BOLD)
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                })
+                addView(TextView(ctx).apply {
+                    text = "›"
+                    setTextColor(Color.parseColor("#F7D99B"))
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 25f)
+                    gravity = Gravity.CENTER
+                })
+            }
+
+        val ppRow = legalRow("🔒", "Privacy Policy")
+        ppRow.setOnClickListener {
+            val ppContent = LinearLayout(ctx).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding((16 * dp).toInt(), (12 * dp).toInt(), (16 * dp).toInt(), (12 * dp).toInt())
+            }
+            fun pTxt(t: String, bold: Boolean = false, accent: Boolean = false) = TextView(ctx).apply {
+                text = t
+                setTextColor(if (accent) Color.parseColor("#E3B86A") else Color.parseColor("#CCCCCC"))
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 12.5f)
+                if (bold) setTypeface(typeface, Typeface.BOLD)
+                setPadding(0, (4 * dp).toInt(), 0, (4 * dp).toInt())
+            }
+            ppContent.addView(pTxt("Privacy Policy — MK BOARD GAMES v1.2", bold = true, accent = true))
+            ppContent.addView(pTxt("Effective date: June 2026"))
+            ppContent.addView(pTxt("\nDATA COLLECTION\nMK BOARD GAMES does not collect or transmit personal data. Game statistics (wins, losses, draws) are stored only on your device."))
+            ppContent.addView(pTxt("\nADVERTISING\nThis version of MK BOARD GAMES contains no advertising. Ads may be introduced in a future update via Google AdMob, in which case this policy will be updated accordingly."))
+            ppContent.addView(pTxt("\nPERMISSIONS\n• Vibrate — in-game haptic feedback"))
+            ppContent.addView(pTxt("\nCONTACT\n$SUPPORT_EMAIL"))
+            val ppScroll = ScrollView(ctx).apply {
+                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (320 * dp).toInt())
+            }
+            ppScroll.addView(ppContent)
+            val ppWrapper = LinearLayout(ctx).apply {
+                orientation = LinearLayout.VERTICAL
+                setBackgroundColor(Color.parseColor("#061321"))
+            }
+            ppWrapper.addView(ppScroll)
+            AlertDialog.Builder(ctx, android.R.style.Theme_Material_Dialog_MinWidth)
+                .setView(ppWrapper)
+                .setPositiveButton("Close", null)
+                .setNeutralButton("Open in Browser") { _, _ ->
+                    try { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(PRIVACY_POLICY_URL))) } catch (_: Exception) {}
+                }
+                .create()
+                .apply {
+                    window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.parseColor("#061321")))
+                    show()
+                }
+        }
+        root.addView(ppRow)
+        root.addView(divider())
+
+        val tosRow = legalRow("📄", "Terms of Service")
+        tosRow.setOnClickListener {
+            val tosContent = LinearLayout(ctx).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding((16 * dp).toInt(), (12 * dp).toInt(), (16 * dp).toInt(), (12 * dp).toInt())
+            }
+            fun tTxt(t: String, bold: Boolean = false, accent: Boolean = false) = TextView(ctx).apply {
+                text = t
+                setTextColor(if (accent) Color.parseColor("#E3B86A") else Color.parseColor("#CCCCCC"))
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 12.5f)
+                if (bold) setTypeface(typeface, Typeface.BOLD)
+                setPadding(0, (4 * dp).toInt(), 0, (4 * dp).toInt())
+            }
+            tosContent.addView(tTxt("Terms of Service — MK BOARD GAMES v1.2", bold = true, accent = true))
+            tosContent.addView(tTxt("Effective date: June 2026"))
+            tosContent.addView(tTxt("\n1. ACCEPTANCE\nBy installing or using MK BOARD GAMES you agree to these terms. If you do not agree, uninstall the app."))
+            tosContent.addView(tTxt("\n2. LICENCE\nMK BOARD GAMES is provided free of charge for personal, non-commercial use. You may not reverse-engineer, redistribute, or sell the app or any part of it."))
+            tosContent.addView(tTxt("\n3. ADVERTISING\nThis version of MK BOARD GAMES is ad-free. Ads may be introduced in a future release. If advertising is added, the relevant ad networks will operate under their own terms and privacy policies and this section will be updated."))
+            tosContent.addView(tTxt("\n4. DISCLAIMER\nMK BOARD GAMES is provided \"as is\" without warranties of any kind. MKDEV is not liable for any loss or damage arising from use of the app."))
+            tosContent.addView(tTxt("\n5. CHANGES\nThese terms may be updated at any time. Continued use after an update constitutes acceptance of the revised terms."))
+            tosContent.addView(tTxt("\nCONTACT\n$SUPPORT_EMAIL"))
+            val tosScroll = ScrollView(ctx).apply {
+                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (320 * dp).toInt())
+            }
+            tosScroll.addView(tosContent)
+            val tosWrapper = LinearLayout(ctx).apply {
+                orientation = LinearLayout.VERTICAL
+                setBackgroundColor(Color.parseColor("#061321"))
+            }
+            tosWrapper.addView(tosScroll)
+            AlertDialog.Builder(ctx, android.R.style.Theme_Material_Dialog_MinWidth)
+                .setView(tosWrapper)
+                .setPositiveButton("Close", null)
+                .setNeutralButton("Open in Browser") { _, _ ->
+                    try { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(TERMS_OF_SERVICE_URL))) } catch (_: Exception) {}
+                }
+                .create()
+                .apply {
+                    window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.parseColor("#061321")))
+                    show()
+                }
+        }
+        root.addView(tosRow)
+        root.addView(divider())
+
+        val contactRow = legalRow("", "Contact Us").apply {
+            val emailIcon = getChildAt(0) as TextView
+            emailIcon.text = ""
+            emailIcon.background = android.graphics.drawable.GradientDrawable().apply {
+                shape = android.graphics.drawable.GradientDrawable.OVAL
+                setColor(Color.parseColor("#321718"))
+                setStroke((1f * dp).toInt(), Color.parseColor("#C8894C"))
+            }
+            emailIcon.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_email, 0, 0, 0)
+            emailIcon.compoundDrawablePadding = 0
+            emailIcon.setPadding((7 * dp).toInt(), (7 * dp).toInt(), (7 * dp).toInt(), (7 * dp).toInt())
+        }
+        contactRow.setOnClickListener {
+            try {
+                startActivity(Intent(Intent.ACTION_SENDTO).apply {
+                    data = Uri.parse("mailto:$SUPPORT_EMAIL")
+                    putExtra(Intent.EXTRA_SUBJECT, "MK BOARD GAMES Support")
+                })
+            } catch (_: Exception) {
+                Toast.makeText(ctx, SUPPORT_EMAIL, Toast.LENGTH_LONG).show()
+            }
+        }
+        root.addView(contactRow)
+
+        val dialog = AlertDialog.Builder(ctx, android.R.style.Theme_Material_Dialog_MinWidth)
+            .setView(wrapper)
+            .setPositiveButton("Done", null)
+            .create()
+        dialog.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.parseColor("#061321")))
+        dialog.setOnDismissListener { if (activeSettingsDialog === dialog) activeSettingsDialog = null }
+        dialog.show()
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(Color.parseColor("#F7D99B"))
+        activeSettingsDialog = dialog
+    }
 
     private fun showSettings() {
         activeSettingsDialog?.dismiss()
@@ -729,109 +993,6 @@ class MainActivity : AppCompatActivity() {
         }
         root.addView(yoteDiffRow)
         root.addView(divider())
-
-        // ── Legal ──
-        root.addView(sectionHeader("📋  LEGAL"))
-        val ppUrl  = PRIVACY_POLICY_URL
-        val tosUrl = TERMS_OF_SERVICE_URL
-        val (ppRow, _) = settingRow("🔒", "Privacy Policy", "›")
-        ppRow.setOnClickListener {
-            val ppContent = LinearLayout(ctx).apply {
-                orientation = LinearLayout.VERTICAL
-                setPadding((16*dp).toInt(), (12*dp).toInt(), (16*dp).toInt(), (12*dp).toInt())
-            }
-            fun pTxt(t: String, bold: Boolean = false, accent: Boolean = false) = TextView(ctx).apply {
-                text = t
-                setTextColor(if (accent) Color.parseColor("#E3B86A") else Color.parseColor("#CCCCCC"))
-                setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12.5f)
-                if (bold) setTypeface(typeface, android.graphics.Typeface.BOLD)
-                setPadding(0, (4*dp).toInt(), 0, (4*dp).toInt())
-            }
-            ppContent.addView(pTxt("Privacy Policy — MK BOARD GAMES v1.2", bold = true, accent = true))
-            ppContent.addView(pTxt("Effective date: June 2026", bold = false))
-            ppContent.addView(pTxt("\nDATA COLLECTION\nMK BOARD GAMES does not collect or transmit personal data. Game statistics (wins, losses, draws) are stored only on your device."))
-            ppContent.addView(pTxt("\nADVERTISING\nThis version of MK BOARD GAMES contains no advertising. Ads may be introduced in a future update via Google AdMob, in which case this policy will be updated accordingly."))
-            ppContent.addView(pTxt("\nPERMISSIONS\n• Vibrate — in-game haptic feedback"))
-            ppContent.addView(pTxt("\nCONTACT\n$SUPPORT_EMAIL", bold = false))
-            val ppScroll = ScrollView(ctx).apply {
-                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (320*dp).toInt())
-            }
-            ppScroll.addView(ppContent)
-            val ppWrapper = LinearLayout(ctx).apply {
-                orientation = LinearLayout.VERTICAL
-                setBackgroundColor(Color.parseColor("#061321"))
-            }
-            ppWrapper.addView(ppScroll)
-            AlertDialog.Builder(ctx, android.R.style.Theme_Material_Dialog_MinWidth)
-                .setView(ppWrapper)
-                .setPositiveButton("Close", null)
-                .setNeutralButton("Open in Browser") { _, _ ->
-                    try { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(ppUrl))) } catch (_: Exception) {}
-                }
-                .create()
-                .apply {
-                    window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.parseColor("#061321")))
-                    show()
-                }
-        }
-        root.addView(ppRow); root.addView(divider())
-        val (tosRow, _) = settingRow("📄", "Terms of Service", "›")
-        tosRow.setOnClickListener {
-            val tosContent = LinearLayout(ctx).apply {
-                orientation = LinearLayout.VERTICAL
-                setPadding((16*dp).toInt(), (12*dp).toInt(), (16*dp).toInt(), (12*dp).toInt())
-            }
-            fun tTxt(t: String, bold: Boolean = false, accent: Boolean = false) = TextView(ctx).apply {
-                text = t
-                setTextColor(if (accent) Color.parseColor("#E3B86A") else Color.parseColor("#CCCCCC"))
-                setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12.5f)
-                if (bold) setTypeface(typeface, android.graphics.Typeface.BOLD)
-                setPadding(0, (4*dp).toInt(), 0, (4*dp).toInt())
-            }
-            tosContent.addView(tTxt("Terms of Service — MK BOARD GAMES v1.2", bold = true, accent = true))
-            tosContent.addView(tTxt("Effective date: June 2026", bold = false))
-            tosContent.addView(tTxt("\n1. ACCEPTANCE\nBy installing or using MK BOARD GAMES you agree to these terms. If you do not agree, uninstall the app."))
-            tosContent.addView(tTxt("\n2. LICENCE\nMK BOARD GAMES is provided free of charge for personal, non-commercial use. You may not reverse-engineer, redistribute, or sell the app or any part of it."))
-            tosContent.addView(tTxt("\n3. ADVERTISING\nThis version of MK BOARD GAMES is ad-free. Ads may be introduced in a future release. If advertising is added, the relevant ad networks will operate under their own terms and privacy policies and this section will be updated."))
-            tosContent.addView(tTxt("\n4. DISCLAIMER\nMK BOARD GAMES is provided \"as is\" without warranties of any kind. MKDEV is not liable for any loss or damage arising from use of the app."))
-            tosContent.addView(tTxt("\n5. CHANGES\nThese terms may be updated at any time. Continued use after an update constitutes acceptance of the revised terms."))
-            tosContent.addView(tTxt("\nCONTACT\n$SUPPORT_EMAIL", bold = false))
-            val tosScroll = ScrollView(ctx).apply {
-                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (320*dp).toInt())
-            }
-            tosScroll.addView(tosContent)
-            val tosWrapper = LinearLayout(ctx).apply {
-                orientation = LinearLayout.VERTICAL
-                setBackgroundColor(Color.parseColor("#061321"))
-            }
-            tosWrapper.addView(tosScroll)
-            AlertDialog.Builder(ctx, android.R.style.Theme_Material_Dialog_MinWidth)
-                .setView(tosWrapper)
-                .setPositiveButton("Close", null)
-                .setNeutralButton("Open in Browser") { _, _ ->
-                    try { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(tosUrl))) } catch (_: Exception) {}
-                }
-                .create()
-                .apply {
-                    window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.parseColor("#061321")))
-                    show()
-                }
-        }
-        root.addView(tosRow); root.addView(divider())
-
-        // ── Contact ──
-        val (contactRow, _) = settingRow("", "Contact Us", "›", R.drawable.ic_email)
-        contactRow.setOnClickListener {
-            try {
-                startActivity(Intent(Intent.ACTION_SENDTO).apply {
-                    data = Uri.parse("mailto:$SUPPORT_EMAIL")
-                    putExtra(Intent.EXTRA_SUBJECT, "MK BOARD GAMES Support")
-                })
-            } catch (_: Exception) {
-                android.widget.Toast.makeText(ctx, SUPPORT_EMAIL, android.widget.Toast.LENGTH_LONG).show()
-            }
-        }
-        root.addView(contactRow)
 
         val dialog = AlertDialog.Builder(ctx, android.R.style.Theme_Material_Dialog_MinWidth)
             .setView(wrapper).setPositiveButton("Done", null).create()
