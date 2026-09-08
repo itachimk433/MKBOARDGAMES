@@ -40,6 +40,8 @@ class ConnectFourActivity : AppCompatActivity() {
     private var interstitialAd: Any? = null
     private var boardStyleSwitchEnabled = true
     private var autoplayEnabled = false
+    private val autoplayAllowed: Boolean
+        get() = SettingsManager.currentMode(this) == GameMode.IRREGULAR
     private var exitPosted = false
 
     private lateinit var hudView: HudView
@@ -76,7 +78,7 @@ class ConnectFourActivity : AppCompatActivity() {
         scoreView = ScoreView(this)
         autoplayButton = AutoplayButtonView(this)
         autoplayButton.onAutoplayChanged = { enabled ->
-            if (vsAI) {
+            if (autoplayAllowed && vsAI) {
                 autoplayEnabled = enabled
                 if (enabled &&
                     matchStarted &&
@@ -354,7 +356,7 @@ Control the centre columns, build threats in more than one direction, and block 
         boardView.reset(gameState)
         autoplayEnabled = false
         autoplayButton.setAutoplayEnabled(false, animate = false)
-        autoplayButton.visibility = if (vsAI) View.VISIBLE else View.GONE
+        autoplayButton.visibility = if (autoplayAllowed && vsAI) View.VISIBLE else View.GONE
         boardView.onGameOverTapped = { showResultDialog() }
         scoreView.update(scoreRed, scoreDraws, scoreYellow)
         updateHud()
@@ -493,7 +495,8 @@ Control the centre columns, build threats in more than one direction, and block 
     }
 
     private fun aiControlsCurrentTurn(): Boolean =
-        vsAI && (gameState.currentTurn != playerColor || autoplayEnabled)
+        vsAI && (gameState.currentTurn != playerColor ||
+            (autoplayAllowed && autoplayEnabled))
 
     private fun updateHud() {
         val redTurn = gameState.currentTurn == PieceColor.WHITE

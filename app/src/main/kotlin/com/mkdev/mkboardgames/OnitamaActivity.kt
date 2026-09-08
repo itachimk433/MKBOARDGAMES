@@ -40,6 +40,8 @@ class OnitamaActivity : AppCompatActivity() {
     private var activityResumed = false
     private var resultRecorded = false
     private var autoplayEnabled = false
+    private val autoplayAllowed: Boolean
+        get() = SettingsManager.currentMode(this) == GameMode.IRREGULAR
     private var aiRequestToken = 0
     private var aiJob: Job? = null
     private val previousStates = ArrayDeque<GameState>()
@@ -84,8 +86,8 @@ class OnitamaActivity : AppCompatActivity() {
         }
         autoplayButton = AutoplayButtonView(this).apply {
             onAutoplayChanged = { enabled ->
-                autoplayEnabled = enabled
-                if (enabled) triggerAI()
+                autoplayEnabled = autoplayAllowed && enabled
+                if (autoplayAllowed && enabled) triggerAI()
                 else {
                     aiRequestToken++
                     aiJob?.cancel()
@@ -184,7 +186,7 @@ class OnitamaActivity : AppCompatActivity() {
         whiteCardIndex = 0
         blackCardIndex = 0
         PausedMatchStore.clear(this, "ONITAMA")
-        autoplayButton.visibility = if (vsAI) View.VISIBLE else View.GONE
+        autoplayButton.visibility = if (autoplayAllowed && vsAI) View.VISIBLE else View.GONE
         autoplayButton.setAutoplayEnabled(false, animate = false)
         if (vsAI) SettingsManager.setActiveGame(this, "onitama")
         val setupSeed = restoring?.setupSeed ?: System.nanoTime()
@@ -274,7 +276,8 @@ class OnitamaActivity : AppCompatActivity() {
     }
 
     private fun aiControlsCurrentTurn(): Boolean =
-        vsAI && (gameState.currentTurn != playerColor || autoplayEnabled)
+        vsAI && (gameState.currentTurn != playerColor ||
+            (autoplayAllowed && autoplayEnabled))
 
     private fun selectCardForMove(move: Move) {
         val cardId = move.metadata["card"] as? String ?: return

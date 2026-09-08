@@ -47,6 +47,8 @@ class TicTacToeActivity : AppCompatActivity() {
     private lateinit var autoplayButton: AutoplayButtonView
     private lateinit var gameRoot: View
     private var autoplayEnabled = false
+    private val autoplayAllowed: Boolean
+        get() = SettingsManager.currentMode(this) == GameMode.IRREGULAR
     private var exitPosted = false
 
     // ─── Lifecycle ────────────────────────────────────────────────────────────
@@ -67,7 +69,7 @@ class TicTacToeActivity : AppCompatActivity() {
         scoreView = ScoreView(this)
         autoplayButton = AutoplayButtonView(this)
         autoplayButton.onAutoplayChanged = { enabled ->
-            if (vsAI) {
+            if (autoplayAllowed && vsAI) {
                 autoplayEnabled = enabled
                 if (enabled &&
                     matchStarted &&
@@ -366,7 +368,7 @@ Strategy
         boardView.reset(gameState)
         autoplayEnabled = false
         autoplayButton.setAutoplayEnabled(false, animate = false)
-        autoplayButton.visibility = if (vsAI) View.VISIBLE else View.GONE
+        autoplayButton.visibility = if (autoplayAllowed && vsAI) View.VISIBLE else View.GONE
         // Re-show result dialog when board is tapped after game over
         boardView.onGameOverTapped = { showResultDialog() }
         scoreView.setLabels(boardSize)
@@ -500,7 +502,8 @@ Strategy
     }
 
     private fun aiControlsCurrentTurn(): Boolean =
-        vsAI && (gameState.currentTurn != playerColor || autoplayEnabled)
+        vsAI && (gameState.currentTurn != playerColor ||
+            (autoplayAllowed && autoplayEnabled))
 
     // ─── HUD / undo / menu ────────────────────────────────────────────────────
 

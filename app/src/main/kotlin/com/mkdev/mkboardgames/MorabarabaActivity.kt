@@ -40,6 +40,8 @@ class MorabarabaActivity : AppCompatActivity() {
     private var matchStarted                = false
     private var activityResumed             = false
     private var autoplayEnabled             = false
+    private val autoplayAllowed: Boolean
+        get() = SettingsManager.currentMode(this) == GameMode.IRREGULAR
     private var exitPosted                  = false
     private var autoplayMoveInProgress      = false
     private var pieceCount                  = 12
@@ -91,7 +93,7 @@ class MorabarabaActivity : AppCompatActivity() {
                 .getOrElse(styleIndex) { MorabarabaBoardStyle.CANVAS }
         }
         autoplayButton.onAutoplayChanged = { enabled ->
-            if (vsAI) {
+            if (autoplayAllowed && vsAI) {
                 autoplayEnabled = enabled
                 if (!enabled && autoplayMoveInProgress) {
                     autoplayMoveInProgress = false
@@ -325,7 +327,7 @@ class MorabarabaActivity : AppCompatActivity() {
         autoplayEnabled = false
         autoplayMoveInProgress = false
         autoplayButton.setAutoplayEnabled(false, animate = false)
-        autoplayButton.visibility = if (vsAI) View.VISIBLE else View.GONE
+        autoplayButton.visibility = if (autoplayAllowed && vsAI) View.VISIBLE else View.GONE
         moveHistory.clear()
         capturedByWhite.clear(); capturedByBlack.clear(); captureSnapshots.clear()
         if (restoring == null) clearPausedMatch()
@@ -530,7 +532,8 @@ class MorabarabaActivity : AppCompatActivity() {
     }
 
     private fun aiControlsCurrentTurn(): Boolean =
-        vsAI && (gameState.currentTurn != playerColor || autoplayEnabled)
+        vsAI && (gameState.currentTurn != playerColor ||
+            (autoplayAllowed && autoplayEnabled))
 
     private fun resumeComputerTurnIfNeeded() {
         if (!activityResumed ||

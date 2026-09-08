@@ -41,6 +41,8 @@ class YoteActivity : AppCompatActivity() {
     private var activityResumed = false
     private var resultRecorded = false
     private var autoplayEnabled = false
+    private val autoplayAllowed: Boolean
+        get() = SettingsManager.currentMode(this) == GameMode.IRREGULAR
     private var autoplayMoveInProgress = false
     private var aiRequestToken = 0
     private var aiJob: Job? = null
@@ -100,7 +102,7 @@ class YoteActivity : AppCompatActivity() {
 
         autoplayButton = AutoplayButtonView(this).apply {
             onAutoplayChanged = { enabled ->
-                if (vsAI) {
+                if (autoplayAllowed && vsAI) {
                     autoplayEnabled = enabled
                     if (!enabled) autoplayLoopDetector.reset()
                     if (enabled && matchStarted && gameState.status == GameStatus.IN_PROGRESS &&
@@ -413,7 +415,7 @@ class YoteActivity : AppCompatActivity() {
         pendingBonusCapturePositions = emptyList()
         pendingBonusCaptureFromComputer = false
         PausedMatchStore.clear(this, "YOTE")
-        autoplayButton.visibility = if (vsAI) View.VISIBLE else View.GONE
+        autoplayButton.visibility = if (autoplayAllowed && vsAI) View.VISIBLE else View.GONE
         autoplayButton.setAutoplayEnabled(false, animate = false)
         if (vsAI) SettingsManager.setActiveGame(this, "yote")
         gameState = engine.initialState()
@@ -682,7 +684,8 @@ class YoteActivity : AppCompatActivity() {
     }
 
     private fun aiControlsCurrentTurn(): Boolean =
-        vsAI && (gameState.currentTurn != playerColor || autoplayEnabled)
+        vsAI && (gameState.currentTurn != playerColor ||
+            (autoplayAllowed && autoplayEnabled))
 
     private fun stopAutomatedGameplay() {
         autoplayEnabled = false

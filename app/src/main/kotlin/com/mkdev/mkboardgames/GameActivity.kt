@@ -78,6 +78,8 @@ class GameActivity : AppCompatActivity() {
     private var activityResumed = false
     private var autoplayEnabled = false
     private var autoplayMoveInProgress = false
+    private val autoplayAllowed: Boolean
+        get() = SettingsManager.currentMode(this) == GameMode.IRREGULAR
     private val moveHistory      = ArrayDeque<GameState>()
     private val scope            = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
@@ -192,7 +194,7 @@ class GameActivity : AppCompatActivity() {
         }
         boardView.onEmptySpaceTapped = ::revealBoardStyleSwitch
         autoplayButton.onAutoplayChanged = { enabled ->
-            if (gameType != "LUDO" && vsAI) {
+            if (autoplayAllowed && gameType != "LUDO" && vsAI) {
                 autoplayEnabled = enabled
                 if (!enabled && autoplayMoveInProgress) {
                     autoplayMoveInProgress = false
@@ -289,7 +291,7 @@ class GameActivity : AppCompatActivity() {
             ).apply {
                 gravity = Gravity.CENTER_HORIZONTAL
                 autoplayButton.visibility =
-                    if (gameType == "CHESS" && vsAI) View.VISIBLE else View.GONE
+                    if (autoplayAllowed && gameType == "CHESS" && vsAI) View.VISIBLE else View.GONE
             })
         container.addView(bottomCaptureView,
             android.widget.LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, capH))
@@ -1038,7 +1040,7 @@ Checkmate your opponent's King.
         if (::autoplayButton.isInitialized) {
             autoplayButton.setAutoplayEnabled(false, animate = false)
             autoplayButton.visibility =
-                if (gameType != "LUDO" && vsAI) View.VISIBLE else View.GONE
+                if (autoplayAllowed && gameType != "LUDO" && vsAI) View.VISIBLE else View.GONE
         }
         redoGameStates.clear(); redoCaptures.clear(); redoMoves.clear(); redoCapSnaps.clear()
         AdManager.loadInterstitial(this) { interstitialAd = it }
@@ -1422,7 +1424,7 @@ Checkmate your opponent's King.
     private fun aiControlsCurrentTurn(): Boolean =
         vsAI && gameType != "LUDO" && (
             gameState.currentTurn != playerColor ||
-                autoplayEnabled
+                (autoplayAllowed && autoplayEnabled)
             )
 
     private fun resumeComputerTurnIfNeeded() {
@@ -1521,7 +1523,8 @@ Checkmate your opponent's King.
                 gameState.currentTurn == thinkingState.currentTurn &&
                     gameState.moveHistory.size == thinkingState.moveHistory.size &&
                     gameState.status == thinkingState.status
-            val playerAutoplayStillEnabled = !autoplayingPlayerTurn || autoplayEnabled
+            val playerAutoplayStillEnabled =
+                !autoplayingPlayerTurn || (autoplayAllowed && autoplayEnabled)
             if (move != null &&
                 isActive &&
                 activityResumed &&

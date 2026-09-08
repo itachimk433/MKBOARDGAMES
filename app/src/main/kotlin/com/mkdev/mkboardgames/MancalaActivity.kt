@@ -37,6 +37,8 @@ class MancalaActivity : AppCompatActivity() {
     private var activityResumed = false
     private var resultRecorded = false
     private var autoplayEnabled = false
+    private val autoplayAllowed: Boolean
+        get() = SettingsManager.currentMode(this) == GameMode.IRREGULAR
     private var autoplayMoveInProgress = false
     private var movementSpeedMultiplier = 1f
     private val previousStates = ArrayDeque<GameState>()
@@ -138,7 +140,7 @@ class MancalaActivity : AppCompatActivity() {
 
         autoplayButton = AutoplayButtonView(this)
         autoplayButton.onAutoplayChanged = { enabled ->
-            if (vsAI) {
+            if (autoplayAllowed && vsAI) {
                 autoplayEnabled = enabled
                 if (enabled &&
                     matchStarted &&
@@ -558,7 +560,7 @@ class MancalaActivity : AppCompatActivity() {
         autoplayEnabled = false
         autoplayMoveInProgress = false
         autoplayButton.setAutoplayEnabled(false, animate = false)
-        autoplayButton.visibility = if (vsAI) View.VISIBLE else View.GONE
+        autoplayButton.visibility = if (autoplayAllowed && vsAI) View.VISIBLE else View.GONE
         previousStates.clear()
         PausedMatchStore.clear(this, "MANCALA")
         SettingsManager.activateGameTheme(this, "mancala")
@@ -667,7 +669,8 @@ class MancalaActivity : AppCompatActivity() {
     }
 
     private fun aiControlsCurrentTurn(): Boolean =
-        vsAI && (gameState.currentTurn != playerColor || autoplayEnabled)
+        vsAI && (gameState.currentTurn != playerColor ||
+            (autoplayAllowed && autoplayEnabled))
 
     private fun stopAutomatedGameplay() {
         autoplayEnabled = false

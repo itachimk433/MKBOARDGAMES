@@ -161,7 +161,7 @@ class MainActivity : AppCompatActivity() {
             setPadding((18 * dp).toInt(), (15 * dp).toInt(), (18 * dp).toInt(), (13 * dp).toInt())
         }
         header.addView(TextView(ctx).apply {
-            text = "⚙  SETTINGS"
+            text = "Legal"
             setTextColor(Color.parseColor("#F7D99B"))
             setTypeface(typeface, Typeface.BOLD)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)

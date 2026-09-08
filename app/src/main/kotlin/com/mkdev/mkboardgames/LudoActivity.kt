@@ -426,20 +426,24 @@ class LudoActivity : AppCompatActivity() {
     }
 
     private fun showLudoAiModeDialog() {
+        val irregularModeSelected = SettingsManager.currentMode(this) == GameMode.IRREGULAR
         StyledDialogs.showChoices(
             this,
             "CPU Match",
             "Choose the kind of computer match.",
             listOf(
-                StyledDialogs.choice("Normal", "Classic computer match", "", "#8EC7B9"),
-                StyledDialogs.choice("Irregular", "Abilities and coins enabled", "", "#E3B86A"),
+                if (irregularModeSelected) {
+                    StyledDialogs.choice("Irregular", "Abilities and coins enabled", "", "#E3B86A")
+                } else {
+                    StyledDialogs.choice("Normal", "Classic computer match", "", "#8EC7B9")
+                },
             ),
             420f,
             "L U D O",
             onCancel = { showModeDialog() },
-        ) { which, dialog ->
+        ) { _, dialog ->
             vsAI = true
-            irregularMode = which == 1
+            irregularMode = irregularModeSelected
             dialog.dismiss()
             showPlayerPicker()
         }
