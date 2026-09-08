@@ -140,7 +140,7 @@ class MenuView(context: Context) : View(context) {
     }
     private val cardDescPaint  = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#BDBDBD"); textAlign = Paint.Align.CENTER
-        textSize = 5f * sp.coerceAtMost(3f)
+        textSize = 7.5f * sp.coerceAtMost(3f)
         setShadowLayer(1.5f * dp, 0f, 1f * dp, Color.argb(210, 0, 0, 0))
     }
     private val copyrightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {

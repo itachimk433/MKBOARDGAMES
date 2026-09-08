@@ -408,7 +408,9 @@ class LudoActivity : AppCompatActivity() {
         val menuView = ChessMenuView(this, false, gameLabel = "L U D O")
         menuView.onVsAi = {
             StyledDialogs.dismiss()
-            showLudoAiModeDialog()
+            vsAI = true
+            irregularMode = SettingsManager.currentMode(this) == GameMode.IRREGULAR
+            showPlayerPicker()
         }
         menuView.onTwoPlayers = {
             StyledDialogs.dismiss()
@@ -422,30 +424,6 @@ class LudoActivity : AppCompatActivity() {
         }
         StyledDialogs.showFullScreenView(this, menuView) {
             if (!matchStarted) finish() else showBoardAfterDialog()
-        }
-    }
-
-    private fun showLudoAiModeDialog() {
-        val irregularModeSelected = SettingsManager.currentMode(this) == GameMode.IRREGULAR
-        StyledDialogs.showChoices(
-            this,
-            "CPU Match",
-            "Choose the kind of computer match.",
-            listOf(
-                if (irregularModeSelected) {
-                    StyledDialogs.choice("Irregular", "Abilities and coins enabled", "", "#E3B86A")
-                } else {
-                    StyledDialogs.choice("Normal", "Classic computer match", "", "#8EC7B9")
-                },
-            ),
-            420f,
-            "L U D O",
-            onCancel = { showModeDialog() },
-        ) { _, dialog ->
-            vsAI = true
-            irregularMode = irregularModeSelected
-            dialog.dismiss()
-            showPlayerPicker()
         }
     }
 
