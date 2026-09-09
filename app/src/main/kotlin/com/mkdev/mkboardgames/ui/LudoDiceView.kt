@@ -100,7 +100,7 @@ class LudoDiceView(context: Context) : View(context) {
             else -> 0f
         }
         animator = ValueAnimator.ofFloat(0f, 1f).apply {
-            duration = 820L
+            duration = 273L
             interpolator = AccelerateDecelerateInterpolator()
             addUpdateListener {
                 val progress = it.animatedFraction

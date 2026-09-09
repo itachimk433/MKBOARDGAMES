@@ -805,10 +805,19 @@ class BoardView(context: Context) : View(context) {
             val choices = legalMoves.filter { it.to == pos }
             if (choices.size == 1) { startMoveAnimation(choices.first()); return }
             if (choices.size > 1) {
-                selectedPos = null
-                legalMoves = emptyList()
-                onPromotionChoice?.invoke(choices)
-                invalidate()
+                // Flying kings and multi-capture routes can legitimately
+                // produce more than one legal route to the same landing
+                // square. That is not a promotion choice, and showing the
+                // promotion UI here makes a valid capture appear untappable.
+                val promotionTypes = choices.mapNotNull { it.promotionType }.distinct()
+                if (promotionTypes.size > 1) {
+                    selectedPos = null
+                    legalMoves = emptyList()
+                    onPromotionChoice?.invoke(choices)
+                    invalidate()
+                } else {
+                    startMoveAnimation(choices.first())
+                }
                 return
             }
 
@@ -3123,14 +3132,27 @@ class BoardView(context: Context) : View(context) {
                 if (isFlipped) 7 - displayedCol else displayedCol,
             )
         }
-        if (isDraughtsImageBoard()) {
-            if (draughtsCellWidth <= 0f || draughtsCellHeight <= 0f) return null
+        if (isDraughtsBoard()) {
             val boardDimension = gameState.boardSize
-            val displayedCol = (0 until boardDimension).firstOrNull {
-                x >= draughtsLineX(it) && x < draughtsLineX(it + 1)
+            val left = draughtsLineX(0)
+            val right = draughtsLineX(boardDimension)
+            val top = draughtsLineY(0)
+            val bottom = draughtsLineY(boardDimension)
+            if (x < left || x >= right || y < top || y >= bottom) return null
+
+            // Use the same measured cell centres used for rendering pieces and
+            // capture targets. This matters for the photographed boards, whose
+            // perspective makes neighbouring cells slightly different widths,
+            // and keeps human taps aligned with the visible capture rings.
+            val displayedCol = (0 until boardDimension).minByOrNull { index ->
+                kotlin.math.abs(
+                    x - (draughtsLineX(index) + draughtsLineX(index + 1)) / 2f,
+                )
             } ?: return null
-            val displayedRow = (0 until boardDimension).firstOrNull {
-                y >= draughtsLineY(it) && y < draughtsLineY(it + 1)
+            val displayedRow = (0 until boardDimension).minByOrNull { index ->
+                kotlin.math.abs(
+                    y - (draughtsLineY(index) + draughtsLineY(index + 1)) / 2f,
+                )
             } ?: return null
             val last = boardDimension - 1
             return Position(

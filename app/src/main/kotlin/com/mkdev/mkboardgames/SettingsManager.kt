@@ -263,16 +263,16 @@ object SettingsManager {
     private const val KEY_MUSIC_ENABLED = "background_music_enabled"
     private const val KEY_MUSIC_VOLUME = "background_music_volume"
     fun isMusicEnabled(ctx: Context) =
-        sharedPrefs(ctx).getBoolean(KEY_MUSIC_ENABLED, true)
+        prefs(ctx).getBoolean(KEY_MUSIC_ENABLED, true)
 
     fun setMusicEnabled(ctx: Context, v: Boolean) =
-        sharedPrefs(ctx).edit().putBoolean(KEY_MUSIC_ENABLED, v).apply()
+        prefs(ctx).edit().putBoolean(KEY_MUSIC_ENABLED, v).apply()
 
     fun getMusicVolume(ctx: Context) =
-        sharedPrefs(ctx).getInt(KEY_MUSIC_VOLUME, 70).coerceIn(0, 100)
+        prefs(ctx).getInt(KEY_MUSIC_VOLUME, 70).coerceIn(0, 100)
 
     fun setMusicVolume(ctx: Context, v: Int) =
-        sharedPrefs(ctx).edit().putInt(KEY_MUSIC_VOLUME, v.coerceIn(0, 100)).apply()
+        prefs(ctx).edit().putInt(KEY_MUSIC_VOLUME, v.coerceIn(0, 100)).apply()
 
     // ── Motion dice ───────────────────────────────────────────────────────────
     private const val KEY_MOTION_DICE = "motion_dice"
