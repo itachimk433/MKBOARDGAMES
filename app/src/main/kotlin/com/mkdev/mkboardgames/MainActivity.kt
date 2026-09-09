@@ -72,6 +72,7 @@ class MainActivity : AppCompatActivity() {
         menuView = menu
         menu.onGameSelected = { type -> launchGame(type) }
         menu.onSettingsClicked = { showSettings() }
+        menu.onBackClicked = { showModeSelection() }
         screenRoot.removeAllViews()
         screenRoot.addView(menu, FrameLayout.LayoutParams(-1, -1))
     }

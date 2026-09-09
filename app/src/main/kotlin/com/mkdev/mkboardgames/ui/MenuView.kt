@@ -5,6 +5,7 @@ import android.content.Context
 import android.graphics.*
 import android.view.MotionEvent
 import android.view.View
+import com.mkdev.mkboardgames.GameMode
 import com.mkdev.mkboardgames.engine.Position
 import com.mkdev.mkboardgames.games.foxandgeese.FoxAndGeeseSetup
 import com.mkdev.mkboardgames.games.go.GoSetup
@@ -13,6 +14,7 @@ class MenuView(context: Context) : View(context) {
 
     var onGameSelected: ((GameType) -> Unit)? = null
     var onSettingsClicked: (() -> Unit)? = null
+    var onBackClicked: (() -> Unit)? = null
 
     /** Applied at attach-time from saved preferences; controls colour scheme. */
     var isLightMode: Boolean = false
@@ -24,9 +26,12 @@ class MenuView(context: Context) : View(context) {
     var isWoodGameCardStyleEnabled: Boolean = true
         set(v) { field = v; invalidate() }
 
+    private var currentGameMode = com.mkdev.mkboardgames.SettingsManager.currentMode(context)
+
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
         isLightMode = com.mkdev.mkboardgames.SettingsManager.isLightMode(context)
+        currentGameMode = com.mkdev.mkboardgames.SettingsManager.currentMode(context)
         val brownHomeStyle =
             com.mkdev.mkboardgames.SettingsManager.isBrownHomeStyleEnabled(context)
         isHomeBackgroundEnabled = brownHomeStyle
@@ -127,9 +132,28 @@ class MenuView(context: Context) : View(context) {
         color = Color.parseColor("#555555"); textAlign = Paint.Align.CENTER
         textSize = 10f * sp.coerceAtMost(3f)
     }
-    private val versionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#555555"); textAlign = Paint.Align.LEFT
-        textSize = 10f * sp.coerceAtMost(3f)
+    private val irregularModePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#F7D99B")
+        textAlign = Paint.Align.CENTER
+        isFakeBoldText = true
+        textSize = 15f * sp.coerceAtMost(3f)
+        letterSpacing = 0.12f
+        setShadowLayer(2f * dp, 0f, 1f * dp, Color.argb(210, 0, 0, 0))
+    }
+    private val backButtonPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(210, 34, 18, 13)
+    }
+    private val backButtonEdgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#D3A05F")
+        style = Paint.Style.STROKE
+        strokeWidth = 1f * dp
+    }
+    private val backArrowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#F7D99B")
+        style = Paint.Style.STROKE
+        strokeWidth = 2.2f * dp
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
     }
     private val gearFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#E3B86A")
@@ -168,8 +192,11 @@ class MenuView(context: Context) : View(context) {
 
     private val gearRect  = RectF()
     private val gearTouch = RectF()
+    private val backRect = RectF()
+    private val backTouch = RectF()
     private var pressedCard: GameType? = null
     private var pressedGear  = false
+    private var pressedBack = false
     private var gearRotation  = 0f
     private var gearSpinAnim: ValueAnimator? = null
     private val cardScales    = HashMap<GameType, Float>()
@@ -187,10 +214,10 @@ class MenuView(context: Context) : View(context) {
     private var scrollY    = 0f
     private var maxScrollY = 0f
     private var lastTouchY = 0f
-    private var headerH    = 0f   // Y where cards begin (below the title block)
+    private var headerH    = 0f   // Y where cards begin (below the compact header)
 
     override fun onSizeChanged(w: Int, h: Int, ow: Int, oh: Int) {
-        headerH = 64f * dp
+        headerH = if (currentGameMode == GameMode.IRREGULAR) 82f * dp else 64f * dp
         for (i in cards.indices) {
             val column = i % gridColumns
             val row = i / gridColumns
@@ -201,6 +228,16 @@ class MenuView(context: Context) : View(context) {
         val contentBottom = cards.last().rect.bottom + 56f * dp   // room for two-line footer
         maxScrollY = maxOf(0f, contentBottom - h)
 
+        val backSize = 34f * dp
+        val backLeft = 14f * dp
+        val backTop = 14f * dp
+        backRect.set(backLeft, backTop, backLeft + backSize, backTop + backSize)
+        backTouch.set(
+            backLeft - 6f * dp,
+            backTop - 6f * dp,
+            backLeft + backSize + 6f * dp,
+            backTop + backSize + 6f * dp,
+        )
         val gs = 34f * dp; val gx = w - gs - 14f * dp; val gy = 14f * dp
         gearRect.set(gx, gy, gx + gs, gy + gs)
         gearTouch.set(gx - 4f * dp, gy - 4f * dp, gx + gs + 4f * dp, gy + gs + 18f * dp)
@@ -216,12 +253,20 @@ class MenuView(context: Context) : View(context) {
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
                 lastTouchY  = event.y
-                pressedGear = gearTouch.contains(event.x, cy)
-                pressedCard = if (!pressedGear) cards.firstOrNull { it.rect.contains(event.x, cy) }?.type else null
+                pressedBack = backTouch.contains(event.x, event.y)
+                pressedGear = !pressedBack && gearTouch.contains(event.x, cy)
+                pressedCard =
+                    if (!pressedGear && !pressedBack) cards.firstOrNull { it.rect.contains(event.x, cy) }?.type
+                    else null
                 pressedCard?.let { animateCardScale(it, 0.96f) }
                 invalidate()
             }
             MotionEvent.ACTION_MOVE -> {
+                if (pressedBack && !backTouch.contains(event.x, event.y)) {
+                    pressedBack = false
+                    invalidate()
+                    return true
+                }
                 val dy = lastTouchY - event.y
                 if (kotlin.math.abs(dy) > 6f) {
                     pressedCard?.let { animateCardScale(it, 1f) }
@@ -232,6 +277,16 @@ class MenuView(context: Context) : View(context) {
                 invalidate()
             }
             MotionEvent.ACTION_UP -> {
+                if (pressedBack) {
+                    val selectedBack = backTouch.contains(event.x, event.y)
+                    pressedBack = false
+                    if (selectedBack) {
+                        com.mkdev.mkboardgames.SoundPlayer.play("ui_click")
+                        onBackClicked?.invoke()
+                    }
+                    invalidate()
+                    return true
+                }
                 if (pressedGear && gearTouch.contains(event.x, cy)) {
                     com.mkdev.mkboardgames.SoundPlayer.play("ui_click")
                     animateGearSpin()
@@ -248,7 +303,7 @@ class MenuView(context: Context) : View(context) {
             }
             MotionEvent.ACTION_CANCEL -> {
                 pressedCard?.let { animateCardScale(it, 1f) }
-                pressedCard = null; pressedGear = false; invalidate()
+                pressedCard = null; pressedGear = false; pressedBack = false; invalidate()
             }
         }
         return true
@@ -265,10 +320,23 @@ class MenuView(context: Context) : View(context) {
         canvas.clipRect(0f, 0f, width.toFloat(), height.toFloat())
         canvas.translate(0f, -scrollY)
         drawGear(canvas)
-        canvas.drawText("v1.2", 12f * dp, 12f * dp + versionPaint.textSize, versionPaint)
+        if (currentGameMode == GameMode.IRREGULAR) {
+            canvas.drawText("IRREGULAR MODE", width / 2f, headerH - 18f * dp, irregularModePaint)
+        }
         cards.forEach { drawCard(canvas, it) }
         drawFooter(canvas)
         canvas.restore()
+        drawBackArrow(canvas)
+    }
+
+    private fun drawBackArrow(canvas: Canvas) {
+        canvas.drawRoundRect(backRect, 10f * dp, 10f * dp, backButtonPaint)
+        canvas.drawRoundRect(backRect, 10f * dp, 10f * dp, backButtonEdgePaint)
+        val cy = backRect.centerY()
+        val tipX = backRect.left + 9f * dp
+        canvas.drawLine(tipX, cy, backRect.right - 8f * dp, cy, backArrowPaint)
+        canvas.drawLine(tipX, cy, tipX + 9f * dp, cy - 8f * dp, backArrowPaint)
+        canvas.drawLine(tipX, cy, tipX + 9f * dp, cy + 8f * dp, backArrowPaint)
     }
 
     private fun drawHomeBackground(canvas: Canvas) {
@@ -1063,6 +1131,10 @@ class MenuView(context: Context) : View(context) {
             gearEdgePaint.color  = Color.parseColor("#0D5277")
             gearHolePaint.color  = Color.parseColor("#F5F5F5")
             gearLabelPaint.color = Color.parseColor("#1976A8")
+            irregularModePaint.color = Color.parseColor("#1976A8")
+            backButtonPaint.color = Color.WHITE
+            backButtonEdgePaint.color = Color.parseColor("#1976A8")
+            backArrowPaint.color = Color.parseColor("#1976A8")
         } else {
             bgPaint.color        = Color.parseColor("#121212")
             cardPaint.color      = Color.parseColor("#202429")
@@ -1075,6 +1147,10 @@ class MenuView(context: Context) : View(context) {
             gearEdgePaint.color  = Color.parseColor("#F7D99B")
             gearHolePaint.color  = Color.parseColor("#102C32")
             gearLabelPaint.color = Color.parseColor("#E3B86A")
+            irregularModePaint.color = Color.parseColor("#F7D99B")
+            backButtonPaint.color = Color.argb(210, 34, 18, 13)
+            backButtonEdgePaint.color = Color.parseColor("#D3A05F")
+            backArrowPaint.color = Color.parseColor("#F7D99B")
         }
     }
 

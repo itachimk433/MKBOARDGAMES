@@ -70,6 +70,11 @@ class ModeSelectionView(context: Context) : View(context) {
         textSize = 11f * textScale
         letterSpacing = 0.12f
     }
+    private val versionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#555555")
+        textAlign = Paint.Align.LEFT
+        textSize = 10f * textScale
+    }
     private val modeTitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
         textAlign = Paint.Align.CENTER
@@ -192,6 +197,7 @@ class ModeSelectionView(context: Context) : View(context) {
             canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), backgroundScrimPaint)
         }
 
+        canvas.drawText("v1.2", 12f * unit, 12f * unit + versionPaint.textSize, versionPaint)
         val centerX = width / 2f
         logoBitmap?.let {
             canvas.drawBitmap(it, null, statsRect, logoPaint)
