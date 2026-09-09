@@ -811,7 +811,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
         val volumeLabel = TextView(ctx).apply {
-            text = "Music Volume  •  $musicVolume%"
+            text = "Background Music Volume  •  $musicVolume%"
             setTextColor(Color.parseColor("#FFF8E8"))
             setTypeface(typeface, Typeface.BOLD)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
@@ -827,7 +827,7 @@ class MainActivity : AppCompatActivity() {
                     if (!fromUser) return
                     musicVolume = progress
                     MusicPlayer.setVolume(ctx, musicVolume)
-                    volumeLabel.text = "Music Volume  •  $musicVolume%"
+                    volumeLabel.text = "Background Music Volume  •  $musicVolume%"
                 }
 
                 override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
@@ -835,6 +835,54 @@ class MainActivity : AppCompatActivity() {
             })
         })
         root.addView(volumePanel)
+
+        var matchMusicVolume = SettingsManager.getMatchMusicVolume(ctx)
+        val matchVolumePanel = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            background = android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                intArrayOf(
+                    Color.parseColor("#21454A"),
+                    Color.parseColor("#16353B"),
+                    Color.parseColor("#102C32"),
+                ),
+            ).apply {
+                cornerRadius = 12f * dp
+                setStroke((1f * dp).toInt(), Color.parseColor("#2C5960"))
+            }
+            setPadding((14 * dp).toInt(), (8 * dp).toInt(), (14 * dp).toInt(), (5 * dp).toInt())
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).also {
+                it.setMargins((2 * dp).toInt(), (0 * dp).toInt(), (2 * dp).toInt(), (8 * dp).toInt())
+            }
+        }
+        val matchVolumeLabel = TextView(ctx).apply {
+            text = "In-match Music Volume  •  $matchMusicVolume%"
+            setTextColor(Color.parseColor("#FFF8E8"))
+            setTypeface(typeface, Typeface.BOLD)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+        }
+        matchVolumePanel.addView(matchVolumeLabel)
+        matchVolumePanel.addView(SeekBar(ctx).apply {
+            max = 100
+            progress = matchMusicVolume
+            progressTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#C8894C"))
+            thumbTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#F7D99B"))
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                    if (!fromUser) return
+                    matchMusicVolume = progress
+                    MusicPlayer.setMatchVolume(ctx, matchMusicVolume)
+                    matchVolumeLabel.text = "In-match Music Volume  •  $matchMusicVolume%"
+                }
+
+                override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
+                override fun onStopTrackingTouch(seekBar: SeekBar?) = Unit
+            })
+        })
+        root.addView(matchVolumePanel)
 
         var movementSounds = SettingsManager.isMovementSoundsEnabled(ctx)
         val (movSoundRow, movSoundVal) = settingRow("🔊", "Movement Sounds", if (movementSounds) "On" else "Off")

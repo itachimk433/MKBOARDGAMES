@@ -33,28 +33,32 @@ object MusicPlayer {
     private var appInForeground = true
     private var applicationContext: Context? = null
     private var matchTrack = MATCH_TRACK
+    private val trackPositionsMs = IntArray(tracks.size)
+    private var activeUsesMatchVolume = false
+    private var requestedUsesMatchVolume = false
 
-    /** Begin the selected mode's music session and resume from its saved position. */
+    /** Begin the selected mode's music session from the beginning.
+     *
+     * Game-selection music intentionally starts fresh whenever the user enters
+     * that screen. Its saved position is not reused, unlike the other tracks.
+     */
     fun playForMode(ctx: Context, mode: GameMode) {
         applicationContext = ctx.applicationContext
         modeSessionActive = true
         requestedTrack = if (mode == GameMode.IRREGULAR) IRREGULAR_TRACK else NORMAL_TRACK
-
-        if (activeTrack != requestedTrack) {
-            releasePlayer()
-            activeTrack = requestedTrack
-        }
-        resumeIfAllowed()
+        requestedUsesMatchVolume = false
+        resetTrackPosition(requestedTrack)
+        switchToRequestedTrack()
     }
 
     /** Switch to the standard match soundtrack for the current game. */
     fun enterMatch(ctx: Context) {
-        switchToTrack(ctx, MATCH_TRACK)
+        switchToTrack(ctx, MATCH_TRACK, usesMatchVolume = true)
     }
 
     /** Switch to the dedicated Onitama match soundtrack. */
     fun enterOnitamaMatch(ctx: Context) {
-        switchToTrack(ctx, MODE_SELECTION_ONITAMA_TRACK)
+        switchToTrack(ctx, MODE_SELECTION_ONITAMA_TRACK, usesMatchVolume = true)
     }
 
     /** Switch to the soundtrack used by an in-game pause overlay. */
@@ -62,19 +66,21 @@ object MusicPlayer {
         applicationContext = ctx.applicationContext
         modeSessionActive = true
         requestedTrack = PAUSED_MATCH_TRACK
+        requestedUsesMatchVolume = true
         switchToRequestedTrack()
     }
 
     /** Restore the active match soundtrack after a pause overlay is dismissed. */
     fun resumeMatch(ctx: Context) {
-        switchToTrack(ctx, matchTrack)
+        switchToTrack(ctx, matchTrack, usesMatchVolume = true)
     }
 
-    private fun switchToTrack(ctx: Context, track: Int) {
+    private fun switchToTrack(ctx: Context, track: Int, usesMatchVolume: Boolean) {
         applicationContext = ctx.applicationContext
         modeSessionActive = true
         if (track != PAUSED_MATCH_TRACK) matchTrack = track
         requestedTrack = track
+        requestedUsesMatchVolume = usesMatchVolume
         switchToRequestedTrack()
     }
 
@@ -82,13 +88,17 @@ object MusicPlayer {
         if (activeTrack != requestedTrack) {
             releasePlayer()
             activeTrack = requestedTrack
+            activeUsesMatchVolume = requestedUsesMatchVolume
+        } else if (activeUsesMatchVolume != requestedUsesMatchVolume) {
+            activeUsesMatchVolume = requestedUsesMatchVolume
+            applyVolume()
         }
         resumeIfAllowed()
     }
 
     /** Play the dedicated mode-selection soundtrack. */
     fun enterModeSelection(ctx: Context) {
-        switchToTrack(ctx, MODE_SELECTION_ONITAMA_TRACK)
+        switchToTrack(ctx, MODE_SELECTION_ONITAMA_TRACK, usesMatchVolume = false)
     }
 
     /** Called by the application when no app activity is visible. */
@@ -112,8 +122,13 @@ object MusicPlayer {
     fun setVolume(ctx: Context, volumePercent: Int) {
         val volume = volumePercent.coerceIn(0, 100)
         SettingsManager.setMusicVolume(ctx, volume)
-        val scaledVolume = volume / 100f
-        player?.setVolume(scaledVolume, scaledVolume)
+        if (!activeUsesMatchVolume) applyVolume()
+    }
+
+    fun setMatchVolume(ctx: Context, volumePercent: Int) {
+        val volume = volumePercent.coerceIn(0, 100)
+        SettingsManager.setMatchMusicVolume(ctx, volume)
+        if (activeUsesMatchVolume) applyVolume()
     }
 
     fun pause() {
@@ -126,15 +141,19 @@ object MusicPlayer {
 
         val existing = player
         if (existing != null) {
+            applyVolume(existing)
             if (!existing.isPlaying) existing.start()
             return
         }
         if (requestedTrack !in tracks.indices) return
 
         val newPlayer = MediaPlayer.create(ctx, tracks[requestedTrack]) ?: return
-        val volume = SettingsManager.getMusicVolume(ctx) / 100f
-        newPlayer.setVolume(volume, volume)
+        applyVolume(newPlayer)
         newPlayer.isLooping = true
+        val savedPosition = trackPositionsMs[requestedTrack]
+        if (savedPosition > 0 && savedPosition < newPlayer.duration) {
+            newPlayer.seekTo(savedPosition)
+        }
         newPlayer.setOnErrorListener { failedPlayer, _, _ ->
             failedPlayer.release()
             if (player === failedPlayer) player = null
@@ -146,10 +165,36 @@ object MusicPlayer {
         newPlayer.start()
     }
 
+    private fun applyVolume(target: MediaPlayer? = player) {
+        val ctx = applicationContext ?: return
+        val volumePercent = if (activeUsesMatchVolume) {
+            SettingsManager.getMatchMusicVolume(ctx)
+        } else {
+            SettingsManager.getMusicVolume(ctx)
+        }
+        val scaledVolume = volumePercent / 100f
+        target?.setVolume(scaledVolume, scaledVolume)
+    }
+
+    private fun resetTrackPosition(track: Int) {
+        if (track !in trackPositionsMs.indices) return
+        trackPositionsMs[track] = 0
+        if (activeTrack == track) {
+            player?.let { current ->
+                runCatching { current.seekTo(0) }
+            }
+        }
+    }
+
     private fun releasePlayer() {
-        player?.setOnCompletionListener(null)
-        player?.setOnErrorListener(null)
-        player?.release()
+        player?.let { current ->
+            if (activeTrack in trackPositionsMs.indices) {
+                trackPositionsMs[activeTrack] = runCatching { current.currentPosition }.getOrDefault(0)
+            }
+            current.setOnCompletionListener(null)
+            current.setOnErrorListener(null)
+            current.release()
+        }
         player = null
     }
 }
