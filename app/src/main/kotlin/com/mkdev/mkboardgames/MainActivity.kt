@@ -59,11 +59,7 @@ class MainActivity : AppCompatActivity() {
                 selectedGameMode = mode
                 SettingsManager.setCurrentMode(this@MainActivity, mode)
                 MusicPlayer.playForMode(this@MainActivity, mode)
-                if (mode == GameMode.CHALLENGES) {
-                    startActivity(Intent(this@MainActivity, ChallengesActivity::class.java))
-                } else {
-                    showGameMenu()
-                }
+                showGameMenu()
             }
             onSettingsClicked = { showGeneralSettings() }
             onStatsClicked = { showStatsDialog() }
@@ -74,9 +70,20 @@ class MainActivity : AppCompatActivity() {
 
     private fun showGameMenu() {
         showingGameMenu = true
-        val menu = MenuView(this)
+        val menu = MenuView(
+            this,
+            isChallengeMenu = selectedGameMode == GameMode.CHALLENGES,
+        )
         menuView = menu
-        menu.onGameSelected = { type -> launchGame(type) }
+        menu.onGameSelected = { type ->
+            if (selectedGameMode == GameMode.CHALLENGES) {
+                if (type == MenuView.GameType.CHESS) {
+                    startActivity(Intent(this@MainActivity, ChessChallengeActivity::class.java))
+                }
+            } else {
+                launchGame(type)
+            }
+        }
         menu.onSettingsClicked = { showSettings() }
         menu.onBackClicked = { showModeSelection() }
         screenRoot.removeAllViews()

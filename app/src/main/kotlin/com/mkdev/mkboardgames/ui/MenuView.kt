@@ -10,7 +10,10 @@ import com.mkdev.mkboardgames.engine.Position
 import com.mkdev.mkboardgames.games.foxandgeese.FoxAndGeeseSetup
 import com.mkdev.mkboardgames.games.go.GoSetup
 
-class MenuView(context: Context) : View(context) {
+class MenuView(
+    context: Context,
+    private val isChallengeMenu: Boolean = false,
+) : View(context) {
 
     var onGameSelected: ((GameType) -> Unit)? = null
     var onSettingsClicked: (() -> Unit)? = null
@@ -31,7 +34,11 @@ class MenuView(context: Context) : View(context) {
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
         isLightMode = com.mkdev.mkboardgames.SettingsManager.isLightMode(context)
-        currentGameMode = com.mkdev.mkboardgames.SettingsManager.currentMode(context)
+        currentGameMode = if (isChallengeMenu) {
+            GameMode.CHALLENGES
+        } else {
+            com.mkdev.mkboardgames.SettingsManager.currentMode(context)
+        }
         val brownHomeStyle =
             com.mkdev.mkboardgames.SettingsManager.isBrownHomeStyleEnabled(context)
         isHomeBackgroundEnabled = brownHomeStyle
@@ -59,6 +66,20 @@ class MenuView(context: Context) : View(context) {
     private val sp = context.resources.displayMetrics.scaledDensity
 
     private val brownWoodCardRenderer = BrownWoodCardRenderer(dp)
+
+    private val challengeLockOverlayPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(112, 8, 17, 25)
+    }
+    private val challengeLockPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#E3B86A")
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+    }
+    private val challengeLockTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#F7D99B")
+        textAlign = Paint.Align.CENTER
+        isFakeBoldText = true
+    }
 
     private val homeBackgroundBitmap: Bitmap? = try {
         context.assets.open("mk_board_home_background.webp").use { BitmapFactory.decodeStream(it) }
@@ -295,7 +316,7 @@ class MenuView(context: Context) : View(context) {
                 }
                 val hit = cards.firstOrNull { it.rect.contains(event.x, cy) }?.type
                 pressedCard?.let { animateCardScale(it, 1f) }
-                if (hit != null && hit == pressedCard) {
+                if (hit != null && hit == pressedCard && !isChallengeLocked(hit)) {
                     com.mkdev.mkboardgames.SoundPlayer.play("ui_click")
                     onGameSelected?.invoke(hit)
                 }
@@ -427,7 +448,53 @@ class MenuView(context: Context) : View(context) {
         }
         val descY = titleStartY + titleLines.size * (cardTitlePaint.textSize + 1f * dp) + 2f * dp
         canvas.drawText(desc, r.centerX(), descY, cardDescPaint)
+        if (isChallengeLocked(card.type)) {
+            drawChallengeLockOverlay(canvas, r)
+        }
         if (scale != 1f) canvas.restore()
+    }
+
+    private fun isChallengeLocked(type: GameType): Boolean =
+        isChallengeMenu && type != GameType.CHESS
+
+    private fun drawChallengeLockOverlay(canvas: Canvas, rect: RectF) {
+        canvas.drawRoundRect(rect, 18f * dp, 18f * dp, challengeLockOverlayPaint)
+
+        val lockCenterX = rect.right - 26f * dp
+        val lockTop = rect.top + 15f * dp
+        challengeLockPaint.strokeWidth = 1.8f * dp
+        canvas.drawRoundRect(
+            RectF(
+                lockCenterX - 8f * dp,
+                lockTop + 9f * dp,
+                lockCenterX + 8f * dp,
+                lockTop + 22f * dp,
+            ),
+            2.5f * dp,
+            2.5f * dp,
+            challengeLockPaint,
+        )
+        canvas.drawArc(
+            RectF(
+                lockCenterX - 5.5f * dp,
+                lockTop,
+                lockCenterX + 5.5f * dp,
+                lockTop + 16f * dp,
+            ),
+            180f,
+            -180f,
+            false,
+            challengeLockPaint,
+        )
+        canvas.drawCircle(lockCenterX, lockTop + 15f * dp, 1.4f * dp, challengeLockPaint)
+
+        challengeLockTextPaint.textSize = 8f * sp.coerceAtMost(3f)
+        canvas.drawText(
+            "LOCKED",
+            lockCenterX,
+            lockTop + 34f * dp,
+            challengeLockTextPaint,
+        )
     }
 
     private fun drawWoodCardShell(canvas: Canvas, r: RectF, pressed: Boolean) {

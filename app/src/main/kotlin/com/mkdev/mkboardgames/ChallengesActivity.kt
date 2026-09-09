@@ -4,16 +4,18 @@ import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
-import com.mkdev.mkboardgames.ui.ChallengeCatalogView
+import com.mkdev.mkboardgames.ui.MenuView
 
 class ChallengesActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         makeFullscreen()
-        setContentView(ChallengeCatalogView(this).apply {
-            onChessSelected = {
-                startActivity(Intent(this@ChallengesActivity, ChessChallengeActivity::class.java))
+        setContentView(MenuView(this, isChallengeMenu = true).apply {
+            onGameSelected = { type ->
+                if (type == MenuView.GameType.CHESS) {
+                    startActivity(Intent(this@ChallengesActivity, ChessChallengeActivity::class.java))
+                }
             }
             onBackClicked = { finish() }
         })
