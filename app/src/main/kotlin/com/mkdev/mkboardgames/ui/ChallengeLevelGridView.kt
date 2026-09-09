@@ -7,11 +7,11 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import android.view.MotionEvent
-import android.view.OverScroller
 import android.view.View
 import android.view.VelocityTracker
 import android.view.ViewConfiguration
 import android.view.animation.DecelerateInterpolator
+import android.widget.OverScroller
 import com.mkdev.mkboardgames.SoundPlayer
 import kotlin.math.abs
 import kotlin.math.ceil
