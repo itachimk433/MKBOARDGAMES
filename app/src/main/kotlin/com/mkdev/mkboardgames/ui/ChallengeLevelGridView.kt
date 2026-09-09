@@ -1,0 +1,227 @@
+package com.mkdev.mkboardgames.ui
+
+import android.animation.ValueAnimator
+import android.content.Context
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.RectF
+import android.view.MotionEvent
+import android.view.View
+import android.view.animation.DecelerateInterpolator
+import com.mkdev.mkboardgames.SoundPlayer
+import kotlin.math.abs
+import kotlin.math.ceil
+
+/**
+ * Four-column challenge selector using the same wood/gold card language as the
+ * game catalogue. The view owns scrolling so the level cards stay compact on
+ * phones without introducing a second widget style.
+ */
+class ChallengeLevelGridView(
+    context: Context,
+    private val levelCount: Int,
+    private val highestCompleted: Int,
+) : View(context) {
+
+    var onLevelSelected: ((Int) -> Unit)? = null
+
+    private val unit = resources.displayMetrics.density.coerceAtLeast(1f)
+    private val textScale = resources.displayMetrics.scaledDensity.coerceAtMost(2f)
+    private val woodCardRenderer = BrownWoodCardRenderer(unit)
+    private val levelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#F7D99B")
+        textAlign = Paint.Align.CENTER
+        isFakeBoldText = true
+        textSize = 12f * textScale
+    }
+    private val completedLevelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#FFE5A8")
+        textAlign = Paint.Align.CENTER
+        isFakeBoldText = true
+        textSize = 12f * textScale
+    }
+    private val loadingRingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#F7D99B")
+        style = Paint.Style.STROKE
+        strokeWidth = 2.2f * unit
+        strokeCap = Paint.Cap.ROUND
+    }
+
+    private val cardRects = ArrayList<RectF>(levelCount)
+    private val cardScales = FloatArray(levelCount) { 1f }
+    private var pressedIndex = -1
+    private var loadingIndex = -1
+    private var loadingAngle = 0f
+    private var scrollOffset = 0f
+    private var maxScroll = 0f
+    private var downX = 0f
+    private var downY = 0f
+    private var lastY = 0f
+    private var scaleAnimator: ValueAnimator? = null
+    private var loadingAnimator: ValueAnimator? = null
+
+    init {
+        isClickable = true
+        setBackgroundColor(Color.parseColor("#061321"))
+    }
+
+    override fun onDetachedFromWindow() {
+        scaleAnimator?.cancel()
+        loadingAnimator?.cancel()
+        super.onDetachedFromWindow()
+    }
+
+    override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
+        val sidePadding = 14f * unit
+        val columnGap = 8f * unit
+        val cardWidth = ((width - sidePadding * 2f - columnGap * 3f) / 4f)
+            .coerceAtLeast(1f)
+        val cardHeight = 64f * unit
+        val rowGap = 10f * unit
+        val firstTop = 8f * unit
+        val rowCount = ceil(levelCount / 4f).toInt()
+
+        cardRects.clear()
+        repeat(levelCount) { index ->
+            val row = index / 4
+            val column = index % 4
+            val left = sidePadding + column * (cardWidth + columnGap)
+            val top = firstTop + row * (cardHeight + rowGap)
+            cardRects += RectF(left, top, left + cardWidth, top + cardHeight)
+        }
+
+        val contentBottom = firstTop + rowCount * cardHeight +
+            (rowCount - 1).coerceAtLeast(0) * rowGap + 14f * unit
+        maxScroll = (contentBottom - height).coerceAtLeast(0f)
+        scrollOffset = scrollOffset.coerceIn(0f, maxScroll)
+    }
+
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
+        canvas.drawColor(Color.parseColor("#061321"))
+        canvas.save()
+        canvas.translate(0f, -scrollOffset)
+
+        cardRects.forEachIndexed { index, rect ->
+            val scale = cardScales[index]
+            canvas.save()
+            canvas.scale(scale, scale, rect.centerX(), rect.centerY())
+            woodCardRenderer.draw(canvas, rect, pressedIndex == index)
+            canvas.drawText(
+                "Level ${(index + 1).toString().padStart(2, '0')}",
+                rect.centerX(),
+                rect.centerY() - (levelPaint.ascent() + levelPaint.descent()) / 2f,
+                if (index + 1 <= highestCompleted) completedLevelPaint else levelPaint,
+            )
+            if (loadingIndex == index) {
+                val radius = 7f * unit
+                val centerX = rect.right - 17f * unit
+                val centerY = rect.top + 17f * unit
+                canvas.drawArc(
+                    RectF(
+                        centerX - radius,
+                        centerY - radius,
+                        centerX + radius,
+                        centerY + radius,
+                    ),
+                    loadingAngle,
+                    285f,
+                    false,
+                    loadingRingPaint,
+                )
+            }
+            canvas.restore()
+        }
+        canvas.restore()
+    }
+
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        val contentY = event.y + scrollOffset
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                downX = event.x
+                downY = event.y
+                lastY = event.y
+                pressedIndex = cardAt(event.x, contentY)
+                pressedIndex.takeIf { it >= 0 }?.let { animateCardScale(it, 0.94f) }
+                invalidate()
+                return true
+            }
+
+            MotionEvent.ACTION_MOVE -> {
+                val dy = lastY - event.y
+                if (abs(event.y - downY) > 8f * unit && pressedIndex >= 0) {
+                    animateCardScale(pressedIndex, 1f)
+                    pressedIndex = -1
+                }
+                scrollOffset = (scrollOffset + dy).coerceIn(0f, maxScroll)
+                lastY = event.y
+                invalidate()
+                return true
+            }
+
+            MotionEvent.ACTION_UP -> {
+                val selected = pressedIndex
+                val stillOnCard = selected >= 0 && cardAt(event.x, event.y + scrollOffset) == selected
+                if (selected >= 0) animateCardScale(selected, 1f)
+                pressedIndex = -1
+                if (
+                    selected >= 0 &&
+                    stillOnCard &&
+                    abs(event.x - downX) <= 18f * unit &&
+                    abs(event.y - downY) <= 18f * unit
+                ) {
+                    SoundPlayer.play("ui_click")
+                    startLoading(selected)
+                }
+                invalidate()
+                return true
+            }
+
+            MotionEvent.ACTION_CANCEL -> {
+                if (pressedIndex >= 0) animateCardScale(pressedIndex, 1f)
+                pressedIndex = -1
+                invalidate()
+                return true
+            }
+        }
+        return true
+    }
+
+    private fun cardAt(x: Float, contentY: Float): Int =
+        cardRects.indexOfFirst { it.contains(x, contentY) }
+
+    private fun animateCardScale(index: Int, target: Float) {
+        scaleAnimator?.cancel()
+        val from = cardScales[index]
+        scaleAnimator = ValueAnimator.ofFloat(from, target).apply {
+            duration = if (target < 1f) 70L else 110L
+            interpolator = DecelerateInterpolator()
+            addUpdateListener {
+                cardScales[index] = it.animatedValue as Float
+                invalidate()
+            }
+            start()
+        }
+    }
+
+    private fun startLoading(index: Int) {
+        loadingAnimator?.cancel()
+        loadingIndex = index
+        loadingAngle = 0f
+        loadingAnimator = ValueAnimator.ofFloat(0f, 360f).apply {
+            duration = 700L
+            repeatCount = ValueAnimator.INFINITE
+            addUpdateListener {
+                loadingAngle = it.animatedValue as Float
+                invalidate()
+            }
+            start()
+        }
+        postDelayed({
+            if (loadingIndex == index) onLevelSelected?.invoke(index + 1)
+        }, 260L)
+        invalidate()
+    }
+}

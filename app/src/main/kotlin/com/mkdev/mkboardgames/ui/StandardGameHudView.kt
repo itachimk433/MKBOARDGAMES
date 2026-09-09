@@ -21,6 +21,8 @@ class StandardGameHudView(
     private val showHistoryControls: Boolean = true,
     labelTextSizeSp: Float = 15f,
     private val labelOffsetDp: Float = 0f,
+    private val backLabel: String = "← Back",
+    private val menuLabel: String = "Menu",
 ) : View(context) {
     var onBack: (() -> Unit)? = null
     var onUndo: (() -> Unit)? = null
@@ -137,7 +139,7 @@ class StandardGameHudView(
         controls.forEach {
             canvas.drawRoundRect(it, radius, radius, buttonBackgroundPaint)
         }
-        canvas.drawText("← Back", backRect.centerX(), backRect.centerY() + buttonPaint.textSize * 0.36f, buttonPaint)
+        canvas.drawText(backLabel, backRect.centerX(), backRect.centerY() + buttonPaint.textSize * 0.36f, buttonPaint)
         if (showHistoryControls) {
             canvas.drawText(
                 "Undo",
@@ -152,7 +154,7 @@ class StandardGameHudView(
                 if (canRedo) buttonPaint else disabledButtonPaint,
             )
         }
-        canvas.drawText("Menu", menuRect.centerX(), menuRect.centerY() + buttonPaint.textSize * 0.36f, buttonPaint)
+        canvas.drawText(menuLabel, menuRect.centerX(), menuRect.centerY() + buttonPaint.textSize * 0.36f, buttonPaint)
 
         textPaint.color = labelColor
         val centerX = width / 2f

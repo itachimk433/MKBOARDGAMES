@@ -3,7 +3,6 @@ package com.mkdev.mkboardgames
 import android.app.AlertDialog
 import android.content.Context
 import android.graphics.Color
-import android.graphics.Typeface
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -17,6 +16,8 @@ import com.mkdev.mkboardgames.engine.*
 import com.mkdev.mkboardgames.games.chess.*
 import com.mkdev.mkboardgames.ui.BoardView
 import com.mkdev.mkboardgames.ui.ChessBoardStyle
+import com.mkdev.mkboardgames.ui.ChallengeLevelGridView
+import com.mkdev.mkboardgames.ui.StandardGameHudView
 
 class ChessChallengeActivity : AppCompatActivity() {
 
@@ -30,8 +31,7 @@ class ChessChallengeActivity : AppCompatActivity() {
     private var solutionMoves: List<String> = emptyList()
     private var expectedMoveIndex = 1
     private var boardView: BoardView? = null
-    private var statusText: TextView? = null
-    private var levelTitle: TextView? = null
+    private var gameHud: StandardGameHudView? = null
     private var completed = false
     private var resetting = false
 
@@ -66,52 +66,27 @@ class ChessChallengeActivity : AppCompatActivity() {
     private fun showLevelList() {
         handler.removeCallbacksAndMessages(null)
         boardView = null
-        statusText = null
+        gameHud = null
         val root = verticalRoot()
         root.addView(topBar("CHESS CHALLENGES", "100 tactical levels") {
             finish()
         })
 
         val summary = TextView(this).apply {
-            text = "Complete levels in order from beginner tactics to master calculation.\nHighest completed: ${highestCompleted.coerceAtMost(puzzles.size)} / ${puzzles.size}"
+            text = "Complete levels in order.\nHighest completed: ${highestCompleted.coerceAtMost(puzzles.size)} / ${puzzles.size}"
             setTextColor(Color.parseColor("#B7C9D1"))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             setPadding(dp(20), dp(13), dp(20), dp(12))
         }
         root.addView(summary)
 
-        val scroll = ScrollView(this).apply {
-            isFillViewport = true
-            setPadding(dp(12), 0, dp(12), dp(20))
-        }
-        val list = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-        }
-        puzzles.forEachIndexed { index, puzzle ->
-            val level = index + 1
-            val row = TextView(this).apply {
-                text = "LEVEL ${level.toString().padStart(2, '0')}    ${ChessPuzzleData.themeFor(puzzle.level)}\n${puzzle.ratingLabel} • ${puzzle.rating} rating"
-                setTextColor(if (level <= highestCompleted) Color.parseColor("#F7D99B") else Color.WHITE)
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
-                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-                gravity = android.view.Gravity.CENTER_VERTICAL
-                setPadding(dp(18), dp(12), dp(18), dp(12))
-                background = roundedBackground(
-                    if (level <= highestCompleted) "#214A55" else "#172B35",
-                    if (level <= highestCompleted) "#D3A05F" else "#39505B",
-                    12f,
-                )
-                setOnClickListener {
-                    selectedLevel = level
-                    showPuzzle(level)
-                }
+        val levelGrid = ChallengeLevelGridView(this, puzzles.size, highestCompleted).apply {
+            onLevelSelected = { level ->
+                selectedLevel = level
+                showPuzzle(level)
             }
-            list.addView(row, LinearLayout.LayoutParams(-1, dp(68)).apply {
-                bottomMargin = dp(8)
-            })
         }
-        scroll.addView(list)
-        root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        root.addView(levelGrid, LinearLayout.LayoutParams(-1, 0, 1f))
         setContentView(root)
     }
 
@@ -123,20 +98,24 @@ class ChessChallengeActivity : AppCompatActivity() {
         resetting = false
         val root = verticalRoot()
 
-        val top = topBar("CHESS • LEVEL ${selectedLevel.toString().padStart(2, '0')}", "Levels") {
-            showLevelList()
+        val hud = StandardGameHudView(
+            this,
+            showHistoryControls = false,
+            labelTextSizeSp = 15f,
+            backLabel = "← Levels",
+            menuLabel = "Reset",
+        ).apply {
+            setInfo(
+                value = "LEVEL ${selectedLevel.toString().padStart(2, '0')}",
+                undo = false,
+                detail = "Loading puzzle…",
+                accentColor = Color.parseColor("#F7D99B"),
+            )
+            onBack = { showLevelList() }
+            onMenu = { resetPuzzle() }
         }
-        levelTitle = top.findViewWithTag("level-subtitle")
-        root.addView(top)
-
-        val puzzle = currentPuzzle!!
-        root.addView(TextView(this).apply {
-            text = "${ChessPuzzleData.themeFor(puzzle.level)}   •   ${puzzle.ratingLabel}   •   ${puzzle.rating}"
-            setTextColor(Color.parseColor("#E3B86A"))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
-            gravity = android.view.Gravity.CENTER
-            setPadding(0, dp(6), 0, dp(6))
-        })
+        gameHud = hud
+        root.addView(hud, LinearLayout.LayoutParams(-1, dp(56)))
 
         val board = BoardView(this).apply {
             ruleEngine = engine
@@ -149,28 +128,18 @@ class ChessChallengeActivity : AppCompatActivity() {
         boardView = board
         root.addView(board, LinearLayout.LayoutParams(-1, 0, 1f))
 
-        statusText = TextView(this).apply {
-            setTextColor(Color.parseColor("#D7E8E6"))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
-            gravity = android.view.Gravity.CENTER
-            setPadding(dp(16), dp(9), dp(16), dp(9))
-            text = "Loading puzzle…"
-        }
-        root.addView(statusText, LinearLayout.LayoutParams(-1, dp(54)))
-
-        val controls = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(12), dp(5), dp(12), dp(12))
-        }
-        controls.addView(actionButton("RESET") { resetPuzzle() }, LinearLayout.LayoutParams(0, dp(48), 1f).apply {
-            marginEnd = dp(6)
-        })
-        controls.addView(actionButton("LEVELS") { showLevelList() }, LinearLayout.LayoutParams(0, dp(48), 1f).apply {
-            marginStart = dp(6)
-        })
-        root.addView(controls)
         setContentView(root)
+        val puzzle = currentPuzzle!!
         loadPuzzle(puzzle)
+    }
+
+    private fun setChallengeStatus(text: String) {
+        gameHud?.setInfo(
+            value = "LEVEL ${selectedLevel.toString().padStart(2, '0')}",
+            undo = false,
+            detail = text,
+            accentColor = Color.parseColor("#F7D99B"),
+        )
     }
 
     private fun loadPuzzle(puzzle: ChessPuzzle) {
@@ -183,7 +152,7 @@ class ChessChallengeActivity : AppCompatActivity() {
             playerStartState = initial
             boardView?.gameState = initial
             boardView?.isLocked = true
-            statusText?.text = "This puzzle could not be loaded."
+            setChallengeStatus("This puzzle could not be loaded.")
             return
         }
         val afterOpponent = engine.applyMove(initial, firstMove)
@@ -192,7 +161,7 @@ class ChessChallengeActivity : AppCompatActivity() {
         boardView?.gameState = puzzleState!!
         boardView?.isFlipped = puzzleState!!.currentTurn == PieceColor.BLACK
         boardView?.isLocked = false
-        statusText?.text = "Your move. Find the best continuation."
+        setChallengeStatus("Your move. Find the best continuation.")
     }
 
     private fun handlePlayerMove(move: Move) {
@@ -213,7 +182,7 @@ class ChessChallengeActivity : AppCompatActivity() {
             completeLevel()
         } else {
             boardView?.isLocked = true
-            statusText?.text = "Correct. Watch the reply…"
+            setChallengeStatus("Correct. Watch the reply…")
             handler.postDelayed({ playOpponentReply() }, 380L)
         }
     }
@@ -234,7 +203,7 @@ class ChessChallengeActivity : AppCompatActivity() {
         if (expectedMoveIndex >= solutionMoves.size) completeLevel()
         else {
             boardView?.isLocked = false
-            statusText?.text = "Your move. Find the best continuation."
+            setChallengeStatus("Your move. Find the best continuation.")
         }
     }
 
@@ -244,13 +213,13 @@ class ChessChallengeActivity : AppCompatActivity() {
         if (selectedLevel > highestCompleted) {
             progressPrefs.edit().putInt(KEY_HIGHEST_COMPLETED, selectedLevel).apply()
         }
-        statusText?.text = "Level complete. Excellent calculation."
+        setChallengeStatus("Level complete. Excellent calculation.")
     }
 
     private fun showWrongMove() {
         resetting = true
         boardView?.isLocked = true
-        statusText?.text = "Not quite. Resetting the position…"
+        setChallengeStatus("Not quite. Resetting the position…")
         handler.postDelayed({ resetPuzzle() }, 900L)
     }
 
@@ -264,7 +233,7 @@ class ChessChallengeActivity : AppCompatActivity() {
         boardView?.gameState = start
         boardView?.isFlipped = start.currentTurn == PieceColor.BLACK
         boardView?.isLocked = false
-        statusText?.text = "Your move. Find the best continuation."
+        setChallengeStatus("Your move. Find the best continuation.")
     }
 
     private fun showPromotionChoice(choices: List<Move>) {
