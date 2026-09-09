@@ -305,6 +305,7 @@ class YoteActivity : AppCompatActivity() {
     }
 
     private fun showLeaveMatchDialog() {
+        MusicPlayer.enterPausedMatch(this)
         stopAutomatedGameplay()
         boardView.isLocked = true
         showChoiceOverlay(
@@ -333,6 +334,7 @@ class YoteActivity : AppCompatActivity() {
     }
 
     private fun showMenu() {
+        MusicPlayer.enterPausedMatch(this)
         boardView.isLocked = true
         autoplayEnabled = false
         autoplayButton.setAutoplayEnabled(false, animate = false)
@@ -770,6 +772,9 @@ class YoteActivity : AppCompatActivity() {
     }
 
     private fun showBoardAfterDialog(resumeAi: Boolean = true) {
+        if (matchStarted && gameState.status == GameStatus.IN_PROGRESS) {
+            MusicPlayer.resumeMatch(this)
+        }
         dismissOverlay()
         gameRoot.visibility = View.VISIBLE
         boardView.isLocked = gameState.status != GameStatus.IN_PROGRESS

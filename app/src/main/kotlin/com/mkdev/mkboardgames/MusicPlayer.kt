@@ -6,21 +6,24 @@ import android.media.MediaPlayer
 /**
  * App-wide background music player.
  *
- * The player is paused, rather than released, when music is disabled, the app
- * is backgrounded, or the user returns to mode selection. Match music stays
- * active while an in-game pause screen is visible because the match activity
- * remains active.
+ * The player is paused, rather than released, when music is disabled or the
+ * app is backgrounded. Mode selection, active matches, and in-game pause
+ * screens each have their own looping soundtrack.
  */
 object MusicPlayer {
 
     private const val NORMAL_TRACK = 0
     private const val IRREGULAR_TRACK = 1
     private const val MATCH_TRACK = 2
+    private const val MODE_SELECTION_ONITAMA_TRACK = 3
+    private const val PAUSED_MATCH_TRACK = 4
 
     private val tracks = intArrayOf(
         R.raw.in_game_selection_screen1,
         R.raw.in_game_selection_screen2,
         R.raw.in_match,
+        R.raw.mode_selection_screen_and_onitama_in_match_only,
+        R.raw.paused_match,
     )
 
     private var player: MediaPlayer? = null
@@ -29,6 +32,7 @@ object MusicPlayer {
     private var modeSessionActive = false
     private var appInForeground = true
     private var applicationContext: Context? = null
+    private var matchTrack = MATCH_TRACK
 
     /** Begin the selected mode's music session and resume from its saved position. */
     fun playForMode(ctx: Context, mode: GameMode) {
@@ -43,12 +47,38 @@ object MusicPlayer {
         resumeIfAllowed()
     }
 
-    /** Switch to the match soundtrack for the current game, including pause screens. */
+    /** Switch to the standard match soundtrack for the current game. */
     fun enterMatch(ctx: Context) {
+        switchToTrack(ctx, MATCH_TRACK)
+    }
+
+    /** Switch to the dedicated Onitama match soundtrack. */
+    fun enterOnitamaMatch(ctx: Context) {
+        switchToTrack(ctx, MODE_SELECTION_ONITAMA_TRACK)
+    }
+
+    /** Switch to the soundtrack used by an in-game pause overlay. */
+    fun enterPausedMatch(ctx: Context) {
         applicationContext = ctx.applicationContext
         modeSessionActive = true
-        requestedTrack = MATCH_TRACK
+        requestedTrack = PAUSED_MATCH_TRACK
+        switchToRequestedTrack()
+    }
 
+    /** Restore the active match soundtrack after a pause overlay is dismissed. */
+    fun resumeMatch(ctx: Context) {
+        switchToTrack(ctx, matchTrack)
+    }
+
+    private fun switchToTrack(ctx: Context, track: Int) {
+        applicationContext = ctx.applicationContext
+        modeSessionActive = true
+        if (track != PAUSED_MATCH_TRACK) matchTrack = track
+        requestedTrack = track
+        switchToRequestedTrack()
+    }
+
+    private fun switchToRequestedTrack() {
         if (activeTrack != requestedTrack) {
             releasePlayer()
             activeTrack = requestedTrack
@@ -56,10 +86,9 @@ object MusicPlayer {
         resumeIfAllowed()
     }
 
-    /** Leaves the music paused while the mode-selection screen is visible. */
-    fun enterModeSelection() {
-        modeSessionActive = false
-        pause()
+    /** Play the dedicated mode-selection soundtrack. */
+    fun enterModeSelection(ctx: Context) {
+        switchToTrack(ctx, MODE_SELECTION_ONITAMA_TRACK)
     }
 
     /** Called by the application when no app activity is visible. */

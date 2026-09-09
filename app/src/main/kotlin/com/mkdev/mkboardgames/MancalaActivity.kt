@@ -354,6 +354,7 @@ class MancalaActivity : AppCompatActivity() {
     }
 
     private fun showLeaveMatchDialog() {
+        MusicPlayer.enterPausedMatch(this)
         stopAutomatedGameplay()
         boardView.isLocked = true
         showChoiceOverlay(
@@ -383,6 +384,7 @@ class MancalaActivity : AppCompatActivity() {
 
     private fun showMenu() {
         if (boardView.isMoveAnimating) return
+        MusicPlayer.enterPausedMatch(this)
         stopAutomatedGameplay()
         boardView.isLocked = true
         showChoiceOverlay(
@@ -782,6 +784,9 @@ class MancalaActivity : AppCompatActivity() {
 
     private fun showBoardAfterDialog(resumeAi: Boolean = true) {
         dismissMancalaOverlay()
+        if (matchStarted && gameState.status == GameStatus.IN_PROGRESS) {
+            MusicPlayer.resumeMatch(this)
+        }
         if (::gameRoot.isInitialized) gameRoot.visibility = View.VISIBLE
         boardView.isLocked = gameState.status != GameStatus.IN_PROGRESS
         if (resumeAi) resumeComputerTurnIfNeeded()

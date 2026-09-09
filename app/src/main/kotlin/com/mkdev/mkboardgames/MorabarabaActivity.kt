@@ -294,6 +294,7 @@ class MorabarabaActivity : AppCompatActivity() {
     }
 
     private fun showLeaveMatchDialog() {
+        MusicPlayer.enterPausedMatch(this)
         showChoiceDialog(
             "Leave Match?",
             "Pause to resume later, or leave to forfeit this game.",
@@ -828,6 +829,9 @@ You win by either:
     }
 
     private fun showBoardAfterDialog(resumeAi: Boolean = true) {
+        if (matchStarted && gameState.status == GameStatus.IN_PROGRESS) {
+            MusicPlayer.resumeMatch(this)
+        }
         gameRoot.visibility = View.VISIBLE
         if (resumeAi) resumeComputerTurnIfNeeded()
     }

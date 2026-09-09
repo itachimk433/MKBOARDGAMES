@@ -173,6 +173,7 @@ class TicTacToeActivity : AppCompatActivity() {
             return
         }
         stopAutomatedGameplay()
+        MusicPlayer.enterPausedMatch(this)
         hideBoardWhileDialogIsOpen()
         StyledDialogs.showChoices(this, "Leave Match?",
             "Pause to resume later, or leave to forfeit this game.",
@@ -561,6 +562,7 @@ Strategy
         stopAutomatedGameplay()
         hideBoardWhileDialogIsOpen()
         val inProgress = gameState.status == GameStatus.IN_PROGRESS && moveHistory.isNotEmpty()
+        if (inProgress) MusicPlayer.enterPausedMatch(this)
         val items = mutableListOf("New Game", "How to Play")
         if (vsAI) items.add("CPU Difficulty")
         items.add("Main Menu")
@@ -662,6 +664,9 @@ Strategy
     }
 
     private fun showBoardAfterDialog(resumeAi: Boolean = true) {
+        if (matchStarted && gameState.status == GameStatus.IN_PROGRESS) {
+            MusicPlayer.resumeMatch(this)
+        }
         gameRoot.visibility = View.VISIBLE
         if (resumeAi) resumeComputerTurnIfNeeded()
     }

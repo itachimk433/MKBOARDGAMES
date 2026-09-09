@@ -439,6 +439,7 @@ class GameActivity : AppCompatActivity() {
             return
         }
         stopAutoplayAndAiThinking()
+        MusicPlayer.enterPausedMatch(this)
         if (isStyledBoardGame()) {
             showChessLeaveMatchDialog()
             return
@@ -453,12 +454,17 @@ class GameActivity : AppCompatActivity() {
                 if (vsAI) SettingsManager.recordForfeit(this)
                 finish()
             }
-            .setNegativeButton("Keep Playing", null).show()
+            .setNegativeButton("Keep Playing") { _, _ ->
+                MusicPlayer.resumeMatch(this)
+            }
+            .setOnCancelListener { MusicPlayer.resumeMatch(this) }
+            .show()
     }
 
     private fun showChessLeaveMatchDialog() {
         // The overlay does not pause the Activity, so stop automated gameplay
         // before covering the board with the leave-match screen.
+        MusicPlayer.enterPausedMatch(this)
         stopAutoplayAndAiThinking()
         val view = ChessChoiceView(
             this,
@@ -1025,6 +1031,9 @@ Checkmate your opponent's King.
     private fun showChessBoardAfterDialog(resumeAi: Boolean) {
         gameContainer.visibility = View.VISIBLE
         dismissStyledOverlay()
+        if (matchStarted && gameState.status == GameStatus.IN_PROGRESS) {
+            MusicPlayer.resumeMatch(this)
+        }
         if (resumeAi) resumeComputerTurnIfNeeded()
     }
 
@@ -1617,6 +1626,7 @@ Checkmate your opponent's King.
         // The menu is an in-app dialog and does not trigger onPause().
         stopAutoplayAndAiThinking()
         val inProgress = gameState.status == GameStatus.IN_PROGRESS && moveHistory.isNotEmpty()
+        if (inProgress) MusicPlayer.enterPausedMatch(this)
         if (isStyledBoardGame()) {
             showChessGameplayMenu(inProgress)
             return

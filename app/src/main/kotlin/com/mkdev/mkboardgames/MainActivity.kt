@@ -52,7 +52,7 @@ class MainActivity : AppCompatActivity() {
         activeSettingsDialog = null
         showingGameMenu = false
         menuView = null
-        MusicPlayer.enterModeSelection()
+        MusicPlayer.enterModeSelection(this)
 
         val modeSelection = ModeSelectionView(this).apply {
             onModeSelected = { mode ->
@@ -125,7 +125,7 @@ class MainActivity : AppCompatActivity() {
         if (showingGameMenu) {
             MusicPlayer.playForMode(this, selectedGameMode)
         } else {
-            MusicPlayer.enterModeSelection()
+            MusicPlayer.enterModeSelection(this)
         }
         makeFullscreen()
     }

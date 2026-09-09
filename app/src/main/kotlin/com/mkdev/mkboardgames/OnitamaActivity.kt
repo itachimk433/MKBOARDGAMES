@@ -180,7 +180,7 @@ class OnitamaActivity : AppCompatActivity() {
 
     private fun startGame(restoring: PausedMatchStore.Match? = null) {
         matchStarted = true
-        MusicPlayer.enterMatch(this)
+        MusicPlayer.enterOnitamaMatch(this)
         resultRecorded = false
         autoplayEnabled = false
         previousStates.clear()
@@ -350,6 +350,7 @@ class OnitamaActivity : AppCompatActivity() {
     }
 
     private fun showMenu() {
+        MusicPlayer.enterPausedMatch(this)
         stopAutomatedGameplay()
         boardView.isLocked = true
         showChoiceOverlay(
@@ -474,6 +475,9 @@ class OnitamaActivity : AppCompatActivity() {
     private fun showBoardAfterDialog(resumeAi: Boolean = true) {
         dismissOverlay()
         gameRoot.visibility = View.VISIBLE
+        if (matchStarted && gameState.status == GameStatus.IN_PROGRESS) {
+            MusicPlayer.resumeMatch(this)
+        }
         boardView.isLocked = gameState.status != GameStatus.IN_PROGRESS
         syncCards()
         updateHud()
@@ -481,6 +485,7 @@ class OnitamaActivity : AppCompatActivity() {
     }
 
     private fun showLeaveMatchDialog() {
+        MusicPlayer.enterPausedMatch(this)
         stopAutomatedGameplay()
         showChoiceOverlay(
             "Leave Match?",

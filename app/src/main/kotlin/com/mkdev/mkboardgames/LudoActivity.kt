@@ -379,6 +379,7 @@ class LudoActivity : AppCompatActivity() {
             return
         }
         if (state.status == GameStatus.IN_PROGRESS && moves.isNotEmpty()) {
+            MusicPlayer.enterPausedMatch(this)
             hideBoardWhileDialogIsOpen()
             StyledDialogs.showChoices(this, "Leave Match?", "Leaving counts as a forfeit.",
                 listOf(
@@ -1869,6 +1870,9 @@ class LudoActivity : AppCompatActivity() {
     }
 
     private fun showBoardAfterDialog() {
+        if (matchStarted && state.status == GameStatus.IN_PROGRESS) {
+            MusicPlayer.resumeMatch(this)
+        }
         dialogOpen = false
         overlay.visibility = View.VISIBLE
         diceView.setGameplayVisible(true)
