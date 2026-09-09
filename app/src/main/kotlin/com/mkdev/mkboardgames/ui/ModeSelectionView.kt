@@ -26,6 +26,7 @@ class ModeSelectionView(context: Context) : View(context) {
     private val textScale = resources.displayMetrics.scaledDensity.coerceAtMost(2f)
     private val normalRect = RectF()
     private val irregularRect = RectF()
+    private val challengesRect = RectF()
     private val settingsRect = RectF()
     private val settingsTouchRect = RectF()
     private val statsRect = RectF()
@@ -40,6 +41,7 @@ class ModeSelectionView(context: Context) : View(context) {
     private var settingsAnimator: ValueAnimator? = null
     private var normalScale = 1f
     private var irregularScale = 1f
+    private var challengesScale = 1f
     private val logoBitmap: Bitmap? = try {
         (context.resources.getDrawable(R.drawable.ic_app_logo, null) as? android.graphics.drawable.BitmapDrawable)?.bitmap
     } catch (_: Exception) {
@@ -136,7 +138,7 @@ class ModeSelectionView(context: Context) : View(context) {
         val left = (width - buttonWidth) / 2f
         val buttonHeight = 136f / 3f * 1.1f * unit
         val gap = 10f * unit
-        val totalHeight = buttonHeight * 2f + gap
+        val totalHeight = buttonHeight * 3f + gap * 2f
         val firstTop = (height * 0.16f).coerceAtMost(
             (height - totalHeight - 12f * unit).coerceAtLeast(12f * unit),
         )
@@ -146,6 +148,12 @@ class ModeSelectionView(context: Context) : View(context) {
             normalRect.bottom + gap,
             left + buttonWidth,
             normalRect.bottom + gap + buttonHeight,
+        )
+        challengesRect.set(
+            left,
+            irregularRect.bottom + gap,
+            left + buttonWidth,
+            irregularRect.bottom + gap + buttonHeight,
         )
         val settingsSize = 34f * unit
         val settingsLeft = width - settingsSize - 14f * unit
@@ -213,6 +221,14 @@ class ModeSelectionView(context: Context) : View(context) {
             "Play (IRREGULAR MODE)",
             "Irregular rules",
         )
+        drawModeCard(
+            canvas,
+            challengesRect,
+            GameMode.CHALLENGES,
+            "♞",
+            "Challenges",
+            "100 chess puzzles",
+        )
         drawSettings(canvas)
     }
 
@@ -224,7 +240,11 @@ class ModeSelectionView(context: Context) : View(context) {
         label: String,
         description: String,
     ) {
-        val scale = if (mode == GameMode.NORMAL) normalScale else irregularScale
+        val scale = when (mode) {
+            GameMode.NORMAL -> normalScale
+            GameMode.IRREGULAR -> irregularScale
+            GameMode.CHALLENGES -> challengesScale
+        }
         canvas.save()
         canvas.scale(scale, scale, rect.centerX(), rect.centerY())
         brownWoodCardRenderer.draw(canvas, rect, pressedMode == mode)
@@ -301,12 +321,19 @@ class ModeSelectionView(context: Context) : View(context) {
     }
 
     private fun animateCardScale(mode: GameMode, target: Float) {
-        val from = if (mode == GameMode.NORMAL) normalScale else irregularScale
+        val from = when (mode) {
+            GameMode.NORMAL -> normalScale
+            GameMode.IRREGULAR -> irregularScale
+            GameMode.CHALLENGES -> challengesScale
+        }
         ValueAnimator.ofFloat(from, target).apply {
             duration = if (target < 1f) 70L else 110L
             addUpdateListener {
-                if (mode == GameMode.NORMAL) normalScale = it.animatedValue as Float
-                else irregularScale = it.animatedValue as Float
+                when (mode) {
+                    GameMode.NORMAL -> normalScale = it.animatedValue as Float
+                    GameMode.IRREGULAR -> irregularScale = it.animatedValue as Float
+                    GameMode.CHALLENGES -> challengesScale = it.animatedValue as Float
+                }
                 invalidate()
             }
             start()
@@ -326,6 +353,7 @@ class ModeSelectionView(context: Context) : View(context) {
                     when {
                         normalRect.contains(event.x, event.y) -> GameMode.NORMAL
                         irregularRect.contains(event.x, event.y) -> GameMode.IRREGULAR
+                        challengesRect.contains(event.x, event.y) -> GameMode.CHALLENGES
                         else -> null
                     }
                 }
@@ -347,7 +375,7 @@ class ModeSelectionView(context: Context) : View(context) {
                 }
                 val current = pressedMode
                 if (current != null) {
-                    val rect = if (current == GameMode.NORMAL) normalRect else irregularRect
+                    val rect = modeRect(current)
                     if (!rect.contains(event.x, event.y)) {
                         animateCardScale(current, 1f)
                         pressedMode = null
@@ -380,11 +408,7 @@ class ModeSelectionView(context: Context) : View(context) {
                     return true
                 }
                 val selected = pressedMode
-                val rect = when (selected) {
-                    GameMode.NORMAL -> normalRect
-                    GameMode.IRREGULAR -> irregularRect
-                    null -> null
-                }
+                val rect = selected?.let(::modeRect)
                 pressedMode = null
                 selected?.let { animateCardScale(it, 1f) }
                 invalidate()
@@ -419,5 +443,11 @@ class ModeSelectionView(context: Context) : View(context) {
             }
         }
         return true
+    }
+
+    private fun modeRect(mode: GameMode): RectF = when (mode) {
+        GameMode.NORMAL -> normalRect
+        GameMode.IRREGULAR -> irregularRect
+        GameMode.CHALLENGES -> challengesRect
     }
 }

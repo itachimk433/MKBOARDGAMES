@@ -59,6 +59,18 @@
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize" />
 
         <activity
+            android:name=".ChallengesActivity"
+            android:exported="false"
+            android:screenOrientation="unspecified"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize" />
+
+        <activity
+            android:name=".ChessChallengeActivity"
+            android:exported="false"
+            android:screenOrientation="unspecified"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize" />
+
+        <activity
             android:name=".ReplayActivity"
             android:exported="false"
             android:screenOrientation="unspecified"

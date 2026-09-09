@@ -59,7 +59,11 @@ class MainActivity : AppCompatActivity() {
                 selectedGameMode = mode
                 SettingsManager.setCurrentMode(this@MainActivity, mode)
                 MusicPlayer.playForMode(this@MainActivity, mode)
-                showGameMenu()
+                if (mode == GameMode.CHALLENGES) {
+                    startActivity(Intent(this@MainActivity, ChallengesActivity::class.java))
+                } else {
+                    showGameMenu()
+                }
             }
             onSettingsClicked = { showGeneralSettings() }
             onStatsClicked = { showStatsDialog() }

@@ -9,7 +9,8 @@ package com.mkdev.mkboardgames
  */
 enum class GameMode {
     NORMAL,
-    IRREGULAR;
+    IRREGULAR,
+    CHALLENGES;
 
     companion object {
         const val EXTRA_MODE = "com.mkdev.mkboardgames.GAME_MODE"
