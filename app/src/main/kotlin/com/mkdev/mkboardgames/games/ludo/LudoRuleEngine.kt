@@ -125,6 +125,7 @@ class LudoRuleEngine : RuleEngine {
         val legalMoves = if (
             usedExtraMove &&
             move.metadata["player"] == player &&
+            baseDice != null &&
             baseDice == (state.metadata["ludo_dice"] as? Int) &&
             effectiveDice != null
         ) {
@@ -144,7 +145,6 @@ class LudoRuleEngine : RuleEngine {
         val movingPiece = LudoSetup.pieceForMove(state, move)
             ?: (state.get(move.from) as? LudoPiece)
             ?: return state
-        val player = (move.metadata["player"] as? Int) ?: movingPiece.player
         val dice = (move.metadata["baseDice"] as? Int)
             ?: (move.metadata["dice"] as? Int)
             ?: 0
