@@ -6,10 +6,8 @@ import android.graphics.*
 import android.view.MotionEvent
 import android.view.View
 import com.mkdev.mkboardgames.GameMode
-import com.mkdev.mkboardgames.MusicPlayer
 import com.mkdev.mkboardgames.R
 import com.mkdev.mkboardgames.SoundPlayer
-import com.mkdev.mkboardgames.SettingsManager
 import kotlin.math.min
 
 /**
@@ -30,15 +28,11 @@ class ModeSelectionView(context: Context) : View(context) {
     private val irregularRect = RectF()
     private val settingsRect = RectF()
     private val settingsTouchRect = RectF()
-    private val musicRect = RectF()
-    private val musicTouchRect = RectF()
     private val statsRect = RectF()
     private val statsTouchRect = RectF()
     private var pressedMode: GameMode? = null
     private var pressedSettings = false
-    private var pressedMusic = false
     private var pressedStats = false
-    private var musicEnabled = SettingsManager.isMusicEnabled(context)
     private var loadingMode: GameMode? = null
     private var loadingAngle = 0f
     private var loadingAnimator: ValueAnimator? = null
@@ -122,18 +116,6 @@ class ModeSelectionView(context: Context) : View(context) {
         color = Color.parseColor("#321718")
         style = Paint.Style.FILL
     }
-    private val musicNotePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#F7D99B")
-        style = Paint.Style.FILL
-        strokeWidth = 2.2f * unit
-        strokeCap = Paint.Cap.ROUND
-    }
-    private val musicSlashPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#F7D99B")
-        style = Paint.Style.STROKE
-        strokeWidth = 2.2f * unit
-        strokeCap = Paint.Cap.ROUND
-    }
 
     init {
         isClickable = true
@@ -173,14 +155,6 @@ class ModeSelectionView(context: Context) : View(context) {
             settingsLeft - 8f * unit,
             settingsTop - 8f * unit,
             settingsLeft + settingsSize + 8f * unit,
-            settingsTop + settingsSize + 8f * unit,
-        )
-        val musicLeft = settingsLeft - settingsSize - 18f * unit
-        musicRect.set(musicLeft, settingsTop, musicLeft + settingsSize, settingsTop + settingsSize)
-        musicTouchRect.set(
-            musicLeft - 8f * unit,
-            settingsTop - 8f * unit,
-            musicLeft + settingsSize + 8f * unit,
             settingsTop + settingsSize + 8f * unit,
         )
         val logoSize = 58f * unit
@@ -240,7 +214,6 @@ class ModeSelectionView(context: Context) : View(context) {
             "Irregular rules",
         )
         drawSettings(canvas)
-        drawMusic(canvas)
     }
 
     private fun drawModeCard(
@@ -314,46 +287,6 @@ class ModeSelectionView(context: Context) : View(context) {
         canvas.restore()
     }
 
-    private fun drawMusic(canvas: Canvas) {
-        val centerX = musicRect.centerX()
-        val centerY = musicRect.centerY()
-        if (pressedMusic) {
-            val pressedPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.argb(62, 247, 217, 155)
-            }
-            canvas.drawRoundRect(musicTouchRect, 10f * unit, 10f * unit, pressedPaint)
-        }
-
-        canvas.drawCircle(centerX, centerY, 17f * unit, settingsButtonPaint)
-        canvas.drawCircle(centerX, centerY, 17f * unit, settingsButtonEdgePaint)
-
-        val noteX = centerX - 4f * unit
-        canvas.drawCircle(noteX, centerY + 7f * unit, 4f * unit, musicNotePaint)
-        canvas.drawRect(
-            noteX,
-            centerY - 10f * unit,
-            noteX + 2.2f * unit,
-            centerY + 7f * unit,
-            musicNotePaint,
-        )
-        canvas.drawLine(
-            noteX + 1f * unit,
-            centerY - 10f * unit,
-            noteX + 9f * unit,
-            centerY - 7f * unit,
-            musicNotePaint,
-        )
-        if (!musicEnabled) {
-            canvas.drawLine(
-                musicRect.left + 8f * unit,
-                musicRect.bottom - 8f * unit,
-                musicRect.right - 8f * unit,
-                musicRect.top + 8f * unit,
-                musicSlashPaint,
-            )
-        }
-    }
-
     private fun animateSettingsSpin() {
         settingsAnimator?.cancel()
         settingsAnimator = ValueAnimator.ofFloat(settingsRotation, settingsRotation + 360f).apply {
@@ -386,9 +319,8 @@ class ModeSelectionView(context: Context) : View(context) {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 pressedStats = statsTouchRect.contains(event.x, event.y)
-                pressedMusic = !pressedStats && musicTouchRect.contains(event.x, event.y)
-                pressedSettings = !pressedStats && !pressedMusic && settingsTouchRect.contains(event.x, event.y)
-                pressedMode = if (pressedSettings || pressedMusic || pressedStats) {
+                pressedSettings = !pressedStats && settingsTouchRect.contains(event.x, event.y)
+                pressedMode = if (pressedSettings || pressedStats) {
                     null
                 } else {
                     when {
@@ -410,11 +342,6 @@ class ModeSelectionView(context: Context) : View(context) {
                 }
                 if (pressedSettings && !settingsTouchRect.contains(event.x, event.y)) {
                     pressedSettings = false
-                    invalidate()
-                    return true
-                }
-                if (pressedMusic && !musicTouchRect.contains(event.x, event.y)) {
-                    pressedMusic = false
                     invalidate()
                     return true
                 }
@@ -452,16 +379,6 @@ class ModeSelectionView(context: Context) : View(context) {
                     invalidate()
                     return true
                 }
-                if (pressedMusic) {
-                    val selectedMusic = musicTouchRect.contains(event.x, event.y)
-                    pressedMusic = false
-                    if (selectedMusic) {
-                        SoundPlayer.play("ui_click")
-                        musicEnabled = MusicPlayer.toggle(context)
-                    }
-                    invalidate()
-                    return true
-                }
                 val selected = pressedMode
                 val rect = when (selected) {
                     GameMode.NORMAL -> normalRect
@@ -495,7 +412,6 @@ class ModeSelectionView(context: Context) : View(context) {
             MotionEvent.ACTION_CANCEL -> {
                 pressedStats = false
                 pressedSettings = false
-                pressedMusic = false
                 pressedMode?.let { animateCardScale(it, 1f) }
                 pressedMode = null
                 invalidate()

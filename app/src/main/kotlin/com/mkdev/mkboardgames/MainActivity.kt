@@ -33,7 +33,6 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         makeFullscreen()
         SoundPlayer.init(this)
-        MusicPlayer.start(this)
 
         screenRoot = FrameLayout(this)
         setContentView(screenRoot)
@@ -53,11 +52,13 @@ class MainActivity : AppCompatActivity() {
         activeSettingsDialog = null
         showingGameMenu = false
         menuView = null
+        MusicPlayer.enterModeSelection()
 
         val modeSelection = ModeSelectionView(this).apply {
             onModeSelected = { mode ->
                 selectedGameMode = mode
                 SettingsManager.setCurrentMode(this@MainActivity, mode)
+                MusicPlayer.playForMode(this@MainActivity, mode)
                 showGameMenu()
             }
             onSettingsClicked = { showGeneralSettings() }
@@ -768,6 +769,65 @@ class MainActivity : AppCompatActivity() {
 
         // ── General ──
         root.addView(sectionHeader("⚙  GENERAL"))
+        root.addView(sectionHeader("♫  MUSIC"))
+        var musicEnabled = SettingsManager.isMusicEnabled(ctx)
+        val (musicRow, musicVal) =
+            settingRow("♫", "Background Music", if (musicEnabled) "On" else "Off")
+        musicRow.setOnClickListener {
+            musicEnabled = !musicEnabled
+            MusicPlayer.setEnabled(ctx, musicEnabled)
+            musicVal.text = if (musicEnabled) "On" else "Off"
+        }
+        root.addView(musicRow)
+
+        var musicVolume = SettingsManager.getMusicVolume(ctx)
+        val volumePanel = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            background = android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                intArrayOf(
+                    Color.parseColor("#21454A"),
+                    Color.parseColor("#16353B"),
+                    Color.parseColor("#102C32"),
+                ),
+            ).apply {
+                cornerRadius = 12f * dp
+                setStroke((1f * dp).toInt(), Color.parseColor("#2C5960"))
+            }
+            setPadding((14 * dp).toInt(), (8 * dp).toInt(), (14 * dp).toInt(), (5 * dp).toInt())
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).also {
+                it.setMargins((2 * dp).toInt(), (5 * dp).toInt(), (2 * dp).toInt(), (8 * dp).toInt())
+            }
+        }
+        val volumeLabel = TextView(ctx).apply {
+            text = "Music Volume  •  $musicVolume%"
+            setTextColor(Color.parseColor("#FFF8E8"))
+            setTypeface(typeface, Typeface.BOLD)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+        }
+        volumePanel.addView(volumeLabel)
+        volumePanel.addView(SeekBar(ctx).apply {
+            max = 100
+            progress = musicVolume
+            progressTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#C8894C"))
+            thumbTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#F7D99B"))
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                    if (!fromUser) return
+                    musicVolume = progress
+                    MusicPlayer.setVolume(ctx, musicVolume)
+                    volumeLabel.text = "Music Volume  •  $musicVolume%"
+                }
+
+                override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
+                override fun onStopTrackingTouch(seekBar: SeekBar?) = Unit
+            })
+        })
+        root.addView(volumePanel)
+
         var movementSounds = SettingsManager.isMovementSoundsEnabled(ctx)
         val (movSoundRow, movSoundVal) = settingRow("🔊", "Movement Sounds", if (movementSounds) "On" else "Off")
         movSoundRow.setOnClickListener {

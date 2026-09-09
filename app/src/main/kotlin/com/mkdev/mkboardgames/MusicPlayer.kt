@@ -2,84 +2,116 @@ package com.mkdev.mkboardgames
 
 import android.content.Context
 import android.media.MediaPlayer
-import kotlin.random.Random
 
 /**
  * App-wide background music player.
  *
- * Music is deliberately separate from [SoundPlayer], so short game effects
- * can continue to use SoundPool without interrupting the current track.
+ * The player is paused, rather than released, when music is disabled, the app
+ * is backgrounded, or the user returns to mode selection. This preserves the
+ * current position when music is enabled again.
  */
 object MusicPlayer {
 
+    private const val NORMAL_TRACK = 0
+    private const val IRREGULAR_TRACK = 1
+
     private val tracks = intArrayOf(
-        R.raw.nebulite_summer_time,
         R.raw.pufino_enlivening,
+        R.raw.nebulite_summer_time,
     )
 
     private var player: MediaPlayer? = null
-    private var currentTrack = -1
+    private var activeTrack = -1
+    private var requestedTrack = -1
+    private var modeSessionActive = false
+    private var appInForeground = true
     private var applicationContext: Context? = null
 
-    fun isEnabled(ctx: Context): Boolean = SettingsManager.isMusicEnabled(ctx)
-
-    /** Starts or resumes music when the user has enabled it. */
-    fun start(ctx: Context) {
+    /** Begin the selected mode's music session and resume from its saved position. */
+    fun playForMode(ctx: Context, mode: GameMode) {
         applicationContext = ctx.applicationContext
-        if (!SettingsManager.isMusicEnabled(ctx)) return
+        modeSessionActive = true
+        requestedTrack = if (mode == GameMode.IRREGULAR) IRREGULAR_TRACK else NORMAL_TRACK
+
+        if (activeTrack != requestedTrack) {
+            releasePlayer()
+            activeTrack = requestedTrack
+        }
+        resumeIfAllowed()
+    }
+
+    /** Leaves the music paused while the mode-selection screen is visible. */
+    fun enterModeSelection() {
+        modeSessionActive = false
+        pause()
+    }
+
+    /** Called by the application when no app activity is visible. */
+    fun onAppBackground() {
+        appInForeground = false
+        pause()
+    }
+
+    /** Called by the application when the app becomes visible again. */
+    fun onAppForeground() {
+        appInForeground = true
+        resumeIfAllowed()
+    }
+
+    fun setEnabled(ctx: Context, enabled: Boolean) {
+        applicationContext = ctx.applicationContext
+        SettingsManager.setMusicEnabled(ctx, enabled)
+        if (enabled) resumeIfAllowed() else pause()
+    }
+
+    fun setVolume(ctx: Context, volumePercent: Int) {
+        val volume = volumePercent.coerceIn(0, 100)
+        SettingsManager.setMusicVolume(ctx, volume)
+        val scaledVolume = volume / 100f
+        player?.setVolume(scaledVolume, scaledVolume)
+    }
+
+    fun pause() {
+        player?.takeIf { it.isPlaying }?.pause()
+    }
+
+    private fun resumeIfAllowed() {
+        val ctx = applicationContext ?: return
+        if (!modeSessionActive || !appInForeground || !SettingsManager.isMusicEnabled(ctx)) return
 
         val existing = player
         if (existing != null) {
             if (!existing.isPlaying) existing.start()
             return
         }
-        playRandomTrack()
+        if (requestedTrack !in tracks.indices) return
+
+        val newPlayer = MediaPlayer.create(ctx, tracks[requestedTrack]) ?: return
+        val volume = SettingsManager.getMusicVolume(ctx) / 100f
+        newPlayer.setVolume(volume, volume)
+        newPlayer.setOnCompletionListener { completedPlayer ->
+            completedPlayer.setOnCompletionListener(null)
+            completedPlayer.setOnErrorListener(null)
+            completedPlayer.release()
+            if (player === completedPlayer) player = null
+            resumeIfAllowed()
+        }
+        newPlayer.setOnErrorListener { failedPlayer, _, _ ->
+            failedPlayer.setOnCompletionListener(null)
+            failedPlayer.release()
+            if (player === failedPlayer) player = null
+            resumeIfAllowed()
+            true
+        }
+        activeTrack = requestedTrack
+        player = newPlayer
+        newPlayer.start()
     }
 
-    /** Toggles background music and returns the new enabled state. */
-    fun toggle(ctx: Context): Boolean {
-        val enabled = !SettingsManager.isMusicEnabled(ctx)
-        SettingsManager.setMusicEnabled(ctx, enabled)
-        if (enabled) start(ctx) else stop()
-        return enabled
-    }
-
-    fun stop() {
+    private fun releasePlayer() {
         player?.setOnCompletionListener(null)
         player?.setOnErrorListener(null)
         player?.release()
         player = null
-    }
-
-    private fun playRandomTrack() {
-        val ctx = applicationContext ?: return
-        if (!SettingsManager.isMusicEnabled(ctx)) return
-
-        val nextTrack = if (tracks.size == 1) {
-            0
-        } else {
-            var candidate: Int
-            do {
-                candidate = Random.nextInt(tracks.size)
-            } while (candidate == currentTrack)
-            candidate
-        }
-        currentTrack = nextTrack
-
-        val nextPlayer = MediaPlayer.create(ctx, tracks[nextTrack]) ?: return
-        nextPlayer.setOnCompletionListener {
-            player?.release()
-            player = null
-            playRandomTrack()
-        }
-        nextPlayer.setOnErrorListener { failedPlayer, _, _ ->
-            failedPlayer.release()
-            if (player === failedPlayer) player = null
-            playRandomTrack()
-            true
-        }
-        nextPlayer.setVolume(0.7f, 0.7f)
-        player = nextPlayer
-        nextPlayer.start()
     }
 }
