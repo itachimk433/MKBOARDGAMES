@@ -105,15 +105,8 @@ object MusicPlayer {
         val newPlayer = MediaPlayer.create(ctx, tracks[requestedTrack]) ?: return
         val volume = SettingsManager.getMusicVolume(ctx) / 100f
         newPlayer.setVolume(volume, volume)
-        newPlayer.setOnCompletionListener { completedPlayer ->
-            completedPlayer.setOnCompletionListener(null)
-            completedPlayer.setOnErrorListener(null)
-            completedPlayer.release()
-            if (player === completedPlayer) player = null
-            resumeIfAllowed()
-        }
+        newPlayer.isLooping = true
         newPlayer.setOnErrorListener { failedPlayer, _, _ ->
-            failedPlayer.setOnCompletionListener(null)
             failedPlayer.release()
             if (player === failedPlayer) player = null
             resumeIfAllowed()

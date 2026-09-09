@@ -319,6 +319,7 @@ class MorabarabaActivity : AppCompatActivity() {
     private fun startGame(restoring: PausedMatchStore.Match? = null) {
         showBoardAfterDialog()
         matchStarted = true
+        MusicPlayer.enterMatch(this)
         resultRecorded = false
         interstitialAd = null
         redoGameStates.clear(); redoCaptures.clear(); redoMoves.clear(); redoCapSnaps.clear()

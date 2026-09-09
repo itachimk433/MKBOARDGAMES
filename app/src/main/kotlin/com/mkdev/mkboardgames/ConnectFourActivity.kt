@@ -342,6 +342,7 @@ Control the centre columns, build threats in more than one direction, and block 
     private fun startGame(restoring: PausedMatchStore.Match? = null) {
         showBoardAfterDialog(resumeAi = false)
         matchStarted = true
+        MusicPlayer.enterMatch(this)
         resultRecorded = false
         interstitialAd = null
         redoGameStates.clear()

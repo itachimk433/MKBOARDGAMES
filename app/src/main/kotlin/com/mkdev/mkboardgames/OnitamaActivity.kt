@@ -180,6 +180,7 @@ class OnitamaActivity : AppCompatActivity() {
 
     private fun startGame(restoring: PausedMatchStore.Match? = null) {
         matchStarted = true
+        MusicPlayer.enterMatch(this)
         resultRecorded = false
         autoplayEnabled = false
         previousStates.clear()
