@@ -57,11 +57,13 @@ object SettingsManager {
     private fun sharedPrefs(ctx: Context) =
         ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
-    private fun prefs(ctx: Context) =
+    private fun prefsForMode(ctx: Context, mode: GameMode) =
         ctx.getSharedPreferences(
-            if (currentMode(ctx) == GameMode.IRREGULAR) IRREGULAR_PREFS else PREFS,
+            if (mode == GameMode.IRREGULAR) IRREGULAR_PREFS else PREFS,
             Context.MODE_PRIVATE,
         )
+
+    private fun prefs(ctx: Context) = prefsForMode(ctx, currentMode(ctx))
 
     fun currentMode(ctx: Context): GameMode =
         GameMode.fromName(sharedPrefs(ctx).getString(KEY_GAME_MODE, GameMode.NORMAL.name))
@@ -355,18 +357,22 @@ object SettingsManager {
     // ── Stats data ────────────────────────────────────────────────────────────
     data class Stats(val wins: Int, val losses: Int, val draws: Int, val forfeits: Int)
 
-    fun getStats(ctx: Context) = Stats(
-        wins     = prefs(ctx).getInt(KEY_STATS_WINS,     0),
-        losses   = prefs(ctx).getInt(KEY_STATS_LOSSES,   0),
-        draws    = prefs(ctx).getInt(KEY_STATS_DRAWS,    0),
-        forfeits = prefs(ctx).getInt(KEY_STATS_FORFEITS, 0)
+    fun getStats(ctx: Context, mode: GameMode = currentMode(ctx)) = Stats(
+        wins     = prefsForMode(ctx, mode).getInt(KEY_STATS_WINS,     0),
+        losses   = prefsForMode(ctx, mode).getInt(KEY_STATS_LOSSES,   0),
+        draws    = prefsForMode(ctx, mode).getInt(KEY_STATS_DRAWS,    0),
+        forfeits = prefsForMode(ctx, mode).getInt(KEY_STATS_FORFEITS, 0)
     )
 
-    fun getGameStats(ctx: Context, game: String) = Stats(
-        wins     = prefs(ctx).getInt(winKey(game),     0),
-        losses   = prefs(ctx).getInt(lossKey(game),    0),
-        draws    = prefs(ctx).getInt(drawKey(game),    0),
-        forfeits = prefs(ctx).getInt(forfeitKey(game), 0)
+    fun getGameStats(
+        ctx: Context,
+        game: String,
+        mode: GameMode = currentMode(ctx),
+    ) = Stats(
+        wins     = prefsForMode(ctx, mode).getInt(winKey(game),     0),
+        losses   = prefsForMode(ctx, mode).getInt(lossKey(game),    0),
+        draws    = prefsForMode(ctx, mode).getInt(drawKey(game),    0),
+        forfeits = prefsForMode(ctx, mode).getInt(forfeitKey(game), 0)
     )
 
     // ── Record outcomes — updates both global AND per-game counters ───────────
@@ -408,8 +414,8 @@ object SettingsManager {
         if (won) recordWin(ctx) else recordLoss(ctx)
     }
 
-    fun resetStats(ctx: Context) {
-        val edit = prefs(ctx).edit()
+    fun resetStats(ctx: Context, mode: GameMode = currentMode(ctx)) {
+        val edit = prefsForMode(ctx, mode).edit()
         edit.putInt(KEY_STATS_WINS, 0).putInt(KEY_STATS_LOSSES, 0)
             .putInt(KEY_STATS_DRAWS, 0).putInt(KEY_STATS_FORFEITS, 0)
         for (g in listOf(

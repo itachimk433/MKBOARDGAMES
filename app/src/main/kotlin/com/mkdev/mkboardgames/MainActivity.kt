@@ -60,6 +60,7 @@ class MainActivity : AppCompatActivity() {
                 showGameMenu()
             }
             onSettingsClicked = { showGeneralSettings() }
+            onStatsClicked = { showStatsDialog() }
         }
         screenRoot.removeAllViews()
         screenRoot.addView(modeSelection, FrameLayout.LayoutParams(-1, -1))
@@ -71,7 +72,6 @@ class MainActivity : AppCompatActivity() {
         menuView = menu
         menu.onGameSelected = { type -> launchGame(type) }
         menu.onSettingsClicked = { showSettings() }
-        menu.onLogoTapped = { showStatsDialog() }
         screenRoot.removeAllViews()
         screenRoot.addView(menu, FrameLayout.LayoutParams(-1, -1))
     }
@@ -1030,6 +1030,7 @@ class MainActivity : AppCompatActivity() {
         )
 
         var currentPage = 0
+        var statsMode = SettingsManager.currentMode(ctx)
 
         val wrapper = android.widget.LinearLayout(ctx).apply {
             orientation = android.widget.LinearLayout.VERTICAL
@@ -1051,6 +1052,32 @@ class MainActivity : AppCompatActivity() {
                 dotRow.addView(this)
             }
         }
+
+        val modeRow = android.widget.LinearLayout(ctx).apply {
+            orientation = android.widget.LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER
+            setPadding((10 * dp).toInt(), (8 * dp).toInt(), (10 * dp).toInt(), (4 * dp).toInt())
+        }
+        val normalModeChip = android.widget.TextView(ctx).apply {
+            text = "Normal Mode"
+            setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 13f)
+            gravity = android.view.Gravity.CENTER
+            setPadding((12 * dp).toInt(), (8 * dp).toInt(), (12 * dp).toInt(), (8 * dp).toInt())
+            layoutParams = android.widget.LinearLayout.LayoutParams(
+                0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f,
+            ).also { it.setMargins((4 * dp).toInt(), 0, (4 * dp).toInt(), 0) }
+        }
+        val irregularModeChip = android.widget.TextView(ctx).apply {
+            text = "Irregular Mode"
+            setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 13f)
+            gravity = android.view.Gravity.CENTER
+            setPadding((12 * dp).toInt(), (8 * dp).toInt(), (12 * dp).toInt(), (8 * dp).toInt())
+            layoutParams = android.widget.LinearLayout.LayoutParams(
+                0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f,
+            ).also { it.setMargins((4 * dp).toInt(), 0, (4 * dp).toInt(), 0) }
+        }
+        modeRow.addView(normalModeChip)
+        modeRow.addView(irregularModeChip)
 
         val navRow = android.widget.LinearLayout(ctx).apply {
             orientation = android.widget.LinearLayout.HORIZONTAL
@@ -1086,8 +1113,8 @@ class MainActivity : AppCompatActivity() {
 
         fun buildStatCard(gameTag: String) {
             statCard.removeAllViews()
-            val s = if (gameTag == "overall") SettingsManager.getStats(ctx)
-                    else SettingsManager.getGameStats(ctx, gameTag)
+            val s = if (gameTag == "overall") SettingsManager.getStats(ctx, statsMode)
+                    else SettingsManager.getGameStats(ctx, gameTag, statsMode)
 
             fun statLine(label: String, value: Int, color: String) {
                 val row = android.widget.LinearLayout(ctx).apply {
@@ -1141,6 +1168,33 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        fun refreshModeChips() {
+            listOf(
+                normalModeChip to GameMode.NORMAL,
+                irregularModeChip to GameMode.IRREGULAR,
+            ).forEach { (chip, mode) ->
+                chip.setTextColor(
+                    Color.parseColor(if (statsMode == mode) "#102C32" else "#E3B86A"),
+                )
+                chip.background = android.graphics.drawable.GradientDrawable().apply {
+                    cornerRadius = 12f * dp
+                    setColor(Color.parseColor(if (statsMode == mode) "#E3B86A" else "#21454A"))
+                    setStroke((1 * dp).toInt(), Color.parseColor("#85502D"))
+                }
+            }
+        }
+
+        normalModeChip.setOnClickListener {
+            statsMode = GameMode.NORMAL
+            refreshModeChips()
+            buildStatCard(pages[currentPage].gameTag)
+        }
+        irregularModeChip.setOnClickListener {
+            statsMode = GameMode.IRREGULAR
+            refreshModeChips()
+            buildStatCard(pages[currentPage].gameTag)
+        }
+
         fun navigateTo(idx: Int) {
             currentPage = idx.coerceIn(0, pages.lastIndex)
             val page = pages[currentPage]
@@ -1185,8 +1239,10 @@ class MainActivity : AppCompatActivity() {
             }
         })
 
+        refreshModeChips()
         buildStatCard("overall")
 
+        wrapper.addView(modeRow)
         wrapper.addView(dotRow)
         wrapper.addView(navRow)
         wrapper.addView(android.view.View(ctx).apply {
@@ -1197,14 +1253,14 @@ class MainActivity : AppCompatActivity() {
         wrapper.addView(statCard)
 
         AlertDialog.Builder(ctx, android.R.style.Theme_Material_Dialog_MinWidth)
-            .setTitle("Your Stats (vs CPU)")
+            .setTitle("Your Stats")
             .setIcon(R.drawable.ic_app_logo)
             .setView(wrapper)
             .setPositiveButton("OK", null)
             .setNeutralButton("Reset") { _, _ ->
                 AlertDialog.Builder(ctx).setTitle("Reset Stats?")
-                    .setMessage("This clears all wins, losses, draws and forfeits for the current mode.")
-                    .setPositiveButton("Reset") { _, _ -> SettingsManager.resetStats(ctx) }
+                    .setMessage("This clears all wins, losses, draws and forfeits for the selected mode.")
+                    .setPositiveButton("Reset") { _, _ -> SettingsManager.resetStats(ctx, statsMode) }
                     .setNegativeButton("Cancel", null).show()
             }
             .show()

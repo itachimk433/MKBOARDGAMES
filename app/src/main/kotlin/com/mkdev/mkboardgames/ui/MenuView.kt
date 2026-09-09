@@ -3,11 +3,8 @@ package com.mkdev.mkboardgames.ui
 import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.*
-import android.graphics.drawable.BitmapDrawable
 import android.view.MotionEvent
 import android.view.View
-import com.mkdev.mkboardgames.R
-import com.mkdev.mkboardgames.SettingsManager
 import com.mkdev.mkboardgames.engine.Position
 import com.mkdev.mkboardgames.games.foxandgeese.FoxAndGeeseSetup
 import com.mkdev.mkboardgames.games.go.GoSetup
@@ -16,7 +13,6 @@ class MenuView(context: Context) : View(context) {
 
     var onGameSelected: ((GameType) -> Unit)? = null
     var onSettingsClicked: (() -> Unit)? = null
-    var onLogoTapped: (() -> Unit)? = null
 
     /** Applied at attach-time from saved preferences; controls colour scheme. */
     var isLightMode: Boolean = false
@@ -28,12 +24,9 @@ class MenuView(context: Context) : View(context) {
     var isWoodGameCardStyleEnabled: Boolean = true
         set(v) { field = v; invalidate() }
 
-    private var currentGameMode = com.mkdev.mkboardgames.GameMode.NORMAL
-
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
         isLightMode = com.mkdev.mkboardgames.SettingsManager.isLightMode(context)
-        currentGameMode = com.mkdev.mkboardgames.SettingsManager.currentMode(context)
         val brownHomeStyle =
             com.mkdev.mkboardgames.SettingsManager.isBrownHomeStyleEnabled(context)
         isHomeBackgroundEnabled = brownHomeStyle
@@ -61,10 +54,6 @@ class MenuView(context: Context) : View(context) {
     private val sp = context.resources.displayMetrics.scaledDensity
 
     private val brownWoodCardRenderer = BrownWoodCardRenderer(dp)
-
-    private val logoBitmap: Bitmap? = try {
-        (context.resources.getDrawable(R.drawable.ic_app_logo, null) as? BitmapDrawable)?.bitmap
-    } catch (e: Exception) { null }
 
     private val homeBackgroundBitmap: Bitmap? = try {
         context.assets.open("mk_board_home_background.webp").use { BitmapFactory.decodeStream(it) }
@@ -124,15 +113,6 @@ class MenuView(context: Context) : View(context) {
         style = Paint.Style.STROKE
         strokeWidth = 1f * dp
     }
-    private val accentPaint    = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#7FC8F8"); style = Paint.Style.FILL }
-    private val titlePaint     = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.WHITE; textAlign = Paint.Align.CENTER; isFakeBoldText = true
-        textSize = 28f * sp.coerceAtMost(3f)
-    }
-    private val subPaint       = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#9E9E9E"); textAlign = Paint.Align.CENTER
-        textSize = 13f * sp.coerceAtMost(3f)
-    }
     private val cardTitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE; textAlign = Paint.Align.CENTER; isFakeBoldText = true
         textSize = 14f * sp.coerceAtMost(3f)
@@ -188,13 +168,9 @@ class MenuView(context: Context) : View(context) {
 
     private val gearRect  = RectF()
     private val gearTouch = RectF()
-    private val logoRect  = RectF()
     private var pressedCard: GameType? = null
     private var pressedGear  = false
-    private var logoPressed  = false
-    private var logoScale     = 1f
     private var gearRotation  = 0f
-    private var scaleAnim: ValueAnimator? = null
     private var gearSpinAnim: ValueAnimator? = null
     private val cardScales    = HashMap<GameType, Float>()
 
@@ -214,7 +190,7 @@ class MenuView(context: Context) : View(context) {
     private var headerH    = 0f   // Y where cards begin (below the title block)
 
     override fun onSizeChanged(w: Int, h: Int, ow: Int, oh: Int) {
-        headerH = h * 0.245f
+        headerH = 64f * dp
         for (i in cards.indices) {
             val column = i % gridColumns
             val row = i / gridColumns
@@ -229,9 +205,6 @@ class MenuView(context: Context) : View(context) {
         gearRect.set(gx, gy, gx + gs, gy + gs)
         gearTouch.set(gx - 4f * dp, gy - 4f * dp, gx + gs + 4f * dp, gy + gs + 18f * dp)
 
-        val logoSize = 58f * dp + 16f * dp
-        val lx2 = w / 2f; val ly2 = h * 0.075f
-        logoRect.set(lx2 - logoSize / 2f, ly2 - logoSize / 2f, lx2 + logoSize / 2f, ly2 + logoSize / 2f)
     }
 
     // ── Touch ─────────────────────────────────────────────────────────────────
@@ -244,33 +217,21 @@ class MenuView(context: Context) : View(context) {
             MotionEvent.ACTION_DOWN -> {
                 lastTouchY  = event.y
                 pressedGear = gearTouch.contains(event.x, cy)
-                if (!pressedGear && logoRect.contains(event.x, cy)) {
-                    logoPressed = true; animateLogoScale(0.85f)
-                } else {
-                    pressedCard = if (!pressedGear) cards.firstOrNull { it.rect.contains(event.x, cy) }?.type else null
-                    pressedCard?.let { animateCardScale(it, 0.96f) }
-                }
+                pressedCard = if (!pressedGear) cards.firstOrNull { it.rect.contains(event.x, cy) }?.type else null
+                pressedCard?.let { animateCardScale(it, 0.96f) }
                 invalidate()
             }
             MotionEvent.ACTION_MOVE -> {
                 val dy = lastTouchY - event.y
                 if (kotlin.math.abs(dy) > 6f) {
                     pressedCard?.let { animateCardScale(it, 1f) }
-                    pressedCard = null; pressedGear = false; logoPressed = false
+                    pressedCard = null; pressedGear = false
                 }
                 scrollY = (scrollY + dy).coerceIn(0f, maxScrollY)
                 lastTouchY = event.y
                 invalidate()
             }
             MotionEvent.ACTION_UP -> {
-                if (logoPressed) {
-                    animateLogoScale(1f)
-                    if (logoRect.contains(event.x, event.y)) {
-                        com.mkdev.mkboardgames.SoundPlayer.play("ui_click")
-                        onLogoTapped?.invoke()
-                    }
-                    logoPressed = false; invalidate(); return true
-                }
                 if (pressedGear && gearTouch.contains(event.x, cy)) {
                     com.mkdev.mkboardgames.SoundPlayer.play("ui_click")
                     animateGearSpin()
@@ -286,7 +247,6 @@ class MenuView(context: Context) : View(context) {
                 pressedCard = null; pressedGear = false; invalidate()
             }
             MotionEvent.ACTION_CANCEL -> {
-                if (logoPressed) { animateLogoScale(1f); logoPressed = false }
                 pressedCard?.let { animateCardScale(it, 1f) }
                 pressedCard = null; pressedGear = false; invalidate()
             }
@@ -304,7 +264,6 @@ class MenuView(context: Context) : View(context) {
         canvas.save()
         canvas.clipRect(0f, 0f, width.toFloat(), height.toFloat())
         canvas.translate(0f, -scrollY)
-        drawTitle(canvas)
         drawGear(canvas)
         canvas.drawText("v1.2", 12f * dp, 12f * dp + versionPaint.textSize, versionPaint)
         cards.forEach { drawCard(canvas, it) }
@@ -335,45 +294,6 @@ class MenuView(context: Context) : View(context) {
             height.toFloat(),
             homeBackgroundScrimPaint,
         )
-    }
-
-    private fun drawTitle(canvas: Canvas) {
-        val w = width.toFloat(); val h = height.toFloat()
-        val logoSize = 58f * dp; val lx = w / 2f; val ly = h * 0.075f
-
-        canvas.save()
-        canvas.scale(logoScale, logoScale, lx, ly)
-        if (logoBitmap != null) {
-            val left = lx - logoSize / 2f; val top = ly - logoSize / 2f
-            canvas.drawBitmap(logoBitmap, null, RectF(left, top, left + logoSize, top + logoSize), bitmapPaint)
-        } else {
-            val ls = 14f * dp
-            val sq1 = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#F0D9B5") }
-            val sq2 = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#7FC8F8") }
-            canvas.drawRect(lx - ls * 1.1f, ly - ls, lx + ls * 0.1f, ly + ls, sq1)
-            canvas.drawRect(lx - ls * 0.1f, ly - ls, lx + ls * 1.1f, ly + ls, sq2)
-        }
-        canvas.restore()
-
-        canvas.drawText("MK BOARD GAMES", w / 2f, h * 0.168f, titlePaint)
-        val modeSubtitle = if (currentGameMode == com.mkdev.mkboardgames.GameMode.IRREGULAR) {
-            "(IRREGULAR)"
-        } else {
-            "Your board game hub"
-        }
-        canvas.drawText(modeSubtitle, w / 2f, h * 0.198f, subPaint)
-        accentPaint.style = Paint.Style.STROKE; accentPaint.strokeWidth = 1.5f * dp
-        canvas.drawLine(w * 0.40f, h * 0.205f, w * 0.60f, h * 0.205f, accentPaint)
-        accentPaint.style = Paint.Style.FILL
-    }
-
-    private fun animateLogoScale(target: Float) {
-        scaleAnim?.cancel()
-        scaleAnim = ValueAnimator.ofFloat(logoScale, target).apply {
-            duration = 110L
-            addUpdateListener { logoScale = it.animatedValue as Float; invalidate() }
-            start()
-        }
     }
 
     private fun drawCard(canvas: Canvas, card: Card) {
@@ -1136,8 +1056,6 @@ class MenuView(context: Context) : View(context) {
             cardPaint.color      = Color.parseColor("#FFFFFF")
             cardHiPaint.color    = Color.parseColor("#F4F7FA")
             cardBorderPaint.color = Color.parseColor("#E0E5EA")
-            titlePaint.color     = Color.parseColor("#1A1A1A")
-            subPaint.color       = Color.parseColor("#666666")
             cardTitlePaint.color = Color.parseColor("#1A1A1A")
             cardDescPaint.color  = Color.parseColor("#555555")
             copyrightPaint.color = Color.parseColor("#999999")
@@ -1150,8 +1068,6 @@ class MenuView(context: Context) : View(context) {
             cardPaint.color      = Color.parseColor("#202429")
             cardHiPaint.color    = Color.parseColor("#2B3138")
             cardBorderPaint.color = Color.parseColor("#343A42")
-            titlePaint.color     = Color.WHITE
-            subPaint.color       = Color.parseColor("#9E9E9E")
             cardTitlePaint.color = Color.WHITE
             cardDescPaint.color  = Color.parseColor("#BDBDBD")
             copyrightPaint.color = Color.parseColor("#555555")

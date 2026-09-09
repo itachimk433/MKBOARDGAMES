@@ -6,6 +6,7 @@ import android.graphics.*
 import android.view.MotionEvent
 import android.view.View
 import com.mkdev.mkboardgames.GameMode
+import com.mkdev.mkboardgames.R
 import com.mkdev.mkboardgames.SoundPlayer
 import kotlin.math.min
 
@@ -19,6 +20,7 @@ class ModeSelectionView(context: Context) : View(context) {
 
     var onModeSelected: ((GameMode) -> Unit)? = null
     var onSettingsClicked: (() -> Unit)? = null
+    var onStatsClicked: (() -> Unit)? = null
 
     private val unit = resources.displayMetrics.density.coerceAtLeast(1f)
     private val textScale = resources.displayMetrics.scaledDensity.coerceAtMost(2f)
@@ -26,8 +28,11 @@ class ModeSelectionView(context: Context) : View(context) {
     private val irregularRect = RectF()
     private val settingsRect = RectF()
     private val settingsTouchRect = RectF()
+    private val statsRect = RectF()
+    private val statsTouchRect = RectF()
     private var pressedMode: GameMode? = null
     private var pressedSettings = false
+    private var pressedStats = false
     private var loadingMode: GameMode? = null
     private var loadingAngle = 0f
     private var loadingAnimator: ValueAnimator? = null
@@ -35,6 +40,12 @@ class ModeSelectionView(context: Context) : View(context) {
     private var settingsAnimator: ValueAnimator? = null
     private var normalScale = 1f
     private var irregularScale = 1f
+    private val logoBitmap: Bitmap? = try {
+        (context.resources.getDrawable(R.drawable.ic_app_logo, null) as? android.graphics.drawable.BitmapDrawable)?.bitmap
+    } catch (_: Exception) {
+        null
+    }
+    private val logoPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
 
     private val backgroundBitmap: Bitmap? = try {
         context.assets.open("mode_selection_background.webp").use { BitmapFactory.decodeStream(it) }
@@ -141,6 +152,21 @@ class ModeSelectionView(context: Context) : View(context) {
             settingsLeft + settingsSize + 8f * unit,
             settingsTop + settingsSize + 8f * unit,
         )
+        val logoSize = 58f * unit
+        val logoCenterX = width / 2f
+        val logoCenterY = min(height * 0.055f, 52f * unit)
+        statsRect.set(
+            logoCenterX - logoSize / 2f,
+            logoCenterY - logoSize / 2f,
+            logoCenterX + logoSize / 2f,
+            logoCenterY + logoSize / 2f,
+        )
+        statsTouchRect.set(
+            statsRect.left - 10f * unit,
+            statsRect.top - 10f * unit,
+            statsRect.right + 10f * unit,
+            statsRect.bottom + 10f * unit,
+        )
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -167,6 +193,9 @@ class ModeSelectionView(context: Context) : View(context) {
         }
 
         val centerX = width / 2f
+        logoBitmap?.let {
+            canvas.drawBitmap(it, null, statsRect, logoPaint)
+        }
         canvas.drawText("SELECT MODE", centerX, height * 0.13f, sectionPaint)
 
         drawModeCard(canvas, normalRect, GameMode.NORMAL, "♟️", "Play", "Standard rules")
@@ -283,8 +312,9 @@ class ModeSelectionView(context: Context) : View(context) {
 
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
-                pressedSettings = settingsTouchRect.contains(event.x, event.y)
-                pressedMode = if (pressedSettings) {
+                pressedStats = statsTouchRect.contains(event.x, event.y)
+                pressedSettings = !pressedStats && settingsTouchRect.contains(event.x, event.y)
+                pressedMode = if (pressedSettings || pressedStats) {
                     null
                 } else {
                     when {
@@ -299,6 +329,11 @@ class ModeSelectionView(context: Context) : View(context) {
             }
 
             MotionEvent.ACTION_MOVE -> {
+                if (pressedStats && !statsTouchRect.contains(event.x, event.y)) {
+                    pressedStats = false
+                    invalidate()
+                    return true
+                }
                 if (pressedSettings && !settingsTouchRect.contains(event.x, event.y)) {
                     pressedSettings = false
                     invalidate()
@@ -317,6 +352,16 @@ class ModeSelectionView(context: Context) : View(context) {
             }
 
             MotionEvent.ACTION_UP -> {
+                if (pressedStats) {
+                    val selectedStats = statsTouchRect.contains(event.x, event.y)
+                    pressedStats = false
+                    if (selectedStats) {
+                        SoundPlayer.play("ui_click")
+                        onStatsClicked?.invoke()
+                    }
+                    invalidate()
+                    return true
+                }
                 if (pressedSettings) {
                     val selectedSettings = settingsTouchRect.contains(event.x, event.y)
                     pressedSettings = false
@@ -359,6 +404,7 @@ class ModeSelectionView(context: Context) : View(context) {
             }
 
             MotionEvent.ACTION_CANCEL -> {
+                pressedStats = false
                 pressedSettings = false
                 pressedMode?.let { animateCardScale(it, 1f) }
                 pressedMode = null
