@@ -252,9 +252,18 @@ class OnitamaActivity : AppCompatActivity() {
         aiJob = scope.launch {
             try {
                 val move = withContext(Dispatchers.Default) {
-                    OnitamaAIPlayer(engine, SettingsManager.onitamaAiDepth(this@OnitamaActivity))
-                        .bestMove(snapshot)
+                    try {
+                        OnitamaAIPlayer(
+                            engine,
+                            SettingsManager.onitamaAiDepth(this@OnitamaActivity),
+                        ).bestMove(snapshot)
+                    } catch (_: Throwable) {
+                        null
+                    } ?: runCatching {
+                        engine.allLegalMoves(snapshot, snapshot.currentTurn).firstOrNull()
+                    }.getOrNull()
                 }
+                hudView.setThinking(false)
                 if (!activityResumed || requestToken != aiRequestToken || snapshot != gameState ||
                     activeOverlay != null
                 ) {

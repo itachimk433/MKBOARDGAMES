@@ -657,8 +657,18 @@ class YoteActivity : AppCompatActivity() {
         aiJob = scope.launch {
             try {
                 val move = withContext(Dispatchers.Default) {
-                    YoteAIPlayer(engine, SettingsManager.yoteAiDepth(this@YoteActivity)).bestMove(snapshot)
+                    try {
+                        YoteAIPlayer(
+                            engine,
+                            SettingsManager.yoteAiDepth(this@YoteActivity),
+                        ).bestMove(snapshot)
+                    } catch (_: Throwable) {
+                        null
+                    } ?: runCatching {
+                        engine.allLegalMoves(snapshot, snapshot.currentTurn).firstOrNull()
+                    }.getOrNull()
                 }
+                hudView.setThinking(false)
                 if (!activityResumed || requestToken != aiRequestToken || snapshot != gameState ||
                     activeOverlay != null
                 ) {

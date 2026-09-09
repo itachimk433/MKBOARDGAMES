@@ -55,9 +55,16 @@ class ShogiRuleEngine : com.mkdev.mkboardgames.engine.RuleEngine {
         if (whiteKing == null) return GameStatus.BLACK_WINS
         if (blackKing == null) return GameStatus.WHITE_WINS
 
-        if (allLegalMoves(state, state.currentTurn).isNotEmpty()) {
-            return GameStatus.IN_PROGRESS
+        // Most positions have a board move. Avoid generating every possible
+        // hand drop (including pawn-drop-mate checks) just to answer the
+        // common "is the game over?" question. Drops are only needed when
+        // there are no legal board moves.
+        if (hasAnyBoardLegalMove(state, state.currentTurn)) return GameStatus.IN_PROGRESS
+        val hasLegalDrop = ShogiPieceType.entries.any { type ->
+            legalDropsFrom(state.copy(currentTurn = state.currentTurn), type).isNotEmpty()
         }
+        if (hasLegalDrop) return GameStatus.IN_PROGRESS
+
         // Shogi has no chess-style stalemate draw. A player with no legal
         // move loses whether or not their king is currently in check.
         return winnerFor(state.currentTurn.opponent())
@@ -268,9 +275,15 @@ class ShogiRuleEngine : com.mkdev.mkboardgames.engine.RuleEngine {
                     to = to,
                     metadata = mapOf("drop" to type.name),
                 )
-                if (!checkPawnDropMate || type != ShogiPieceType.PAWN || !isPawnDropMate(state, move)) {
-                    moves += move
-                }
+                // A drop must not expose the dropping player's king. This is
+                // especially important while escaping check: the old code
+                // exposed pseudo-legal drops to both the UI and the AI.
+                val next = applyMoveInternal(state, move)
+                if (isKingInCheck(next, color)) continue
+                if (checkPawnDropMate && type == ShogiPieceType.PAWN &&
+                    isPawnDropMate(state, move)
+                ) continue
+                moves += move
             }
         }
         return moves
@@ -296,6 +309,16 @@ class ShogiRuleEngine : com.mkdev.mkboardgames.engine.RuleEngine {
                 }
             }
         }
+    }
+
+    private fun hasAnyBoardLegalMove(state: GameState, color: PieceColor): Boolean {
+        val turnState = state.copy(currentTurn = color)
+        for (row in 0 until ShogiSetup.SIZE) {
+            for (col in 0 until ShogiSetup.SIZE) {
+                if (legalMovesFrom(turnState, Position(row, col)).isNotEmpty()) return true
+            }
+        }
+        return false
     }
 
     private fun hasUnpromotedPawnOnFile(state: GameState, color: PieceColor, col: Int): Boolean =

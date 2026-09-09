@@ -646,8 +646,18 @@ class MancalaActivity : AppCompatActivity() {
         val autoplayingPlayerTurn = autoplayEnabled && snapshot.currentTurn == playerColor
         scope.launch {
             val move = withContext(Dispatchers.Default) {
-                MancalaAIPlayer(engine, SettingsManager.mancalaAiDepth(this@MancalaActivity)).bestMove(snapshot)
+                try {
+                    MancalaAIPlayer(
+                        engine,
+                        SettingsManager.mancalaAiDepth(this@MancalaActivity),
+                    ).bestMove(snapshot)
+                } catch (_: Throwable) {
+                    null
+                } ?: runCatching {
+                    engine.allLegalMoves(snapshot, snapshot.currentTurn).firstOrNull()
+                }.getOrNull()
             }
+            hudView.setThinking(false)
             val autoplayStillControlsTurn =
                 snapshot.currentTurn != playerColor || autoplayEnabled
             if (!activityResumed || snapshot != gameState || !autoplayStillControlsTurn) {
@@ -657,6 +667,7 @@ class MancalaActivity : AppCompatActivity() {
             }
             boardView.isLocked = false
             if (move != null) playMove(move, autoplayTurn = autoplayingPlayerTurn)
+            else updateHud()
         }
     }
 

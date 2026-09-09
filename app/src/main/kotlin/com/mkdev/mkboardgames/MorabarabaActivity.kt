@@ -506,7 +506,9 @@ class MorabarabaActivity : AppCompatActivity() {
             val timeMs = SettingsManager.morabarabaAiTimeLimitMs(this@MorabarabaActivity)
             val ai = AIPlayer(engine, depth, timeMs)
             val move = withContext(Dispatchers.Default) {
-                val legal = engine.allLegalMoves(thinkingState, thinkingState.currentTurn)
+                val legal = runCatching {
+                    engine.allLegalMoves(thinkingState, thinkingState.currentTurn)
+                }.getOrDefault(emptyList())
                 try {
                     val best = ai.bestMove(thinkingState)
                     if (best != null && legal.any { it.from == best.from && it.to == best.to }) best

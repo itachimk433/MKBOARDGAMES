@@ -461,6 +461,7 @@ Strategy
         if (!vsAI || !activityResumed || gameState.status != GameStatus.IN_PROGRESS) return
         boardView.isLocked = true
         hudView.setThinking(true)
+        val snapshot = gameState
         scope.launch {
             val move = withContext(Dispatchers.Default) {
                 try {
@@ -473,10 +474,10 @@ Strategy
                     //   (forced draw on 3×3), causing the AI to pick randomly — paradoxically
                     //   making Hard feel weaker than Easy which uses heuristics consistently.
                     if (diff == 0 && Math.random() < 0.40) {
-                        engine.allLegalMoves(gameState, gameState.currentTurn).randomOrNull()
+                        engine.allLegalMoves(snapshot, snapshot.currentTurn).randomOrNull()
                     } else {
                         val varWindow = when (diff) { 0 -> 80; 2 -> 0; else -> 25 }
-                        AIPlayer(engine, maxDepth = depth, timeLimitMs = 2500L, varietyWindowOverride = varWindow).bestMove(gameState)
+                        AIPlayer(engine, maxDepth = depth, timeLimitMs = 2500L, varietyWindowOverride = varWindow).bestMove(snapshot)
                     }
                 } catch (e: Throwable) { null }
             }
@@ -485,7 +486,13 @@ Strategy
                 return@launch
             }
             hudView.setThinking(false)
-            if (move != null) { boardView.isLocked = false; handleMove(move) }
+            val safeMove = move ?: runCatching {
+                engine.allLegalMoves(snapshot, snapshot.currentTurn).firstOrNull()
+            }.getOrNull()
+            if (safeMove != null && snapshot == gameState) {
+                boardView.isLocked = false
+                handleMove(safeMove)
+            }
             else boardView.isLocked = false
         }
     }

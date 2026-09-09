@@ -455,6 +455,7 @@ Control the centre columns, build threats in more than one direction, and block 
         if (!vsAI || !activityResumed || gameState.status != GameStatus.IN_PROGRESS) return
         boardView.isLocked = true
         hudView.setThinking(true)
+        val snapshot = gameState
         scope.launch {
             val move = withContext(Dispatchers.Default) {
                 try {
@@ -462,14 +463,14 @@ Control the centre columns, build threats in more than one direction, and block 
                     val depth = SettingsManager.connectFourAiDepth(this@ConnectFourActivity)
                     val window = when (difficulty) { 0 -> 80; 2 -> 0; else -> 25 }
                     if (difficulty == 0 && Math.random() < 0.25) {
-                        engine.allLegalMoves(gameState, gameState.currentTurn).randomOrNull()
+                        engine.allLegalMoves(snapshot, snapshot.currentTurn).randomOrNull()
                     } else {
                         AIPlayer(
                             engine,
                             maxDepth = depth,
                             timeLimitMs = SettingsManager.connectFourAiTimeLimitMs(this@ConnectFourActivity),
                             varietyWindowOverride = window
-                        ).bestMove(gameState)
+                        ).bestMove(snapshot)
                     }
                 } catch (_: Throwable) { null }
             }
@@ -478,7 +479,10 @@ Control the centre columns, build threats in more than one direction, and block 
                 return@launch
             }
             hudView.setThinking(false)
-            if (move != null) handleMove(move, fromAI = true)
+            val safeMove = move ?: runCatching {
+                engine.allLegalMoves(snapshot, snapshot.currentTurn).firstOrNull()
+            }.getOrNull()
+            if (safeMove != null && snapshot == gameState) handleMove(safeMove, fromAI = true)
             else boardView.isLocked = false
         }
     }

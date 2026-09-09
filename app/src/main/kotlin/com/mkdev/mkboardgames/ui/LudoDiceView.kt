@@ -168,7 +168,7 @@ class LudoDiceView(context: Context) : View(context) {
         canvas.drawRoundRect(panel, 12f * density, 12f * density, panelPaint)
         canvas.drawRoundRect(panel, 12f * density, 12f * density, panelStroke)
 
-        val size = min(width, height).toFloat() * 0.62f
+        val size = min(width, height).toFloat() * 0.558f
         val half = size / 2f
         val centerX = width / 2f
         val centerY = height * 0.55f

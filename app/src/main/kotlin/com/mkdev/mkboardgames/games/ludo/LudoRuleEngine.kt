@@ -113,7 +113,32 @@ class LudoRuleEngine : RuleEngine {
         require(state.status == GameStatus.IN_PROGRESS) {
             "Cannot apply a move after the game has ended"
         }
-        require(move in allLegalMoves(state, state.currentTurn)) {
+        // An Extra Move is still one turn, but it deliberately uses a
+        // different effective dice value. Validate it against that same
+        // effective value instead of only against the value stored for the
+        // original roll. Without this, the animated move is rejected after
+        // the token has already been selected.
+        val player = LudoSetup.playerFromState(state)
+        val usedExtraMove = move.metadata["usedExtraMove"] == true
+        val baseDice = move.metadata["baseDice"] as? Int
+        val effectiveDice = move.metadata["effectiveDice"] as? Int
+        val legalMoves = if (
+            usedExtraMove &&
+            move.metadata["player"] == player &&
+            baseDice == (state.metadata["ludo_dice"] as? Int) &&
+            effectiveDice != null
+        ) {
+            legalMovesForDice(
+                state = state,
+                player = player,
+                dice = effectiveDice,
+                baseDice = baseDice,
+                usedExtraMove = true,
+            )
+        } else {
+            allLegalMoves(state, state.currentTurn)
+        }
+        require(move in legalMoves) {
             "Illegal Ludo move"
         }
         val movingPiece = LudoSetup.pieceForMove(state, move)

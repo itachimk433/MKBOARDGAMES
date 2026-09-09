@@ -1458,7 +1458,7 @@ Checkmate your opponent's King.
                 gameType != "LUDO" && thinkingState.currentTurn == playerColor
             val move = withContext(Dispatchers.Default) {
                 try {
-                    when (gameType) {
+                    val preferredMove = when (gameType) {
                         "XIANGQI" -> {
                             AIPlayer(
                                 engine,
@@ -1516,6 +1516,12 @@ Checkmate your opponent's King.
                             ai.bestMove(thinkingState)
                         }
                     }
+                    // Never leave a turn locked because a bounded search
+                    // timed out or returned no move. The rule engine remains
+                    // authoritative; this is only a safe recovery move.
+                    preferredMove ?: engine
+                        .allLegalMoves(thinkingState, thinkingState.currentTurn)
+                        .firstOrNull()
                 } catch (e: Throwable) { null }
             }
             hudView.setThinking(false)

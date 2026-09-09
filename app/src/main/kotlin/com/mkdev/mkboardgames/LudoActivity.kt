@@ -1576,7 +1576,23 @@ class LudoActivity : AppCompatActivity() {
             if (LudoSetup.isStarTrackCell(move.to)) {
                 SoundPlayer.playMovement("ludo_star")
             }
-            state = engine.applyMove(state, move)
+            try {
+                state = engine.applyMove(state, move)
+            } catch (_: IllegalArgumentException) {
+                // A stale animation or restored turn must not crash the
+                // activity. Rebuild the selection from the current roll so
+                // the player can continue without losing the turn.
+                rolledValue = move.metadata["baseDice"] as? Int ?: rolledValue
+                boardView.gameState = state
+                boardView.legalMoves = if (rolledValue != 0 && isHumanTurn()) {
+                    engine.legalMovesForDice(state, humanPlayer, rolledValue)
+                } else {
+                    emptyList()
+                }
+                updateHud()
+                Toast.makeText(this, "That move is no longer available", Toast.LENGTH_SHORT).show()
+                return@animateMove
+            }
             moves += move
             rolledValue = 0
             boardView.gameState = state
