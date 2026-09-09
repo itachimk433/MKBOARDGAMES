@@ -120,7 +120,15 @@ class MainActivity : AppCompatActivity() {
         super.onBackPressed()
     }
 
-    override fun onResume() { super.onResume(); makeFullscreen() }
+    override fun onResume() {
+        super.onResume()
+        if (showingGameMenu) {
+            MusicPlayer.playForMode(this, selectedGameMode)
+        } else {
+            MusicPlayer.enterModeSelection()
+        }
+        makeFullscreen()
+    }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)

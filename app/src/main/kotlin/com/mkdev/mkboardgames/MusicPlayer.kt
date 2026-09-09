@@ -7,17 +7,20 @@ import android.media.MediaPlayer
  * App-wide background music player.
  *
  * The player is paused, rather than released, when music is disabled, the app
- * is backgrounded, or the user returns to mode selection. This preserves the
- * current position when music is enabled again.
+ * is backgrounded, or the user returns to mode selection. Match music stays
+ * active while an in-game pause screen is visible because the match activity
+ * remains active.
  */
 object MusicPlayer {
 
     private const val NORMAL_TRACK = 0
     private const val IRREGULAR_TRACK = 1
+    private const val MATCH_TRACK = 2
 
     private val tracks = intArrayOf(
-        R.raw.pufino_enlivening,
-        R.raw.nebulite_summer_time,
+        R.raw.in_game_selection_screen1,
+        R.raw.in_game_selection_screen2,
+        R.raw.in_match,
     )
 
     private var player: MediaPlayer? = null
@@ -32,6 +35,19 @@ object MusicPlayer {
         applicationContext = ctx.applicationContext
         modeSessionActive = true
         requestedTrack = if (mode == GameMode.IRREGULAR) IRREGULAR_TRACK else NORMAL_TRACK
+
+        if (activeTrack != requestedTrack) {
+            releasePlayer()
+            activeTrack = requestedTrack
+        }
+        resumeIfAllowed()
+    }
+
+    /** Switch to the match soundtrack for the current game, including pause screens. */
+    fun enterMatch(ctx: Context) {
+        applicationContext = ctx.applicationContext
+        modeSessionActive = true
+        requestedTrack = MATCH_TRACK
 
         if (activeTrack != requestedTrack) {
             releasePlayer()
