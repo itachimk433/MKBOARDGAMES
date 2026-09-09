@@ -259,6 +259,14 @@ object SettingsManager {
     fun setMovementSoundsEnabled(ctx: Context, v: Boolean) =
         prefs(ctx).edit().putBoolean(KEY_MOVEMENT_SOUNDS, v).apply()
 
+    // ── Background music ────────────────────────────────────────────────────
+    private const val KEY_MUSIC_ENABLED = "background_music_enabled"
+    fun isMusicEnabled(ctx: Context) =
+        sharedPrefs(ctx).getBoolean(KEY_MUSIC_ENABLED, true)
+
+    fun setMusicEnabled(ctx: Context, v: Boolean) =
+        sharedPrefs(ctx).edit().putBoolean(KEY_MUSIC_ENABLED, v).apply()
+
     // ── Motion dice ───────────────────────────────────────────────────────────
     private const val KEY_MOTION_DICE = "motion_dice"
     fun isMotionDiceEnabled(ctx: Context) = prefs(ctx).getBoolean(KEY_MOTION_DICE, false)

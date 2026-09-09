@@ -33,6 +33,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         makeFullscreen()
         SoundPlayer.init(this)
+        MusicPlayer.start(this)
 
         screenRoot = FrameLayout(this)
         setContentView(screenRoot)
