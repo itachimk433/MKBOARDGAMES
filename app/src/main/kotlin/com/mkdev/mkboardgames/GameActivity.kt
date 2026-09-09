@@ -2050,23 +2050,28 @@ Checkmate your opponent's King.
         private val dp = resources.displayMetrics.density
         private val sp = resources.displayMetrics.scaledDensity
 
-        private val bgPaint    = Paint().apply { color = Color.parseColor("#1A1A1A") }
-        private val divPaint   = Paint().apply { color = Color.parseColor("#2A2A2A") }
+        private val bgPaint    = Paint().apply { color = Color.parseColor("#102C32") }
+        private val divPaint   = Paint().apply { color = Color.parseColor("#203E42") }
         private val txtPaint   = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE; textAlign = Paint.Align.LEFT; isFakeBoldText = true
             textSize = 15f * sp.coerceAtMost(3f)
         }
         private val subPaint   = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#7FC8F8"); textAlign = Paint.Align.LEFT
+            color = Color.parseColor("#BFD0C6"); textAlign = Paint.Align.LEFT
             textSize = 11f * sp.coerceAtMost(3f)
         }
-        private val btnBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#252525") }
+        private val btnBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#34261B") }
+        private val btnEdgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#D3A05F")
+            style = Paint.Style.STROKE
+            strokeWidth = dp
+        }
         private val btnPaint   = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#7FC8F8"); textAlign = Paint.Align.CENTER
+            color = Color.parseColor("#F7D99B"); textAlign = Paint.Align.CENTER
             textSize = 11f * sp.coerceAtMost(3f)
         }
         private val dimPaint   = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#555555"); textAlign = Paint.Align.CENTER
+            color = Color.parseColor("#7D776C"); textAlign = Paint.Align.CENTER
             textSize = 11f * sp.coerceAtMost(3f)
         }
 
@@ -2132,6 +2137,11 @@ Checkmate your opponent's King.
             canvas.drawRoundRect(undoRect, rr, rr, btnBgPaint)
             canvas.drawRoundRect(redoRect, rr, rr, btnBgPaint)
             canvas.drawRoundRect(menuRect, rr, rr, btnBgPaint)
+            canvas.drawRoundRect(backRect, rr, rr, btnEdgePaint)
+            if (goMode) canvas.drawRoundRect(passRect, rr, rr, btnEdgePaint)
+            canvas.drawRoundRect(undoRect, rr, rr, btnEdgePaint)
+            canvas.drawRoundRect(redoRect, rr, rr, btnEdgePaint)
+            canvas.drawRoundRect(menuRect, rr, rr, btnEdgePaint)
             canvas.drawText("← Back", backRect.centerX(), backRect.centerY() + btnPaint.textSize * 0.36f, btnPaint)
             if (goMode) canvas.drawText("Pass", passRect.centerX(), passRect.centerY() + btnPaint.textSize * 0.36f, btnPaint)
             canvas.drawText("Undo", undoRect.centerX(), undoRect.centerY() + btnPaint.textSize * 0.36f,

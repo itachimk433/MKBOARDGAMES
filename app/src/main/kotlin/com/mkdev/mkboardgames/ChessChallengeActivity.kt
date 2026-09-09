@@ -1,6 +1,5 @@
 package com.mkdev.mkboardgames
 
-import android.app.AlertDialog
 import android.content.Context
 import android.graphics.Color
 import android.graphics.Typeface
@@ -16,8 +15,10 @@ import com.mkdev.mkboardgames.challenges.ChessPuzzleData
 import com.mkdev.mkboardgames.engine.*
 import com.mkdev.mkboardgames.games.chess.*
 import com.mkdev.mkboardgames.ui.BoardView
+import com.mkdev.mkboardgames.ui.BoardStyleSwitchView
 import com.mkdev.mkboardgames.ui.ChessBoardStyle
 import com.mkdev.mkboardgames.ui.ChallengeLevelGridView
+import com.mkdev.mkboardgames.ui.ChessChoiceView
 import com.mkdev.mkboardgames.ui.StandardGameHudView
 
 class ChessChallengeActivity : AppCompatActivity() {
@@ -33,8 +34,11 @@ class ChessChallengeActivity : AppCompatActivity() {
     private var expectedMoveIndex = 1
     private var boardView: BoardView? = null
     private var gameHud: StandardGameHudView? = null
+    private var screenRoot: FrameLayout? = null
+    private var activeOverlay: View? = null
     private var completed = false
     private var resetting = false
+    private var hintActive = false
 
     private val progressPrefs by lazy {
         getSharedPreferences("chess_challenge_progress", Context.MODE_PRIVATE)
@@ -57,8 +61,15 @@ class ChessChallengeActivity : AppCompatActivity() {
 
     @Suppress("DEPRECATION")
     override fun onBackPressed() {
-        if (boardView != null) {
-            showLevelList()
+        if (activeOverlay != null) {
+            dismissOverlay()
+            if (resetting) {
+                resetPuzzle()
+            } else if (!completed) {
+                boardView?.isLocked = false
+            }
+        } else if (boardView != null) {
+            showPauseScreen()
         } else {
             finish()
         }
@@ -66,6 +77,7 @@ class ChessChallengeActivity : AppCompatActivity() {
 
     private fun showLevelList() {
         handler.removeCallbacksAndMessages(null)
+        dismissOverlay()
         boardView = null
         gameHud = null
         val root = verticalRoot()
@@ -93,10 +105,12 @@ class ChessChallengeActivity : AppCompatActivity() {
 
     private fun showPuzzle(level: Int) {
         handler.removeCallbacksAndMessages(null)
+        dismissOverlay()
         selectedLevel = level.coerceIn(1, puzzles.size)
         currentPuzzle = puzzles[selectedLevel - 1]
         completed = false
         resetting = false
+        hintActive = false
         val root = verticalRoot()
 
         val hud = StandardGameHudView(
@@ -104,7 +118,8 @@ class ChessChallengeActivity : AppCompatActivity() {
             showHistoryControls = false,
             labelTextSizeSp = 15f,
             backLabel = "← Levels",
-            menuLabel = "Reset",
+            menuLabel = "Menu",
+            showHintControl = true,
         ).apply {
             setInfo(
                 value = "LEVEL ${selectedLevel.toString().padStart(2, '0')}",
@@ -112,11 +127,29 @@ class ChessChallengeActivity : AppCompatActivity() {
                 detail = "Loading puzzle…",
                 accentColor = Color.parseColor("#F7D99B"),
             )
-            onBack = { showLevelList() }
-            onMenu = { resetPuzzle() }
+            onBack = { showPauseScreen() }
+            onMenu = { showChallengeMenu() }
+            onHint = {
+                if (!completed && !resetting) toggleHint()
+            }
         }
         gameHud = hud
         root.addView(hud, LinearLayout.LayoutParams(-1, dp(56)))
+
+        val styleRow = LinearLayout(this).apply {
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            setPadding(dp(10), 0, 0, 0)
+            setBackgroundColor(Color.parseColor("#102C32"))
+        }
+        val styleSwitch = BoardStyleSwitchView(this).apply {
+            setStyleCount(ChessBoardStyle.entries.size)
+            setSelectedIndex(ChessBoardStyle.CANVAS.ordinal, animate = false)
+        }
+        styleSwitch.onStyleChanged = { index ->
+            boardView?.chessBoardStyle = ChessBoardStyle.entries[index]
+        }
+        styleRow.addView(styleSwitch, LinearLayout.LayoutParams(dp(118), dp(44)))
+        root.addView(styleRow, LinearLayout.LayoutParams(-1, dp(44)))
 
         val board = BoardView(this).apply {
             ruleEngine = engine
@@ -129,7 +162,11 @@ class ChessChallengeActivity : AppCompatActivity() {
         boardView = board
         root.addView(board, LinearLayout.LayoutParams(-1, 0, 1f))
 
-        setContentView(root)
+        screenRoot = FrameLayout(this).apply {
+            setBackgroundColor(Color.parseColor("#102C32"))
+            addView(root, FrameLayout.LayoutParams(-1, -1))
+        }
+        setContentView(screenRoot!!)
         val puzzle = currentPuzzle!!
         loadPuzzle(puzzle)
     }
@@ -175,6 +212,9 @@ class ChessChallengeActivity : AppCompatActivity() {
             return
         }
 
+        hintActive = false
+        gameHud?.setHintActive(false)
+        boardView?.setHintMove(null)
         puzzleState = engine.applyMove(state, expected).copy(status = GameStatus.IN_PROGRESS)
         expectedMoveIndex++
         boardView?.gameState = puzzleState!!
@@ -200,6 +240,7 @@ class ChessChallengeActivity : AppCompatActivity() {
         puzzleState = engine.applyMove(state, reply).copy(status = GameStatus.IN_PROGRESS)
         expectedMoveIndex++
         boardView?.gameState = puzzleState!!
+        boardView?.setHintMove(null)
         boardView?.isFlipped = puzzleState!!.currentTurn == PieceColor.BLACK
         if (expectedMoveIndex >= solutionMoves.size) completeLevel()
         else {
@@ -215,37 +256,216 @@ class ChessChallengeActivity : AppCompatActivity() {
             progressPrefs.edit().putInt(KEY_HIGHEST_COMPLETED, selectedLevel).apply()
         }
         setChallengeStatus("Level complete. Excellent calculation.")
+        showCompletionScreen()
     }
 
     private fun showWrongMove() {
         resetting = true
         boardView?.isLocked = true
-        setChallengeStatus("Not quite. Resetting the position…")
-        handler.postDelayed({ resetPuzzle() }, 900L)
+        hintActive = false
+        gameHud?.setHintActive(false)
+        boardView?.setHintMove(null)
+        setChallengeStatus("That line does not solve the position.")
+        showFailureScreen()
     }
 
     private fun resetPuzzle() {
         handler.removeCallbacksAndMessages(null)
+        dismissOverlay()
         val start = playerStartState ?: return
         puzzleState = start
         expectedMoveIndex = 1
         completed = false
         resetting = false
+        hintActive = false
         boardView?.gameState = start
         boardView?.isFlipped = start.currentTurn == PieceColor.BLACK
         boardView?.isLocked = false
+        gameHud?.setHintActive(false, animate = false)
+        boardView?.setHintMove(null)
         setChallengeStatus("Your move. Find the best continuation.")
     }
 
     private fun showPromotionChoice(choices: List<Move>) {
         val available = choices.filter { it.promotionType != null }
         if (available.isEmpty()) return
-        val names = available.map { it.promotionType!!.lowercase().replaceFirstChar(Char::uppercaseChar) }.toTypedArray()
-        AlertDialog.Builder(this)
-            .setTitle("Choose a promotion")
-            .setItems(names) { _, which -> boardView?.animateExternalMove(available[which]) }
-            .setOnCancelListener { boardView?.isLocked = false }
-            .show()
+        val view = ChessChoiceView(
+            this,
+            title = "Choose Promotion",
+            subtitle = "Select the piece for your advancing pawn.",
+            choices = available.map {
+                ChessChoiceView.Choice(
+                    it.promotionType!!.lowercase().replaceFirstChar(Char::uppercaseChar),
+                    "Continue the challenge",
+                    it.promotionType!!.first().toString(),
+                    GOLD,
+                )
+            },
+            gameLabel = "C H E S S",
+            fullScreenOverride = true,
+        )
+        view.onChoiceSelected = { which ->
+            dismissOverlay()
+            boardView?.animateExternalMove(available[which])
+        }
+        showOverlay(view)
+    }
+
+    private fun toggleHint() {
+        if (puzzleState == null) return
+        val move = expectedMoveForCurrentState()
+        if (move == null) {
+            hintActive = false
+            boardView?.setHintMove(null)
+            gameHud?.setHintActive(false)
+            return
+        }
+        hintActive = !hintActive
+        boardView?.setHintMove(if (hintActive) move else null)
+        setChallengeStatus(
+            if (hintActive) "Hint shown. Follow the highlighted move."
+            else "Your move. Find the best continuation.",
+        )
+    }
+
+    private fun expectedMoveForCurrentState(): Move? {
+        val state = puzzleState ?: return null
+        return solutionMoves.getOrNull(expectedMoveIndex)?.let { findMove(state, it) }
+    }
+
+    private fun showPauseScreen() {
+        if (activeOverlay != null || boardView == null) return
+        boardView?.isLocked = true
+        showOverlay(
+            ChessChoiceView(
+                this,
+                title = "Paused",
+                subtitle = "The position is saved while you decide what to do next.",
+                choices = listOf(
+                    ChessChoiceView.Choice("Resume", "Return to the board", "▶", GOLD),
+                    ChessChoiceView.Choice("Restart Level", "Try this puzzle again", "↻", GOLD),
+                    ChessChoiceView.Choice("Choose Level", "Return to the challenge list", "☷", GOLD),
+                ),
+                gameLabel = "C H E S S",
+                fullScreenOverride = true,
+            ).apply {
+                onChoiceSelected = { which ->
+                    when (which) {
+                        0 -> {
+                            dismissOverlay()
+                            boardView?.isLocked = false
+                        }
+                        1 -> resetPuzzle()
+                        else -> showLevelList()
+                    }
+                }
+            },
+        )
+    }
+
+    private fun showChallengeMenu() {
+        if (activeOverlay != null) return
+        boardView?.isLocked = true
+        showOverlay(
+            ChessChoiceView(
+                this,
+                title = "Challenge Menu",
+                subtitle = "Keep calculating or choose a different position.",
+                choices = listOf(
+                    ChessChoiceView.Choice("Resume", "Return to the board", "▶", GOLD),
+                    ChessChoiceView.Choice("Restart Level", "Reset the current position", "↻", GOLD),
+                    ChessChoiceView.Choice("Choose Level", "Return to the challenge list", "☷", GOLD),
+                ),
+                gameLabel = "C H E S S",
+                fullScreenOverride = true,
+            ).apply {
+                onChoiceSelected = { which ->
+                    when (which) {
+                        0 -> {
+                            dismissOverlay()
+                            boardView?.isLocked = false
+                        }
+                        1 -> resetPuzzle()
+                        else -> showLevelList()
+                    }
+                }
+            },
+        )
+    }
+
+    private fun showFailureScreen() {
+        showOverlay(
+            ChessChoiceView(
+                this,
+                title = "Challenge Failed",
+                subtitle = "The first move or continuation would not lead to the solution.",
+                choices = listOf(
+                    ChessChoiceView.Choice("Retry Level", "Calculate the line again", "↻", GOLD),
+                    ChessChoiceView.Choice("Show Hint", "Highlight the next move", "?", GOLD),
+                    ChessChoiceView.Choice("Choose Level", "Return to the challenge list", "☷", GOLD),
+                ),
+                gameLabel = "C H E S S",
+                fullScreenOverride = true,
+            ).apply {
+                onChoiceSelected = { which ->
+                    when (which) {
+                        0 -> resetPuzzle()
+                        1 -> {
+                            resetPuzzle()
+                            hintActive = true
+                            val move = expectedMoveForCurrentState()
+                            boardView?.setHintMove(move)
+                            gameHud?.setHintActive(true)
+                            setChallengeStatus("Hint shown. Follow the highlighted move.")
+                        }
+                        else -> showLevelList()
+                    }
+                }
+            },
+        )
+    }
+
+    private fun showCompletionScreen() {
+        val nextLevel = selectedLevel < puzzles.size
+        showOverlay(
+            ChessChoiceView(
+                this,
+                title = "Level Complete",
+                subtitle = "Excellent calculation. The solution is yours.",
+                choices = buildList {
+                    if (nextLevel) add(ChessChoiceView.Choice("Next Level", "Continue the challenge", "→", GOLD))
+                    add(ChessChoiceView.Choice("Replay Level", "Solve this one again", "↻", GOLD))
+                    add(ChessChoiceView.Choice("Choose Level", "Return to the challenge list", "☷", GOLD))
+                },
+                gameLabel = "C H E S S",
+                fullScreenOverride = true,
+            ).apply {
+                onChoiceSelected = { which ->
+                    if (nextLevel && which == 0) showPuzzle(selectedLevel + 1)
+                    else if (which == if (nextLevel) 1 else 0) resetPuzzle()
+                    else showLevelList()
+                }
+            },
+        )
+    }
+
+    private fun showOverlay(view: View) {
+        val root = screenRoot ?: return
+        dismissOverlay()
+        val overlay = FrameLayout(this).apply {
+            isClickable = true
+            isFocusable = true
+            addView(view, FrameLayout.LayoutParams(-1, -1))
+        }
+        activeOverlay = overlay
+        root.addView(overlay, FrameLayout.LayoutParams(-1, -1))
+        overlay.requestFocus()
+    }
+
+    private fun dismissOverlay() {
+        val root = screenRoot
+        activeOverlay?.let { root?.removeView(it) }
+        activeOverlay = null
     }
 
     private fun findMove(state: GameState, uci: String): Move? {
@@ -308,7 +528,7 @@ class ChessChallengeActivity : AppCompatActivity() {
         setTextColor(Color.parseColor("#F7D99B"))
         setTextSize(TypedValue.COMPLEX_UNIT_SP, if (label == "‹") 28f else 12f)
         typeface = Typeface.DEFAULT_BOLD
-        background = roundedBackground("#172B35", "#39505B", 10f)
+        background = roundedBackground("#34261B", "#D3A05F", 10f)
         setOnClickListener { action() }
     }
 
@@ -339,6 +559,7 @@ class ChessChallengeActivity : AppCompatActivity() {
     companion object {
         const val EXTRA_LEVEL = "challenge_level"
         private const val KEY_HIGHEST_COMPLETED = "highest_chess_level"
+        private val GOLD = Color.parseColor("#E3B86A")
     }
 }
 

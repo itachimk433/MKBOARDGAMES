@@ -7,7 +7,10 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import android.view.MotionEvent
+import android.view.OverScroller
 import android.view.View
+import android.view.VelocityTracker
+import android.view.ViewConfiguration
 import android.view.animation.DecelerateInterpolator
 import com.mkdev.mkboardgames.SoundPlayer
 import kotlin.math.abs
@@ -44,7 +47,7 @@ class ChallengeLevelGridView(
     private val loadingRingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#F7D99B")
         style = Paint.Style.STROKE
-        strokeWidth = 2.2f * unit
+        strokeWidth = 1.76f * unit
         strokeCap = Paint.Cap.ROUND
     }
 
@@ -58,8 +61,13 @@ class ChallengeLevelGridView(
     private var downX = 0f
     private var downY = 0f
     private var lastY = 0f
+    private var dragging = false
     private var scaleAnimator: ValueAnimator? = null
     private var loadingAnimator: ValueAnimator? = null
+    private var velocityTracker: VelocityTracker? = null
+    private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop.toFloat()
+    private val minimumFlingVelocity = ViewConfiguration.get(context).scaledMinimumFlingVelocity.toFloat()
+    private val scroller = OverScroller(context, DecelerateInterpolator(1.4f))
 
     init {
         isClickable = true
@@ -69,7 +77,17 @@ class ChallengeLevelGridView(
     override fun onDetachedFromWindow() {
         scaleAnimator?.cancel()
         loadingAnimator?.cancel()
+        velocityTracker?.recycle()
+        velocityTracker = null
+        scroller.forceFinished(true)
         super.onDetachedFromWindow()
+    }
+
+    override fun computeScroll() {
+        if (scroller.computeScrollOffset()) {
+            scrollOffset = scroller.currY.toFloat().coerceIn(0f, maxScroll)
+            postInvalidateOnAnimation()
+        }
     }
 
     override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
@@ -115,7 +133,7 @@ class ChallengeLevelGridView(
                 if (index + 1 <= highestCompleted) completedLevelPaint else levelPaint,
             )
             if (loadingIndex == index) {
-                val radius = 7f * unit
+                val radius = 5.6f * unit
                 val centerX = rect.right - 17f * unit
                 val centerY = rect.top + 17f * unit
                 canvas.drawArc(
@@ -140,9 +158,14 @@ class ChallengeLevelGridView(
         val contentY = event.y + scrollOffset
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                scroller.forceFinished(true)
+                velocityTracker?.recycle()
+                velocityTracker = VelocityTracker.obtain()
+                velocityTracker?.addMovement(event)
                 downX = event.x
                 downY = event.y
                 lastY = event.y
+                dragging = false
                 pressedIndex = cardAt(event.x, contentY)
                 pressedIndex.takeIf { it >= 0 }?.let { animateCardScale(it, 0.94f) }
                 invalidate()
@@ -150,9 +173,11 @@ class ChallengeLevelGridView(
             }
 
             MotionEvent.ACTION_MOVE -> {
+                velocityTracker?.addMovement(event)
                 val dy = lastY - event.y
-                if (abs(event.y - downY) > 8f * unit && pressedIndex >= 0) {
-                    animateCardScale(pressedIndex, 1f)
+                if (!dragging && abs(event.y - downY) > touchSlop) {
+                    dragging = true
+                    pressedIndex.takeIf { it >= 0 }?.let { animateCardScale(it, 1f) }
                     pressedIndex = -1
                 }
                 scrollOffset = (scrollOffset + dy).coerceIn(0f, maxScroll)
@@ -162,6 +187,26 @@ class ChallengeLevelGridView(
             }
 
             MotionEvent.ACTION_UP -> {
+                velocityTracker?.addMovement(event)
+                if (dragging) {
+                    velocityTracker?.computeCurrentVelocity(1000)
+                    val velocityY = velocityTracker?.yVelocity ?: 0f
+                    if (abs(velocityY) >= minimumFlingVelocity) {
+                        scroller.fling(
+                            0,
+                            scrollOffset.toInt(),
+                            0,
+                            -velocityY.toInt(),
+                            0,
+                            0,
+                            0,
+                            maxScroll.toInt(),
+                        )
+                        postInvalidateOnAnimation()
+                    }
+                }
+                velocityTracker?.recycle()
+                velocityTracker = null
                 val selected = pressedIndex
                 val stillOnCard = selected >= 0 && cardAt(event.x, event.y + scrollOffset) == selected
                 if (selected >= 0) animateCardScale(selected, 1f)
@@ -175,13 +220,17 @@ class ChallengeLevelGridView(
                     SoundPlayer.play("ui_click")
                     startLoading(selected)
                 }
+                dragging = false
                 invalidate()
                 return true
             }
 
             MotionEvent.ACTION_CANCEL -> {
+                velocityTracker?.recycle()
+                velocityTracker = null
                 if (pressedIndex >= 0) animateCardScale(pressedIndex, 1f)
                 pressedIndex = -1
+                dragging = false
                 invalidate()
                 return true
             }

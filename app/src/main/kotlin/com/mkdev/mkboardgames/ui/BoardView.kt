@@ -107,6 +107,12 @@ class BoardView(context: Context) : View(context) {
     private var selectedPos: Position? = null
     private var legalMoves: List<Move> = emptyList()
     private var shogiDropPiece: ShogiPieceType? = null
+    private var hintMove: Move? = null
+
+    fun setHintMove(move: Move?) {
+        hintMove = move
+        invalidate()
+    }
 
     fun beginShogiDrop(type: ShogiPieceType) {
         val engine = ruleEngine as? ShogiRuleEngine ?: return
@@ -479,6 +485,10 @@ class BoardView(context: Context) : View(context) {
     private var darkPaint   = Paint(Paint.ANTI_ALIAS_FLAG)
     private var accentPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val highlightGold = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(90,255,215,0) }
+    private val hintGold = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(165, 255, 193, 62)
+        style = Paint.Style.FILL
+    }
     private val highlightBlue = Paint(Paint.ANTI_ALIAS_FLAG)
     private val dotPaint      = Paint(Paint.ANTI_ALIAS_FLAG)
     private val ringPaint     = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -1063,6 +1073,10 @@ class BoardView(context: Context) : View(context) {
         gameState.lastMove?.let {
             drawChessCell(canvas, it.from, highlightGold)
             drawChessCell(canvas, it.to, highlightGold)
+        }
+        hintMove?.let {
+            drawChessCell(canvas, it.from, hintGold)
+            drawChessCell(canvas, it.to, hintGold)
         }
         selectedPos?.let { drawChessCell(canvas, it, highlightBlue) }
 
