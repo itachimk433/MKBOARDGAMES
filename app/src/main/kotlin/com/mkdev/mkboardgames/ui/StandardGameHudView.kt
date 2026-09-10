@@ -33,6 +33,7 @@ class StandardGameHudView(
     var onRedo: (() -> Unit)? = null
     var onMenu: (() -> Unit)? = null
     var onHint: (() -> Unit)? = null
+    var controlsEnabled: Boolean = true
 
     private var label = ""
     private var canUndo = false
@@ -152,6 +153,7 @@ class StandardGameHudView(
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         if (event.actionMasked == MotionEvent.ACTION_UP) {
+            if (!controlsEnabled) return true
             when {
                 backRect.contains(event.x, event.y) -> {
                     SoundPlayer.play("ui_click")

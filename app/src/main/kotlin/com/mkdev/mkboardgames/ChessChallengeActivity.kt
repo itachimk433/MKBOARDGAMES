@@ -33,6 +33,10 @@ class ChessChallengeActivity : AppCompatActivity() {
     private var playerStartState: GameState? = null
     private var solutionMoves: List<String> = emptyList()
     private var expectedMoveIndex = 1
+    private var playerColor = PieceColor.WHITE
+    private var playerMovesMade = 0
+    private var maxPlayerMoves = 1
+    private var opponentMoveAnimating = false
     private var boardView: BoardView? = null
     private var gameHud: StandardGameHudView? = null
     private var screenRoot: FrameLayout? = null
@@ -133,6 +137,7 @@ class ChessChallengeActivity : AppCompatActivity() {
         completed = false
         resetting = false
         hintActive = false
+        opponentMoveAnimating = false
         val root = verticalRoot()
 
         val hud = StandardGameHudView(
@@ -210,6 +215,8 @@ class ChessChallengeActivity : AppCompatActivity() {
         val initial = ChessFenParser.parse(puzzle.fen)
         solutionMoves = puzzle.moves.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
         expectedMoveIndex = 1
+        playerMovesMade = 0
+        maxPlayerMoves = (solutionMoves.size / 2).coerceAtLeast(1)
         val firstMove = solutionMoves.firstOrNull()?.let { findMove(initial, it) }
         if (firstMove == null) {
             puzzleState = initial
@@ -222,6 +229,7 @@ class ChessChallengeActivity : AppCompatActivity() {
         val afterOpponent = engine.applyMove(initial, firstMove)
         puzzleState = afterOpponent.copy(status = GameStatus.IN_PROGRESS)
         playerStartState = puzzleState
+        playerColor = puzzleState!!.currentTurn
         boardView?.gameState = puzzleState!!
         boardView?.isFlipped = puzzleState!!.currentTurn == PieceColor.BLACK
         boardView?.isLocked = false
@@ -229,47 +237,65 @@ class ChessChallengeActivity : AppCompatActivity() {
     }
 
     private fun handlePlayerMove(move: Move) {
-        if (completed || resetting) return
-        val state = puzzleState ?: return
-        val expectedUci = solutionMoves.getOrNull(expectedMoveIndex) ?: return
-        val expected = findMove(state, expectedUci)
-        if (expected == null || !sameMove(move, expected)) {
-            showWrongMove()
+        if (opponentMoveAnimating) {
+            opponentMoveAnimating = false
+            applyOpponentReply(move)
             return
         }
+        if (completed || resetting) return
+        val state = puzzleState ?: return
 
         hintActive = false
         gameHud?.setHintActive(false)
         boardView?.setHintMove(null)
-        puzzleState = engine.applyMove(state, expected).copy(status = GameStatus.IN_PROGRESS)
+        val nextState = engine.applyMove(state, move)
+        if (nextState === state) return
+        puzzleState = nextState
+        playerMovesMade++
         expectedMoveIndex++
         boardView?.gameState = puzzleState!!
 
-        if (expectedMoveIndex >= solutionMoves.size) {
+        if (isPlayerVictory(nextState) && playerMovesMade <= maxPlayerMoves) {
             completeLevel()
+        } else if (nextState.status != GameStatus.IN_PROGRESS || playerMovesMade >= maxPlayerMoves) {
+            showWrongMove()
         } else {
             boardView?.isLocked = true
-            setChallengeStatus("Correct. Watch the reply…")
+            setChallengeStatus("Opponent is preparing a reply…")
             handler.postDelayed({ playOpponentReply() }, 380L)
         }
     }
 
     private fun playOpponentReply() {
-        if (completed) return
+        if (completed || resetting) return
         val state = puzzleState ?: return
-        val replyUci = solutionMoves.getOrNull(expectedMoveIndex) ?: return
-        val reply = findMove(state, replyUci)
+        val reply = solutionMoves.getOrNull(expectedMoveIndex)?.let { findMove(state, it) }
+            ?: engine.allLegalMoves(state, state.currentTurn).firstOrNull()
         if (reply == null) {
             showWrongMove()
             return
         }
-        puzzleState = engine.applyMove(state, reply).copy(status = GameStatus.IN_PROGRESS)
+        opponentMoveAnimating = true
+        boardView?.isLocked = true
+        setChallengeStatus("Opponent is moving…")
+        boardView?.animateExternalMove(reply)
+    }
+
+    private fun applyOpponentReply(move: Move) {
+        val state = puzzleState ?: return
+        val nextState = engine.applyMove(state, move)
+        if (nextState === state) {
+            showWrongMove()
+            return
+        }
+        puzzleState = nextState
         expectedMoveIndex++
-        boardView?.gameState = puzzleState!!
+        boardView?.gameState = nextState
         boardView?.setHintMove(null)
-        boardView?.isFlipped = puzzleState!!.currentTurn == PieceColor.BLACK
-        if (expectedMoveIndex >= solutionMoves.size) completeLevel()
-        else {
+        boardView?.isFlipped = nextState.currentTurn == PieceColor.BLACK
+        if (nextState.status != GameStatus.IN_PROGRESS) {
+            showWrongMove()
+        } else {
             boardView?.isLocked = false
             setChallengeStatus(objectiveText())
         }
@@ -277,23 +303,27 @@ class ChessChallengeActivity : AppCompatActivity() {
 
     private fun completeLevel() {
         completed = true
+        opponentMoveAnimating = false
         boardView?.isLocked = true
+        gameHud?.controlsEnabled = false
         SoundPlayer.play("game_end")
         if (selectedLevel > highestCompleted) {
             progressPrefs.edit().putInt(KEY_HIGHEST_COMPLETED, selectedLevel).apply()
         }
         setChallengeStatus("Level complete")
-        markResultBoard()
+        markResultBoard(victory = true)
         showCompletionScreen()
     }
 
     private fun showWrongMove() {
         resetting = true
+        opponentMoveAnimating = false
         boardView?.isLocked = true
+        gameHud?.controlsEnabled = false
         hintActive = false
         gameHud?.setHintActive(false)
         boardView?.setHintMove(null)
-        setChallengeStatus("Solution missed")
+        setChallengeStatus("Mate not found in time")
         markResultBoard()
         showFailureScreen()
     }
@@ -305,12 +335,15 @@ class ChessChallengeActivity : AppCompatActivity() {
         val start = playerStartState ?: return
         puzzleState = start
         expectedMoveIndex = 1
+        playerMovesMade = 0
         completed = false
         resetting = false
         hintActive = false
+        opponentMoveAnimating = false
         boardView?.gameState = start
         boardView?.isFlipped = start.currentTurn == PieceColor.BLACK
         boardView?.isLocked = false
+        gameHud?.controlsEnabled = true
         gameHud?.setHintActive(false, animate = false)
         boardView?.setHintMove(null)
         setChallengeStatus(objectiveText())
@@ -361,20 +394,40 @@ class ChessChallengeActivity : AppCompatActivity() {
     private fun objectiveText(): String {
         val theme = ChessPuzzleData.themeFor(selectedLevel)
         if (theme.equals("Mate in one", ignoreCase = true)) return "Mate in one move"
-        val playerMoves = (solutionMoves.size / 2).coerceAtLeast(1)
+        val playerMoves = maxPlayerMoves
         val moveLabel = if (playerMoves == 1) "move" else "moves"
         return "$theme • $playerMoves $moveLabel"
     }
 
-    private fun markResultBoard() {
+    private fun markResultBoard(victory: Boolean = false) {
         val state = puzzleState ?: return
-        boardView?.gameState = state.copy(status = GameStatus.WHITE_WINS)
+        val resultStatus = if (victory) {
+            if (playerColor == PieceColor.WHITE) GameStatus.WHITE_WINS else GameStatus.BLACK_WINS
+        } else {
+            GameStatus.WHITE_WINS
+        }
+        boardView?.gameState = state.copy(status = resultStatus)
         boardView?.isLocked = true
+    }
+
+    private fun isPlayerVictory(state: GameState): Boolean {
+        val playerWin = if (playerColor == PieceColor.WHITE) {
+            GameStatus.WHITE_WINS
+        } else {
+            GameStatus.BLACK_WINS
+        }
+        return state.status == playerWin
     }
 
     private fun expectedMoveForCurrentState(): Move? {
         val state = puzzleState ?: return null
-        return solutionMoves.getOrNull(expectedMoveIndex)?.let { findMove(state, it) }
+        solutionMoves.getOrNull(expectedMoveIndex)?.let { findMove(state, it) }?.let { return it }
+        if (playerMovesMade + 1 <= maxPlayerMoves) {
+            return engine.allLegalMoves(state, playerColor).firstOrNull { move ->
+                isPlayerVictory(engine.applyMove(state, move))
+            }
+        }
+        return null
     }
 
     private fun showPauseScreen() {
@@ -518,9 +571,6 @@ class ChessChallengeActivity : AppCompatActivity() {
             move.to == to && (promotion == null || move.promotionType == promotion)
         }
     }
-
-    private fun sameMove(a: Move, b: Move): Boolean =
-        a.from == b.from && a.to == b.to && a.promotionType == b.promotionType
 
     private fun verticalRoot() = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
