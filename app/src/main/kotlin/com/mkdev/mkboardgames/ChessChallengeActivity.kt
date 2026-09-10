@@ -52,7 +52,6 @@ class ChessChallengeActivity : AppCompatActivity() {
     private var opponentMoveAnimating = false
     private var boardView: BoardView? = null
     private var gameHud: StandardGameHudView? = null
-    private var challengeStatusView: TextView? = null
     private var moveHistoryView: TextView? = null
     private var capturedPiecesView: TextView? = null
     private var screenRoot: FrameLayout? = null
@@ -60,7 +59,6 @@ class ChessChallengeActivity : AppCompatActivity() {
     private var completed = false
     private var resetting = false
     private var hintActive = false
-    private var hintStage = 0
     private var hintUsed = false
     private var retryCount = 0
     private var attemptNumber = 0
@@ -129,7 +127,6 @@ class ChessChallengeActivity : AppCompatActivity() {
         dismissOverlay()
         boardView = null
         gameHud = null
-        challengeStatusView = null
         val root = verticalRoot()
         val levelSummary = if (puzzles.size == 1) "1 level" else "${puzzles.size} progressive levels"
         root.addView(topBar("CHESS CHALLENGES", levelSummary) {
@@ -171,11 +168,9 @@ class ChessChallengeActivity : AppCompatActivity() {
         completed = false
         resetting = false
         hintActive = false
-        hintStage = 0
         hintUsed = false
         retryCount = 0
         opponentMoveAnimating = false
-        challengeStatusView = null
         moveHistoryView = null
         capturedPiecesView = null
         val root = verticalRoot()
@@ -216,18 +211,6 @@ class ChessChallengeActivity : AppCompatActivity() {
         }
         styleRow.addView(styleSwitch, LinearLayout.LayoutParams(dp(118), dp(44)))
         root.addView(styleRow, LinearLayout.LayoutParams(-1, dp(44)))
-
-        val statusView = TextView(this).apply {
-            setTextColor(Color.parseColor("#D7E4DE"))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
-            gravity = android.view.Gravity.CENTER
-            includeFontPadding = false
-            maxLines = 3
-            setPadding(dp(14), dp(7), dp(14), dp(7))
-            setBackgroundColor(Color.parseColor("#0B2028"))
-        }
-        challengeStatusView = statusView
-        root.addView(statusView, LinearLayout.LayoutParams(-1, dp(58)))
 
         val historyView = TextView(this).apply {
             setTextColor(Color.parseColor("#AFC6CC"))
@@ -280,7 +263,6 @@ class ChessChallengeActivity : AppCompatActivity() {
     }
 
     private fun setChallengeStatus(text: String) {
-        challengeStatusView?.text = text
         renderHistory()
         gameHud?.setInfo(
             value = "LEVEL ${selectedLevel.toString().padStart(2, '0')}",
@@ -351,7 +333,6 @@ class ChessChallengeActivity : AppCompatActivity() {
         val state = puzzleState ?: return
 
         hintActive = false
-        hintStage = 0
         gameHud?.setHintActive(false)
         boardView?.setHintMove(null)
         val expectedLine = solutionLines.firstOrNull { line ->
@@ -460,7 +441,6 @@ class ChessChallengeActivity : AppCompatActivity() {
         boardView?.isLocked = true
         gameHud?.controlsEnabled = false
         hintActive = false
-        hintStage = 0
         gameHud?.setHintActive(false)
         boardView?.setHintMove(null)
         setChallengeStatus(failureMessage())
@@ -480,7 +460,6 @@ class ChessChallengeActivity : AppCompatActivity() {
         completed = false
         resetting = false
         hintActive = false
-        hintStage = 0
         retryCount++
         beginAttempt()
         opponentMoveAnimating = false
@@ -520,21 +499,40 @@ class ChessChallengeActivity : AppCompatActivity() {
 
     private fun toggleHint() {
         if (currentPuzzle == null || puzzleState == null) return
-        hintActive = !hintActive
+        hintActive = true
         hintUsed = true
-        hintStage = 0
         boardView?.setHintMove(null)
-        gameHud?.setHintActive(hintActive)
-        setChallengeStatus(if (hintActive) hintDescription() else objectiveText())
+        gameHud?.setHintActive(true)
+        showHintOverlay()
     }
 
     private fun hintDescription(): String {
         val beginnerBrief = currentPuzzle?.beginnerChallenge
         return if (beginnerBrief != null) {
-            "Hint: ${beginnerBrief.focus}\nWin condition: ${beginnerBrief.winCondition}"
+            "${beginnerBrief.focus}\nWin condition: ${beginnerBrief.winCondition}"
         } else {
-            "Hint: ${objectiveText()}"
+            objectiveText()
         }
+    }
+
+    private fun showHintOverlay() {
+        showOverlay(
+            ChessChoiceView(
+                this,
+                title = "Hint",
+                subtitle = hintDescription(),
+                choices = listOf(
+                    ChessChoiceView.Choice("Close", "Return to the board", "×", GOLD),
+                ),
+                gameLabel = "C H E S S",
+                fullScreenOverride = false,
+                dismissOnEmptyTap = true,
+            ).apply {
+                onDismissRequested = { dismissOverlay() }
+                onChoiceSelected = { dismissOverlay() }
+            },
+            cardOverlay = true,
+        )
     }
 
     private fun objectiveText(): String {
@@ -689,7 +687,6 @@ class ChessChallengeActivity : AppCompatActivity() {
         boardView?.isLocked = true
         gameHud?.controlsEnabled = false
         hintActive = false
-        hintStage = 0
         gameHud?.setHintActive(false)
         boardView?.setHintMove(null)
         setChallengeStatus(failureMessage())
@@ -715,11 +712,6 @@ class ChessChallengeActivity : AppCompatActivity() {
             GameStatus.BLACK_WINS
         }
         return state.status == playerWin
-    }
-
-    private fun expectedMoveForCurrentState(): Move? {
-        val state = puzzleState ?: return null
-        return solutionMoves.getOrNull(expectedMoveIndex)?.let { findMove(state, it) }
     }
 
     private fun showPauseScreen() {
