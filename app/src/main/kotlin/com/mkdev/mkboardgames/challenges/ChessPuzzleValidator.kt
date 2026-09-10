@@ -24,6 +24,13 @@ object ChessPuzzleValidator {
         if (levels != (1..100).toList()) {
             issues += "levels must be present once each from 1 to 100"
         }
+        if (ChessChallengeCatalogue.size != 100) {
+            issues += "challenge catalogue must contain exactly 100 titles"
+        }
+        val duplicateFens = puzzles.groupBy { it.fen }.filterValues { it.size > 1 }
+        duplicateFens.values.forEach { duplicatePuzzles ->
+            issues += "duplicate puzzle FEN for levels ${duplicatePuzzles.joinToString { it.level.toString() }}"
+        }
 
         puzzles.forEach { puzzle ->
             if (puzzle.solutionLines.isEmpty()) {

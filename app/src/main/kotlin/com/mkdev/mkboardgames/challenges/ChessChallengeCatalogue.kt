@@ -109,5 +109,8 @@ object ChessChallengeCatalogue {
         "The Grandmaster Immortal Test",
     )
 
+    val size: Int
+        get() = titles.size
+
     fun titleFor(level: Int): String = titles.getOrNull(level - 1) ?: "Chess challenge"
 }

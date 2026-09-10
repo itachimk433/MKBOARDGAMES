@@ -21,8 +21,14 @@ class ChessPuzzleValidatorTest {
     fun catalogueIncludesAuthoredTrapAndLongMateObjectives() {
         val puzzles = ChessPuzzleData.all.associateBy { it.level }
         assertTrue(puzzles.getValue(39).condition == ChallengeCondition.SET_TRAP)
-        assertTrue(puzzles.getValue(100).objective.targetPlayerMoves == 20)
-        assertTrue(puzzles.getValue(100).mateIn == 20)
+        assertTrue(puzzles.getValue(100).objective.targetPlayerMoves == 10)
+        assertTrue(puzzles.getValue(100).mateIn == 10)
+    }
+
+    @Test
+    fun catalogueMatchesTheAuthoredChallengeCount() {
+        assertTrue(ChessChallengeCatalogue.size == 100)
+        assertTrue(ChessChallengeCatalogue.titleFor(100) == "The Grandmaster Immortal Test")
     }
 
     @Test
