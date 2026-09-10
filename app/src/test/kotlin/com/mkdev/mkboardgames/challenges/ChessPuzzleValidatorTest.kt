@@ -13,20 +13,16 @@ class ChessPuzzleValidatorTest {
     @Test
     fun authoredObjectivesIncludeThePromotionVariants() {
         val objectives = ChessPuzzleData.all.associateBy { it.level }
-        assertTrue(objectives.getValue(98).objective.promotionRequirement == PromotionRequirement.QUEEN)
-        assertTrue(objectives.getValue(99).objective.promotionRequirement == PromotionRequirement.ROOK)
-        assertTrue(objectives.getValue(100).objective.promotionRequirement == PromotionRequirement.KNIGHT)
-        assertTrue(objectives.getValue(101).objective.promotionRequirement == PromotionRequirement.QUEEN)
+        assertTrue(objectives.getValue(31).objective.promotionRequirement == PromotionRequirement.KNIGHT)
+        assertTrue(objectives.getValue(98).objective.promotionRequirement == PromotionRequirement.KNIGHT)
     }
 
     @Test
     fun catalogueIncludesAuthoredTrapAndLongMateObjectives() {
         val puzzles = ChessPuzzleData.all.associateBy { it.level }
         assertTrue(puzzles.getValue(39).condition == ChallengeCondition.SET_TRAP)
-        assertTrue(puzzles.getValue(102).objective.targetPlayerMoves == 10)
-        assertTrue(puzzles.getValue(103).objective.targetPlayerMoves == 11)
-        assertTrue(puzzles.getValue(104).objective.targetPlayerMoves == 20)
-        assertTrue(puzzles.getValue(104).mateIn == 20)
+        assertTrue(puzzles.getValue(100).objective.targetPlayerMoves == 20)
+        assertTrue(puzzles.getValue(100).mateIn == 20)
     }
 
     @Test

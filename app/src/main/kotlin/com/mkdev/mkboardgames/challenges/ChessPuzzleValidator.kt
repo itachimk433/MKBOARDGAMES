@@ -21,8 +21,8 @@ object ChessPuzzleValidator {
     fun validateAll(puzzles: List<ChessPuzzle> = ChessPuzzleData.all): List<String> {
         val issues = mutableListOf<String>()
         val levels = puzzles.map { it.level }
-        if (levels != (1..104).toList()) {
-            issues += "levels must be present once each from 1 to 104"
+        if (levels != (1..100).toList()) {
+            issues += "levels must be present once each from 1 to 100"
         }
 
         puzzles.forEach { puzzle ->

@@ -22,6 +22,7 @@ data class ChessPuzzle(
     val sourceId: String,
     val objective: ChallengeObjective = ChallengeObjective(),
     val alternateSolutions: List<String> = emptyList(),
+    val title: String = "Chess challenge",
 ) {
     val solutionLines: List<String>
         get() = (listOf(moves) + alternateSolutions)
@@ -51,6 +52,12 @@ object ChessPuzzleData {
         9 to ChallengeObjective(ChallengeCondition.CAPTURE_MATE, requiredCaptures = 1, difficulty = 2),
         10 to ChallengeObjective(ChallengeCondition.QUIET_MATE, allowedPiecesToLose = 0, difficulty = 2),
         27 to ChallengeObjective(ChallengeCondition.CAPTURE_MATE, requiredCaptures = 1, difficulty = 2),
+        31 to ChallengeObjective(
+            condition = ChallengeCondition.PROMOTE_AND_MATE,
+            requiredPromotions = 1,
+            promotionRequirement = PromotionRequirement.KNIGHT,
+            difficulty = 2,
+        ),
         39 to ChallengeObjective(ChallengeCondition.SET_TRAP, difficulty = 3),
         55 to ChallengeObjective(ChallengeCondition.DOUBLE_CAPTURE_MATE, requiredCaptures = 2, difficulty = 3),
         67 to ChallengeObjective(ChallengeCondition.SACRIFICE_TRAP, difficulty = 4),
@@ -59,38 +66,10 @@ object ChessPuzzleData {
         98 to ChallengeObjective(
             condition = ChallengeCondition.PROMOTE_AND_MATE,
             requiredPromotions = 1,
-            promotionRequirement = PromotionRequirement.QUEEN,
-            difficulty = 4,
-        ),
-        99 to ChallengeObjective(
-            condition = ChallengeCondition.PROMOTE_AND_MATE,
-            requiredPromotions = 1,
-            promotionRequirement = PromotionRequirement.ROOK,
-            difficulty = 5,
-        ),
-        100 to ChallengeObjective(
-            condition = ChallengeCondition.PROMOTE_AND_MATE,
-            requiredPromotions = 1,
             promotionRequirement = PromotionRequirement.KNIGHT,
             difficulty = 5,
         ),
-        101 to ChallengeObjective(
-            condition = ChallengeCondition.PAWN_PROMOTION,
-            requiredPromotions = 1,
-            promotionRequirement = PromotionRequirement.QUEEN,
-            difficulty = 5,
-        ),
-        102 to ChallengeObjective(
-            condition = ChallengeCondition.LONG_MATE,
-            targetPlayerMoves = 10,
-            difficulty = 4,
-        ),
-        103 to ChallengeObjective(
-            condition = ChallengeCondition.LONG_MATE,
-            targetPlayerMoves = 11,
-            difficulty = 4,
-        ),
-        104 to ChallengeObjective(
+        100 to ChallengeObjective(
             condition = ChallengeCondition.LONG_MATE,
             targetPlayerMoves = 20,
             difficulty = 5,
@@ -124,14 +103,7 @@ object ChessPuzzleData {
         )
 
     fun themeFor(level: Int): String {
-        val mateIn = all.getOrNull(level - 1)?.mateIn ?: 1
-        return when (mateIn) {
-            1 -> "Mate in one"
-            2 -> "Mate in two"
-            3 -> "Mate in three"
-            4 -> "Mate in four"
-            else -> "Mate in $mateIn"
-        }
+        return all.getOrNull(level - 1)?.title ?: ChessChallengeCatalogue.titleFor(level)
     }
 
     val all: List<ChessPuzzle> = listOf(
@@ -165,7 +137,7 @@ object ChessPuzzleData {
             ChessPuzzle(28, "r1bq2kr/1p2b1pp/p2pN3/4p3/2B1P3/5Q2/PP3PPP/2RR2K1 b - - 0 17", "c8e6 c4e6", 805, "00f1D"),
             ChessPuzzle(29, "r2qk2r/pp2bpp1/4pn1p/1B6/3p4/2P2QNP/PP4P1/R4RK1 b kq - 1 15", "f6d7 f3f7", 818, "0M8lm"),
             ChessPuzzle(30, "rnbqk1nr/ppp2ppp/3p1b2/6B1/2BpP3/5Q2/PPP2PP1/RN2K2R b KQkq - 3 8", "f6g5 f3f7", 833, "0y1sh"),
-            ChessPuzzle(31, "3r4/1R2pr1k/1p4pp/2p5/2P1P3/1P4N1/P3n1PP/3R2K1 w - - 1 38", "g3e2 d8d1", 851, "0iNZf"),
+            ChessPuzzle(31, "R7/4NP1k/6K1/4B3/8/8/8/7r b - - 0 1", "h1h2 f7f8N", 851, "local-underpromotion-tactician"),
             ChessPuzzle(32, "r5k1/ppq2p2/2n5/3p4/B3p3/2P1BbrN/PP3P2/RN3RK1 w - - 0 28", "f2g3 c7g3", 861, "0J1gQ"),
             ChessPuzzle(33, "r4b1r/pppqpkpp/6B1/7Q/2PP4/2N1P2P/PP4P1/R5K1 b - - 0 15", "f7g8 g6f7", 874, "00TTm"),
             ChessPuzzle(34, "6k1/1Q4p1/p1p4p/3pP3/P3bq2/2N4P/1P4PK/5B2 w - - 1 26", "h2h1 f4f1 h1h2 f1g2", 881, "00dzT"),
@@ -292,13 +264,42 @@ object ChessPuzzleData {
                 2310,
                 "local-mate-in-20",
             ),
-    ).map { puzzle ->
+    ).filter { it.level <= 97 } + listOf(
+        ChessPuzzle(
+            98,
+            "R7/4NP1k/6K1/4B3/8/8/8/7r b - - 0 1",
+            "h1h2 f7f8N",
+            2400,
+            "local-underpromotion-mate",
+            alternateSolutions = listOf("h1h3 f7f8N"),
+        ),
+        ChessPuzzle(
+            99,
+            "7k/5PK1/8/8/8/8/8/7r b - - 0 1",
+            "h1h2 f7f8R",
+            2300,
+            "local-zenith-combination",
+            alternateSolutions = listOf("h1h3 f7f8R"),
+        ),
+        ChessPuzzle(
+            100,
+            "r6k/pppp1p2/5KQ1/8/8/8/8/8 b - - 0 1",
+            "a7a6 g6h5 a8a7 h5g6 a7a8 g6h5 a6a5 h5g6 a8a7 g6h5 a7a8 h5g6 b7b6 g6h5 a8a7 h5g6 a7a8 g6h5 b6b5 h5g6 a8a7 g6h5 a7a8 h5g6 c7c6 g6h5 a8a7 h5g6 a7a8 h5g6 c6c5 h5g6 a8a7 g6h5 a7a8 h5g6 d7d6 g6h5 a8a7 h5g5 a7a8 g5g6 d6d5 g6g7",
+            2310,
+            "local-grandmaster-immortal",
+        ),
+    )).map { puzzle ->
         puzzle.copy(
-            moves = finalLongLines[puzzle.level]
+            moves = if (puzzle.level == 100) {
+                finalLongLines[104] ?: puzzle.moves
+            } else {
+                finalLongLines[puzzle.level]
                 ?: correctedLongLines[puzzle.level]
                 ?: authoredLines[puzzle.level]
-                ?: puzzle.moves,
+                ?: puzzle.moves
+            },
             objective = objectiveFor(puzzle),
+            title = ChessChallengeCatalogue.titleFor(puzzle.level),
         )
     }
 }
