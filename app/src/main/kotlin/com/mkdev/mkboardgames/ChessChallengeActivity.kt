@@ -217,6 +217,14 @@ class ChessChallengeActivity : AppCompatActivity() {
         expectedMoveIndex = 1
         playerMovesMade = 0
         maxPlayerMoves = (solutionMoves.size / 2).coerceAtLeast(1)
+        if (solutionMoves.size < 2 || solutionMoves.size % 2 != 0) {
+            puzzleState = initial
+            playerStartState = initial
+            boardView?.gameState = initial
+            boardView?.isLocked = true
+            setChallengeStatus("This puzzle has an incomplete solution.")
+            return
+        }
         val firstMove = solutionMoves.firstOrNull()?.let { findMove(initial, it) }
         if (firstMove == null) {
             puzzleState = initial
@@ -248,6 +256,11 @@ class ChessChallengeActivity : AppCompatActivity() {
         hintActive = false
         gameHud?.setHintActive(false)
         boardView?.setHintMove(null)
+        val expectedMove = expectedMoveForCurrentState()
+        if (expectedMove == null || move != expectedMove) {
+            showWrongMove()
+            return
+        }
         val nextState = engine.applyMove(state, move)
         if (nextState === state) return
         puzzleState = nextState
@@ -270,7 +283,6 @@ class ChessChallengeActivity : AppCompatActivity() {
         if (completed || resetting) return
         val state = puzzleState ?: return
         val reply = solutionMoves.getOrNull(expectedMoveIndex)?.let { findMove(state, it) }
-            ?: engine.allLegalMoves(state, state.currentTurn).firstOrNull()
         if (reply == null) {
             showWrongMove()
             return
@@ -283,6 +295,11 @@ class ChessChallengeActivity : AppCompatActivity() {
 
     private fun applyOpponentReply(move: Move) {
         val state = puzzleState ?: return
+        val expectedMove = solutionMoves.getOrNull(expectedMoveIndex)?.let { findMove(state, it) }
+        if (expectedMove == null || move != expectedMove) {
+            showWrongMove()
+            return
+        }
         val nextState = engine.applyMove(state, move)
         if (nextState === state) {
             showWrongMove()
@@ -310,7 +327,7 @@ class ChessChallengeActivity : AppCompatActivity() {
         if (selectedLevel > highestCompleted) {
             progressPrefs.edit().putInt(KEY_HIGHEST_COMPLETED, selectedLevel).apply()
         }
-        setChallengeStatus("Level complete")
+        setChallengeStatus("Checkmate! Level complete")
         markResultBoard(victory = true)
         showCompletionScreen()
     }
@@ -421,13 +438,7 @@ class ChessChallengeActivity : AppCompatActivity() {
 
     private fun expectedMoveForCurrentState(): Move? {
         val state = puzzleState ?: return null
-        solutionMoves.getOrNull(expectedMoveIndex)?.let { findMove(state, it) }?.let { return it }
-        if (playerMovesMade + 1 <= maxPlayerMoves) {
-            return engine.allLegalMoves(state, playerColor).firstOrNull { move ->
-                isPlayerVictory(engine.applyMove(state, move))
-            }
-        }
-        return null
+        return solutionMoves.getOrNull(expectedMoveIndex)?.let { findMove(state, it) }
     }
 
     private fun showPauseScreen() {

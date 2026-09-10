@@ -1,12 +1,16 @@
 package com.mkdev.mkboardgames.challenges
 
 /**
- * Offline chess challenge set.
+ * Offline checkmate challenge set.
  *
- * Positions and principal variations are sourced from the Lichess open puzzle
- * database (CC0): https://database.lichess.org/#puzzles
- * The set is ordered by puzzle rating so the 100 levels climb from beginner
- * tactics to master-level calculation.
+ * Every entry is a real mate puzzle from the Lichess open puzzle database
+ * (CC0: https://database.lichess.org/#puzzles). Lichess defines the FEN as
+ * the position before the opponent's first move, so [moves] always starts
+ * with that opponent move and ends with the player's checkmate.
+ *
+ * The 100 entries are curated and sorted by puzzle rating. This keeps the
+ * first levels approachable while gradually introducing longer mating lines
+ * and master-level calculation.
  */
 data class ChessPuzzle(
     val level: Int,
@@ -15,132 +19,131 @@ data class ChessPuzzle(
     val rating: Int,
     val sourceId: String,
 ) {
+    val mateIn: Int
+        get() = moves.trim().split(Regex("\\s+")).size / 2
+
     val ratingLabel: String
         get() = when {
-            rating < 1100 -> "Beginner"
-            rating < 1500 -> "Developing"
-            rating < 1900 -> "Advanced"
-            rating < 2300 -> "Expert"
+            rating < 900 -> "Beginner"
+            rating < 1300 -> "Developing"
+            rating < 1700 -> "Advanced"
+            rating < 2050 -> "Expert"
             else -> "Master"
         }
 }
 
 object ChessPuzzleData {
-    private val featuredThemes = mapOf(
-        1 to "Mate in one",
-        6 to "Back-rank mate",
-        18 to "Endgame",
-        34 to "Attraction",
-        40 to "Attraction",
-        56 to "Endgame",
-        89 to "Bishop endgame",
-        96 to "Pawn promotion",
-    )
-
-    fun themeFor(level: Int): String = featuredThemes[level] ?: "Tactical puzzle"
+    fun themeFor(level: Int): String {
+        val mateIn = all.getOrNull(level - 1)?.mateIn ?: 1
+        return when (mateIn) {
+            1 -> "Mate in one"
+            2 -> "Mate in two"
+            3 -> "Mate in three"
+            4 -> "Mate in four"
+            else -> "Mate in $mateIn"
+        }
+    }
 
     val all: List<ChessPuzzle> = listOf(
-            ChessPuzzle(1, "rn1qkb1r/ppp2ppp/8/3pp3/4n3/1PN2P1P/PBPPP2P/R2QKB1R w KQkq - 1 7", "f3e4 d8h4", 751, "GyvFB"),
-            ChessPuzzle(2, "8/5N2/8/8/2pk1K2/8/6bP/8 w - - 2 47", "f7e5 c4c3 e5g4 c3c2", 773, "34koa"),
-            ChessPuzzle(3, "6k1/6pp/ppqp2p1/2p5/5P2/1P3b1P/PBP1r2Q/1R3RK1 w - - 9 35", "h2g3 e2g2 g3g2 f3g2", 795, "A6QZg"),
-            ChessPuzzle(4, "8/8/7P/7q/4pR2/4P1Pk/2K2P2/8 b - - 2 69", "h5h6 f4h4 h6h4 g3h4", 818, "KU9pO"),
-            ChessPuzzle(5, "3r3k/p1q2pp1/1p2p2p/8/Q7/P1P4P/1P2RPP1/6K1 w - - 1 27", "a4g4 d8d1 e2e1 d1e1", 841, "FUwgh"),
-            ChessPuzzle(6, "5k2/5ppp/pN6/1p6/1n6/1P4P1/P1r2P1P/4R1K1 b - - 1 27", "b4a2 b6d7 f8g8 e1e8", 864, "t4CnV"),
-            ChessPuzzle(7, "6k1/p1b1r2p/4p1p1/1B6/1P6/P1r1P2P/4R1P1/3R2K1 w - - 7 33", "d1d3 c3c1 e2e1 c1e1", 886, "TjL9S"),
-            ChessPuzzle(8, "8/8/2k2p1p/4pP2/2P1P2r/2K5/4B3/8 b - - 1 51", "h4e4 e2f3 c6b6 f3e4", 909, "7uez3"),
-            ChessPuzzle(9, "r1bq2kr/pppp2pp/2n5/2bQP1N1/5Bn1/2P5/P4PPP/RN2K2R b KQ - 3 12", "g8f8 d5f7", 932, "8jacf"),
-            ChessPuzzle(10, "2r3k1/p1qbQ1p1/1p2p2r/nP2P2P/4B1P1/N1P5/P7/5R1K b - - 4 27", "d7e8 f1f8", 955, "MfKEh"),
-            ChessPuzzle(11, "5r2/5pk1/N1p1n1pp/Pp2P3/1Pq1B2P/2P2Q2/6P1/4R2K w - - 1 38", "e4c6 c4h4 h1g1 h4e1", 977, "w2aSl"),
-            ChessPuzzle(12, "2k5/pp2qb2/2n3p1/3P4/N5n1/2PB4/PPQ3P1/R1B2RKr w - - 1 24", "g1h1 e7h4 h1g1 h4h2", 1000, "Gyu7W"),
-            ChessPuzzle(13, "4r1k1/ppR2pp1/1n1P3p/8/P7/6PP/1PP2P1K/8 b - - 2 32", "b6a4 d6d7 e8d8 c7c8 g8f8 c8d8", 1023, "w2aFv"),
-            ChessPuzzle(14, "5rk1/1Q3ppp/6r1/8/5qn1/1B5P/PPP2PP1/4RR1K w - - 1 28", "h3g4 g6h6 h1g1 f4h2", 1045, "F2IHk"),
-            ChessPuzzle(15, "2r2r1k/4Q2p/pq2Npp1/1p6/1P2P3/3n1P2/P5PP/5R1K b - - 1 28", "f8g8 e7f6 g8g7 f6g7", 1068, "mrHEy"),
-            ChessPuzzle(16, "2kr3r/1bpp1R2/p1n3qp/1p1BpNp1/4P3/3PP3/PPP3PP/R2Q2K1 w - - 2 15", "f5e7 c6e7 f7e7 b7d5", 1091, "uiCzS"),
-            ChessPuzzle(17, "8/p5kp/bp4p1/8/4N2B/5PK1/PPr3PP/8 b - - 1 33", "c2b2 h4f6 g7f7 f6b2", 1114, "oWk7X"),
-            ChessPuzzle(18, "2R2k2/1p4b1/5NQp/q2Ppb2/p7/5r2/PP3PP1/6K1 b - - 0 27", "f5c8 g6e8", 1136, "oWk38"),
-            ChessPuzzle(19, "6r1/1pq1pp1k/p1p2b2/5P1p/4P3/2PPQNr1/PP5R/R6K b - - 0 28", "f6e5 h2h5 h7g7 e3h6", 1159, "p3Qlk"),
-            ChessPuzzle(20, "2rqr1k1/1bp1b1nB/pp1p1n1Q/4p1N1/2PP4/2N4P/PP3PP1/2RR2K1 b - - 1 19", "f6h7 h6h7 g8f8 h7h8", 1181, "A6QYQ"),
-            ChessPuzzle(21, "8/1p6/p1pN4/2P1k1P1/1P2BpK1/r7/7r/2R5 w - - 3 43", "g5g6 a3g3", 1205, "xV1Rx"),
-            ChessPuzzle(22, "4r1k1/pp3p2/4qppP/8/3R4/2P1BQ2/bP3PP1/6K1 w - - 0 26", "d4d7 e6d7 f3f6 d7d1 g1h2 d1h5", 1227, "HdvsR"),
-            ChessPuzzle(23, "r1b1k2r/ppp1bppp/5n2/n2q2N1/3P4/2NB4/P4PPP/R1BQK2R b KQkq - 1 11", "d5d4 d3b5 c7c6 d1d4", 1249, "807Vi"),
-            ChessPuzzle(24, "r1b3k1/2Q3pp/p1p2q2/3p4/8/3P4/P1P3PP/5RK1 b - - 1 26", "f6e6 c7d8 e6e8 d8e8", 1273, "uiC1K"),
-            ChessPuzzle(25, "8/1pk1rR2/p1p4p/1n1p4/1P5P/3B2PK/4r3/5R2 b - - 8 36", "b5c3 d3e2 e7f7 f1f7", 1295, "NJULJ"),
-            ChessPuzzle(26, "7k/3q2p1/2p2p1p/3r4/5P2/B4RP1/P3Q3/6K1 w - - 2 34", "f3e3 d5d1 g1f2 d1d2 a3b4 d2e2", 1318, "ZUaI4"),
-            ChessPuzzle(27, "1q4k1/1r4pp/3bp3/5p2/1pQBp3/6P1/PP3P1P/4R1K1 b - - 1 35", "b8c7 c4e6 c7f7 e6d6", 1341, "Q5DMA"),
-            ChessPuzzle(28, "8/2k5/5p1p/1B2nK2/P1p5/7P/6P1/8 w - - 0 46", "f5f6 c4c3 f6e5 c3c2", 1364, "34nMb"),
-            ChessPuzzle(29, "r6k/p5R1/2Q2n1p/8/8/8/PP1q2PP/4rR1K w - - 1 27", "c6f6 e1f1 f6f1 h8g7", 1386, "Gytx1"),
-            ChessPuzzle(30, "6k1/pp2bp2/1q4p1/5p1p/2BPr3/1P4Q1/PB3PKP/R7 w - - 1 30", "a1d1 e4g4 g2f1 g4g3", 1409, "dflF5"),
-            ChessPuzzle(31, "2r4k/p2p2pp/qp6/P2Q4/2R5/5P2/6PP/R5K1 b - - 0 25", "a6c4 d5c4 c8c4 a5b6", 1432, "uiBpb"),
-            ChessPuzzle(32, "3r2k1/5pp1/4b2p/1B1p4/n4q2/5N1P/P1Q2PP1/3R2K1 b - - 0 26", "d8c8 c2a4 f4a4 b5a4", 1455, "t4BuI"),
-            ChessPuzzle(33, "b3r2k/6p1/7p/1pP2p1B/1P1R3P/PQ2rpP1/8/6K1 w - - 0 42", "b3f7 e3e1 g1h2 e8e2 h2h3 e1h1", 1477, "p3Pfr"),
-            ChessPuzzle(34, "2R2rk1/1b4pp/p4q2/8/4pN2/4Q1P1/PP5P/3R2K1 b - - 0 30", "f8c8 e3b3 f6f7 b3f7 g8f7 d1d7", 1500, "8jXC8"),
-            ChessPuzzle(35, "8/3R2k1/2r1P1p1/1pN5/1P5p/3K3P/2P3r1/8 b - - 1 50", "g7f6 d7f7 f6e5 e6e7 c6c8 f7f8", 1522, "zs4uj"),
-            ChessPuzzle(36, "2brr1k1/5pp1/p6p/q7/Pb2p3/1P2B1PP/2Q2PB1/1RR3K1 w - - 0 25", "c2c7 d8d1 c1d1 a5c7", 1545, "MfMHp"),
-            ChessPuzzle(37, "8/8/5p1p/1Q2p1k1/8/1R3P1P/4r3/3q1N1K w - - 5 43", "h1g1 d1d4 g1h1 d4f2 b5e2 f2e2", 1568, "cVLxH"),
-            ChessPuzzle(38, "r1b2rk1/5pp1/p7/1p1pn1p1/2p5/2P2NP1/PPB3PP/R4RK1 b - - 1 23", "f7f6 f3e5 f6e5 c2h7 g8h7 f1f8", 1591, "7ug2E"),
-            ChessPuzzle(39, "r1b1k1nr/p2pppbp/2p3p1/q7/4P3/2PBB3/PP3PPP/RN1QK2R b KQkq - 1 8", "c8a6 b2b4 a5c7 d3a6", 1615, "805s9"),
-            ChessPuzzle(40, "2qr2k1/1b2bppp/p3pn2/np2N3/3P4/4B2P/PPBN1PP1/3Q1RK1 b - - 0 17", "f6d5 c2h7 g8h7 d1h5 h7g8 h5f7", 1636, "p3PHr"),
-            ChessPuzzle(41, "4R3/1p3r1p/4p2k/3pP1q1/1Pb2Q2/5P2/6PP/6K1 w - - 0 47", "f4f7 g5e3 g1h1 e3c1", 1659, "zs3s4"),
-            ChessPuzzle(42, "r1b3k1/p1p2p1p/2p3pQ/3r4/3q4/3B3P/P1P2PP1/3R1R1K b - - 4 18", "d5h5 h6h5 g6h5 d3h7 g8h7 d1d4", 1682, "7ufa5"),
-            ChessPuzzle(43, "r4rk1/p1p2ppp/1pnq2b1/3p2P1/3Pn3/1QN1PN1P/PP2BP2/R4RK1 w - - 1 15", "c3d5 c6a5 b3d1 d6d5", 1705, "A6PQ0"),
-            ChessPuzzle(44, "3R4/4Qpbk/p5p1/1p2pqBp/7P/1P3P2/2rp1PK1/8 b - - 3 41", "c2c1 e7e8 f5f3 g2f3 d2d1q d8d1", 1727, "zs6EY"),
-            ChessPuzzle(45, "2r3k1/5p2/b3PP1p/3p2pq/p2N4/Pp1PQ3/1P6/1K4R1 b - - 0 32", "f7e6 e3e6 h5f7 e6a6", 1750, "S90Ja"),
-            ChessPuzzle(46, "3r4/3rq2k/1p4p1/2pNPp1p/2Q2P1P/4K1P1/P7/3R4 b - - 0 37", "e7f7 d5f6 h7g7 c4f7 d7f7 d1d8", 1773, "mrJej"),
-            ChessPuzzle(47, "r4rk1/ppqb1ppp/2nb1n2/1B1p4/8/2N2N1P/PPP2PP1/R1BQR1K1 w - - 3 12", "c3d5 f6d5 d1d5 c6b4", 1795, "S8zdH"),
-            ChessPuzzle(48, "3r2k1/p1q1b1pp/2p1p3/2p1pp2/2Pr4/1P1RQ3/P1P1NPPP/3R2K1 b - - 3 22", "e5e4 e2d4 c5d4 d3d4", 1818, "p3OZm"),
-            ChessPuzzle(49, "4kr2/1p2bpQ1/p2p4/1q1Pp3/5rPp/2P4P/1P2RPB1/4R1K1 b - - 6 26", "b5d3 e2e5 d6e5 g7e5", 1841, "F2JLL"),
-            ChessPuzzle(50, "5r2/2p1b3/1kp1b3/1p2P2r/pP1P2p1/1q1N1p2/3R1QPP/K1R5 b - - 3 33", "e7g5 d4d5 b6b7 d3c5 b7b8 c5b3", 1864, "JW5KO"),
-            ChessPuzzle(51, "4r2k/1p3PRb/7p/p6P/1P1Qr1PK/6B1/1P6/5q2 b - - 1 34", "e4d4 f7e8q h8g7 g3e5 f1f6 e5f6", 1886, "ui9eX"),
-            ChessPuzzle(52, "8/8/2p1kp1p/2Pp1p2/3P1PP1/5K1P/8/8 b - - 0 39", "f5g4 f3g4 e6f7 g4f5", 1909, "NJSea"),
-            ChessPuzzle(53, "2r1k2r/pp1b1p2/4p2p/6N1/3qp3/2P3P1/PPQ2PP1/R3K2R w KQk - 0 18", "c2e4 h6g5 e4d4 h8h1 e1d2 h1a1", 1933, "GyuQe"),
-            ChessPuzzle(54, "8/3k3p/1p1p2p1/1Pp1p1P1/P3r3/2R4P/4nPK1/1R6 w - - 2 33", "c3e3 e2f4 g2f1 e4a4", 1955, "Q5Ana"),
-            ChessPuzzle(55, "3rr3/1p2pB1p/p1p3p1/1nk3B1/2Nb4/8/P4PPP/1R4K1 b - - 9 27", "e8f8 g5e7 b5d6 c4d6 d8d6 e7f8", 1977, "46Yum"),
-            ChessPuzzle(56, "3k4/6p1/bp5p/p1bp1Q2/P2R4/2PK3P/1PB3P1/4q3 w - - 3 36", "c3c4 a6c4 d4c4 e1e3", 2000, "7uhTo"),
-            ChessPuzzle(57, "5rk1/pp5p/6p1/2p5/3P3q/4PB2/PP3bP1/R2Q1K2 b - - 0 28", "f2e3 d1b3 c5c4 b3e3 f8f3 g2f3 h4h1 e3g1", 2023, "Q5CiZ"),
-            ChessPuzzle(58, "r1b2rk1/1pq1bpnp/p3p1pQ/4n3/3NN3/1P1B4/PBP3PP/R3R1K1 b - - 1 16", "e5g4 h6g7 g8g7 d4e6 g7g8 e6c7", 2045, "Q5DSO"),
-            ChessPuzzle(59, "r1bq3r/p1N1kppp/1p2pn2/2bp4/2PQ1B2/P7/1P2PPPP/R3KB1R w KQ - 4 11", "d4e5 c5f2 e1f2 f6g4 f2e1 g4e5", 2067, "MfKCx"),
-            ChessPuzzle(60, "r2q4/p4NBk/2p1rPp1/1p1pb2p/7Q/7P/P2n2P1/5R1K b - - 0 31", "d8e8 f7g5 h7g8 f6f7 e8f7 f1f7", 2091, "M9mZd"),
-            ChessPuzzle(61, "r1b1kbnr/ppp2ppp/2n5/4p3/2B5/1PN2N2/P1qPQPPP/R1B1K2R b KQkq - 1 7", "c8g4 c4d3 c2d3 e2d3", 2114, "dflbe"),
-            ChessPuzzle(62, "8/4Bp1p/4pKp1/1k2P3/p3bPP1/P7/7P/8 b - - 0 45", "h7h5 f6f7 h5g4 f7e6", 2136, "M9kMt"),
-            ChessPuzzle(63, "2r5/5p1k/Q2p2pb/2q1p3/pN2P2p/P4P1P/1P4PK/5R2 w - - 0 35", "a6a4 h6f4 h2h1 c5f2 a4a6 f2g3", 2157, "w2Zxh"),
-            ChessPuzzle(64, "8/8/8/2pk1P2/8/3q1K2/8/4Q3 w - - 10 66", "e1e3 d3f5 f3e2 f5e4 e3e4 d5e4 e2d2 e4d4 d2c2 d4c4", 2182, "Q5DLm"),
-            ChessPuzzle(65, "2r1k3/R2n1p2/4p2p/1Rp1P3/2Np1r2/3K4/2P4P/8 b - - 2 32", "e8d8 b5b7 d7e5 c4e5", 2205, "A6QgD"),
-            ChessPuzzle(66, "N5nr/b2k1pp1/p1np3p/1p6/2BPb1P1/1Q2Bq1P/PP3P2/2KR3R w - - 0 17", "c4b5 a6b5 b3b5 g8e7 b5b7 d7e6", 2227, "w2amL"),
-            ChessPuzzle(67, "5rk1/1p4pp/pr1P4/4pp2/7b/1qPB4/1P2Q1R1/R6K b - - 0 28", "g8h8 d3c4 b3b2 e2b2 b6b2 g2b2", 2251, "Q5EKZ"),
-            ChessPuzzle(68, "r3k1nr/pp1n1p1p/4p1p1/q1bpP3/8/2N1B3/PPPQ1PPP/2KR2NR w kq - 0 11", "c3d5 a5d2 d1d2 e6d5 e3c5 d7c5", 2273, "A6Pi0"),
-            ChessPuzzle(69, "5rk1/pp3bp1/2p5/6R1/3Pq3/4Br1P/PPPQ1P1K/7R w - - 8 28", "h1g1 f3h3 h2h3 f7e6 g5g4 e6g4", 2294, "t4C1M"),
-            ChessPuzzle(70, "r3r1k1/3q2p1/p2bp1Qp/1p1p4/1P1PnN2/P3P2P/6P1/2R1BRK1 b - - 5 24", "e6e5 f4d5 e5d4 d5b6 d7e7 b6a8", 2318, "TjJEe"),
-            ChessPuzzle(71, "r3k2r/1bq1bppp/n3p1P1/p2p3P/PpnNP3/2P2P2/NP2B3/R1BQK1R1 b Qkq - 0 18", "d5e4 g6f7 e8f7 g1g7 f7e8 d4e6", 2340, "F2JVX"),
-            ChessPuzzle(72, "r1b3k1/pp3r1p/1q4p1/3Bb3/8/P1RQ1P2/1P2R1PP/7K b - - 2 30", "e5c3 e2e8 g8g7 d3c3 b6f6 e8g8 g7h6 d5f7 f6c3 b2c3", 2364, "mrJW8"),
-            ChessPuzzle(73, "r3k2r/1b1p1pp1/p2bp1n1/5q2/P3PPPp/2BB4/1P5P/R2Q1RNK b kq - 0 19", "b7e4 g1f3 f5f4 d3e4 f4e4 d1d6", 2387, "NJSDy"),
-            ChessPuzzle(74, "rn2kb1r/pp3ppp/3qp3/2pn4/2B3b1/2P2N2/PP1P1PPP/RNBQR1K1 b kq - 1 8", "f8e7 d1a4 b8c6 c4d5 d6d5 a4g4", 2409, "JW5Xq"),
-            ChessPuzzle(75, "1Rr4r/2Bk1ppp/B3p3/2bpP3/8/P7/5qPP/1Q5K w - - 2 27", "a6c8 h8c8 c7d6 c8b8", 2428, "XATfF"),
-            ChessPuzzle(76, "8/8/6k1/1K1p4/3Pp1n1/P3P3/6p1/6B1 b - - 3 56", "g4e3 g1e3 g6f5 b5b4 f5g4 b4c3", 2456, "TjKFb"),
-            ChessPuzzle(77, "8/5p2/5p1p/3kpP2/6PP/4KP2/8/8 b - - 0 43", "d5c4 e3e4 c4c3 g4g5 f6g5 h4g5 h6g5 e4e5 c3d3 e5f6 d3e2 f6f7", 2476, "cVPlO"),
-            ChessPuzzle(78, "5k1b/p4p1p/3Np1pn/3pP1q1/Q2P2P1/7P/PP1n1P2/5RK1 b - - 6 23", "h6g4 a4e8 f8g7 e8h8 g7h8 d6f7 h8g8 f7g5", 2500, "XAQb3"),
-            ChessPuzzle(79, "5rkb/p1q1pp2/6NP/2pP4/4p3/1QP4P/1K3P2/6R1 b - - 0 27", "f7g6 d5d6 c5c4 d6c7 c4b3 g1d1 h8e5 d1d8 e5c7 h6h7 g8h7 d8f8", 2523, "p3OUH"),
-            ChessPuzzle(80, "r3rbk1/5p2/1qp3np/pp1pNQ1N/3P3P/2P3P1/PP2B3/2K4R b - - 7 24", "g6e5 h5f6 g8g7 h1f1", 2545, "uiCLQ"),
-            ChessPuzzle(81, "r1bq2kr/pp2N1p1/2pp1P1p/2b1n2Q/4P3/3P4/PP4PP/n1B2R1K b - - 1 15", "g8f8 e7g6 e5g6 h5g6 g7f6 f1f6 d8f6 g6f6", 2567, "ZUYJn"),
-            ChessPuzzle(82, "2b1r1k1/5ppp/p2b4/2pPn1q1/4p3/PP2P2P/1BQN1PP1/R4RK1 w - - 1 27", "d2e4 e5f3 g1h1 g5h4", 2592, "HdzT4"),
-            ChessPuzzle(83, "7Q/1p6/1p3pp1/4p1kp/4Pn2/2P1N1P1/qP3P2/6K1 b - - 0 35", "f4d3 e3d5 a2b1 g1g2 b1c2 h8f6", 2614, "oWm5a"),
-            ChessPuzzle(84, "4rr1k/ppp3p1/6q1/5n2/5PK1/2N3P1/PP3Q1P/R3R3 w - - 3 34", "g4f3 f5h4 g3h4 f8f4 f3f4 e8f8", 2641, "34mQ5"),
-            ChessPuzzle(85, "8/8/8/1pp5/8/2P1k3/PK6/8 w - - 2 59", "b2b3 e3d2 c3c4 b5b4 b3b2 d2d3", 2659, "p3PzO"),
-            ChessPuzzle(86, "8/5k2/r1P2p2/3P4/1p1KNpp1/8/P5P1/8 b - - 0 44", "f7e8 c6c7 a6a8 e4f6", 2683, "mrHSG"),
-            ChessPuzzle(87, "r1bqk2r/1p2bpp1/p4n1p/3B4/3Q3B/2N5/PPP2PPP/R4RK1 b kq - 0 12", "f6d5 c3d5 e7h4 d4g7", 2706, "JmeeC"),
-            ChessPuzzle(88, "r7/1k3K2/5R1p/4R1p1/6P1/7r/8/8 b - - 0 50", "a8a7 f7g6 b7c8 e5e8 c8d7 e8h8", 2727, "34nNw"),
-            ChessPuzzle(89, "8/8/6p1/1p3p1p/5P1P/P1p1B3/1k3K2/8 w - - 6 72", "f2e2 b2a3 e2d3 a3b3 e3d4 b5b4 d4e5 b3b2", 2751, "7uewB"),
-            ChessPuzzle(90, "r3k2r/1R1bbppp/p1p1pn2/7q/3NNB2/3Q4/P1P3PP/5R1K b kq - 7 20", "h5d5 e4c3 d5c5 c3a4", 2773, "uiBKY"),
-            ChessPuzzle(91, "8/6k1/1p1p3p/p1p2RP1/P1P1r3/1q2p1KP/4Q3/8 b - - 0 38", "b3c4 e2h5 c4e6 f5f6 e6f6 g5f6", 2798, "XAQZk"),
-            ChessPuzzle(92, "5Q2/1p3pk1/p3b1pp/8/1Br1P3/P5NP/2q3P1/2b4K b - - 2 31", "g7f6 f8h8 f6g5 h8e5 g5h4 b4e1", 2825, "uiAPx"),
-            ChessPuzzle(93, "5rk1/1b3pp1/p1p3rp/1pqP3Q/4N2P/5R2/PP4P1/5R1K b - - 1 29", "c5d5 h5g6 f7g6 f3f8 g8h7 f1e1", 2839, "t4E2u"),
-            ChessPuzzle(94, "r4r1k/2p3Rn/2npq2p/4pN2/p3Pb2/1PBP1P2/P1K1QN2/7R w - - 0 24", "g7c7 a4b3 c2b1 b3b2 a2a4 a8a4 e2b2 f8b8", 2870, "JW2R6"),
-            ChessPuzzle(95, "5k2/4pn2/p2b3p/5Pp1/2QB2P1/1PP2q2/KP2R3/7r b - - 9 41", "h1f1 c4c8 f7d8 c8d8 f8f7 d4g7", 2890, "46YI8"),
-            ChessPuzzle(96, "8/8/4r3/5p1P/8/3kpKP1/1R6/8 w - - 8 68", "h5h6 e3e2 b2b1 e2e1q b1e1 e6e1 f3f4 e1f1 f4e5 d3c4", 2905, "XASwz"),
-            ChessPuzzle(97, "8/6p1/4p2p/4p2P/P3k3/1p4P1/3K4/8 b - - 0 44", "b3b2 d2c2 e4f5 c2b2 f5g4 b2c3 e5e4 c3d2 g4f3 d2e1", 2952, "w2ZhK"),
-            ChessPuzzle(98, "6k1/4P3/3K1Pp1/8/8/8/8/2q5 b - - 4 67", "c1c2 e7e8q g8h7 e8d7 h7h6 d7h3 h6g5 h3f3", 2905, "A6Sbc"),
-            ChessPuzzle(99, "6b1/P6k/q6p/8/4Q2P/4p3/1P6/1K6 b - - 2 48", "h7g7 e4g2 g7f6 g2f3 f6e5 a7a8q g8h7 b1c1 a6c4 c1d1 h7c2 d1e1", 2856, "uiAou"),
-            ChessPuzzle(100, "r1b5/1pp4p/p2p2pk/4b3/1PBnP1q1/P1NQ2P1/2P2P1P/R4RK1 w - - 1 21", "a1e1 d4f3 g1g2 g4h5 h2h4 f3h4 g3h4 h5g4 d3g3 e5g3", 2831, "XATBG"),
-    ).sortedBy { it.rating }.mapIndexed { index, puzzle ->
-        puzzle.copy(level = index + 1)
-    }
+            ChessPuzzle(1, "2r2rk1/6pp/p1q5/1pn2p2/1B1pPP2/3Pn1QB/1PP2R1P/6RK b - - 3 24", "f8f6 g3g7", 400, "00c89"),
+            ChessPuzzle(2, "1k2r3/p2r1R2/2Q5/1p5p/P1P3p1/8/6PP/7K w - - 2 44", "c6d7 e8e1 f7f1 e1f1", 421, "00VC1"),
+            ChessPuzzle(3, "6k1/ppp2ppp/8/3p1q2/2Q5/8/P3r3/R1KR4 b - - 0 33", "d5c4 d1d8 e2e8 d8e8", 442, "0J0jI"),
+            ChessPuzzle(4, "r2q1k1r/pbp1bppp/1p2pn2/1B2N3/3P1Q2/8/PPP2PPP/R1B2RK1 b - - 5 12", "f6d5 f4f7", 470, "00dOP"),
+            ChessPuzzle(5, "r2q1r2/pppb1R1k/3p3p/2P3pP/2QBP3/8/P3B1P1/6K1 b - - 3 23", "f8f7 c4f7", 489, "0xzqb"),
+            ChessPuzzle(6, "1r2kbnr/3b1ppp/pq1pp3/8/2pNPPP1/P1N1B3/1PPQ3P/2KR3R w k - 1 14", "f4f5 b6b2", 503, "00tsu"),
+            ChessPuzzle(7, "1k2R2r/pp4bp/1B2Q1p1/2pn4/P2r4/5P2/2P2P1P/6K1 b - - 9 23", "h8e8 e6e8", 522, "0iMU5"),
+            ChessPuzzle(8, "r2q1b1r/1pp2kpp/2n1bn2/p3p1N1/1P2p3/1QP5/P2P1PPP/RNB1K2R b KQ - 3 10", "f7e7 b3e6", 540, "0roxk"),
+            ChessPuzzle(9, "3r2k1/4nppp/pq1p1b2/1p2P3/2r2P2/2P1NR2/PP1Q2BP/3R2K1 b - - 0 24", "d6e5 d2d8 b6d8 d1d8", 551, "0042j"),
+            ChessPuzzle(10, "8/6k1/2R4p/5p1P/5P1K/6P1/8/r7 w - - 2 58", "c6b6 a1h1", 564, "002vV"),
+            ChessPuzzle(11, "R5k1/3r2pp/3N4/1nP5/6P1/1P3P2/P2K2n1/8 b - - 1 30", "d7d8 a8d8", 576, "00NR5"),
+            ChessPuzzle(12, "2k2r2/pp5p/3p4/3Nb1p1/8/1P1P3P/P1Pn4/1K1R1R2 w - - 3 28", "d1d2 f8f1 d2d1 f1d1", 588, "00KVb"),
+            ChessPuzzle(13, "r1b2r1k/1pp1b1pp/p1np2q1/3Qp3/1PB1P3/P3BN1P/2P2PP1/R2R3K b - - 6 17", "f8f3 d5g8", 599, "00teH"),
+            ChessPuzzle(14, "3r4/2QP1pkp/p7/3np1q1/2P5/5pP1/PP3P2/3R1K2 w - - 0 42", "d1d5 g5c1 d5d1 c1d1", 608, "1198E"),
+            ChessPuzzle(15, "r1b5/pppnppkP/8/q7/6Q1/1P1B4/P1Pn1PP1/R5K1 b - - 4 18", "g7h8 g4g8", 630, "0y0bi"),
+            ChessPuzzle(16, "r1b2q1k/1pp3p1/1b1p3p/1p5Q/P1P1Bp2/3P4/6PP/5R1K b - - 1 23", "f8f6 h5e8 f6f8 e8f8", 638, "00ax2"),
+            ChessPuzzle(17, "2kr3r/ppp2p2/2nb1n1p/4q1p1/Q7/N1P1B3/PP2NPPP/R4RK1 w - - 2 13", "a3c4 e5h2", 653, "00ad3"),
+            ChessPuzzle(18, "r2q1rk1/pppb1pp1/3p1n1B/4p3/2BbP3/2NP2QP/PPP2PP1/R4RK1 b - - 0 13", "d4c3 g3g7", 661, "0M9xW"),
+            ChessPuzzle(19, "1k6/1pp3pB/8/p3P3/7P/bP5r/P1P5/1K1R4 w - - 1 32", "d1d4 h3h1 d4d1 h1d1", 674, "0lUNL"),
+            ChessPuzzle(20, "2r3nr/ppq1kb2/4pnBp/3p4/3P1N2/5RQ1/PPP2PPP/2K1R3 w - - 14 23", "g6f7 c7c2", 688, "0bxYF"),
+            ChessPuzzle(21, "N4rk1/pp3ppp/5n2/3pq3/8/2P5/PP3PPP/R1BQ2K1 w - - 0 18", "d1f3 e5e1", 699, "00ud8"),
+            ChessPuzzle(22, "4R3/p5pk/7p/5r2/4Q3/P7/1P3q1P/6K1 w - - 0 42", "g1h1 f2f1", 706, "0M98x"),
+            ChessPuzzle(23, "2kr3r/Bpp2ppp/8/3qb3/3P4/6Pb/PP2BP1P/R2QR1K1 w - - 0 18", "d4e5 d5g2", 725, "1175r"),
+            ChessPuzzle(24, "3r3k/ppb2Qp1/2p5/2P2pp1/1P1Pp3/P4B1P/3R1PPq/5K2 w - - 0 30", "f3e2 h2h1", 739, "0PJ7t"),
+            ChessPuzzle(25, "8/6pp/3k1p2/3Pp3/1r2KP2/8/6PP/3R4 w - - 1 41", "e4f5 b4f4", 750, "0y1jJ"),
+            ChessPuzzle(26, "5kr1/ppR3p1/3R3p/8/1r1n4/8/1P3PPP/2K5 b - - 4 31", "d4b5 d6d8", 752, "005Ep"),
+            ChessPuzzle(27, "3r3k/5Qpp/2pq4/p7/P3N3/8/1rP3PP/5R1K b - - 2 32", "d6g6 f7f8 d8f8 f1f8", 777, "0uyvt"),
+            ChessPuzzle(28, "r1bq2kr/1p2b1pp/p2pN3/4p3/2B1P3/5Q2/PP3PPP/2RR2K1 b - - 0 17", "c8e6 c4e6", 805, "00f1D"),
+            ChessPuzzle(29, "r2qk2r/pp2bpp1/4pn1p/1B6/3p4/2P2QNP/PP4P1/R4RK1 b kq - 1 15", "f6d7 f3f7", 818, "0M8lm"),
+            ChessPuzzle(30, "rnbqk1nr/ppp2ppp/3p1b2/6B1/2BpP3/5Q2/PPP2PP1/RN2K2R b KQkq - 3 8", "f6g5 f3f7", 833, "0y1sh"),
+            ChessPuzzle(31, "3r4/1R2pr1k/1p4pp/2p5/2P1P3/1P4N1/P3n1PP/3R2K1 w - - 1 38", "g3e2 d8d1", 851, "0iNZf"),
+            ChessPuzzle(32, "r5k1/ppq2p2/2n5/3p4/B3p3/2P1BbrN/PP3P2/RN3RK1 w - - 0 28", "f2g3 c7g3", 861, "0J1gQ"),
+            ChessPuzzle(33, "r4b1r/pppqpkpp/6B1/7Q/2PP4/2N1P2P/PP4P1/R5K1 b - - 0 15", "f7g8 g6f7", 874, "00TTm"),
+            ChessPuzzle(34, "6k1/1Q4p1/p1p4p/3pP3/P3bq2/2N4P/1P4PK/5B2 w - - 1 26", "h2h1 f4f1 h1h2 f1g2", 881, "00dzT"),
+            ChessPuzzle(35, "rn2k2Q/5p2/2p1p1r1/1q4p1/8/8/4NPPP/3R1K1R b q - 5 23", "e8e7 h8d8", 898, "00AGs"),
+            ChessPuzzle(36, "6rk/1p6/p3q1p1/5nQ1/2pR4/2P4P/PP4PK/8 b - - 0 38", "f5d4 g5h6", 908, "0VZzF"),
+            ChessPuzzle(37, "2r3k1/7p/6q1/p1Np4/Qp2pr2/P4P2/1PR2P1K/5R2 w - - 0 36", "f1g1 f4h4", 922, "009eX"),
+            ChessPuzzle(38, "r1b3k1/pp2N1pp/n7/2p5/2PQ4/P5P1/1P5P/4rRK1 b - - 1 25", "e1e7 d4d8 e7e8 d8e8", 931, "0bvMG"),
+            ChessPuzzle(39, "3rk2r/4bppb/2B4p/2p2P2/2n5/2P3BP/P7/3RR1K1 b - - 6 29", "e8f8 d1d8 e7d8 e1e8", 946, "0YkSI"),
+            ChessPuzzle(40, "8/4k3/R4pp1/3Pp2p/2P1NnK1/1r5P/5PP1/8 w - - 0 48", "g4h4 f4g2", 960, "0YjFP"),
+            ChessPuzzle(41, "r4knb/1bpp4/p1n1pq2/1p4NQ/3PP3/2N5/PPP2PP1/2KR1B2 b - - 3 15", "f6h6 h5f7", 970, "00Lnf"),
+            ChessPuzzle(42, "2r2rQk/6pp/p6N/1p1p4/2pq4/P6P/1P3PP1/4R1K1 b - - 9 36", "f8g8 h6f7", 979, "00Tmr"),
+            ChessPuzzle(43, "2r3k1/2qR1ppp/p7/2p2Q2/P7/7P/5PP1/6K1 b - - 3 26", "c7c6 f5f7 g8h8 f7g7", 991, "0092z"),
+            ChessPuzzle(44, "8/3R2p1/4pbk1/6N1/7P/5P1R/1r6/r3K3 w - - 15 31", "d7d1 f6c3 e1f1 a1d1", 1005, "0bw5Q"),
+            ChessPuzzle(45, "r7/2p1b3/pp2bk1q/3p1p2/3P1Pp1/P6p/1P1BQP2/R4RKB w - - 4 31", "a1e1 h3h2 g1g2 h6h3", 1025, "0lVGB"),
+            ChessPuzzle(46, "2r3k1/R4pp1/1p2p2p/1q2P3/3Pp3/1p2P2P/5QP1/6K1 b - - 1 34", "b3b2 f2f7 g8h8 f7g7", 1039, "00rYm"),
+            ChessPuzzle(47, "r7/pp4kp/6p1/2P2q1n/1PBb1p2/P4P2/3B2PP/2Q1R1K1 w - - 1 28", "g1h1 h5g3 h2g3 f5h5", 1049, "00Yy4"),
+            ChessPuzzle(48, "r4rk1/1pp2ppp/p2p4/2bPp3/2P1Pn1q/P1N2B2/1P3P2/R1BQK1R1 w Q - 1 15", "c1f4 h4f2", 1061, "003YF"),
+            ChessPuzzle(49, "rnb1k2r/p1p2ppp/1p3n2/2b1N1B1/3qP3/3P4/PPP3PP/RN1QKB1R w KQkq - 1 8", "e5f3 d4f2", 1080, "00eNa"),
+            ChessPuzzle(50, "1R6/3k1Q2/p2b1p2/2r1p3/3n4/P6P/5PP1/4qBK1 b - - 1 40", "d7c6 f7b7", 1100, "00MYL"),
+            ChessPuzzle(51, "2r5/3k4/4p3/3pPp2/3P3P/3bP1P1/1P5R/1K1B4 w - - 4 37", "b1a1 c8a8 d1a4 a8a4", 1101, "0uxHd"),
+            ChessPuzzle(52, "4r1k1/1b3p2/pq1prBp1/2p4R/8/3P3Q/PP4PP/1R3K2 b - - 0 30", "g6h5 h3g3 g8f8 g3g7", 1114, "116WH"),
+            ChessPuzzle(53, "8/ppk1pR2/3p1b2/3B4/8/1P2PpP1/P1PK1P1r/8 w - - 3 32", "d2e1 f6c3 e1d1 h2h1", 1122, "0CaJd"),
+            ChessPuzzle(54, "6k1/1p3p1p/p5p1/8/6Q1/2B2PRK/PPq1r3/8 w - - 0 39", "g4d4 e2h2 h3g4 c2f5", 1133, "0VaGx"),
+            ChessPuzzle(55, "2kr3r/1pq2pp1/p1pbb3/7p/Q2P2n1/5N2/PP1B1PPP/2R1RBK1 w - - 1 20", "d2a5 d6h2 f3h2 c7h2", 1148, "00gnK"),
+            ChessPuzzle(56, "k2r3r/p2q2pp/P1pB4/1BQpPb2/4p1n1/2P5/2P2PPP/R4RK1 b - - 0 19", "c6b5 c5d5 d7c6 d5c6", 1152, "0VXb1"),
+            ChessPuzzle(57, "8/p4Rpk/7p/5p2/7r/1P2q1PK/P5Q1/8 w - - 0 38", "h3h4 e3g5 h4h3 g5h5", 1163, "0PGOQ"),
+            ChessPuzzle(58, "4Q1bk/2p3p1/1p1p4/5Bp1/p1q5/7P/5P2/6K1 b - - 1 34", "a4a3 e8h5 g8h7 h5h7", 1180, "00wAT"),
+            ChessPuzzle(59, "r3kb1r/ppp2pp1/3p4/1P2p3/2P3pn/2N1P2q/PB1P1P1N/R2Q1RK1 w kq - 0 15", "d1g4 h4f3 h2f3 h3g4", 1196, "00Zit"),
+            ChessPuzzle(60, "1kR1r3/4Q1p1/pr2Nn2/1q1P4/4P2p/5P2/6PP/2R3K1 b - - 9 32", "e8c8 c1c8 b8c8 e7c7", 1217, "0J1BO"),
+            ChessPuzzle(61, "r1bq3r/ppppnkpp/2n5/b5N1/4P3/B1P5/P4PPP/RN1QK2R b KQ - 1 9", "f7f8 d1f3 f8e8 f3f7", 1232, "00QZ3"),
+            ChessPuzzle(62, "4r2k/2q1r3/2p4Q/p5P1/1p1Pp1P1/2P1N2P/PP6/4bRK1 b - - 0 28", "e7h7 f1f8 e8f8 h6f8", 1270, "00mFI"),
+            ChessPuzzle(63, "3r3k/p5pp/2r2q2/2p4Q/8/8/P5PP/3R1R1K b - - 5 29", "d8d1 h5e8 f6f8 e8f8", 1294, "00MFe"),
+            ChessPuzzle(64, "rn1qk2r/4b1p1/p4pp1/8/3pQ3/1B1P4/PPP2PPP/R3K2R b KQkq - 0 16", "b8d7 e4g6 e8f8 g6f7", 1322, "0PGJq"),
+            ChessPuzzle(65, "1k6/p1p2p2/1pq5/8/1P6/2KN2Q1/4r2B/1R5R w - - 8 41", "c3b3 c6c2 b3a3 c2a2", 1339, "0Yjq0"),
+            ChessPuzzle(66, "r4rk1/pp4p1/1np1p1P1/4q1PR/5p2/4BP2/PPQ5/R4K2 b - - 1 25", "e5e3 h5h8 g8h8 c2h2 h8g8 h2h7", 1362, "0Yiuu"),
+            ChessPuzzle(67, "r6r/pp2kb2/3p1p1Q/1N1Pp3/3bP3/P2B2P1/1P4PP/7K w - - 6 28", "h6d2 h8h2 h1h2 a8h8 d2h6 h8h6", 1380, "00BrZ"),
+            ChessPuzzle(68, "rn2r2Q/pp1k1pp1/2pbq1P1/6B1/3P4/8/PPP2PP1/R4K1R w - - 5 18", "h8g7 e6e2 f1g1 e2e1 a1e1 e8e1", 1402, "0y0Jo"),
+            ChessPuzzle(69, "rn1Q1b1r/1qN2kpp/p7/1p4B1/4p3/P7/1PP2PPP/R5K1 b - - 3 17", "a8a7 d8e8 f7g8 e8e6", 1436, "09TAi"),
+            ChessPuzzle(70, "3r2k1/p5pp/8/3rp1q1/1RQp4/PP6/6PP/5R1K b - - 5 30", "g5e3 c4d5 d8d5 b4b8 d5d8 b8d8", 1460, "0J0GM"),
+            ChessPuzzle(71, "5rk1/3Q1ppp/p4q2/1p6/4pn2/1B6/PP3P1P/3R1K2 b - - 5 27", "f6b2 d7f7 f8f7 d1d8", 1480, "0ojP3"),
+            ChessPuzzle(72, "1r6/2r2p1R/7R/4pPk1/2B2n2/1P3P1P/P4K2/8 b - - 0 43", "c7c4 h3h4 g5f5 h7f7", 1524, "00voi"),
+            ChessPuzzle(73, "5k2/p1R4R/1p4p1/3r3q/3P4/2P2rQp/PP5K/8 b - - 4 36", "f3g3 c7c8 d5d8 c8d8", 1537, "00h8Z"),
+            ChessPuzzle(74, "r2q1rk1/4N1bp/p2p2p1/2p3N1/Pp4P1/1Q5P/1P1n1P2/5RK1 b - - 0 21", "g8h8 b3g8 f8g8 g5f7", 1564, "00pER"),
+            ChessPuzzle(75, "r2qkb1r/ppp2ppp/3p1n2/4N1B1/4P1b1/1BN5/PPP2PPP/R2QK2R b KQkq - 0 9", "g4d1 b3f7 e8e7 c3d5", 1590, "0M90o"),
+            ChessPuzzle(76, "2r2r2/2p1kpp1/2QBbn1p/q7/2P5/1P6/P4PPP/3RR1K1 b - - 4 28", "c7d6 c6d6 e7e8 e1e6 f7e6 d6e6", 1607, "0iMCD"),
+            ChessPuzzle(77, "8/6kp/3Q2p1/2p1p3/1PP1q1P1/4b3/6KP/3R4 w - - 0 34", "g2f1 e4f3 f1e1 f3f2", 1626, "0VaT1"),
+            ChessPuzzle(78, "5r1k/5prp/1p1N1Q2/p7/1P2p3/P2n2q1/2B4R/5R1K w - - 3 32", "d6f5 d3f2 h2f2 g3h3 f2h2 h3f1", 1644, "0Iyf7"),
+            ChessPuzzle(79, "3k2q1/pb1p3p/1p1P4/2p5/2P2Q1K/8/P7/5R2 b - - 2 36", "b7g2 f4f8 g8f8 f1f8", 1665, "00EEp"),
+            ChessPuzzle(80, "r2q3k/5Pb1/2n3Bp/3p2pP/pp1P2Q1/6B1/1PP5/6K1 b - - 0 39", "g7d4 g4d4 c6d4 g3e5 d8f6 e5f6", 1674, "00rw0"),
+            ChessPuzzle(81, "3R2k1/2q5/2b3pb/1pp5/p3r2Q/P7/1PP3PP/5RK1 b - - 1 27", "g8g7 h4f6 g7h7 d8h8", 1701, "0SSgk"),
+            ChessPuzzle(82, "5bk1/1R3ppp/1Q1p1n2/5N2/2P2BP1/3P3P/5PK1/r3q3 w - - 5 33", "b7b8 e1h1 g2g3 a1g1 g3h4 g1g4", 1727, "0ojQb"),
+            ChessPuzzle(83, "2k5/pp3p2/5q2/2b1p1p1/4P1Pr/1nN2BK1/PPP3P1/R2Q4 w - - 3 23", "c3d5 f6f4 d5f4 e5f4", 1758, "00he6"),
+            ChessPuzzle(84, "k1r5/pp1R1p2/8/4Q3/6p1/P1P5/KPP2P2/5q2 b - - 4 32", "f1f2 e5c7 c8c7 d7d8 c7c8 d8c8", 1780, "0PGoz"),
+            ChessPuzzle(85, "1rb4r/pp1nN1pk/1b1pNn1p/4pP2/3PP3/2P2R2/PP4PP/R1B3K1 b - - 4 18", "e5d4 e6g5 h6g5 f3h3 f6h5 h3h5", 1803, "0MAkP"),
+            ChessPuzzle(86, "8/5p2/pq5p/1p5k/6B1/6P1/P6P/2Q4K b - - 0 36", "h5g4 c1f4 g4h5 f4f5", 1842, "00bpH"),
+            ChessPuzzle(87, "2b2rk1/3p1ppp/p3p2B/2Q1P3/Pn2N1q1/3B2P1/1rP4P/5RK1 b - - 3 28", "b4d3 e4f6 g8h8 c5f8", 1892, "0xzky"),
+            ChessPuzzle(88, "r1b2rk1/1p1p2pp/p1n1n3/5N2/1P2Q2P/P2BB3/2PK1PP1/q6R b - - 0 19", "a1a3 f5h6 g7h6 e4h7", 1915, "0fDzR"),
+            ChessPuzzle(89, "2q2rk1/1p2p3/p2pb1pB/8/1n2P1P1/1Nr2P2/P1P4Q/1K1R3R w - - 0 23", "h6d2 c3b3 a2b3 c8c2 b1a1 c2a2", 1953, "0CYah"),
+            ChessPuzzle(90, "r1b1k1nr/pp1np2p/2q1Npp1/2P1p3/2B5/2N3B1/PPPR1PPP/2K4R b kq - 2 14", "d7c5 d2d8 e8f7 d8f8", 1990, "00JsQ"),
+            ChessPuzzle(91, "8/p4ppk/Pp2p3/2b5/2K4Q/2P3P1/1q6/3R4 b - - 1 34", "h7g8 d1d8 c5f8 d8f8 g8f8 h4d8", 2003, "09UOO"),
+            ChessPuzzle(92, "8/p1Q4k/3p1Bb1/2p5/4r3/1P5r/P1P1q3/1K3R2 b - - 1 37", "h7h6 c7g7 h6h5 f1f5 g6f5 g7g5", 2034, "0fFBZ"),
+            ChessPuzzle(93, "3r1rk1/Q3qppp/8/1ppb4/2Pn1B1n/2N3P1/PP3P2/R2R1K2 w - - 0 21", "a7e7 d5g2 f1e1 h4f3", 2088, "00Pbs"),
+            ChessPuzzle(94, "5r2/pp3pkp/4qNp1/3p4/3Q4/rP5P/6P1/5R1K b - - 2 30", "a3b3 f6e8 g7g8 d4g7", 2106, "0Ca27"),
+            ChessPuzzle(95, "b3r3/R6p/5ppk/N7/1nN2P1P/1P1P2P1/P2R1K1r/8 w - - 1 35", "f2g1 e8e1 g1h2 e1h1", 2120, "0M9nl"),
+            ChessPuzzle(96, "8/3Bkpp1/4b3/2P5/PP4n1/4P1qQ/R4pP1/2R3K1 w - - 0 27", "g1h1 g3h3 g2h3 e6d5 e3e4 d5e4", 2205, "0y20P"),
+            ChessPuzzle(97, "Q7/8/3B4/2p5/Krkn4/8/8/8 w - - 1 54", "a4a3 d4b5 a3a2 b5c3 a2a1 b4b1", 2226, "00dt1"),
+            ChessPuzzle(98, "r4Bk1/pp3p2/7p/3N2p1/2BpPbbq/2P5/PPQ2KP1/R3R3 w - - 1 27", "f2g1 h4h2 g1f1 h2h1 f1f2 f4g3 f2g3 h1h4", 2226, "06LQW"),
+            ChessPuzzle(99, "8/6p1/7p/4p3/4P1kP/2N3P1/3n2K1/8 b - - 9 54", "h6h5 c3d1 g7g6 d1e3", 2251, "0Cadi"),
+            ChessPuzzle(100, "3r2k1/1p1q2rp/p7/1bp1pP2/4P2Q/1PN1nN1R/1PP5/4K2R w - - 2 33", "e1f2 g7g2 f2e3 d7d3 c2d3 d8d3", 2425, "0rp94"),
+    )
 }
