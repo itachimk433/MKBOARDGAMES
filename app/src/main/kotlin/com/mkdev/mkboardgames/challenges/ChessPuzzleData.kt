@@ -3,10 +3,11 @@ package com.mkdev.mkboardgames.challenges
 /**
  * Offline checkmate challenge set.
  *
- * Every entry is a real mate puzzle from the Lichess open puzzle database
- * (CC0: https://database.lichess.org/#puzzles). Lichess defines the FEN as
- * the position before the opponent's first move, so [moves] always starts
- * with that opponent move and ends with the player's checkmate.
+ * Most entries are real mate puzzles from the Lichess open puzzle database
+ * (CC0: https://database.lichess.org/#puzzles); the long-line and promotion
+ * modules are authored locally. Lichess defines the FEN as the position
+ * before the opponent's first move, so [moves] always starts with that
+ * opponent move and ends with the player's checkmate.
  *
  * The imported entries are curated and sorted by puzzle rating, followed by
  * a small set of authored condition puzzles. This keeps the
@@ -50,7 +51,7 @@ object ChessPuzzleData {
         9 to ChallengeObjective(ChallengeCondition.CAPTURE_MATE, requiredCaptures = 1, difficulty = 2),
         10 to ChallengeObjective(ChallengeCondition.QUIET_MATE, allowedPiecesToLose = 0, difficulty = 2),
         27 to ChallengeObjective(ChallengeCondition.CAPTURE_MATE, requiredCaptures = 1, difficulty = 2),
-        39 to ChallengeObjective(ChallengeCondition.SACRIFICE_TRAP, difficulty = 3),
+        39 to ChallengeObjective(ChallengeCondition.SET_TRAP, difficulty = 3),
         55 to ChallengeObjective(ChallengeCondition.DOUBLE_CAPTURE_MATE, requiredCaptures = 2, difficulty = 3),
         67 to ChallengeObjective(ChallengeCondition.SACRIFICE_TRAP, difficulty = 4),
         76 to ChallengeObjective(ChallengeCondition.MATERIAL_PRESSURE, allowedPiecesToLose = 2, difficulty = 4),
@@ -79,6 +80,35 @@ object ChessPuzzleData {
             promotionRequirement = PromotionRequirement.QUEEN,
             difficulty = 5,
         ),
+        102 to ChallengeObjective(
+            condition = ChallengeCondition.LONG_MATE,
+            targetPlayerMoves = 10,
+            difficulty = 4,
+        ),
+        103 to ChallengeObjective(
+            condition = ChallengeCondition.LONG_MATE,
+            targetPlayerMoves = 11,
+            difficulty = 4,
+        ),
+        104 to ChallengeObjective(
+            condition = ChallengeCondition.LONG_MATE,
+            targetPlayerMoves = 20,
+            difficulty = 5,
+        ),
+    )
+
+    private val authoredLines = mapOf(
+        102 to "a7a6 g6g5 a8a7 g5f5 a7a8 f5g5 a6a5 g5g6 a8a7 g6g5 a7a8 g5f5 b7b6 f5g5 a8a7 g5g6 a7a8 g6g5 b6b5 g5g7",
+        103 to "a7a6 g6g5 a8a7 g5f5 a7a8 f5g5 a6a5 g5g6 a8a7 g6g5 a7a8 g5f5 b7b6 f5g5 a8a7 g5g6 a7a8 g6g5 b6b5 g5g6 a8a7 g6g7",
+        104 to "a7a6 g6g5 a8a7 g5f5 a7a8 f5g5 a6a5 g5g6 a8a7 g6g5 a7a8 g5f5 b7b6 f5g5 a8a7 g5g6 a7a8 g6g5 b6b5 g5f5 a8a7 f5g5 a7a8 g5g6 c7c6 g6g5 a8a7 g5f5 a7a8 f5g5 c6c5 g5g6 a8a7 g6g5 a7a8 g5f5 d7d6 f5g5 a8a7 g5g6 a7a8 g6g5 d6d5 g5g7",
+    )
+
+    private val correctedLongLines = mapOf(
+        104 to "a7a6 g6g5 a8a7 g5f5 a7a8 f5g5 a6a5 g5g6 a8a7 g6g5 a7a8 g5f5 b7b6 f5g5 a8a7 g5g6 a7a8 g6g5 b6b5 g5f5 a8a7 f5g5 a7a8 g5g6 c7c6 g6g5 a8a7 g5f5 a7a8 f5g5 c6c5 g5g6 a8a7 g6g5 a7a8 g5f5 d7d6 f5g5 a8a7 g5g6",
+    )
+
+    private val finalLongLines = mapOf(
+        104 to "a7a6 g6g5 a8a7 g5f5 a7a8 f5g5 a6a5 g5g6 a8a7 g6g5 a7a8 g5f5 b7b6 f5g5 a8a7 g5g6 a7a8 g6g5 b6b5 g5f5 a8a7 f5g5 a7a8 g5g6 c7c6 g6g5 a8a7 g5f5 a7a8 f5g5 c6c5 g5g6 a8a7 g6g5 a7a8 g5f5 d7d6 f5g5 a8a7 g5g7",
     )
 
     fun objectiveFor(puzzle: ChessPuzzle): ChallengeObjective =
@@ -238,5 +268,37 @@ object ChessPuzzleData {
                 "local-pawn-promotion-final",
                 alternateSolutions = listOf("h1h3 g7g8Q"),
             ),
-    ).map { it.copy(objective = objectiveFor(it)) }
+            // Long-line calculation module. The black rook and pawns provide
+            // legal waiting moves while the queen repeatedly changes squares.
+            // The final Qg7 move is protected by the white king on f6.
+            ChessPuzzle(
+                102,
+                "r6k/pppp1p2/5KQ1/8/8/8/8/8 b - - 0 1",
+                "a7a6 g6h5 a8a7 h5g6 a7a8 g6h5 a6a5 h5g6 a8a7 g6h5 a7a8 h5g6 b7b6 g6h5 a8a7 h5g6 a7a8 g6g5 b6b5 g5g7",
+                2050,
+                "local-mate-in-10",
+            ),
+            ChessPuzzle(
+                103,
+                "r6k/pppp1p2/5KQ1/8/8/8/8/8 b - - 0 1",
+                "a7a6 g6h5 a8a7 h5g6 a7a8 g6h5 a6a5 h5g6 a8a7 g6h5 a7a8 h5g6 b7b6 g6h5 a8a7 h5g6 a7a8 g6h5 b6b5 h5g5 a8a7 g5g7",
+                2140,
+                "local-mate-in-11",
+            ),
+            ChessPuzzle(
+                104,
+                "r6k/pppp1p2/5KQ1/8/8/8/8/8 b - - 0 1",
+                "a7a6 g6h5 a8a7 h5g6 a7a8 g6h5 a6a5 h5g6 a8a7 g6h5 a7a8 h5g6 b7b6 g6h5 a8a7 h5g6 a7a8 g6h5 b6b5 h5g6 a8a7 g6h5 a7a8 h5g6 c7c6 g6h5 a8a7 h5g6 a7a8 h5g6 c6c5 h5g6 a8a7 g6h5 a7a8 h5g6 d7d6 g6h5 a8a7 h5g5 a7a8 g5g6 d6d5 g6g7",
+                2310,
+                "local-mate-in-20",
+            ),
+    ).map { puzzle ->
+        puzzle.copy(
+            moves = finalLongLines[puzzle.level]
+                ?: correctedLongLines[puzzle.level]
+                ?: authoredLines[puzzle.level]
+                ?: puzzle.moves,
+            objective = objectiveFor(puzzle),
+        )
+    }
 }

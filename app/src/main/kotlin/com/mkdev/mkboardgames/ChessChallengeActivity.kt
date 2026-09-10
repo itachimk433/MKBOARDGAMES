@@ -15,6 +15,7 @@ import com.mkdev.mkboardgames.challenges.ChallengeObjective
 import com.mkdev.mkboardgames.challenges.ChallengeCondition
 import com.mkdev.mkboardgames.challenges.ChessPuzzle
 import com.mkdev.mkboardgames.challenges.ChessPuzzleData
+import com.mkdev.mkboardgames.challenges.ChessPuzzleValidator
 import com.mkdev.mkboardgames.challenges.PromotionRequirement
 import com.mkdev.mkboardgames.engine.*
 import com.mkdev.mkboardgames.games.chess.*
@@ -62,6 +63,7 @@ class ChessChallengeActivity : AppCompatActivity() {
     private var hintStage = 0
     private var hintUsed = false
     private var retryCount = 0
+    private var attemptNumber = 0
     private val playerCapturedSymbols = mutableListOf<String>()
     private val playerLostSymbols = mutableListOf<String>()
     private val initialPlayerCapturedSymbols = mutableListOf<String>()
@@ -135,7 +137,9 @@ class ChessChallengeActivity : AppCompatActivity() {
 
         val summary = TextView(this).apply {
             val earnedStars = (1..puzzles.size).sumOf { progressPrefs.getInt(starsKey(it), 0) }
-            text = "Progress from clean and quiet finishes to captures, sacrifices, promotion, and material pressure.\nHighest completed: ${highestCompleted.coerceAtMost(puzzles.size)} / ${puzzles.size} • Stars: $earnedStars"
+            val solved = (1..puzzles.size).count { progressPrefs.getInt(starsKey(it), 0) > 0 }
+            val attempts = (1..puzzles.size).sumOf { progressPrefs.getInt(attemptsKey(it), 0) }
+            text = "Progress from clean finishes to captures, traps, promotion, and long calculations.\nSolved: $solved / ${puzzles.size} • Highest: ${highestCompleted.coerceAtMost(puzzles.size)} • Stars: $earnedStars • Attempts: $attempts"
             setTextColor(Color.parseColor("#B7C9D1"))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             setPadding(dp(20), dp(13), dp(20), dp(12))
@@ -147,6 +151,7 @@ class ChessChallengeActivity : AppCompatActivity() {
             puzzles.size,
             highestCompleted,
             IntArray(puzzles.size) { progressPrefs.getInt(starsKey(it + 1), 0) },
+            puzzles.map { "${ChessPuzzleData.themeFor(it.level)} • ${it.condition.title}" },
         ).apply {
             onLevelSelected = { level ->
                 selectedLevel = level
@@ -287,9 +292,8 @@ class ChessChallengeActivity : AppCompatActivity() {
 
     private fun loadPuzzle(puzzle: ChessPuzzle) {
         val initial = ChessFenParser.parse(puzzle.fen)
-        solutionLines = puzzle.solutionLines.map { line ->
-            line.split(Regex("\\s+")).filter { it.isNotBlank() }
-        }
+        beginAttempt()
+        solutionLines = ChessPuzzleValidator.playableSolutionLines(puzzle)
         solutionMoves = solutionLines.firstOrNull() ?: emptyList()
         expectedMoveIndex = 1
         playerMovesMade = 0
@@ -304,7 +308,7 @@ class ChessChallengeActivity : AppCompatActivity() {
         initialPlayerCapturedSymbols.clear()
         initialPlayerLostSymbols.clear()
         resetConditionTracking()
-        if (solutionLines.isEmpty() || solutionLines.any { it.size < 2 || it.size % 2 != 0 }) {
+        if (solutionLines.isEmpty()) {
             puzzleState = initial
             playerStartState = initial
             boardView?.gameState = initial
@@ -438,7 +442,7 @@ class ChessChallengeActivity : AppCompatActivity() {
         if (stars > previousStars) {
             progressPrefs.edit().putInt(starsKey(selectedLevel), stars).apply()
         }
-        setChallengeStatus("Checkmate! Challenge complete • ${"★".repeat(stars)}")
+        setChallengeStatus("Checkmate! Challenge complete • ${"★".repeat(stars)} • Attempt $attemptNumber")
         markResultBoard(victory = true)
         showCompletionScreen()
     }
@@ -471,6 +475,7 @@ class ChessChallengeActivity : AppCompatActivity() {
         hintActive = false
         hintStage = 0
         retryCount++
+        beginAttempt()
         opponentMoveAnimating = false
         boardView?.gameState = start
         boardView?.isFlipped = start.currentTurn == PieceColor.BLACK
@@ -583,10 +588,12 @@ class ChessChallengeActivity : AppCompatActivity() {
         ChallengeCondition.CAPTURE_MATE -> opponentPiecesCaptured >= objective.requiredCaptures
         ChallengeCondition.DOUBLE_CAPTURE_MATE -> opponentPiecesCaptured >= objective.requiredCaptures
         ChallengeCondition.SACRIFICE_TRAP -> opponentCapturedPlayerPiece
+        ChallengeCondition.SET_TRAP -> opponentCapturedPlayerPiece
         ChallengeCondition.MATERIAL_PRESSURE -> playerPiecesLost >= objective.allowedPiecesToLose
         ChallengeCondition.PAWN_PROMOTION,
         ChallengeCondition.PROMOTE_AND_MATE -> playerPromotions >= objective.requiredPromotions &&
             promotionRequirementSatisfied()
+        ChallengeCondition.LONG_MATE -> true
         null -> false
     }
 
@@ -616,6 +623,8 @@ class ChessChallengeActivity : AppCompatActivity() {
                 "You found mate, but needed ${objective.requiredCaptures} captures."
             ChallengeCondition.SACRIFICE_TRAP ->
                 "You found mate, but the opponent had to capture one of your pieces."
+            ChallengeCondition.SET_TRAP ->
+                "You found mate, but the trap was not sprung by an opponent capture."
             ChallengeCondition.MATERIAL_PRESSURE ->
                 "You found mate, but needed to lose ${objective.allowedPiecesToLose} pieces."
             ChallengeCondition.PAWN_PROMOTION,
@@ -623,6 +632,8 @@ class ChessChallengeActivity : AppCompatActivity() {
                 "You found mate, but the pawn must promote to ${objective.promotionRequirement.name.lowercase()} first."
             ChallengeCondition.DIRECT_MATE ->
                 "That move did not complete the authored mating line."
+            ChallengeCondition.LONG_MATE ->
+                "The long mating route was not completed."
         }
     }
 
@@ -649,6 +660,13 @@ class ChessChallengeActivity : AppCompatActivity() {
     }
 
     private fun starsKey(level: Int) = "level_${level}_stars"
+
+    private fun attemptsKey(level: Int) = "level_${level}_attempts"
+
+    private fun beginAttempt() {
+        attemptNumber = progressPrefs.getInt(attemptsKey(selectedLevel), 0) + 1
+        progressPrefs.edit().putInt(attemptsKey(selectedLevel), attemptNumber).apply()
+    }
 
     private fun showConditionFailure() {
         resetting = true
@@ -778,7 +796,8 @@ class ChessChallengeActivity : AppCompatActivity() {
         val mateLabel = if (maxPlayerMoves == 1) "Mate in 1" else "Mate in $maxPlayerMoves"
         val material = if (playerPiecesLost == 0) "No pieces lost" else "$playerPiecesLost piece(s) lost"
         val hint = if (hintUsed) "Hint used: Yes" else "Hint used: No"
-        return "$mateLabel • $material • $hint"
+        val best = progressPrefs.getInt(starsKey(selectedLevel), earnedStars())
+        return "$mateLabel • $material • $hint • Attempt $attemptNumber • Best ${"★".repeat(best)}"
     }
 
     private fun showOverlay(view: View, cardOverlay: Boolean = false) {

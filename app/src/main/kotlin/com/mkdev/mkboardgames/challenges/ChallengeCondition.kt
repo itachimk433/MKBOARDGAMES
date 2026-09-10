@@ -64,9 +64,17 @@ enum class ChallengeCondition(
         title = "Sacrifice trap",
         objective = "Let the opponent capture one of your pieces, then deliver mate.",
     ),
+    SET_TRAP(
+        title = "Set a trap",
+        objective = "Offer a piece to force a capture, then spring the mating finish.",
+    ),
     MATERIAL_PRESSURE(
         title = "Material pressure",
         objective = "Checkmate after allowing at least two of your pieces to be captured.",
+    ),
+    LONG_MATE(
+        title = "Long calculation",
+        objective = "Stay on the authored route until the final move delivers checkmate.",
     ),
     PAWN_PROMOTION(
         title = "Pawn promotion",

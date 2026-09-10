@@ -26,6 +26,7 @@ class ChallengeLevelGridView(
     private val levelCount: Int,
     private val highestCompleted: Int,
     private val starsByLevel: IntArray = IntArray(levelCount),
+    private val subtitles: List<String> = emptyList(),
 ) : View(context) {
 
     var onLevelSelected: ((Int) -> Unit)? = null
@@ -50,6 +51,11 @@ class ChallengeLevelGridView(
         textAlign = Paint.Align.CENTER
         isFakeBoldText = true
         textSize = 10f * textScale
+    }
+    private val subtitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#B7C9D1")
+        textAlign = Paint.Align.CENTER
+        textSize = 7.5f * textScale
     }
     private val loadingRingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#F7D99B")
@@ -136,15 +142,27 @@ class ChallengeLevelGridView(
             canvas.drawText(
                 "Level ${(index + 1).toString().padStart(2, '0')}",
                 rect.centerX(),
-                rect.centerY() - 5f * unit,
+                rect.centerY() - 11f * unit,
                 if (index + 1 <= highestCompleted) completedLevelPaint else levelPaint,
             )
+            val subtitle = subtitles.getOrNull(index)
+                ?.replace("Mate in ", "M")
+                ?.replace("Direct mate", "Mate")
+                ?.take(19)
+            if (!subtitle.isNullOrBlank()) {
+                canvas.drawText(
+                    subtitle,
+                    rect.centerX(),
+                    rect.centerY() + 3f * unit,
+                    subtitlePaint,
+                )
+            }
             val stars = starsByLevel.getOrNull(index)?.coerceIn(0, 3) ?: 0
             if (stars > 0) {
                 canvas.drawText(
                     "★".repeat(stars),
                     rect.centerX(),
-                    rect.centerY() + 17f * unit,
+                    rect.centerY() + 19f * unit,
                     starPaint,
                 )
             }

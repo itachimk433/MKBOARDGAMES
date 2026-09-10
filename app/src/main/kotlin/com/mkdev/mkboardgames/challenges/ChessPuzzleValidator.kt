@@ -21,8 +21,8 @@ object ChessPuzzleValidator {
     fun validateAll(puzzles: List<ChessPuzzle> = ChessPuzzleData.all): List<String> {
         val issues = mutableListOf<String>()
         val levels = puzzles.map { it.level }
-        if (levels != (1..101).toList()) {
-            issues += "levels must be present once each from 1 to 101"
+        if (levels != (1..104).toList()) {
+            issues += "levels must be present once each from 1 to 104"
         }
 
         puzzles.forEach { puzzle ->
@@ -38,14 +38,28 @@ object ChessPuzzleValidator {
                 }
                 var state = parseFen(puzzle.fen)
                 val playerColor = state.currentTurn.opponent()
+                var validLine = true
                 tokens.forEachIndexed moveLoop@{ moveIndex, token ->
                     val move = findMove(state, token)
                     if (move == null) {
                         issues += "level ${puzzle.level} line ${lineIndex + 1} has illegal move ${moveIndex + 1}: $token"
+                        validLine = false
                         return@moveLoop
                     }
-                    state = engine.applyMove(state, move)
+                    val nextState = engine.applyMove(state, move)
+                    if (nextState === state) {
+                        issues += "level ${puzzle.level} line ${lineIndex + 1} was rejected by the chess engine: $token"
+                        validLine = false
+                        return@moveLoop
+                    }
+                    if (moveIndex < tokens.lastIndex && nextState.status != GameStatus.IN_PROGRESS) {
+                        issues += "level ${puzzle.level} line ${lineIndex + 1} ends before its final move"
+                        validLine = false
+                        return@moveLoop
+                    }
+                    state = nextState
                 }
+                if (!validLine) return@lineLoop
                 val expectedStatus = if (playerColor == PieceColor.WHITE) {
                     GameStatus.WHITE_WINS
                 } else {
@@ -59,9 +73,42 @@ object ChessPuzzleValidator {
                     issues += "level ${puzzle.level} target move count does not match its authored line"
                 }
             }
+            if (puzzle.objective.condition == ChallengeCondition.LONG_MATE &&
+                (puzzle.objective.targetPlayerMoves ?: 0) < 10
+            ) {
+                issues += "level ${puzzle.level} long-mate objective must be at least mate in 10"
+            }
         }
         return issues
     }
+
+    /**
+     * Returns only complete lines that the same engine used by the board can
+     * actually play from the puzzle FEN. The activity uses this before
+     * unlocking the board, so a bad alternate line cannot leave a screenshot-
+     * friendly but unplayable challenge on screen.
+     */
+    fun playableSolutionLines(puzzle: ChessPuzzle): List<List<String>> =
+        puzzle.solutionLines.map { it.split(Regex("\\s+")).filter(String::isNotBlank) }
+            .filter { tokens ->
+                if (tokens.size < 2 || tokens.size % 2 != 0) return@filter false
+                var state = parseFen(puzzle.fen)
+                tokens.forEachIndexed { index, token ->
+                    val move = findMove(state, token) ?: return@filter false
+                    val next = engine.applyMove(state, move)
+                    if (next === state) return@filter false
+                    if (index < tokens.lastIndex && next.status != GameStatus.IN_PROGRESS) {
+                        return@filter false
+                    }
+                    state = next
+                }
+                val winner = if (state.currentTurn == PieceColor.WHITE) {
+                    GameStatus.BLACK_WINS
+                } else {
+                    GameStatus.WHITE_WINS
+                }
+                state.status == winner
+            }
 
     private fun findMove(state: GameState, uci: String) =
         if (uci.length < 4) {
