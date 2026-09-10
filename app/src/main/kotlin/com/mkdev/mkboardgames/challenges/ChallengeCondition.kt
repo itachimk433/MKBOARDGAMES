@@ -17,11 +17,23 @@ enum class ChallengeCondition(
     ),
     CLEAN_MATE(
         title = "Clean finish",
-        objective = "Checkmate without losing one of your pieces.",
+        objective = "Checkmate without losing any of your pieces.",
+    ),
+    QUIET_MATE(
+        title = "Quiet finish",
+        objective = "Deliver checkmate without any captures on either side.",
+    ),
+    CAPTURE_MATE(
+        title = "Winning capture",
+        objective = "Capture at least one defending piece before delivering mate.",
+    ),
+    DOUBLE_CAPTURE_MATE(
+        title = "Double capture",
+        objective = "Capture at least two defending pieces before delivering mate.",
     ),
     SACRIFICE_TRAP(
         title = "Sacrifice trap",
-        objective = "Offer a piece and use the opponent's capture to set the trap.",
+        objective = "Let the opponent capture one of your pieces, then deliver mate.",
     ),
     MATERIAL_PRESSURE(
         title = "Material pressure",

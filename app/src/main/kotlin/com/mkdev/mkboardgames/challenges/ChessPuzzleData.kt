@@ -38,27 +38,46 @@ data class ChessPuzzle(
 
 object ChessPuzzleData {
     /*
-     * The condition assignments are based on the authored line, not on the
-     * puzzle rating. The activity checks them again while the line is played,
-     * so adding a new condition cannot silently turn an ordinary puzzle into
-     * an unwinnable one.
+     * These groups are verified against the authored UCI line after the
+     * opponent's setup move. They are intentionally split into progression
+     * bands: early levels teach clean and quiet mates, the middle levels add
+     * captures and sacrifices, and the later levels combine those ideas.
+     *
+     * Keeping the assignments tied to line properties matters here. A
+     * condition such as "let a piece be captured" cannot be assigned to a
+     * puzzle whose solution never contains that capture; doing so makes a
+     * correct mating line fail at the finish.
      */
+    private val quietLevels = setOf(
+        10, 13, 15, 21, 22, 23, 24, 26, 33, 35, 36, 37, 41, 42, 45, 49,
+        50, 52, 53, 54, 57, 61, 65, 69, 77, 81, 86, 90, 93, 94, 97, 99,
+    )
     private val cleanLevels = setOf(
-        16, 17, 19, 21, 22, 24, 25, 26, 29, 33, 34, 35, 37, 40, 41, 43,
-        44, 45, 46, 49, 50, 51, 53, 54,
+        1, 2, 3, 4, 5, 6, 7, 8, 11, 12, 14, 16, 17, 18, 19, 20, 25, 28,
+        29, 30, 31, 32, 34, 38, 40, 43, 44, 46, 48, 51, 56, 58, 63, 64,
+        73, 75, 82, 87,
     )
-    private val trapLevels = setOf(
-        5, 7, 12, 18, 20, 28, 30, 31, 32, 39, 48, 55, 56, 67, 70, 75,
-        89, 96,
+    private val captureLevels = setOf(
+        1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 14, 16, 17, 18, 19, 20, 25,
+        27, 28, 29, 30, 31, 32, 34, 38, 39, 40, 43, 44, 46, 48, 51, 55,
+        56, 58, 59, 60, 62, 63, 64, 67, 68, 70, 71, 72, 73, 75, 76, 78,
+        79, 80, 82, 83, 84, 85, 87, 88, 89, 91, 96, 100,
     )
-    private val materialPressureLevels = setOf(
-        9, 59, 60, 66, 68, 71, 72, 76, 80, 84, 85, 88, 100,
+    private val doubleCaptureLevels = setOf(
+        9, 12, 34, 43, 46, 55, 56, 67, 70, 76, 80, 89, 96,
+    )
+    private val sacrificeLevels = setOf(
+        9, 27, 39, 47, 55, 59, 60, 62, 66, 67, 68, 70, 71, 72, 74, 76,
+        78, 79, 80, 83, 84, 85, 88, 89, 91, 92, 95, 96, 98, 100,
     )
 
     fun conditionFor(level: Int): ChallengeCondition = when {
         level == 101 -> ChallengeCondition.PAWN_PROMOTION
-        level in materialPressureLevels -> ChallengeCondition.MATERIAL_PRESSURE
-        level in trapLevels -> ChallengeCondition.SACRIFICE_TRAP
+        level == 100 -> ChallengeCondition.MATERIAL_PRESSURE
+        level >= 61 && level in doubleCaptureLevels -> ChallengeCondition.DOUBLE_CAPTURE_MATE
+        level >= 41 && level in sacrificeLevels -> ChallengeCondition.SACRIFICE_TRAP
+        level >= 21 && level in captureLevels -> ChallengeCondition.CAPTURE_MATE
+        level in quietLevels -> ChallengeCondition.QUIET_MATE
         level in cleanLevels -> ChallengeCondition.CLEAN_MATE
         else -> ChallengeCondition.DIRECT_MATE
     }

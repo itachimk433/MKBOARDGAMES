@@ -47,6 +47,7 @@ class ChessChallengeActivity : AppCompatActivity() {
     private var opponentMoveAnimating = false
     private var boardView: BoardView? = null
     private var gameHud: StandardGameHudView? = null
+    private var challengeStatusView: TextView? = null
     private var screenRoot: FrameLayout? = null
     private var activeOverlay: View? = null
     private var completed = false
@@ -113,13 +114,14 @@ class ChessChallengeActivity : AppCompatActivity() {
         dismissOverlay()
         boardView = null
         gameHud = null
+        challengeStatusView = null
         val root = verticalRoot()
         root.addView(topBar("CHESS CHALLENGES", "${puzzles.size} progressive levels") {
             finish()
         })
 
         val summary = TextView(this).apply {
-            text = "Each level adds a new mating condition.\nHighest completed: ${highestCompleted.coerceAtMost(puzzles.size)} / ${puzzles.size}"
+            text = "Progress from clean and quiet finishes to captures, sacrifices, promotion, and material pressure.\nHighest completed: ${highestCompleted.coerceAtMost(puzzles.size)} / ${puzzles.size}"
             setTextColor(Color.parseColor("#B7C9D1"))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             setPadding(dp(20), dp(13), dp(20), dp(12))
@@ -146,6 +148,7 @@ class ChessChallengeActivity : AppCompatActivity() {
         resetting = false
         hintActive = false
         opponentMoveAnimating = false
+        challengeStatusView = null
         val root = verticalRoot()
 
         val hud = StandardGameHudView(
@@ -159,7 +162,7 @@ class ChessChallengeActivity : AppCompatActivity() {
             setInfo(
                 value = "LEVEL ${selectedLevel.toString().padStart(2, '0')}",
                 undo = false,
-                detail = "Loading puzzle…",
+                detail = "",
                 accentColor = Color.parseColor("#F7D99B"),
             )
             onBack = { showPauseScreen() }
@@ -184,6 +187,18 @@ class ChessChallengeActivity : AppCompatActivity() {
         }
         styleRow.addView(styleSwitch, LinearLayout.LayoutParams(dp(118), dp(44)))
         root.addView(styleRow, LinearLayout.LayoutParams(-1, dp(44)))
+
+        val statusView = TextView(this).apply {
+            setTextColor(Color.parseColor("#D7E4DE"))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            gravity = android.view.Gravity.CENTER
+            includeFontPadding = false
+            maxLines = 3
+            setPadding(dp(14), dp(7), dp(14), dp(7))
+            setBackgroundColor(Color.parseColor("#0B2028"))
+        }
+        challengeStatusView = statusView
+        root.addView(statusView, LinearLayout.LayoutParams(-1, dp(58)))
 
         val board = BoardView(this).apply {
             ruleEngine = engine
@@ -211,10 +226,11 @@ class ChessChallengeActivity : AppCompatActivity() {
     }
 
     private fun setChallengeStatus(text: String) {
+        challengeStatusView?.text = text
         gameHud?.setInfo(
             value = "LEVEL ${selectedLevel.toString().padStart(2, '0')}",
             undo = false,
-            detail = text,
+            detail = "",
             accentColor = Color.parseColor("#F7D99B"),
         )
     }
@@ -468,6 +484,10 @@ class ChessChallengeActivity : AppCompatActivity() {
     private fun conditionSatisfied(): Boolean = when (currentPuzzle?.condition) {
         ChallengeCondition.DIRECT_MATE -> true
         ChallengeCondition.CLEAN_MATE -> playerPiecesLost == 0
+        ChallengeCondition.QUIET_MATE ->
+            playerPiecesLost == 0 && opponentPiecesCaptured == 0
+        ChallengeCondition.CAPTURE_MATE -> opponentPiecesCaptured >= 1
+        ChallengeCondition.DOUBLE_CAPTURE_MATE -> opponentPiecesCaptured >= 2
         ChallengeCondition.SACRIFICE_TRAP -> opponentCapturedPlayerPiece
         ChallengeCondition.MATERIAL_PRESSURE -> playerPiecesLost >= 2
         ChallengeCondition.PAWN_PROMOTION -> playerPromotions > 0
