@@ -26,6 +26,7 @@ class StandardGameHudView(
     private val backLabel: String = "← Back",
     private val menuLabel: String = "Menu",
     private val showHintControl: Boolean = false,
+    private val showMenuControl: Boolean = true,
 ) : View(context) {
     var onBack: (() -> Unit)? = null
     var onUndo: (() -> Unit)? = null
@@ -114,11 +115,19 @@ class StandardGameHudView(
             redoRect.setEmpty()
         }
         if (showHintControl) {
-            hintRect.set(w - buttonWidth * 2.15f, top, w - buttonWidth * 1.1f, top + buttonHeight)
+            if (showMenuControl) {
+                hintRect.set(w - buttonWidth * 2.15f, top, w - buttonWidth * 1.1f, top + buttonHeight)
+            } else {
+                hintRect.set(w - buttonWidth * 1.05f, top, w - 4f * dp, top + buttonHeight)
+            }
         } else {
             hintRect.setEmpty()
         }
-        menuRect.set(w - buttonWidth * 1.05f, top, w - 4f * dp, top + buttonHeight)
+        if (showMenuControl) {
+            menuRect.set(w - buttonWidth * 1.05f, top, w - 4f * dp, top + buttonHeight)
+        } else {
+            menuRect.setEmpty()
+        }
     }
 
     fun setHintActive(active: Boolean, animate: Boolean = true) {
@@ -161,7 +170,7 @@ class StandardGameHudView(
                     setHintActive(!hintActive)
                     onHint?.invoke()
                 }
-                menuRect.contains(event.x, event.y) -> {
+                showMenuControl && menuRect.contains(event.x, event.y) -> {
                     SoundPlayer.play("ui_click")
                     onMenu?.invoke()
                 }
@@ -175,9 +184,12 @@ class StandardGameHudView(
         canvas.drawRect(0f, height - dp, width.toFloat(), height.toFloat(), divPaint)
         val radius = 5f * dp
         val controls = if (showHistoryControls) {
-            listOf(backRect, undoRect, redoRect, menuRect)
+            listOf(backRect, undoRect, redoRect) +
+                (if (showMenuControl) listOf(menuRect) else emptyList())
         } else {
-            listOf(backRect) + (if (showHintControl) listOf(hintRect) else emptyList()) + listOf(menuRect)
+            listOf(backRect) +
+                (if (showHintControl) listOf(hintRect) else emptyList()) +
+                (if (showMenuControl) listOf(menuRect) else emptyList())
         }
         controls.forEach {
             canvas.drawRoundRect(it, radius, radius, buttonBackgroundPaint)
@@ -204,7 +216,9 @@ class StandardGameHudView(
             canvas.drawText("💡", hintRect.centerX(), hintRect.centerY() + buttonPaint.textSize * 0.36f, buttonPaint)
             canvas.restore()
         }
-        canvas.drawText(menuLabel, menuRect.centerX(), menuRect.centerY() + buttonPaint.textSize * 0.36f, buttonPaint)
+        if (showMenuControl) {
+            canvas.drawText(menuLabel, menuRect.centerX(), menuRect.centerY() + buttonPaint.textSize * 0.36f, buttonPaint)
+        }
 
         textPaint.color = labelColor
         val centerX = width / 2f

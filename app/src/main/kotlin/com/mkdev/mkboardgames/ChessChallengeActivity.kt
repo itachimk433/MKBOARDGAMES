@@ -50,6 +50,7 @@ class ChessChallengeActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        SoundPlayer.init(this)
         makeFullscreen()
         selectedLevel = intent.getIntExtra(EXTRA_LEVEL, 1).coerceIn(1, puzzles.size)
         showLevelList()
@@ -68,6 +69,11 @@ class ChessChallengeActivity : AppCompatActivity() {
         }
     }
 
+    override fun onPause() {
+        SoundPlayer.stopAll()
+        super.onPause()
+    }
+
     override fun onDestroy() {
         handler.removeCallbacksAndMessages(null)
         super.onDestroy()
@@ -81,6 +87,7 @@ class ChessChallengeActivity : AppCompatActivity() {
                 boardView?.isLocked = true
             } else {
                 boardView?.isLocked = false
+                MusicPlayer.resumeMatch(this)
             }
         } else if (boardView != null) {
             showPauseScreen()
@@ -122,6 +129,7 @@ class ChessChallengeActivity : AppCompatActivity() {
         dismissOverlay()
         selectedLevel = level.coerceIn(1, puzzles.size)
         currentPuzzle = puzzles[selectedLevel - 1]
+        MusicPlayer.enterMatch(this)
         completed = false
         resetting = false
         hintActive = false
@@ -131,9 +139,9 @@ class ChessChallengeActivity : AppCompatActivity() {
             this,
             showHistoryControls = false,
             labelTextSizeSp = 15f,
-            backLabel = "← Levels",
-            menuLabel = "Menu",
+            backLabel = "Back",
             showHintControl = true,
+            showMenuControl = false,
         ).apply {
             setInfo(
                 value = "LEVEL ${selectedLevel.toString().padStart(2, '0')}",
@@ -142,7 +150,6 @@ class ChessChallengeActivity : AppCompatActivity() {
                 accentColor = Color.parseColor("#F7D99B"),
             )
             onBack = { showPauseScreen() }
-            onMenu = { showChallengeMenu() }
             onHint = {
                 if (!completed && !resetting) toggleHint()
             }
@@ -271,6 +278,7 @@ class ChessChallengeActivity : AppCompatActivity() {
     private fun completeLevel() {
         completed = true
         boardView?.isLocked = true
+        SoundPlayer.play("game_end")
         if (selectedLevel > highestCompleted) {
             progressPrefs.edit().putInt(KEY_HIGHEST_COMPLETED, selectedLevel).apply()
         }
@@ -293,6 +301,7 @@ class ChessChallengeActivity : AppCompatActivity() {
     private fun resetPuzzle() {
         handler.removeCallbacksAndMessages(null)
         dismissOverlay()
+        MusicPlayer.resumeMatch(this)
         val start = playerStartState ?: return
         puzzleState = start
         expectedMoveIndex = 1
@@ -371,6 +380,7 @@ class ChessChallengeActivity : AppCompatActivity() {
     private fun showPauseScreen() {
         if (activeOverlay != null || boardView == null) return
         boardView?.isLocked = true
+        MusicPlayer.enterPausedMatch(this)
         showOverlay(
             ChessChoiceView(
                 this,
@@ -389,36 +399,7 @@ class ChessChallengeActivity : AppCompatActivity() {
                         0 -> {
                             dismissOverlay()
                             boardView?.isLocked = false
-                        }
-                        1 -> resetPuzzle()
-                        else -> finish()
-                    }
-                }
-            },
-        )
-    }
-
-    private fun showChallengeMenu() {
-        if (activeOverlay != null) return
-        boardView?.isLocked = true
-        showOverlay(
-            ChessChoiceView(
-                this,
-                title = "Challenge Menu",
-                subtitle = "Keep calculating or choose a different position.",
-                choices = listOf(
-                    ChessChoiceView.Choice("Resume", "Return to the board", "▶", GOLD),
-                    ChessChoiceView.Choice("Restart Level", "Reset the current position", "↻", GOLD),
-                    ChessChoiceView.Choice("Home", "Return to the challenge home", "⌂", GOLD),
-                ),
-                gameLabel = "C H E S S",
-                fullScreenOverride = true,
-            ).apply {
-                onChoiceSelected = { which ->
-                    when (which) {
-                        0 -> {
-                            dismissOverlay()
-                            boardView?.isLocked = false
+                            MusicPlayer.resumeMatch(this@ChessChallengeActivity)
                         }
                         1 -> resetPuzzle()
                         else -> finish()
@@ -432,14 +413,14 @@ class ChessChallengeActivity : AppCompatActivity() {
         showOverlay(
             ChessChoiceView(
                 this,
-                title = "Challenge Failed",
-                subtitle = "The first move or continuation would not lead to the solution.",
+                title = "Game Over",
+                subtitle = "Keep calculating and try again.",
                 choices = listOf(
                     ChessChoiceView.Choice("Retry Level", "Calculate the line again", "↻", GOLD),
                     ChessChoiceView.Choice("Home", "Return to the challenge home", "⌂", GOLD),
                 ),
                 gameLabel = "C H E S S",
-                fullScreenOverride = true,
+                fullScreenOverride = false,
                 dismissOnEmptyTap = true,
             ).apply {
                 onDismissRequested = { dismissOverlay() }
@@ -450,6 +431,7 @@ class ChessChallengeActivity : AppCompatActivity() {
                     }
                 }
             },
+            cardOverlay = true,
         )
     }
 
@@ -458,15 +440,15 @@ class ChessChallengeActivity : AppCompatActivity() {
         showOverlay(
             ChessChoiceView(
                 this,
-                title = "Level Complete",
-                subtitle = "Excellent calculation. The solution is yours.",
+                title = "Game Over",
+                subtitle = "You win! 🎉",
                 choices = buildList {
                     if (nextLevel) add(ChessChoiceView.Choice("Next Level", "Continue the challenge", "→", GOLD))
                     add(ChessChoiceView.Choice("Replay Level", "Solve this one again", "↻", GOLD))
                     add(ChessChoiceView.Choice("Home", "Return to the challenge home", "⌂", GOLD))
                 },
                 gameLabel = "C H E S S",
-                fullScreenOverride = true,
+                fullScreenOverride = false,
                 dismissOnEmptyTap = true,
             ).apply {
                 onDismissRequested = { dismissOverlay() }
@@ -476,16 +458,37 @@ class ChessChallengeActivity : AppCompatActivity() {
                     else finish()
                 }
             },
+            cardOverlay = true,
         )
     }
 
-    private fun showOverlay(view: View) {
+    private fun showOverlay(view: View, cardOverlay: Boolean = false) {
         val root = screenRoot ?: return
         dismissOverlay()
         val overlay = FrameLayout(this).apply {
             isClickable = true
             isFocusable = true
-            addView(view, FrameLayout.LayoutParams(-1, -1))
+            if (cardOverlay) {
+                addView(
+                    View(this@ChessChallengeActivity).apply {
+                        setBackgroundColor(Color.argb(184, 0, 0, 0))
+                        isClickable = true
+                        setOnClickListener { dismissOverlay() }
+                    },
+                    FrameLayout.LayoutParams(-1, -1),
+                )
+            }
+            if (cardOverlay) {
+                val width = minOf(resources.displayMetrics.widthPixels - dp(48), dp(420))
+                addView(
+                    view,
+                    FrameLayout.LayoutParams(width, -2).apply {
+                        gravity = android.view.Gravity.CENTER
+                    },
+                )
+            } else {
+                addView(view, FrameLayout.LayoutParams(-1, -1))
+            }
         }
         activeOverlay = overlay
         root.addView(overlay, FrameLayout.LayoutParams(-1, -1))
