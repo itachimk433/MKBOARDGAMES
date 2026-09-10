@@ -39,6 +39,7 @@ data class ChallengeObjective(
 enum class ChallengeCondition(
     val title: String,
     val objective: String,
+    val requiresCheckmate: Boolean = true,
 ) {
     DIRECT_MATE(
         title = "Direct mate",
@@ -83,5 +84,110 @@ enum class ChallengeCondition(
     PROMOTE_AND_MATE(
         title = "Promote and mate",
         objective = "Promote to the required piece and deliver checkmate.",
+    ),
+    FORK(
+        title = "Knight fork",
+        objective = "Fork two valuable pieces, then win the higher-value target.",
+        requiresCheckmate = false,
+    ),
+    WIN_FREE_PIECE(
+        title = "Free piece",
+        objective = "Capture the undefended piece without giving material back.",
+        requiresCheckmate = false,
+    ),
+    PIN(
+        title = "Pin and win",
+        objective = "Capture the pinned piece while its king remains exposed.",
+        requiresCheckmate = false,
+    ),
+    SKEWER(
+        title = "Skewer",
+        objective = "Attack through the high-value piece and win what is behind it.",
+        requiresCheckmate = false,
+    ),
+    REMOVE_DEFENDER(
+        title = "Remove the defender",
+        objective = "Remove the guard, then capture the newly undefended target.",
+        requiresCheckmate = false,
+    ),
+    DOUBLE_ATTACK(
+        title = "Double attack",
+        objective = "Create two threats and secure one of the targets.",
+        requiresCheckmate = false,
+    ),
+    DISCOVERED_ATTACK(
+        title = "Discovered attack",
+        objective = "Move the masking piece, then win the revealed target.",
+        requiresCheckmate = false,
+    ),
+    PAWN_PROMOTION_RACE(
+        title = "Promotion race",
+        objective = "Promote the passed pawn before the opposing king can stop it.",
+        requiresCheckmate = false,
+    ),
+    TRAPPED_PIECE(
+        title = "Trapped piece",
+        objective = "Cut off the minor piece and capture it.",
+        requiresCheckmate = false,
+    ),
+    OVERLOADED_DEFENDER(
+        title = "Overloaded defender",
+        objective = "Overload the defender, then take the abandoned target.",
+        requiresCheckmate = false,
+    ),
+    XRAY_ATTACK(
+        title = "X-ray attack",
+        objective = "Attack through the front piece and win the target behind it.",
+        requiresCheckmate = false,
+    ),
+    QUEEN_FORK(
+        title = "Queen fork",
+        objective = "Use one queen move to check the king and attack a rook.",
+        requiresCheckmate = false,
+    ),
+    INTERPOSITION(
+        title = "Interposition",
+        objective = "Block the line of attack and neutralize the check.",
+        requiresCheckmate = false,
+    ),
+    CLEARANCE_SACRIFICE(
+        title = "Clearance sacrifice",
+        objective = "Clear the critical line, then follow with the winning blow.",
+        requiresCheckmate = false,
+    ),
+    PAWN_SHIELD_BREAK(
+        title = "Break the pawn shield",
+        objective = "Exchange into the king's pawn shield and open the attack.",
+        requiresCheckmate = false,
+    ),
+    DEFLECTION(
+        title = "Deflection",
+        objective = "Drive the defender away, then exploit the vacant post.",
+        requiresCheckmate = false,
+    ),
+    INTERCEPTION(
+        title = "Interception",
+        objective = "Break the communication between the two defenders and win material.",
+        requiresCheckmate = false,
+    ),
+    ROOK_INCURSION(
+        title = "Seventh-rank incursion",
+        objective = "Invade the seventh rank, win two pawns, and keep the rook active.",
+        requiresCheckmate = false,
+    ),
+    KNIGHT_OUTPOST(
+        title = "Knight outpost",
+        objective = "Centralize the knight on the outpost and restrict the enemy.",
+        requiresCheckmate = false,
+    ),
+    COUNTER_CHECK(
+        title = "Counter-check",
+        objective = "Answer check with a stronger check while winning the attacker.",
+        requiresCheckmate = false,
+    ),
+    OPPOSITION(
+        title = "Opposition",
+        objective = "Use king opposition to escort the pawn to promotion.",
+        requiresCheckmate = false,
     ),
 }

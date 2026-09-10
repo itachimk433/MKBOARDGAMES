@@ -357,7 +357,8 @@ class ChessChallengeActivity : AppCompatActivity() {
         val expectedLine = solutionLines.firstOrNull { line ->
             line.getOrNull(expectedMoveIndex)?.let { findMove(state, it) == move } == true
         }
-        val acceptsAnyMate = playerMovesMade == 0 &&
+        val acceptsAnyMate = currentPuzzle?.condition?.requiresCheckmate == true &&
+            playerMovesMade == 0 &&
             maxPlayerMoves == 1 &&
             isPlayerVictory(engine.applyMove(state, move))
         if (expectedLine == null && !acceptsAnyMate) {
@@ -377,7 +378,8 @@ class ChessChallengeActivity : AppCompatActivity() {
         expectedMoveIndex++
         boardView?.gameState = puzzleState!!
 
-        if (isPlayerVictory(nextState) && playerMovesMade <= maxPlayerMoves) {
+        val authoredLineComplete = expectedMoveIndex >= solutionMoves.size
+        if ((isPlayerVictory(nextState) || authoredLineComplete) && playerMovesMade <= maxPlayerMoves) {
             if (conditionSatisfied()) completeLevel() else showConditionFailure()
         } else if (nextState.status != GameStatus.IN_PROGRESS || playerMovesMade >= maxPlayerMoves) {
             showWrongMove()
@@ -442,7 +444,12 @@ class ChessChallengeActivity : AppCompatActivity() {
         if (stars > previousStars) {
             progressPrefs.edit().putInt(starsKey(selectedLevel), stars).apply()
         }
-        setChallengeStatus("Checkmate! Challenge complete • ${"★".repeat(stars)} • Attempt $attemptNumber")
+        val resultLabel = if (currentPuzzle?.condition?.requiresCheckmate == true) {
+            "Checkmate!"
+        } else {
+            "Tactical line complete!"
+        }
+        setChallengeStatus("$resultLabel Challenge complete • ${"★".repeat(stars)} • Attempt $attemptNumber")
         markResultBoard(victory = true)
         showCompletionScreen()
     }
@@ -584,21 +591,27 @@ class ChessChallengeActivity : AppCompatActivity() {
         }
     }
 
-    private fun conditionSatisfied(): Boolean = when (currentPuzzle?.condition) {
-        ChallengeCondition.DIRECT_MATE -> true
-        ChallengeCondition.CLEAN_MATE -> playerPiecesLost <= objective.allowedPiecesToLose
-        ChallengeCondition.QUIET_MATE ->
-            playerPiecesLost == 0 && opponentPiecesCaptured == 0
-        ChallengeCondition.CAPTURE_MATE -> opponentPiecesCaptured >= objective.requiredCaptures
-        ChallengeCondition.DOUBLE_CAPTURE_MATE -> opponentPiecesCaptured >= objective.requiredCaptures
-        ChallengeCondition.SACRIFICE_TRAP -> opponentCapturedPlayerPiece
-        ChallengeCondition.SET_TRAP -> opponentCapturedPlayerPiece
-        ChallengeCondition.MATERIAL_PRESSURE -> playerPiecesLost >= objective.allowedPiecesToLose
-        ChallengeCondition.PAWN_PROMOTION,
-        ChallengeCondition.PROMOTE_AND_MATE -> playerPromotions >= objective.requiredPromotions &&
-            promotionRequirementSatisfied()
-        ChallengeCondition.LONG_MATE -> true
-        null -> false
+    private fun conditionSatisfied(): Boolean {
+        if (currentPuzzle == null) return false
+        if (opponentPiecesCaptured < objective.requiredCaptures) return false
+        if (objective.requiredPromotions > 0 && !promotionRequirementSatisfied()) return false
+        return when (currentPuzzle?.condition) {
+            ChallengeCondition.DIRECT_MATE -> true
+            ChallengeCondition.CLEAN_MATE -> playerPiecesLost <= objective.allowedPiecesToLose
+            ChallengeCondition.QUIET_MATE ->
+                playerPiecesLost == 0 && opponentPiecesCaptured == 0
+            ChallengeCondition.CAPTURE_MATE,
+            ChallengeCondition.DOUBLE_CAPTURE_MATE -> true
+            ChallengeCondition.SACRIFICE_TRAP,
+            ChallengeCondition.SET_TRAP -> opponentCapturedPlayerPiece
+            ChallengeCondition.MATERIAL_PRESSURE -> playerPiecesLost >= objective.allowedPiecesToLose
+            ChallengeCondition.PAWN_PROMOTION,
+            ChallengeCondition.PROMOTE_AND_MATE -> playerPromotions >= objective.requiredPromotions &&
+                promotionRequirementSatisfied()
+            ChallengeCondition.LONG_MATE -> true
+            null -> false
+            else -> true
+        }
     }
 
     private val objective: ChallengeObjective
@@ -638,6 +651,8 @@ class ChessChallengeActivity : AppCompatActivity() {
                 "That move did not complete the authored mating line."
             ChallengeCondition.LONG_MATE ->
                 "The long mating route was not completed."
+            else ->
+                "The authored tactical line was not completed."
         }
     }
 

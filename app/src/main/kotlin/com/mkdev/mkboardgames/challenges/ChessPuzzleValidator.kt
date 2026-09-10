@@ -78,8 +78,17 @@ object ChessPuzzleValidator {
                 } else {
                     GameStatus.BLACK_WINS
                 }
-                if (state.status != expectedStatus) {
+                if (puzzle.condition.requiresCheckmate && state.status != expectedStatus) {
                     issues += "level ${puzzle.level} line ${lineIndex + 1} does not end in checkmate"
+                } else if (!puzzle.condition.requiresCheckmate) {
+                    val losingStatus = if (expectedStatus == GameStatus.WHITE_WINS) {
+                        GameStatus.BLACK_WINS
+                    } else {
+                        GameStatus.WHITE_WINS
+                    }
+                    if (state.status == losingStatus) {
+                        issues += "level ${puzzle.level} line ${lineIndex + 1} ends with the player losing"
+                    }
                 }
                 val targetMoves = puzzle.objective.targetPlayerMoves
                 if (targetMoves != null && targetMoves != tokens.size / 2) {
@@ -120,7 +129,11 @@ object ChessPuzzleValidator {
                 } else {
                     GameStatus.WHITE_WINS
                 }
-                state.status == winner
+                if (puzzle.condition.requiresCheckmate) {
+                    state.status == winner
+                } else {
+                    state.status == GameStatus.IN_PROGRESS || state.status == winner
+                }
             }
 
     private fun findMove(state: GameState, uci: String) =
