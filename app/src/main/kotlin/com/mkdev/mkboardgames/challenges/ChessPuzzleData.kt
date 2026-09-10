@@ -19,12 +19,20 @@ data class ChessPuzzle(
     val moves: String,
     val rating: Int,
     val sourceId: String,
+    val objective: ChallengeObjective = ChallengeObjective(),
+    val alternateSolutions: List<String> = emptyList(),
 ) {
+    val solutionLines: List<String>
+        get() = (listOf(moves) + alternateSolutions)
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .distinct()
+
     val mateIn: Int
-        get() = moves.trim().split(Regex("\\s+")).size / 2
+        get() = solutionLines.first().split(Regex("\\s+")).size / 2
 
     val condition: ChallengeCondition
-        get() = ChessPuzzleData.conditionFor(level)
+        get() = objective.condition
 
     val ratingLabel: String
         get() = when {
@@ -37,50 +45,53 @@ data class ChessPuzzle(
 }
 
 object ChessPuzzleData {
-    /*
-     * These groups are verified against the authored UCI line after the
-     * opponent's setup move. They are intentionally split into progression
-     * bands: early levels teach clean and quiet mates, the middle levels add
-     * captures and sacrifices, and the later levels combine those ideas.
-     *
-     * Keeping the assignments tied to line properties matters here. A
-     * condition such as "let a piece be captured" cannot be assigned to a
-     * puzzle whose solution never contains that capture; doing so makes a
-     * correct mating line fail at the finish.
-     */
-    private val quietLevels = setOf(
-        10, 13, 15, 21, 22, 23, 24, 26, 33, 35, 36, 37, 41, 42, 45, 49,
-        50, 52, 53, 54, 57, 61, 65, 69, 77, 81, 86, 90, 93, 94, 97, 99,
-    )
-    private val cleanLevels = setOf(
-        1, 2, 3, 4, 5, 6, 7, 8, 11, 12, 14, 16, 17, 18, 19, 20, 25, 28,
-        29, 30, 31, 32, 34, 38, 40, 43, 44, 46, 48, 51, 56, 58, 63, 64,
-        73, 75, 82, 87,
-    )
-    private val captureLevels = setOf(
-        1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 14, 16, 17, 18, 19, 20, 25,
-        27, 28, 29, 30, 31, 32, 34, 38, 39, 40, 43, 44, 46, 48, 51, 55,
-        56, 58, 59, 60, 62, 63, 64, 67, 68, 70, 71, 72, 73, 75, 76, 78,
-        79, 80, 82, 83, 84, 85, 87, 88, 89, 91, 96, 100,
-    )
-    private val doubleCaptureLevels = setOf(
-        9, 12, 34, 43, 46, 55, 56, 67, 70, 76, 80, 89, 96,
-    )
-    private val sacrificeLevels = setOf(
-        9, 27, 39, 47, 55, 59, 60, 62, 66, 67, 68, 70, 71, 72, 74, 76,
-        78, 79, 80, 83, 84, 85, 88, 89, 91, 92, 95, 96, 98, 100,
+    private val authoredObjectives = mapOf(
+        1 to ChallengeObjective(ChallengeCondition.CLEAN_MATE, allowedPiecesToLose = 0, difficulty = 1),
+        9 to ChallengeObjective(ChallengeCondition.CAPTURE_MATE, requiredCaptures = 1, difficulty = 2),
+        10 to ChallengeObjective(ChallengeCondition.QUIET_MATE, allowedPiecesToLose = 0, difficulty = 2),
+        27 to ChallengeObjective(ChallengeCondition.CAPTURE_MATE, requiredCaptures = 1, difficulty = 2),
+        39 to ChallengeObjective(ChallengeCondition.SACRIFICE_TRAP, difficulty = 3),
+        55 to ChallengeObjective(ChallengeCondition.DOUBLE_CAPTURE_MATE, requiredCaptures = 2, difficulty = 3),
+        67 to ChallengeObjective(ChallengeCondition.SACRIFICE_TRAP, difficulty = 4),
+        76 to ChallengeObjective(ChallengeCondition.MATERIAL_PRESSURE, allowedPiecesToLose = 2, difficulty = 4),
+        91 to ChallengeObjective(ChallengeCondition.CAPTURE_MATE, requiredCaptures = 1, difficulty = 5),
+        98 to ChallengeObjective(
+            condition = ChallengeCondition.PROMOTE_AND_MATE,
+            requiredPromotions = 1,
+            promotionRequirement = PromotionRequirement.QUEEN,
+            difficulty = 4,
+        ),
+        99 to ChallengeObjective(
+            condition = ChallengeCondition.PROMOTE_AND_MATE,
+            requiredPromotions = 1,
+            promotionRequirement = PromotionRequirement.ROOK,
+            difficulty = 5,
+        ),
+        100 to ChallengeObjective(
+            condition = ChallengeCondition.PROMOTE_AND_MATE,
+            requiredPromotions = 1,
+            promotionRequirement = PromotionRequirement.KNIGHT,
+            difficulty = 5,
+        ),
+        101 to ChallengeObjective(
+            condition = ChallengeCondition.PAWN_PROMOTION,
+            requiredPromotions = 1,
+            promotionRequirement = PromotionRequirement.QUEEN,
+            difficulty = 5,
+        ),
     )
 
-    fun conditionFor(level: Int): ChallengeCondition = when {
-        level == 101 -> ChallengeCondition.PAWN_PROMOTION
-        level == 100 -> ChallengeCondition.MATERIAL_PRESSURE
-        level >= 61 && level in doubleCaptureLevels -> ChallengeCondition.DOUBLE_CAPTURE_MATE
-        level >= 41 && level in sacrificeLevels -> ChallengeCondition.SACRIFICE_TRAP
-        level >= 21 && level in captureLevels -> ChallengeCondition.CAPTURE_MATE
-        level in quietLevels -> ChallengeCondition.QUIET_MATE
-        level in cleanLevels -> ChallengeCondition.CLEAN_MATE
-        else -> ChallengeCondition.DIRECT_MATE
-    }
+    fun objectiveFor(puzzle: ChessPuzzle): ChallengeObjective =
+        authoredObjectives[puzzle.level] ?: ChallengeObjective(
+            targetPlayerMoves = puzzle.solutionLines.first().split(Regex("\\s+")).size / 2,
+            difficulty = when {
+                puzzle.rating < 900 -> 1
+                puzzle.rating < 1400 -> 2
+                puzzle.rating < 1900 -> 3
+                puzzle.rating < 2200 -> 4
+                else -> 5
+            },
+        )
 
     fun themeFor(level: Int): String {
         val mateIn = all.getOrNull(level - 1)?.mateIn ?: 1
@@ -191,18 +202,41 @@ object ChessPuzzleData {
             ChessPuzzle(95, "b3r3/R6p/5ppk/N7/1nN2P1P/1P1P2P1/P2R1K1r/8 w - - 1 35", "f2g1 e8e1 g1h2 e1h1", 2120, "0M9nl"),
             ChessPuzzle(96, "8/3Bkpp1/4b3/2P5/PP4n1/4P1qQ/R4pP1/2R3K1 w - - 0 27", "g1h1 g3h3 g2h3 e6d5 e3e4 d5e4", 2205, "0y20P"),
             ChessPuzzle(97, "Q7/8/3B4/2p5/Krkn4/8/8/8 w - - 1 54", "a4a3 d4b5 a3a2 b5c3 a2a1 b4b1", 2226, "00dt1"),
-            ChessPuzzle(98, "r4Bk1/pp3p2/7p/3N2p1/2BpPbbq/2P5/PPQ2KP1/R3R3 w - - 1 27", "f2g1 h4h2 g1f1 h2h1 f1f2 f4g3 f2g3 h1h4", 2226, "06LQW"),
-            ChessPuzzle(99, "8/6p1/7p/4p3/4P1kP/2N3P1/3n2K1/8 b - - 9 54", "h6h5 c3d1 g7g6 d1e3", 2251, "0Cadi"),
-            ChessPuzzle(100, "3r2k1/1p1q2rp/p7/1bp1pP2/4P2Q/1PN1nN1R/1PP5/4K2R w - - 2 33", "e1f2 g7g2 f2e3 d7d3 c2d3 d8d3", 2425, "0rp94"),
-            // A compact pawn-only finish: the black rook gives the required
-            // waiting move, while the white king and pawns cover every escape
-            // square around the promoted queen.
+            // A compact promotion module: the black rook gives the required
+            // waiting move, while the white pieces cover every escape square
+            // around the promoted piece. Each entry exercises a different
+            // promotion requirement.
+            ChessPuzzle(
+                98,
+                "7k/5PK1/8/8/8/8/8/7r b - - 0 1",
+                "h1h2 f7f8Q",
+                2226,
+                "local-queen-promotion",
+                alternateSolutions = listOf("h1h3 f7f8Q"),
+            ),
+            ChessPuzzle(
+                99,
+                "7k/5PK1/8/8/8/8/8/7r b - - 0 1",
+                "h1h2 f7f8R",
+                2300,
+                "local-rook-promotion",
+                alternateSolutions = listOf("h1h3 f7f8R"),
+            ),
+            ChessPuzzle(
+                100,
+                "R7/4NP1k/6K1/4B3/8/8/8/7r b - - 0 1",
+                "h1h2 f7f8N",
+                2400,
+                "local-knight-promotion",
+                alternateSolutions = listOf("h1h3 f7f8N"),
+            ),
             ChessPuzzle(
                 101,
                 "8/5KPk/8/6P1/8/8/8/7r b - - 0 1",
                 "h1h2 g7g8Q",
-                1450,
-                "local-pawn-promotion",
+                2450,
+                "local-pawn-promotion-final",
+                alternateSolutions = listOf("h1h3 g7g8Q"),
             ),
-    )
+    ).map { it.copy(objective = objectiveFor(it)) }
 }

@@ -108,9 +108,15 @@ class BoardView(context: Context) : View(context) {
     private var legalMoves: List<Move> = emptyList()
     private var shogiDropPiece: ShogiPieceType? = null
     private var hintMove: Move? = null
+    private var hintStage: Int = 3
 
-    fun setHintMove(move: Move?) {
+    /**
+     * Hint stages: 1 highlights the piece, 2 highlights the destination, and
+     * 3 shows the complete move. A null move clears the hint.
+     */
+    fun setHintMove(move: Move?, stage: Int = 3) {
         hintMove = move
+        hintStage = stage.coerceIn(1, 3)
         invalidate()
     }
 
@@ -1075,8 +1081,8 @@ class BoardView(context: Context) : View(context) {
             drawChessCell(canvas, it.to, highlightGold)
         }
         hintMove?.let {
-            drawChessCell(canvas, it.from, hintGold)
-            drawChessCell(canvas, it.to, hintGold)
+            if (hintStage == 1 || hintStage == 3) drawChessCell(canvas, it.from, hintGold)
+            if (hintStage == 2 || hintStage == 3) drawChessCell(canvas, it.to, hintGold)
         }
         selectedPos?.let { drawChessCell(canvas, it, highlightBlue) }
 
