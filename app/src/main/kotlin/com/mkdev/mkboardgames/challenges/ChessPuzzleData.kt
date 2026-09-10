@@ -288,7 +288,7 @@ object ChessPuzzleData {
             2310,
             "local-grandmaster-immortal",
         ),
-    )).map { puzzle ->
+    ).map { puzzle ->
         puzzle.copy(
             moves = if (puzzle.level == 100) {
                 finalLongLines[104] ?: puzzle.moves
