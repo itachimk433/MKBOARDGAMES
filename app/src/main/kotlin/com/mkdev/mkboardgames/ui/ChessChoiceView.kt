@@ -45,6 +45,7 @@ class ChessChoiceView(
     fullScreenOverride: Boolean? = null,
     private val gridChoices: Boolean = false,
     private val compactGrid: Boolean = false,
+    private val dismissOnEmptyTap: Boolean = false,
 ) : View(context) {
 
     data class Choice(
@@ -789,6 +790,8 @@ class ChessChoiceView(
                 if (selected != null && hits[selected].rect.contains(event.x, event.y)) {
                     SoundPlayer.play("ui_click")
                     onChoiceSelected?.invoke(selected)
+                } else if (dismissOnEmptyTap) {
+                    onDismissRequested?.invoke()
                 }
                 pressedIndex = null
                 invalidate()

@@ -3,6 +3,7 @@ package com.mkdev.mkboardgames
 import android.content.Context
 import android.graphics.Color
 import android.graphics.Typeface
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -54,6 +55,19 @@ class ChessChallengeActivity : AppCompatActivity() {
         showLevelList()
     }
 
+    override fun onResume() {
+        super.onResume()
+        makeFullscreen()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) {
+            makeFullscreen()
+            window.decorView.postDelayed({ makeFullscreen() }, 200L)
+        }
+    }
+
     override fun onDestroy() {
         handler.removeCallbacksAndMessages(null)
         super.onDestroy()
@@ -63,9 +77,9 @@ class ChessChallengeActivity : AppCompatActivity() {
     override fun onBackPressed() {
         if (activeOverlay != null) {
             dismissOverlay()
-            if (resetting) {
-                resetPuzzle()
-            } else if (!completed) {
+            if (resetting || completed) {
+                boardView?.isLocked = true
+            } else {
                 boardView?.isLocked = false
             }
         } else if (boardView != null) {
@@ -157,6 +171,11 @@ class ChessChallengeActivity : AppCompatActivity() {
             isFlipped = false
             onMoveMade = ::handlePlayerMove
             onPromotionChoice = ::showPromotionChoice
+            onGameOverTapped = {
+                if (activeOverlay == null && (completed || resetting)) {
+                    if (completed) showCompletionScreen() else showFailureScreen()
+                }
+            }
             isLocked = true
         }
         boardView = board
@@ -199,7 +218,7 @@ class ChessChallengeActivity : AppCompatActivity() {
         boardView?.gameState = puzzleState!!
         boardView?.isFlipped = puzzleState!!.currentTurn == PieceColor.BLACK
         boardView?.isLocked = false
-        setChallengeStatus("Your move. Find the best continuation.")
+        setChallengeStatus(objectiveText())
     }
 
     private fun handlePlayerMove(move: Move) {
@@ -245,7 +264,7 @@ class ChessChallengeActivity : AppCompatActivity() {
         if (expectedMoveIndex >= solutionMoves.size) completeLevel()
         else {
             boardView?.isLocked = false
-            setChallengeStatus("Your move. Find the best continuation.")
+            setChallengeStatus(objectiveText())
         }
     }
 
@@ -255,7 +274,8 @@ class ChessChallengeActivity : AppCompatActivity() {
         if (selectedLevel > highestCompleted) {
             progressPrefs.edit().putInt(KEY_HIGHEST_COMPLETED, selectedLevel).apply()
         }
-        setChallengeStatus("Level complete. Excellent calculation.")
+        setChallengeStatus("Level complete")
+        markResultBoard()
         showCompletionScreen()
     }
 
@@ -265,7 +285,8 @@ class ChessChallengeActivity : AppCompatActivity() {
         hintActive = false
         gameHud?.setHintActive(false)
         boardView?.setHintMove(null)
-        setChallengeStatus("That line does not solve the position.")
+        setChallengeStatus("Solution missed")
+        markResultBoard()
         showFailureScreen()
     }
 
@@ -283,7 +304,7 @@ class ChessChallengeActivity : AppCompatActivity() {
         boardView?.isLocked = false
         gameHud?.setHintActive(false, animate = false)
         boardView?.setHintMove(null)
-        setChallengeStatus("Your move. Find the best continuation.")
+        setChallengeStatus(objectiveText())
     }
 
     private fun showPromotionChoice(choices: List<Move>) {
@@ -324,8 +345,22 @@ class ChessChallengeActivity : AppCompatActivity() {
         boardView?.setHintMove(if (hintActive) move else null)
         setChallengeStatus(
             if (hintActive) "Hint shown. Follow the highlighted move."
-            else "Your move. Find the best continuation.",
+            else objectiveText(),
         )
+    }
+
+    private fun objectiveText(): String {
+        val theme = ChessPuzzleData.themeFor(selectedLevel)
+        if (theme.equals("Mate in one", ignoreCase = true)) return "Mate in one move"
+        val playerMoves = (solutionMoves.size / 2).coerceAtLeast(1)
+        val moveLabel = if (playerMoves == 1) "move" else "moves"
+        return "$theme • $playerMoves $moveLabel"
+    }
+
+    private fun markResultBoard() {
+        val state = puzzleState ?: return
+        boardView?.gameState = state.copy(status = GameStatus.WHITE_WINS)
+        boardView?.isLocked = true
     }
 
     private fun expectedMoveForCurrentState(): Move? {
@@ -344,7 +379,7 @@ class ChessChallengeActivity : AppCompatActivity() {
                 choices = listOf(
                     ChessChoiceView.Choice("Resume", "Return to the board", "▶", GOLD),
                     ChessChoiceView.Choice("Restart Level", "Try this puzzle again", "↻", GOLD),
-                    ChessChoiceView.Choice("Choose Level", "Return to the challenge list", "☷", GOLD),
+                    ChessChoiceView.Choice("Home", "Return to the challenge home", "⌂", GOLD),
                 ),
                 gameLabel = "C H E S S",
                 fullScreenOverride = true,
@@ -356,7 +391,7 @@ class ChessChallengeActivity : AppCompatActivity() {
                             boardView?.isLocked = false
                         }
                         1 -> resetPuzzle()
-                        else -> showLevelList()
+                        else -> finish()
                     }
                 }
             },
@@ -374,7 +409,7 @@ class ChessChallengeActivity : AppCompatActivity() {
                 choices = listOf(
                     ChessChoiceView.Choice("Resume", "Return to the board", "▶", GOLD),
                     ChessChoiceView.Choice("Restart Level", "Reset the current position", "↻", GOLD),
-                    ChessChoiceView.Choice("Choose Level", "Return to the challenge list", "☷", GOLD),
+                    ChessChoiceView.Choice("Home", "Return to the challenge home", "⌂", GOLD),
                 ),
                 gameLabel = "C H E S S",
                 fullScreenOverride = true,
@@ -386,7 +421,7 @@ class ChessChallengeActivity : AppCompatActivity() {
                             boardView?.isLocked = false
                         }
                         1 -> resetPuzzle()
-                        else -> showLevelList()
+                        else -> finish()
                     }
                 }
             },
@@ -401,24 +436,17 @@ class ChessChallengeActivity : AppCompatActivity() {
                 subtitle = "The first move or continuation would not lead to the solution.",
                 choices = listOf(
                     ChessChoiceView.Choice("Retry Level", "Calculate the line again", "↻", GOLD),
-                    ChessChoiceView.Choice("Show Hint", "Highlight the next move", "?", GOLD),
-                    ChessChoiceView.Choice("Choose Level", "Return to the challenge list", "☷", GOLD),
+                    ChessChoiceView.Choice("Home", "Return to the challenge home", "⌂", GOLD),
                 ),
                 gameLabel = "C H E S S",
                 fullScreenOverride = true,
+                dismissOnEmptyTap = true,
             ).apply {
+                onDismissRequested = { dismissOverlay() }
                 onChoiceSelected = { which ->
                     when (which) {
                         0 -> resetPuzzle()
-                        1 -> {
-                            resetPuzzle()
-                            hintActive = true
-                            val move = expectedMoveForCurrentState()
-                            boardView?.setHintMove(move)
-                            gameHud?.setHintActive(true)
-                            setChallengeStatus("Hint shown. Follow the highlighted move.")
-                        }
-                        else -> showLevelList()
+                        else -> finish()
                     }
                 }
             },
@@ -435,15 +463,17 @@ class ChessChallengeActivity : AppCompatActivity() {
                 choices = buildList {
                     if (nextLevel) add(ChessChoiceView.Choice("Next Level", "Continue the challenge", "→", GOLD))
                     add(ChessChoiceView.Choice("Replay Level", "Solve this one again", "↻", GOLD))
-                    add(ChessChoiceView.Choice("Choose Level", "Return to the challenge list", "☷", GOLD))
+                    add(ChessChoiceView.Choice("Home", "Return to the challenge home", "⌂", GOLD))
                 },
                 gameLabel = "C H E S S",
                 fullScreenOverride = true,
+                dismissOnEmptyTap = true,
             ).apply {
+                onDismissRequested = { dismissOverlay() }
                 onChoiceSelected = { which ->
                     if (nextLevel && which == 0) showPuzzle(selectedLevel + 1)
                     else if (which == if (nextLevel) 1 else 0) resetPuzzle()
-                    else showLevelList()
+                    else finish()
                 }
             },
         )
@@ -554,6 +584,14 @@ class ChessChallengeActivity : AppCompatActivity() {
                 View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
                 View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
                 View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.insetsController?.hide(
+                android.view.WindowInsets.Type.statusBars() or
+                    android.view.WindowInsets.Type.navigationBars(),
+            )
+            window.insetsController?.systemBarsBehavior =
+                android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
     }
 
     companion object {
