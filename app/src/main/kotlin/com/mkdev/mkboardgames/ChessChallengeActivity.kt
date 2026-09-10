@@ -30,7 +30,7 @@ class ChessChallengeActivity : AppCompatActivity() {
 
     private val engine = ChessRuleEngine()
     private val handler = Handler(Looper.getMainLooper())
-    private val puzzles = ChessPuzzleData.all
+    private val puzzles = ChessPuzzleData.all.filter { it.level == 1 }
     private var selectedLevel = 1
     private var currentPuzzle: ChessPuzzle? = null
     private var puzzleState: GameState? = null
@@ -131,7 +131,8 @@ class ChessChallengeActivity : AppCompatActivity() {
         gameHud = null
         challengeStatusView = null
         val root = verticalRoot()
-        root.addView(topBar("CHESS CHALLENGES", "${puzzles.size} progressive levels") {
+        val levelSummary = if (puzzles.size == 1) "1 level" else "${puzzles.size} progressive levels"
+        root.addView(topBar("CHESS CHALLENGES", levelSummary) {
             finish()
         })
 
@@ -151,7 +152,6 @@ class ChessChallengeActivity : AppCompatActivity() {
             puzzles.size,
             highestCompleted,
             IntArray(puzzles.size) { progressPrefs.getInt(starsKey(it + 1), 0) },
-            puzzles.map { "${ChessPuzzleData.themeFor(it.level)} • ${it.condition.title}" },
         ).apply {
             onLevelSelected = { level ->
                 selectedLevel = level
