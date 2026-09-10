@@ -21,11 +21,11 @@ object ChessPuzzleValidator {
     fun validateAll(puzzles: List<ChessPuzzle> = ChessPuzzleData.all): List<String> {
         val issues = mutableListOf<String>()
         val levels = puzzles.map { it.level }
-        if (levels != (1..100).toList()) {
-            issues += "levels must be present once each from 1 to 100"
+        if (levels != (1..25).toList()) {
+            issues += "levels must be present once each from 1 to 25"
         }
-        if (ChessChallengeCatalogue.size != 100) {
-            issues += "challenge catalogue must contain exactly 100 titles"
+        if (ChessChallengeCatalogue.size != 25) {
+            issues += "challenge catalogue must contain exactly 25 titles"
         }
         if (ChessBeginnerChallenges.all.map { it.level } != (1..25).toList()) {
             issues += "beginner challenge catalogue must contain levels 1 to 25 once each"

@@ -30,7 +30,7 @@ class ChessChallengeActivity : AppCompatActivity() {
 
     private val engine = ChessRuleEngine()
     private val handler = Handler(Looper.getMainLooper())
-    private val puzzles = ChessPuzzleData.all.filter { it.level in 1..25 }
+    private val puzzles = ChessPuzzleData.all
     private var selectedLevel = 1
     private var currentPuzzle: ChessPuzzle? = null
     private var puzzleState: GameState? = null
@@ -519,26 +519,22 @@ class ChessChallengeActivity : AppCompatActivity() {
     }
 
     private fun toggleHint() {
-        if (puzzleState == null) return
-        val move = expectedMoveForCurrentState()
-        if (move == null) {
-            hintActive = false
-            boardView?.setHintMove(null)
-            gameHud?.setHintActive(false)
-            return
-        }
-        hintStage = if (!hintActive) 1 else (hintStage % 3) + 1
-        hintActive = true
+        if (currentPuzzle == null || puzzleState == null) return
+        hintActive = !hintActive
         hintUsed = true
-        boardView?.setHintMove(move, hintStage)
-        val hintLabel = when (hintStage) {
-            1 -> "Hint 1/3: move the highlighted piece."
-            2 -> "Hint 2/3: move it to the highlighted square."
-            else -> "Hint 3/3: follow the complete highlighted move."
+        hintStage = 0
+        boardView?.setHintMove(null)
+        gameHud?.setHintActive(hintActive)
+        setChallengeStatus(if (hintActive) hintDescription() else objectiveText())
+    }
+
+    private fun hintDescription(): String {
+        val beginnerBrief = currentPuzzle?.beginnerChallenge
+        return if (beginnerBrief != null) {
+            "Hint: ${beginnerBrief.focus}\nWin condition: ${beginnerBrief.winCondition}"
+        } else {
+            "Hint: ${objectiveText()}"
         }
-        setChallengeStatus(
-            hintLabel,
-        )
     }
 
     private fun objectiveText(): String {

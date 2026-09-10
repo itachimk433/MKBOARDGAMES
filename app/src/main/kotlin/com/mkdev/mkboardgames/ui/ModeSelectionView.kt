@@ -227,7 +227,7 @@ class ModeSelectionView(context: Context) : View(context) {
             GameMode.CHALLENGES,
             "♞",
             "Challenges",
-            "100 chess puzzles",
+            "25 chess challenges",
         )
         drawSettings(canvas)
     }
