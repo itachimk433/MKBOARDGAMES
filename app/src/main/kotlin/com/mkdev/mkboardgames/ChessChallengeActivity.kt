@@ -450,15 +450,14 @@ class ChessChallengeActivity : AppCompatActivity() {
 
     private fun recordMoveEffects(state: GameState, move: Move, mover: PieceColor) {
         move.captures.forEach { capturePosition ->
-            when (state.get(capturePosition)?.color) {
-                playerColor -> {
-                    playerPiecesLost++
-                    if (mover == playerColor.opponent()) {
-                        opponentCapturedPlayerPiece = true
-                    }
+            val capturedColor = state.get(capturePosition)?.color
+            if (capturedColor == playerColor) {
+                playerPiecesLost++
+                if (mover == playerColor.opponent()) {
+                    opponentCapturedPlayerPiece = true
                 }
-                playerColor.opponent() -> opponentPiecesCaptured++
-                null -> Unit
+            } else if (capturedColor == playerColor.opponent()) {
+                opponentPiecesCaptured++
             }
         }
         if (mover == playerColor && move.promotionType != null) {
