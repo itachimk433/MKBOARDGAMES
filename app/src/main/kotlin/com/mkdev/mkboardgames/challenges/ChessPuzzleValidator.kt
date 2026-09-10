@@ -27,6 +27,12 @@ object ChessPuzzleValidator {
         if (ChessChallengeCatalogue.size != 100) {
             issues += "challenge catalogue must contain exactly 100 titles"
         }
+        if (ChessBeginnerChallenges.all.map { it.level } != (1..25).toList()) {
+            issues += "beginner challenge catalogue must contain levels 1 to 25 once each"
+        }
+        if (ChessBeginnerChallenges.all.any { it.title != ChessChallengeCatalogue.titleFor(it.level) }) {
+            issues += "beginner challenge titles must match the challenge catalogue"
+        }
         val duplicateFens = puzzles.groupBy { it.fen }.filterValues { it.size > 1 }
         duplicateFens.values.forEach { duplicatePuzzles ->
             issues += "duplicate puzzle FEN for levels ${duplicatePuzzles.joinToString { it.level.toString() }}"

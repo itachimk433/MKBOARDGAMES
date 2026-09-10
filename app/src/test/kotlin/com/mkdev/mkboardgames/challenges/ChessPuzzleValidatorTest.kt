@@ -32,6 +32,17 @@ class ChessPuzzleValidatorTest {
     }
 
     @Test
+    fun beginnerCurriculumContainsAllTwentyFiveLevelsAndStartingSetup() {
+        assertTrue(ChessBeginnerChallenges.all.size == 25)
+        assertTrue(ChessBeginnerChallenges.all.map { it.level } == (1..25).toList())
+        assertTrue(ChessBeginnerChallenges.standardInitialSetup.contains("rooks a1/h1"))
+        assertTrue(ChessBeginnerChallenges.standardInitialSetup.contains("king e8"))
+        assertTrue(ChessBeginnerChallenges.standardInitialCoordinates["white.pawns"]?.size == 8)
+        assertTrue(ChessBeginnerChallenges.standardInitialCoordinates["black.pawns"]?.contains("h7") == true)
+        assertTrue(ChessPuzzleData.all.take(25).all { it.beginnerChallenge != null })
+    }
+
+    @Test
     fun everyPuzzleHasAtLeastOnePlayableAuthoredLine() {
         ChessPuzzleData.all.forEach { puzzle ->
             assertTrue(

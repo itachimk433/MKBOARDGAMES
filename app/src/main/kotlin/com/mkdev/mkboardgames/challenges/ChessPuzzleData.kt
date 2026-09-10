@@ -23,6 +23,7 @@ data class ChessPuzzle(
     val objective: ChallengeObjective = ChallengeObjective(),
     val alternateSolutions: List<String> = emptyList(),
     val title: String = "Chess challenge",
+    val beginnerChallenge: ChessBeginnerChallenge? = null,
 ) {
     val solutionLines: List<String>
         get() = (listOf(moves) + alternateSolutions)
@@ -291,6 +292,7 @@ object ChessPuzzleData {
             moves = puzzle.moves,
             objective = objectiveFor(puzzle),
             title = ChessChallengeCatalogue.titleFor(puzzle.level),
+            beginnerChallenge = ChessBeginnerChallenges.forLevel(puzzle.level),
         )
     }
 }

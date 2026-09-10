@@ -30,7 +30,7 @@ class ChessChallengeActivity : AppCompatActivity() {
 
     private val engine = ChessRuleEngine()
     private val handler = Handler(Looper.getMainLooper())
-    private val puzzles = ChessPuzzleData.all.filter { it.level == 1 }
+    private val puzzles = ChessPuzzleData.all.filter { it.level in 1..25 }
     private var selectedLevel = 1
     private var currentPuzzle: ChessPuzzle? = null
     private var puzzleState: GameState? = null
@@ -540,6 +540,10 @@ class ChessChallengeActivity : AppCompatActivity() {
         val playerMoves = puzzle.objective.targetPlayerMoves ?: maxPlayerMoves
         val moveLabel = if (playerMoves == 1) "move" else "moves"
         val lineObjective = "$theme • Difficulty ${puzzle.objective.difficulty}/5 • $playerMoves $moveLabel"
+        val beginnerBrief = puzzle.beginnerChallenge
+        if (beginnerBrief != null) {
+            return "${beginnerBrief.focus}\nWin condition: ${beginnerBrief.winCondition} • $lineObjective"
+        }
         return if (puzzle.condition == ChallengeCondition.DIRECT_MATE) {
             lineObjective
         } else {
