@@ -11,6 +11,7 @@ import android.util.TypedValue
 import android.view.View
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
+import com.mkdev.mkboardgames.challenges.ChallengeCondition
 import com.mkdev.mkboardgames.challenges.ChessPuzzle
 import com.mkdev.mkboardgames.challenges.ChessPuzzleData
 import com.mkdev.mkboardgames.engine.*
@@ -36,6 +37,13 @@ class ChessChallengeActivity : AppCompatActivity() {
     private var playerColor = PieceColor.WHITE
     private var playerMovesMade = 0
     private var maxPlayerMoves = 1
+    private var playerPiecesLost = 0
+    private var opponentPiecesCaptured = 0
+    private var opponentCapturedPlayerPiece = false
+    private var playerPromotions = 0
+    private var initialPlayerPiecesLost = 0
+    private var initialOpponentPiecesCaptured = 0
+    private var initialOpponentCapturedPlayerPiece = false
     private var opponentMoveAnimating = false
     private var boardView: BoardView? = null
     private var gameHud: StandardGameHudView? = null
@@ -106,12 +114,12 @@ class ChessChallengeActivity : AppCompatActivity() {
         boardView = null
         gameHud = null
         val root = verticalRoot()
-        root.addView(topBar("CHESS CHALLENGES", "100 tactical levels") {
+        root.addView(topBar("CHESS CHALLENGES", "${puzzles.size} progressive levels") {
             finish()
         })
 
         val summary = TextView(this).apply {
-            text = "Complete levels in order.\nHighest completed: ${highestCompleted.coerceAtMost(puzzles.size)} / ${puzzles.size}"
+            text = "Each level adds a new mating condition.\nHighest completed: ${highestCompleted.coerceAtMost(puzzles.size)} / ${puzzles.size}"
             setTextColor(Color.parseColor("#B7C9D1"))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             setPadding(dp(20), dp(13), dp(20), dp(12))
@@ -217,6 +225,11 @@ class ChessChallengeActivity : AppCompatActivity() {
         expectedMoveIndex = 1
         playerMovesMade = 0
         maxPlayerMoves = (solutionMoves.size / 2).coerceAtLeast(1)
+        playerColor = initial.currentTurn.opponent()
+        initialPlayerPiecesLost = 0
+        initialOpponentPiecesCaptured = 0
+        initialOpponentCapturedPlayerPiece = false
+        resetConditionTracking()
         if (solutionMoves.size < 2 || solutionMoves.size % 2 != 0) {
             puzzleState = initial
             playerStartState = initial
@@ -235,6 +248,10 @@ class ChessChallengeActivity : AppCompatActivity() {
             return
         }
         val afterOpponent = engine.applyMove(initial, firstMove)
+        recordMoveEffects(initial, firstMove, initial.currentTurn)
+        initialPlayerPiecesLost = playerPiecesLost
+        initialOpponentPiecesCaptured = opponentPiecesCaptured
+        initialOpponentCapturedPlayerPiece = opponentCapturedPlayerPiece
         puzzleState = afterOpponent.copy(status = GameStatus.IN_PROGRESS)
         playerStartState = puzzleState
         playerColor = puzzleState!!.currentTurn
@@ -261,6 +278,7 @@ class ChessChallengeActivity : AppCompatActivity() {
             showWrongMove()
             return
         }
+        recordMoveEffects(state, move, playerColor)
         val nextState = engine.applyMove(state, move)
         if (nextState === state) return
         puzzleState = nextState
@@ -269,7 +287,7 @@ class ChessChallengeActivity : AppCompatActivity() {
         boardView?.gameState = puzzleState!!
 
         if (isPlayerVictory(nextState) && playerMovesMade <= maxPlayerMoves) {
-            completeLevel()
+            if (conditionSatisfied()) completeLevel() else showConditionFailure()
         } else if (nextState.status != GameStatus.IN_PROGRESS || playerMovesMade >= maxPlayerMoves) {
             showWrongMove()
         } else {
@@ -300,6 +318,7 @@ class ChessChallengeActivity : AppCompatActivity() {
             showWrongMove()
             return
         }
+        recordMoveEffects(state, move, playerColor.opponent())
         val nextState = engine.applyMove(state, move)
         if (nextState === state) {
             showWrongMove()
@@ -353,6 +372,7 @@ class ChessChallengeActivity : AppCompatActivity() {
         puzzleState = start
         expectedMoveIndex = 1
         playerMovesMade = 0
+        resetConditionTracking()
         completed = false
         resetting = false
         hintActive = false
@@ -409,11 +429,63 @@ class ChessChallengeActivity : AppCompatActivity() {
     }
 
     private fun objectiveText(): String {
+        val puzzle = currentPuzzle ?: return "Find the checkmate"
         val theme = ChessPuzzleData.themeFor(selectedLevel)
-        if (theme.equals("Mate in one", ignoreCase = true)) return "Mate in one move"
         val playerMoves = maxPlayerMoves
         val moveLabel = if (playerMoves == 1) "move" else "moves"
-        return "$theme • $playerMoves $moveLabel"
+        val lineObjective = "$theme • $playerMoves $moveLabel"
+        return if (puzzle.condition == ChallengeCondition.DIRECT_MATE) {
+            lineObjective
+        } else {
+            "${puzzle.condition.title}: ${puzzle.condition.objective} • $lineObjective"
+        }
+    }
+
+    private fun resetConditionTracking() {
+        playerPiecesLost = initialPlayerPiecesLost
+        opponentPiecesCaptured = initialOpponentPiecesCaptured
+        opponentCapturedPlayerPiece = initialOpponentCapturedPlayerPiece
+        playerPromotions = 0
+    }
+
+    private fun recordMoveEffects(state: GameState, move: Move, mover: PieceColor) {
+        move.captures.forEach { capturePosition ->
+            when (state.get(capturePosition)?.color) {
+                playerColor -> {
+                    playerPiecesLost++
+                    if (mover == playerColor.opponent()) {
+                        opponentCapturedPlayerPiece = true
+                    }
+                }
+                playerColor.opponent() -> opponentPiecesCaptured++
+                null -> Unit
+            }
+        }
+        if (mover == playerColor && move.promotionType != null) {
+            playerPromotions++
+        }
+    }
+
+    private fun conditionSatisfied(): Boolean = when (currentPuzzle?.condition) {
+        ChallengeCondition.DIRECT_MATE -> true
+        ChallengeCondition.CLEAN_MATE -> playerPiecesLost == 0
+        ChallengeCondition.SACRIFICE_TRAP -> opponentCapturedPlayerPiece
+        ChallengeCondition.MATERIAL_PRESSURE -> playerPiecesLost >= 2
+        ChallengeCondition.PAWN_PROMOTION -> playerPromotions > 0
+        null -> false
+    }
+
+    private fun showConditionFailure() {
+        resetting = true
+        opponentMoveAnimating = false
+        boardView?.isLocked = true
+        gameHud?.controlsEnabled = false
+        hintActive = false
+        gameHud?.setHintActive(false)
+        boardView?.setHintMove(null)
+        setChallengeStatus("Mate found, but the level condition was missed")
+        markResultBoard()
+        showFailureScreen()
     }
 
     private fun markResultBoard(victory: Boolean = false) {

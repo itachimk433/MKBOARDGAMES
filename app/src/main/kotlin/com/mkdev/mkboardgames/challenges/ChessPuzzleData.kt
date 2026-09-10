@@ -8,7 +8,8 @@ package com.mkdev.mkboardgames.challenges
  * the position before the opponent's first move, so [moves] always starts
  * with that opponent move and ends with the player's checkmate.
  *
- * The 100 entries are curated and sorted by puzzle rating. This keeps the
+ * The imported entries are curated and sorted by puzzle rating, followed by
+ * a small set of authored condition puzzles. This keeps the
  * first levels approachable while gradually introducing longer mating lines
  * and master-level calculation.
  */
@@ -22,6 +23,9 @@ data class ChessPuzzle(
     val mateIn: Int
         get() = moves.trim().split(Regex("\\s+")).size / 2
 
+    val condition: ChallengeCondition
+        get() = ChessPuzzleData.conditionFor(level)
+
     val ratingLabel: String
         get() = when {
             rating < 900 -> "Beginner"
@@ -33,6 +37,32 @@ data class ChessPuzzle(
 }
 
 object ChessPuzzleData {
+    /*
+     * The condition assignments are based on the authored line, not on the
+     * puzzle rating. The activity checks them again while the line is played,
+     * so adding a new condition cannot silently turn an ordinary puzzle into
+     * an unwinnable one.
+     */
+    private val cleanLevels = setOf(
+        16, 17, 19, 21, 22, 24, 25, 26, 29, 33, 34, 35, 37, 40, 41, 43,
+        44, 45, 46, 49, 50, 51, 53, 54,
+    )
+    private val trapLevels = setOf(
+        5, 7, 12, 18, 20, 28, 30, 31, 32, 39, 48, 55, 56, 67, 70, 75,
+        89, 96,
+    )
+    private val materialPressureLevels = setOf(
+        9, 59, 60, 66, 68, 71, 72, 76, 80, 84, 85, 88, 100,
+    )
+
+    fun conditionFor(level: Int): ChallengeCondition = when {
+        level == 101 -> ChallengeCondition.PAWN_PROMOTION
+        level in materialPressureLevels -> ChallengeCondition.MATERIAL_PRESSURE
+        level in trapLevels -> ChallengeCondition.SACRIFICE_TRAP
+        level in cleanLevels -> ChallengeCondition.CLEAN_MATE
+        else -> ChallengeCondition.DIRECT_MATE
+    }
+
     fun themeFor(level: Int): String {
         val mateIn = all.getOrNull(level - 1)?.mateIn ?: 1
         return when (mateIn) {
@@ -145,5 +175,15 @@ object ChessPuzzleData {
             ChessPuzzle(98, "r4Bk1/pp3p2/7p/3N2p1/2BpPbbq/2P5/PPQ2KP1/R3R3 w - - 1 27", "f2g1 h4h2 g1f1 h2h1 f1f2 f4g3 f2g3 h1h4", 2226, "06LQW"),
             ChessPuzzle(99, "8/6p1/7p/4p3/4P1kP/2N3P1/3n2K1/8 b - - 9 54", "h6h5 c3d1 g7g6 d1e3", 2251, "0Cadi"),
             ChessPuzzle(100, "3r2k1/1p1q2rp/p7/1bp1pP2/4P2Q/1PN1nN1R/1PP5/4K2R w - - 2 33", "e1f2 g7g2 f2e3 d7d3 c2d3 d8d3", 2425, "0rp94"),
+            // A compact pawn-only finish: the black rook gives the required
+            // waiting move, while the white king and pawns cover every escape
+            // square around the promoted queen.
+            ChessPuzzle(
+                101,
+                "8/5KPk/8/6P1/8/8/8/7r b - - 0 1",
+                "h1h2 g7g8Q",
+                1450,
+                "local-pawn-promotion",
+            ),
     )
 }
