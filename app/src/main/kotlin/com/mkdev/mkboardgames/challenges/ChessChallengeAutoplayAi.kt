@@ -123,7 +123,8 @@ class ChessChallengeAutoplayAi(
     ): Int {
         val playerWin = playerWinStatus(playerColor)
         val opponentWin = playerWinStatus(playerColor.opponent())
-        val objectiveWin = next.status == playerWin && objectiveSatisfied(next, move, puzzle, playerColor, progress)
+        val objectiveWin = isSuccessfulResolution(next, playerColor, puzzle) &&
+            objectiveSatisfied(next, move, puzzle, playerColor, progress)
         var score = when {
             objectiveWin -> 1_000_000
             next.status == playerWin -> -400_000
@@ -205,7 +206,7 @@ class ChessChallengeAutoplayAi(
     ): Boolean {
         val next = engine.applyMove(state, move)
         return next.status == GameStatus.IN_PROGRESS ||
-            (next.status == playerWinStatus(playerColor) &&
+            (isSuccessfulResolution(next, playerColor, puzzle) &&
                 objectiveSatisfied(
                     next,
                     move,
@@ -222,7 +223,7 @@ class ChessChallengeAutoplayAi(
         playerColor: PieceColor,
         progress: ChessChallengeAutoplayProgress,
     ): Boolean {
-        if (state.status != playerWinStatus(playerColor)) return false
+        if (!isSuccessfulResolution(state, playerColor, puzzle)) return false
         return when (puzzle.condition) {
             ChallengeCondition.CHECKMATE_WITHIN_LIMIT -> true
             ChallengeCondition.NO_QUEEN_USE -> !progress.playerMovedQueen
@@ -336,6 +337,15 @@ class ChessChallengeAutoplayAi(
 
     private fun playerWinStatus(color: PieceColor) =
         if (color == PieceColor.WHITE) GameStatus.WHITE_WINS else GameStatus.BLACK_WINS
+
+    private fun isSuccessfulResolution(
+        state: GameState,
+        playerColor: PieceColor,
+        puzzle: ChessPuzzle,
+    ): Boolean =
+        state.status == playerWinStatus(playerColor) ||
+            (puzzle.condition == ChallengeCondition.CHECKMATE_WITHIN_LIMIT &&
+                state.status == GameStatus.DRAW)
 
     private fun findMove(state: GameState, uci: String): Move? {
         if (uci.length < 4) return null

@@ -9,26 +9,31 @@ import com.mkdev.mkboardgames.games.chess.ChessPieceType
 import com.mkdev.mkboardgames.games.chess.ChessRuleEngine
 
 /**
- * Content validation for the ten custom challenge positions.
+ * Content validation for the Missing Piece challenge positions.
  */
 object ChessPuzzleValidator {
     private val engine = ChessRuleEngine()
 
     fun validateAll(puzzles: List<ChessPuzzle> = ChessPuzzleData.all): List<String> {
         val issues = mutableListOf<String>()
-        val expectedNumbers = (1..30).toList()
-        val expectedBeginnerNumbers = (1..10).toList()
+        val expectedNumbers = (1..15).toList()
         if (puzzles.map { it.level } != expectedNumbers) {
-            issues += "challenges must be present once each from 1 to 30"
+            issues += "Missing Piece challenges must be present once each from 1 to 15"
         }
-        if (ChessChallengeCatalogue.size != 30) {
-            issues += "challenge catalogue must contain exactly 30 challenges"
+        if (ChessChallengeCatalogue.size != 15) {
+            issues += "Missing Piece catalogue must contain exactly 15 challenges"
         }
-        if (ChessBeginnerChallenges.all.map { it.level } != expectedBeginnerNumbers) {
-            issues += "challenge descriptions must contain 1 to 10 once each"
+        if (puzzles.any { it.title != ChessChallengeCatalogue.titleFor(it.level) }) {
+            issues += "Missing Piece titles must match the challenge catalogue"
         }
-        if (ChessBeginnerChallenges.all.any { it.title != ChessChallengeCatalogue.titleFor(it.level) }) {
-            issues += "challenge titles must match the challenge catalogue"
+        if (puzzles.any { it.missingPieces < 1 }) {
+            issues += "every Missing Piece challenge must start at least one piece short"
+        }
+        if (puzzles.zipWithNext().any { (current, next) ->
+                next.missingPieces < current.missingPieces
+            }
+        ) {
+            issues += "higher Missing Piece levels cannot give White more pieces"
         }
         if (puzzles.any { it.fen.split(Regex("\\s+")).getOrNull(1) != "w" }) {
             issues += "all authored challenges must start with White to move"

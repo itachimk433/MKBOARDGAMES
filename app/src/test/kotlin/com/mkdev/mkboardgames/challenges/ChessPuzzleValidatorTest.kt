@@ -6,40 +6,40 @@ import kotlin.test.assertTrue
 
 class ChessPuzzleValidatorTest {
     @Test
-    fun catalogueContainsThirtyChallengesAcrossThreeSections() {
-        assertEquals(30, ChessPuzzleData.all.size)
-        assertEquals(30, ChessChallengeCatalogue.size)
-        assertEquals((1..30).toList(), ChessPuzzleData.all.map { it.level })
-        assertEquals("Fast Checkmate Challenge", ChessChallengeCatalogue.titleFor(3))
-        assertEquals("Knight Hunter Challenge", ChessChallengeCatalogue.titleFor(10))
+    fun catalogueContainsFifteenMissingPieceChallenges() {
+        assertEquals(15, ChessPuzzleData.all.size)
+        assertEquals(15, ChessChallengeCatalogue.size)
+        assertEquals((1..15).toList(), ChessPuzzleData.all.map { it.level })
+        assertEquals("Three Pieces Short", ChessChallengeCatalogue.titleFor(3))
+        assertEquals("Last Piece Standing", ChessChallengeCatalogue.titleFor(15))
     }
 
     @Test
-    fun everyCustomPositionStartsWithWhiteAndHasAValidHint() {
+    fun everyMissingPiecePositionStartsWithWhiteAndHasAValidHint() {
         val issues = ChessPuzzleValidator.validateAll()
         assertTrue(issues.isEmpty(), issues.joinToString("\n"))
     }
 
     @Test
-    fun challengeRulesMatchTheRequestedWinConditions() {
+    fun missingPieceChallengesUseTheResolutionObjective() {
         val objectives = ChessPuzzleData.all.associateBy { it.level }.mapValues { it.value.objective }
         assertEquals(ChallengeCondition.CHECKMATE_WITHIN_LIMIT, objectives.getValue(1).condition)
-        assertEquals(39, objectives.getValue(1).targetPlayerMoves)
-        assertEquals(ChallengeCondition.NO_QUEEN_USE, objectives.getValue(2).condition)
         assertEquals(ChallengeCondition.CHECKMATE_WITHIN_LIMIT, objectives.getValue(3).condition)
-        assertEquals(25, objectives.getValue(3).targetPlayerMoves)
-        assertEquals(ChallengeCondition.CASTLE_AND_WIN, objectives.getValue(5).condition)
-        assertEquals(ChallengeCondition.ROOK_CHECKMATE, objectives.getValue(7).condition)
-        assertEquals(ChallengeCondition.KNIGHT_HUNTER, objectives.getValue(10).condition)
-        assertEquals(25, objectives.getValue(10).targetPlayerMoves)
+        assertEquals(ChallengeCondition.CHECKMATE_WITHIN_LIMIT, objectives.getValue(15).condition)
+        assertEquals(1, ChessPuzzleData.all.first().missingPieces)
+        assertTrue(
+            ChessPuzzleData.all.zipWithNext().all { (current, next) ->
+                next.missingPieces >= current.missingPieces
+            },
+        )
     }
 
     @Test
-    fun challengeBriefsKeepSetupAndWinConditionTogether() {
-        ChessBeginnerChallenges.all.forEach { brief ->
-            assertTrue(brief.setup.isNotBlank())
-            assertTrue(brief.winCondition.isNotBlank())
-            assertEquals(brief.title, ChessChallengeCatalogue.titleFor(brief.level))
+    fun missingPieceChallengesKeepSetupAndWinConditionTogether() {
+        ChessPuzzleData.all.forEach { puzzle ->
+            assertTrue(puzzle.setup.isNotBlank())
+            assertTrue(puzzle.winCondition.contains("checkmate or stalemate"))
+            assertEquals(puzzle.title, ChessChallengeCatalogue.titleFor(puzzle.level))
         }
     }
 }

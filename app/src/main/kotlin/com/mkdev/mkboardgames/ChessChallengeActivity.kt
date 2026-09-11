@@ -170,8 +170,8 @@ class ChessChallengeActivity : AppCompatActivity() {
         gameHud = null
         autoplayButton = null
         val root = verticalRoot()
-        val challengeSummary = "${puzzles.size} custom chess challenges"
-        root.addView(topBar("CHESS CHALLENGES", challengeSummary) {
+        val challengeSummary = "${puzzles.size} Missing Piece chess challenges"
+        root.addView(topBar("MISSING PIECE", challengeSummary) {
             finish()
         })
 
@@ -179,7 +179,7 @@ class ChessChallengeActivity : AppCompatActivity() {
             val earnedStars = (1..puzzles.size).sumOf { progressPrefs.getInt(starsKey(it), 0) }
             val solved = (1..puzzles.size).count { progressPrefs.getInt(starsKey(it), 0) > 0 }
             val attempts = (1..puzzles.size).sumOf { progressPrefs.getInt(attemptsKey(it), 0) }
-            text = "Custom positions with focused win conditions.\nCompleted: $solved / ${puzzles.size} • Highest completed: ${highestCompleted.coerceAtMost(puzzles.size)} • Stars: $earnedStars • Attempts: $attempts"
+            text = "Checkmate or stalemate while playing with fewer pieces.\nCompleted: $solved / ${puzzles.size} • Highest completed: ${highestCompleted.coerceAtMost(puzzles.size)} • Stars: $earnedStars • Attempts: $attempts"
             setTextColor(Color.parseColor("#B7C9D1"))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             setPadding(dp(20), dp(13), dp(20), dp(12))
@@ -193,11 +193,7 @@ class ChessChallengeActivity : AppCompatActivity() {
             IntArray(puzzles.size) { progressPrefs.getInt(starsKey(it + 1), 0) },
             subtitles = puzzles.map { it.title },
             lockFutureChallenges = false,
-            sections = listOf(
-                ChallengeSection(1, "Beginner"),
-                ChallengeSection(11, "Getting Started"),
-                ChallengeSection(21, "Easy"),
-            ),
+            sections = listOf(ChallengeSection(1, "Missing Piece")),
         ).apply {
             onLevelSelected = { level ->
                 selectedLevel = level
@@ -573,10 +569,7 @@ class ChessChallengeActivity : AppCompatActivity() {
 
     private fun challengeSatisfied(state: GameState): Boolean {
         if (playerMovesMade > maxPlayerMoves) return false
-        if (!isPlayerVictory(state)) {
-            return false
-        }
-        if (currentPuzzle?.condition?.requiresCheckmate == true && !isPlayerVictory(state)) {
+        if (!isSuccessfulResolution(state)) {
             return false
         }
         return conditionSatisfied(state)
@@ -597,11 +590,7 @@ class ChessChallengeActivity : AppCompatActivity() {
         if (stars > previousStars) {
             progressPrefs.edit().putInt(starsKey(selectedLevel), stars).apply()
         }
-        val resultLabel = if (currentPuzzle?.condition?.requiresCheckmate == true) {
-            "Checkmate!"
-        } else {
-            "Challenge complete!"
-        }
+        val resultLabel = if (puzzleState?.status == GameStatus.DRAW) "Stalemate!" else "Checkmate!"
         setChallengeStatus("$resultLabel Challenge complete • ${"★".repeat(stars)} • Attempt $attemptNumber")
         markResultBoard(victory = true)
         showCompletionScreen()
@@ -797,7 +786,7 @@ class ChessChallengeActivity : AppCompatActivity() {
         val puzzle = currentPuzzle ?: return false
         val condition = puzzle.condition
         if (condition == ChallengeCondition.CHECKMATE_WITHIN_LIMIT) {
-            return isPlayerVictory(state)
+            return isSuccessfulResolution(state)
         }
         return when (condition) {
             ChallengeCondition.NO_QUEEN_USE -> !playerMovedQueen
@@ -860,7 +849,7 @@ class ChessChallengeActivity : AppCompatActivity() {
         }
         return when (puzzle.condition) {
             ChallengeCondition.CHECKMATE_WITHIN_LIMIT ->
-                "The king was not checkmated within the move limit."
+                "The position was not resolved by checkmate or stalemate within the move limit."
             ChallengeCondition.NO_QUEEN_USE ->
                 "A queen was used. Retry without moving or promoting to a queen."
             ChallengeCondition.KNIGHT_HUNTER ->
@@ -927,10 +916,12 @@ class ChessChallengeActivity : AppCompatActivity() {
 
     private fun markResultBoard(victory: Boolean = false) {
         val state = puzzleState ?: return
-        val resultStatus = if (victory) {
-            if (playerColor == PieceColor.WHITE) GameStatus.WHITE_WINS else GameStatus.BLACK_WINS
-        } else {
-            if (playerColor == PieceColor.WHITE) GameStatus.BLACK_WINS else GameStatus.WHITE_WINS
+        val resultStatus = when {
+            victory && state.status == GameStatus.DRAW -> GameStatus.DRAW
+            victory && playerColor == PieceColor.WHITE -> GameStatus.WHITE_WINS
+            victory -> GameStatus.BLACK_WINS
+            playerColor == PieceColor.WHITE -> GameStatus.BLACK_WINS
+            else -> GameStatus.WHITE_WINS
         }
         boardView?.gameState = state.copy(status = resultStatus)
         boardView?.isLocked = true
@@ -944,6 +935,9 @@ class ChessChallengeActivity : AppCompatActivity() {
         }
         return state.status == playerWin
     }
+
+    private fun isSuccessfulResolution(state: GameState): Boolean =
+        isPlayerVictory(state) || state.status == GameStatus.DRAW
 
     private fun showPauseScreen() {
         if (activeOverlay != null || boardView == null) return
@@ -977,7 +971,7 @@ class ChessChallengeActivity : AppCompatActivity() {
                             resumeFromPause()
                         }
                         1 -> resetPuzzle()
-                        else -> finish()
+                        else -> returnToLevelList()
                     }
                 }
             },
@@ -996,6 +990,14 @@ class ChessChallengeActivity : AppCompatActivity() {
         } else {
             boardView?.isLocked = false
         }
+    }
+
+    private fun returnToLevelList() {
+        handler.removeCallbacksAndMessages(null)
+        stopAutoplay()
+        dismissOverlay()
+        MusicPlayer.resumeMatch(this)
+        showLevelList()
     }
 
     private fun showFailureScreen() {
@@ -1017,7 +1019,7 @@ class ChessChallengeActivity : AppCompatActivity() {
                 onChoiceSelected = { which ->
                     when (which) {
                         0 -> resetPuzzle()
-                        else -> finish()
+                        else -> returnToLevelList()
                     }
                 }
             },
@@ -1046,7 +1048,7 @@ class ChessChallengeActivity : AppCompatActivity() {
                 onChoiceSelected = { which ->
                     if (nextLevel && which == 0) showPuzzle(selectedLevel + 1)
                     else if (which == if (nextLevel) 1 else 0) resetPuzzle()
-                    else finish()
+                    else returnToLevelList()
                 }
             },
             cardOverlay = true,

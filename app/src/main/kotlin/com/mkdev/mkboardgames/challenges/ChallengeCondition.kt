@@ -9,15 +9,14 @@ enum class PromotionRequirement {
 }
 
 /**
- * The ten chess challenges are regular playable positions with one additional
- * rule each. Keeping the rule in data makes the challenge catalogue easy to
- * edit without tying behavior to a numeric challenge id.
+ * Challenge rules stay in data so the catalogue can change without tying
+ * behavior to a numeric challenge id.
  */
 enum class ChallengeCondition(
     val title: String,
     val requiresCheckmate: Boolean = false,
 ) {
-    CHECKMATE_WITHIN_LIMIT("Checkmate within the move limit", requiresCheckmate = true),
+    CHECKMATE_WITHIN_LIMIT("Checkmate or stalemate within the move limit", requiresCheckmate = true),
     NO_QUEEN_USE("Win without using a queen"),
     KNIGHT_HUNTER("Capture both black knights first"),
     PROMOTE_AND_WIN("Promote, then win"),
