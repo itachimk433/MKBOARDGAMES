@@ -787,7 +787,12 @@ class ChessChallengeActivity : AppCompatActivity() {
     private fun showPauseScreen() {
         if (activeOverlay != null || boardView == null) return
         boardView?.isLocked = true
-        if (opponentReplyPending && !opponentMoveAnimating) {
+        if (opponentMoveAnimating) {
+            boardView?.cancelMoveAnimation()
+            opponentMoveAnimating = false
+            opponentReplyPending = true
+        }
+        if (opponentReplyPending) {
             handler.removeCallbacksAndMessages(null)
         }
         MusicPlayer.enterPausedMatch(this)
