@@ -13,6 +13,8 @@ import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import com.mkdev.mkboardgames.challenges.ChallengeObjective
 import com.mkdev.mkboardgames.challenges.ChallengeCondition
+import com.mkdev.mkboardgames.challenges.ChessChallengeAutoplayAi
+import com.mkdev.mkboardgames.challenges.ChessChallengeAutoplayProgress
 import com.mkdev.mkboardgames.challenges.ChessPuzzle
 import com.mkdev.mkboardgames.challenges.ChessPuzzleData
 import com.mkdev.mkboardgames.challenges.PromotionRequirement
@@ -24,11 +26,13 @@ import com.mkdev.mkboardgames.ui.ChessBoardStyle
 import com.mkdev.mkboardgames.ui.ChallengeSection
 import com.mkdev.mkboardgames.ui.ChallengeLevelGridView
 import com.mkdev.mkboardgames.ui.ChessChoiceView
+import com.mkdev.mkboardgames.ui.AutoplayButtonView
 import com.mkdev.mkboardgames.ui.StandardGameHudView
 
 class ChessChallengeActivity : AppCompatActivity() {
 
     private val engine = ChessRuleEngine()
+    private val autoplayAi by lazy { ChessChallengeAutoplayAi(engine) }
     private val easyChessAi by lazy {
         val profile = SettingsManager.chessAiProfileForLevel(0)
         AIPlayer(
@@ -76,6 +80,10 @@ class ChessChallengeActivity : AppCompatActivity() {
     private var hintUsed = false
     private var pauseOverlayOpen = false
     private var opponentReplyPending = false
+    private var autoplayEnabled = false
+    private var autoplayMoveInProgress = false
+    private var autoplayButton: AutoplayButtonView? = null
+    private val autoplayRunnable = Runnable { playAutoplayMove() }
     private var attemptStarted = false
     private var retryCount = 0
     private var attemptNumber = 0
@@ -121,6 +129,7 @@ class ChessChallengeActivity : AppCompatActivity() {
 
     override fun onPause() {
         SoundPlayer.stopAll()
+        stopAutoplay()
         super.onPause()
     }
 
@@ -156,8 +165,10 @@ class ChessChallengeActivity : AppCompatActivity() {
     private fun showLevelList() {
         handler.removeCallbacksAndMessages(null)
         dismissOverlay()
+        stopAutoplay()
         boardView = null
         gameHud = null
+        autoplayButton = null
         val root = verticalRoot()
         val challengeSummary = "${puzzles.size} custom chess challenges"
         root.addView(topBar("CHESS CHALLENGES", challengeSummary) {
@@ -208,6 +219,7 @@ class ChessChallengeActivity : AppCompatActivity() {
         handler.removeCallbacksAndMessages(null)
         opponentReplyPending = false
         dismissOverlay()
+        stopAutoplay()
         selectedLevel = level.coerceIn(1, puzzles.size)
         currentPuzzle = puzzles[selectedLevel - 1]
         MusicPlayer.enterMatch(this)
@@ -310,6 +322,28 @@ class ChessChallengeActivity : AppCompatActivity() {
         challengeStatusView = statusView
         root.addView(statusView, LinearLayout.LayoutParams(-1, dp(if (compactLayout) 36 else 44)))
 
+        val autoplay = AutoplayButtonView(this).apply {
+            onAutoplayChanged = { enabled ->
+                autoplayEnabled = enabled
+                if (enabled) {
+                    scheduleAutoplayMove(160L)
+                } else {
+                    handler.removeCallbacks(autoplayRunnable)
+                    autoplayMoveInProgress = false
+                    if (!completed && !resetting && !opponentMoveAnimating && !opponentReplyPending) {
+                        boardView?.isLocked = false
+                    }
+                }
+            }
+        }
+        autoplayButton = autoplay
+        root.addView(
+            autoplay,
+            LinearLayout.LayoutParams(dp(104), dp(if (compactLayout) 58 else 66)).apply {
+                gravity = android.view.Gravity.CENTER_HORIZONTAL
+            },
+        )
+
         val board = BoardView(this).apply {
             ruleEngine = engine
             chessBoardStyle = ChessBoardStyle.CANVAS
@@ -378,6 +412,42 @@ class ChessChallengeActivity : AppCompatActivity() {
         setChallengeStatus(objectiveText())
     }
 
+    private fun scheduleAutoplayMove(delayMs: Long = 220L) {
+        if (!autoplayEnabled || completed || resetting || opponentMoveAnimating ||
+            opponentReplyPending || activeOverlay != null
+        ) return
+        handler.removeCallbacks(autoplayRunnable)
+        handler.postDelayed(autoplayRunnable, delayMs)
+    }
+
+    private fun playAutoplayMove() {
+        if (!autoplayEnabled || completed || resetting || opponentMoveAnimating ||
+            opponentReplyPending || activeOverlay != null
+        ) return
+        val state = puzzleState ?: return
+        if (state.status != GameStatus.IN_PROGRESS || state.currentTurn != playerColor) return
+
+        if (!attemptStarted) {
+            beginAttempt()
+            attemptStarted = true
+        }
+        val puzzle = currentPuzzle ?: return
+        val move = autoplayAi.choosePlayerMove(
+            state = state,
+            puzzle = puzzle,
+            playerColor = playerColor,
+            progress = autoplayProgress(),
+        )
+        if (move == null) {
+            showWrongMove()
+            return
+        }
+        autoplayMoveInProgress = true
+        boardView?.isLocked = true
+        setChallengeStatus("Autoplay is selecting an objective-safe move…")
+        boardView?.animateExternalMove(move)
+    }
+
     private fun handlePlayerMove(move: Move) {
         if (opponentMoveAnimating) {
             opponentMoveAnimating = false
@@ -391,6 +461,7 @@ class ChessChallengeActivity : AppCompatActivity() {
             attemptStarted = true
         }
 
+        autoplayMoveInProgress = false
         hintActive = false
         gameHud?.setHintActive(false)
         boardView?.setHintMove(null)
@@ -444,6 +515,14 @@ class ChessChallengeActivity : AppCompatActivity() {
     }
 
     private fun chooseOpponentReply(state: GameState): Move? {
+        if (autoplayEnabled) {
+            return autoplayAi.chooseOpponentMove(
+                state = state,
+                puzzle = currentPuzzle ?: return null,
+                playerColor = playerColor,
+                progress = autoplayProgress(),
+            )
+        }
         return easyChessAi.bestMove(state)
             ?: engine.allLegalMoves(state, state.currentTurn).firstOrNull()
     }
@@ -475,6 +554,7 @@ class ChessChallengeActivity : AppCompatActivity() {
             opponentReplyPending = false
             boardView?.isLocked = false
             setChallengeStatus(objectiveText())
+            scheduleAutoplayMove()
         }
     }
 
@@ -503,6 +583,7 @@ class ChessChallengeActivity : AppCompatActivity() {
     }
 
     private fun completeLevel() {
+        stopAutoplay()
         completed = true
         opponentMoveAnimating = false
         boardView?.isLocked = true
@@ -527,6 +608,7 @@ class ChessChallengeActivity : AppCompatActivity() {
     }
 
     private fun showWrongMove() {
+        stopAutoplay()
         resetting = true
         opponentMoveAnimating = false
         pendingOpponentReply = null
@@ -543,6 +625,7 @@ class ChessChallengeActivity : AppCompatActivity() {
 
     private fun resetPuzzle() {
         handler.removeCallbacksAndMessages(null)
+        stopAutoplay()
         dismissOverlay()
         MusicPlayer.resumeMatch(this)
         val start = playerStartState ?: return
@@ -630,6 +713,27 @@ class ChessChallengeActivity : AppCompatActivity() {
         if (maxPlayerMoves == Int.MAX_VALUE) return "OPEN"
         val remaining = (maxPlayerMoves - playerMovesMade).coerceAtLeast(0)
         return if (remaining == 1) "1 MOVE" else "$remaining MOVES"
+    }
+
+    private fun autoplayProgress() = ChessChallengeAutoplayProgress(
+        startingMaterialDeficit = startingMaterialDeficit,
+        playerMovedQueen = playerMovedQueen,
+        playerCastledKingside = playerCastledKingside,
+        playerUsedNonKnightCapture = playerUsedNonKnightCapture,
+        promotedPawn = promotedPawn,
+        playerPromotionTypes = playerPromotionTypes.toList(),
+        playerCapturedBlackKnights = playerCapturedBlackKnights,
+        opponentCapturedWhiteBishop = opponentCapturedWhiteBishop,
+        lastPlayerMoveWasRook = lastPlayerMove?.let { move ->
+            lastPlayerMoveBeforeState?.get(move.from) as? ChessPiece
+        }?.type == ChessPieceType.ROOK,
+    )
+
+    private fun stopAutoplay() {
+        handler.removeCallbacks(autoplayRunnable)
+        autoplayEnabled = false
+        autoplayMoveInProgress = false
+        autoplayButton?.setAutoplayEnabled(false, animate = false)
     }
 
     private fun resetConditionTracking() {
@@ -808,6 +912,7 @@ class ChessChallengeActivity : AppCompatActivity() {
     }
 
     private fun showConditionFailure() {
+        stopAutoplay()
         resetting = true
         opponentMoveAnimating = false
         boardView?.isLocked = true
@@ -842,6 +947,7 @@ class ChessChallengeActivity : AppCompatActivity() {
 
     private fun showPauseScreen() {
         if (activeOverlay != null || boardView == null) return
+        stopAutoplay()
         boardView?.isLocked = true
         if (opponentMoveAnimating) {
             boardView?.cancelMoveAnimation()
