@@ -25,7 +25,6 @@ class ChessPuzzleValidatorTest {
         assertEquals(ChallengeCondition.CHECKMATE_WITHIN_LIMIT, objectives.getValue(1).condition)
         assertEquals(4, objectives.getValue(1).targetPlayerMoves)
         assertEquals(ChallengeCondition.KNIGHT_HUNTER, objectives.getValue(3).condition)
-        assertEquals(setOf("b8", "g8"), objectives.getValue(3).requiredCaptureSquares)
         assertEquals(ChallengeCondition.CASTLE_AND_WIN, objectives.getValue(5).condition)
         assertEquals(ChallengeCondition.ROOK_CHECKMATE, objectives.getValue(7).condition)
         assertEquals(10, objectives.getValue(10).targetPlayerMoves)

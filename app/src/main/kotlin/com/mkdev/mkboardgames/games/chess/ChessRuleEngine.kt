@@ -12,6 +12,7 @@ class ChessRuleEngine : RuleEngine {
         val piece = state.get(position) as? ChessPiece ?: return emptyList()
         if (piece.color != state.currentTurn) return emptyList()
         return pseudoMovesFrom(state, position, piece).filter { move ->
+            !capturesKing(state, move) &&
             !isInCheck(applyMoveInternal(state, move), piece.color)
         }
     }
@@ -225,6 +226,16 @@ class ChessRuleEngine : RuleEngine {
         return squareAttacked(state, Position(kingIdx / 8, kingIdx % 8), color)
     }
 
+    /**
+     * In chess the king is never captured. A checking move ends the game when
+     * the checked side has no legal response, so moves that land on the enemy
+     * king must never enter the legal move list.
+     */
+    private fun capturesKing(state: GameState, move: Move): Boolean =
+        move.captures.any { capture ->
+            (state.get(capture) as? ChessPiece)?.type == ChessPieceType.KING
+        }
+
     private fun squareAttacked(state: GameState, pos: Position, defenderColor: PieceColor): Boolean {
         val attackerColor = defenderColor.opponent()
         for (row in 0..7) for (col in 0..7) {
@@ -242,6 +253,19 @@ class ChessRuleEngine : RuleEngine {
     // ─── Game status ─────────────────────────────────────────────────────────
 
     override fun gameStatus(state: GameState): GameStatus {
+        val whiteKingPresent = state.board.any {
+            (it as? ChessPiece)?.let { piece ->
+                piece.color == PieceColor.WHITE && piece.type == ChessPieceType.KING
+            } == true
+        }
+        val blackKingPresent = state.board.any {
+            (it as? ChessPiece)?.let { piece ->
+                piece.color == PieceColor.BLACK && piece.type == ChessPieceType.KING
+            } == true
+        }
+        if (!whiteKingPresent) return GameStatus.BLACK_WINS
+        if (!blackKingPresent) return GameStatus.WHITE_WINS
+
         val color = state.currentTurn
         val moves = allLegalMoves(state, color)
         return when {

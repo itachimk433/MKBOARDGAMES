@@ -3,7 +3,7 @@ old 25-level beginner curriculum:
 
 1. **Scholar's Mate Challenge** — White to move; checkmate in four moves or fewer.
 2. **No Queen Challenge** — Start without the white queen; win without moving a queen.
-3. **Knight Hunter Challenge** — Capture the black knights on b8 and g8 first, then win.
+3. **Knight Hunter Challenge** — Capture both black knights before any other black piece, then win.
 4. **Pawn Promotion Challenge** — Promote the a7 pawn, then win.
 5. **Castle & Conquer Challenge** — Castle kingside, then win.
 6. **Bishop Pair Challenge** — Win while keeping both white bishops alive.

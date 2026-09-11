@@ -29,7 +29,6 @@ object ChessPuzzleData {
         ),
         ChallengeObjective(
             condition = ChallengeCondition.KNIGHT_HUNTER,
-            requiredCaptureSquares = setOf("b8", "g8"),
             difficulty = 2,
         ),
         ChallengeObjective(
@@ -67,7 +66,7 @@ object ChessPuzzleData {
     private val beginnerPuzzles = listOf(
         ChessPuzzle(
             1,
-            "4k3/5ppp/2B5/8/8/8/4PPPP/3QK1N1 w - - 0 1",
+            "4k3/5ppp/8/8/2B5/8/4PPPP/3QK1N1 w - - 0 1",
             800,
             "custom-scholar-mate",
             challengeObjectives[0],
@@ -115,7 +114,7 @@ object ChessPuzzleData {
         ),
         ChessPuzzle(
             5,
-            "4k1nr/5ppp/8/8/8/8/5PPP/5BNR w K - 0 1",
+            "4k1nr/5ppp/8/8/8/8/5PPP/4KBNR w K - 0 1",
             1200,
             "custom-castle-conquer",
             challengeObjectives[4],
@@ -175,7 +174,7 @@ object ChessPuzzleData {
         ),
         ChessPuzzle(
             10,
-            "4k3/5ppp/2B5/8/8/8/8/3QK1N1 w - - 0 1",
+            "4k3/5ppp/8/8/2B5/8/8/3QK1N1 w - - 0 1",
             1100,
             "custom-fast-checkmate",
             challengeObjectives[9],

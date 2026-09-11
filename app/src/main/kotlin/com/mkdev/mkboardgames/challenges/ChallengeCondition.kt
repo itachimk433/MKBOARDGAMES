@@ -32,7 +32,6 @@ data class ChallengeObjective(
     val condition: ChallengeCondition,
     val targetPlayerMoves: Int? = null,
     val requiredPromotion: PromotionRequirement = PromotionRequirement.ANY,
-    val requiredCaptureSquares: Set<String> = emptySet(),
     val difficulty: Int = 1,
 ) {
     init {

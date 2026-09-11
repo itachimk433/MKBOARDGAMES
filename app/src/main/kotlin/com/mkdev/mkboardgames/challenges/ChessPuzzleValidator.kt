@@ -37,6 +37,16 @@ object ChessPuzzleValidator {
             if (state.board.count { it != null } == 0) {
                 issues += "challenge ${puzzle.level} has an empty position"
             }
+            val kings = state.board.filterIsInstance<ChessPiece>()
+                .filter { it.type == ChessPieceType.KING }
+            if (kings.count { it.color == PieceColor.WHITE } != 1 ||
+                kings.count { it.color == PieceColor.BLACK } != 1
+            ) {
+                issues += "challenge ${puzzle.level} must contain exactly one king per side"
+            }
+            if (engine.isInCheck(state, state.currentTurn.opponent())) {
+                issues += "challenge ${puzzle.level} has the non-moving side in check"
+            }
             if (state.get(Position(7, 4)) == null && puzzle.level == 1) {
                 issues += "challenge ${puzzle.level} is missing the white king"
             }

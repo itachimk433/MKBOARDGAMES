@@ -75,7 +75,7 @@ class ChessChallengeActivity : AppCompatActivity() {
     private var opponentCapturedWhiteBishop = false
     private var promotedPawn = false
     private var startingMaterialDeficit = 0
-    private val playerCaptureSquares = mutableSetOf<String>()
+    private var playerCapturedBlackKnights = 0
     private val playerCapturedSymbols = mutableListOf<String>()
     private val playerLostSymbols = mutableListOf<String>()
     private val initialPlayerCapturedSymbols = mutableListOf<String>()
@@ -637,22 +637,21 @@ class ChessChallengeActivity : AppCompatActivity() {
         playerUsedNonKnightCapture = false
         opponentCapturedWhiteBishop = false
         promotedPawn = false
-        playerCaptureSquares.clear()
+        playerCapturedBlackKnights = 0
     }
 
     private fun recordMoveEffects(state: GameState, move: Move, mover: PieceColor) {
         val movingPiece = state.get(move.from) as? ChessPiece
         move.captures.forEach { capturePosition ->
-            val capturedColor = state.get(capturePosition)?.color
-            val capturedSymbol = state.get(capturePosition)?.symbol() ?: "?"
+            val capturedPiece = state.get(capturePosition) as? ChessPiece
+            val capturedColor = capturedPiece?.color
+            val capturedSymbol = capturedPiece?.symbol() ?: "?"
             if (capturedColor == playerColor) {
                 playerPiecesLost++
                 playerLostSymbols += capturedSymbol
                 if (mover == playerColor.opponent()) {
                     opponentCapturedPlayerPiece = true
-                    if (state.get(capturePosition) is ChessPiece &&
-                        (state.get(capturePosition) as ChessPiece).type == ChessPieceType.BISHOP
-                    ) {
+                    if (capturedPiece?.type == ChessPieceType.BISHOP) {
                         opponentCapturedWhiteBishop = true
                     }
                 }
@@ -660,7 +659,9 @@ class ChessChallengeActivity : AppCompatActivity() {
                 opponentPiecesCaptured++
                 playerCapturedSymbols += capturedSymbol
                 if (mover == playerColor) {
-                    playerCaptureSquares += capturePosition.toSquare()
+                    if (capturedPiece?.type == ChessPieceType.KNIGHT) {
+                        playerCapturedBlackKnights++
+                    }
                 }
             }
         }
@@ -687,7 +688,7 @@ class ChessChallengeActivity : AppCompatActivity() {
         return when (condition) {
             ChallengeCondition.NO_QUEEN_MOVES -> !playerMovedQueen
             ChallengeCondition.KNIGHT_HUNTER ->
-                playerCaptureSquares.containsAll(objective.requiredCaptureSquares)
+                playerCapturedBlackKnights >= 2
             ChallengeCondition.PROMOTE_AND_WIN ->
                 promotedPawn && promotionRequirementSatisfied()
             ChallengeCondition.CASTLE_AND_WIN -> playerCastledKingside
@@ -722,9 +723,13 @@ class ChessChallengeActivity : AppCompatActivity() {
             ChallengeCondition.NO_QUEEN_MOVES ->
                 movingPiece.type == ChessPieceType.QUEEN
             ChallengeCondition.KNIGHT_HUNTER ->
-                move.isCapture &&
-                    playerCaptureSquares.size < objective.requiredCaptureSquares.size &&
-                    move.captures.none { it.toSquare() in objective.requiredCaptureSquares }
+                move.captures
+                    .mapNotNull { state.get(it) as? ChessPiece }
+                    .any { captured ->
+                        captured.color == playerColor.opponent() &&
+                            playerCapturedBlackKnights < 2 &&
+                            captured.type != ChessPieceType.KNIGHT
+                    }
             ChallengeCondition.KNIGHT_CAPTURE_ONLY ->
                 move.isCapture && movingPiece.type != ChessPieceType.KNIGHT
             else -> false
@@ -1159,5 +1164,3 @@ private fun Move.toNotation(): String {
 private fun Position.colLetter(): Char = ('a'.code + col).toChar()
 
 private fun Position.rowNumber(): Int = 8 - row
-
-private fun Position.toSquare(): String = "${colLetter()}${rowNumber()}"
