@@ -63,14 +63,17 @@ class ChessChallengeAutoplayAi(
         val scored = legal.map { move ->
             val next = engine.applyMove(state, move)
             val nextProgress = progressAfterPlayerMove(state, move, playerColor, progress)
-            scorePlayerMove(
-                state = state,
-                next = next,
+            ScoredMove(
                 move = move,
-                puzzle = puzzle,
-                playerColor = playerColor,
-                progress = nextProgress,
-                preferred = move == preferred,
+                score = scorePlayerMove(
+                    state = state,
+                    next = next,
+                    move = move,
+                    puzzle = puzzle,
+                    playerColor = playerColor,
+                    progress = nextProgress,
+                    preferred = move == preferred,
+                ),
             )
         }
         return scored
@@ -170,10 +173,11 @@ class ChessChallengeAutoplayAi(
         progress: ChessChallengeAutoplayProgress,
     ): Int {
         val playerWin = playerWinStatus(playerColor)
-        val opponentWin = playerWinStatus(playerColor.opponent())
         var score = when (next.status) {
-            playerWin -> 200_000
-            opponentWin -> -1_000_000
+            GameStatus.WHITE_WINS ->
+                if (playerWin == GameStatus.WHITE_WINS) 200_000 else -1_000_000
+            GameStatus.BLACK_WINS ->
+                if (playerWin == GameStatus.BLACK_WINS) 200_000 else -1_000_000
             GameStatus.DRAW -> -250_000
             GameStatus.IN_PROGRESS -> 0
         }
