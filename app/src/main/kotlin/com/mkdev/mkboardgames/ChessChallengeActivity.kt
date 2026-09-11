@@ -28,6 +28,15 @@ import com.mkdev.mkboardgames.ui.StandardGameHudView
 class ChessChallengeActivity : AppCompatActivity() {
 
     private val engine = ChessRuleEngine()
+    private val easyChessAi by lazy {
+        val profile = SettingsManager.chessAiProfileForLevel(0)
+        AIPlayer(
+            engine = engine,
+            maxDepth = profile.depth,
+            timeLimitMs = profile.timeLimitMs,
+            quiesceDepth = profile.quiesceDepth,
+        )
+    }
     private val handler = Handler(Looper.getMainLooper())
     private val puzzles = ChessPuzzleData.all
     private var selectedLevel = 1
@@ -429,13 +438,8 @@ class ChessChallengeActivity : AppCompatActivity() {
     }
 
     private fun chooseOpponentReply(state: GameState): Move? {
-        val legalMoves = engine.allLegalMoves(state, state.currentTurn)
-        if (legalMoves.isEmpty()) return null
-        val safeMoves = legalMoves.filter { move ->
-            state.get(move.from) !is ChessPiece ||
-                (state.get(move.from) as ChessPiece).type != ChessPieceType.QUEEN
-        }
-        return (safeMoves.ifEmpty { legalMoves }).firstOrNull()
+        return easyChessAi.bestMove(state)
+            ?: engine.allLegalMoves(state, state.currentTurn).firstOrNull()
     }
 
     private fun applyOpponentReply(move: Move) {
