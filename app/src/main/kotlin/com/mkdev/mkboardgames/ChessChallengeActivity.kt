@@ -54,13 +54,13 @@ class ChessChallengeActivity : AppCompatActivity() {
     private var gameHud: StandardGameHudView? = null
     private var moveHistoryView: TextView? = null
     private var capturedPiecesView: TextView? = null
+    private var challengeStatusView: TextView? = null
     private var screenRoot: FrameLayout? = null
     private var activeOverlay: View? = null
     private var completed = false
     private var resetting = false
     private var hintActive = false
     private var hintUsed = false
-    private var hintOverlayOpen = false
     private var pauseOverlayOpen = false
     private var opponentReplyPending = false
     private var attemptStarted = false
@@ -114,11 +114,6 @@ class ChessChallengeActivity : AppCompatActivity() {
         if (activeOverlay != null) {
             val terminal = completed || resetting
             val wasPause = pauseOverlayOpen
-            val wasHint = hintOverlayOpen
-            if (wasHint) {
-                closeHintOverlay()
-                return
-            }
             dismissOverlay()
             when {
                 wasPause -> resumeFromPause()
@@ -207,6 +202,7 @@ class ChessChallengeActivity : AppCompatActivity() {
         opponentMoveAnimating = false
         moveHistoryView = null
         capturedPiecesView = null
+        challengeStatusView = null
         val root = verticalRoot()
         val compactLayout = resources.displayMetrics.heightPixels /
             resources.displayMetrics.density < 680f
@@ -220,7 +216,7 @@ class ChessChallengeActivity : AppCompatActivity() {
             showMenuControl = false,
         ).apply {
             setInfo(
-                value = "LEVEL ${selectedLevel.toString().padStart(2, '0')}",
+                value = "MOVES",
                 undo = false,
                 detail = "",
                 accentColor = Color.parseColor("#F7D99B"),
@@ -283,6 +279,18 @@ class ChessChallengeActivity : AppCompatActivity() {
         capturedPiecesView = capturesView
         root.addView(capturesView, LinearLayout.LayoutParams(-1, dp(if (compactLayout) 22 else 28)))
 
+        val statusView = TextView(this).apply {
+            setTextColor(Color.parseColor("#D7E4DE"))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, if (compactLayout) 10f else 11f)
+            gravity = android.view.Gravity.CENTER
+            maxLines = 2
+            ellipsize = android.text.TextUtils.TruncateAt.END
+            setPadding(dp(12), dp(3), dp(12), dp(3))
+            setBackgroundColor(Color.parseColor("#0B2028"))
+        }
+        challengeStatusView = statusView
+        root.addView(statusView, LinearLayout.LayoutParams(-1, dp(if (compactLayout) 36 else 44)))
+
         val board = BoardView(this).apply {
             ruleEngine = engine
             chessBoardStyle = ChessBoardStyle.CANVAS
@@ -313,10 +321,11 @@ class ChessChallengeActivity : AppCompatActivity() {
 
     private fun setChallengeStatus(text: String) {
         renderHistory()
+        challengeStatusView?.text = text.replace('\n', ' ').take(120)
         gameHud?.setInfo(
-            value = "LEVEL ${selectedLevel.toString().padStart(2, '0')}",
+            value = moveCounterText(),
             undo = false,
-            detail = text.replace('\n', ' ').take(46),
+            detail = "",
             accentColor = Color.parseColor("#F7D99B"),
         )
     }
@@ -388,7 +397,9 @@ class ChessChallengeActivity : AppCompatActivity() {
         gameHud?.setHintActive(false)
         boardView?.setHintMove(null)
         val expectedLine = solutionLines.firstOrNull { line ->
-            line.getOrNull(expectedMoveIndex)?.let { findMove(state, it) == move } == true
+            line.getOrNull(expectedMoveIndex)?.let { expected ->
+                findMove(state, expected)?.toUci() == move.toUci()
+            } == true
         }
         val acceptsAnyMate = currentPuzzle?.condition?.requiresCheckmate == true &&
             playerMovesMade == 0 &&
@@ -403,8 +414,9 @@ class ChessChallengeActivity : AppCompatActivity() {
         } else {
             solutionMoves = solutionMoves.take(expectedMoveIndex) + move.toUci()
         }
-        recordMoveEffects(state, move, playerColor)
-        val nextState = engine.applyMove(state, move)
+        val acceptedMove = findMove(state, move.toUci()) ?: move
+        recordMoveEffects(state, acceptedMove, playerColor)
+        val nextState = engine.applyMove(state, acceptedMove)
         if (nextState === state) return
         puzzleState = nextState
         playerMovesMade++
@@ -442,12 +454,12 @@ class ChessChallengeActivity : AppCompatActivity() {
     private fun applyOpponentReply(move: Move) {
         val state = puzzleState ?: return
         val expectedMove = solutionMoves.getOrNull(expectedMoveIndex)?.let { findMove(state, it) }
-        if (expectedMove == null || move != expectedMove) {
+        if (expectedMove == null || move.toUci() != expectedMove.toUci()) {
             showWrongMove()
             return
         }
-        recordMoveEffects(state, move, playerColor.opponent())
-        val nextState = engine.applyMove(state, move)
+        recordMoveEffects(state, expectedMove, playerColor.opponent())
+        val nextState = engine.applyMove(state, expectedMove)
         if (nextState === state) {
             showWrongMove()
             return
@@ -516,7 +528,6 @@ class ChessChallengeActivity : AppCompatActivity() {
         resetting = false
         hintActive = false
         hintUsed = false
-        hintOverlayOpen = false
         pauseOverlayOpen = false
         attemptStarted = false
         retryCount++
@@ -558,68 +569,44 @@ class ChessChallengeActivity : AppCompatActivity() {
 
     private fun toggleHint() {
         if (currentPuzzle == null || puzzleState == null) return
-        hintActive = true
         hintUsed = true
-        hintOverlayOpen = true
-        boardView?.setHintMove(null)
-        gameHud?.setHintActive(true)
-        showHintOverlay()
+        hintActive = !hintActive
+        val move = expectedMoveForCurrentState()
+        boardView?.setHintMove(if (hintActive) move else null)
+        gameHud?.setHintActive(hintActive)
+        setChallengeStatus(
+            when {
+                !hintActive -> objectiveText()
+                move == null -> "No hint is available for this position."
+                else -> hintDescription()
+            },
+        )
+    }
+
+    private fun expectedMoveForCurrentState(): Move? {
+        val state = puzzleState ?: return null
+        return solutionMoves.getOrNull(expectedMoveIndex)?.let { findMove(state, it) }
     }
 
     private fun hintDescription(): String {
         val beginnerBrief = currentPuzzle?.beginnerChallenge
         return if (beginnerBrief != null) {
-            "${beginnerBrief.focus}\nWin condition: ${beginnerBrief.winCondition}"
+            "Hint: ${beginnerBrief.focus}"
         } else {
             objectiveText()
         }
     }
 
-    private fun showHintOverlay() {
-        showOverlay(
-            ChessChoiceView(
-                this,
-                title = "Hint",
-                subtitle = hintDescription(),
-                choices = listOf(
-                    ChessChoiceView.Choice("Close", "Return to the board", "×", GOLD),
-                ),
-                gameLabel = "C H E S S",
-                fullScreenOverride = false,
-                dismissOnEmptyTap = true,
-            ).apply {
-                onDismissRequested = { closeHintOverlay() }
-                onChoiceSelected = { closeHintOverlay() }
-            },
-            cardOverlay = true,
-        )
-        hintOverlayOpen = true
-    }
-
-    private fun closeHintOverlay() {
-        hintOverlayOpen = false
-        dismissOverlay()
-        hintActive = false
-        gameHud?.setHintActive(false, animate = false)
-        boardView?.setHintMove(null)
-        boardView?.isLocked = completed || resetting
-    }
-
     private fun objectiveText(): String {
         val puzzle = currentPuzzle ?: return "Find the checkmate"
-        val theme = ChessPuzzleData.themeFor(selectedLevel)
         val playerMoves = puzzle.objective.targetPlayerMoves ?: maxPlayerMoves
         val moveLabel = if (playerMoves == 1) "move" else "moves"
-        val lineObjective = "$theme • Difficulty ${puzzle.objective.difficulty}/5 • $playerMoves $moveLabel"
-        val beginnerBrief = puzzle.beginnerChallenge
-        if (beginnerBrief != null) {
-            return "${beginnerBrief.focus}\nWin condition: ${beginnerBrief.winCondition} • $lineObjective"
-        }
-        return if (puzzle.condition == ChallengeCondition.DIRECT_MATE) {
-            lineObjective
-        } else {
-            "${puzzle.condition.title}: ${puzzle.condition.objective} • $lineObjective"
-        }
+        return "$playerMoves $moveLabel to solve"
+    }
+
+    private fun moveCounterText(): String {
+        val remaining = (maxPlayerMoves - playerMovesMade).coerceAtLeast(0)
+        return if (remaining == 1) "1 MOVE" else "$remaining MOVES"
     }
 
     private fun resetConditionTracking() {
@@ -946,7 +933,6 @@ class ChessChallengeActivity : AppCompatActivity() {
         val root = screenRoot
         activeOverlay?.let { root?.removeView(it) }
         activeOverlay = null
-        hintOverlayOpen = false
         pauseOverlayOpen = false
     }
 
