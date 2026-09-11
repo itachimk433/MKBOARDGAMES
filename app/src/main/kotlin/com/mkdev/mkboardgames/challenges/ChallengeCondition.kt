@@ -26,7 +26,7 @@ enum class ChallengeCondition(
     ROOK_CHECKMATE("Finish with a rook checkmate", requiresCheckmate = true),
     MATERIAL_COMEBACK("Win from a material deficit"),
     KNIGHT_CAPTURE_ONLY("Only knights may capture");
-)
+}
 
 data class ChallengeObjective(
     val condition: ChallengeCondition,
