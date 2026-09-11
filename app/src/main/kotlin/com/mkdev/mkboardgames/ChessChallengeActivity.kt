@@ -718,12 +718,13 @@ class ChessChallengeActivity : AppCompatActivity() {
         if (state.get(move.to) !is ChessPiece) return false
         val attackState = state.copy(currentTurn = playerColor)
         val targets = engine.legalMovesFrom(attackState, move.to)
-            .mapNotNull { attack -> state.get(attack.to) }
-            .filter { it.color == playerColor.opponent() }
+            .filter { attack -> state.get(attack.to)?.color == playerColor.opponent() }
+            .map { it.to }
+            .distinct()
         val capturedTargets = move.captures.count { capture ->
             beforeState.get(capture)?.color == playerColor.opponent()
         }
-        return targets.distinct().size + capturedTargets >= 2
+        return targets.size + capturedTargets >= 2
     }
 
     private val objective: ChallengeObjective
