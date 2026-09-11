@@ -25,7 +25,7 @@ enum class ChallengeCondition(
     PRESERVE_BISHOPS("Keep both bishops, then win"),
     ROOK_CHECKMATE("Finish with a rook checkmate", requiresCheckmate = true),
     MATERIAL_COMEBACK("Win from a material deficit"),
-    KNIGHT_CAPTURE_ONLY("Only knights may capture"),
+    KNIGHT_CAPTURE_ONLY("Only knights may capture");
 )
 
 data class ChallengeObjective(
