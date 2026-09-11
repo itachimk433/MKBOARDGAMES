@@ -24,6 +24,7 @@ class StandardGameHudView(
     labelTextSizeSp: Float = 15f,
     private val labelOffsetDp: Float = 0f,
     private val backLabel: String = "← Back",
+    private val sideLabel: String = "",
     private val menuLabel: String = "Menu",
     private val showHintControl: Boolean = false,
     private val showMenuControl: Boolean = true,
@@ -62,6 +63,12 @@ class StandardGameHudView(
         color = Color.parseColor("#F7D99B")
         textAlign = Paint.Align.CENTER
         textSize = 11f * sp.coerceAtMost(3f)
+    }
+    private val sideLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#BFD0C6")
+        textAlign = Paint.Align.LEFT
+        isFakeBoldText = true
+        textSize = 9f * sp.coerceAtMost(3f)
     }
     private val disabledButtonPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#7D776C")
@@ -217,6 +224,14 @@ class StandardGameHudView(
             canvas.drawRoundRect(it, radius, radius, buttonBorderPaint)
         }
         canvas.drawText(backLabel, backRect.centerX(), backRect.centerY() + buttonPaint.textSize * 0.36f, buttonPaint)
+        if (sideLabel.isNotEmpty()) {
+            canvas.drawText(
+                sideLabel,
+                backRect.right + 9f * dp,
+                backRect.centerY() + sideLabelPaint.textSize * 0.36f,
+                sideLabelPaint,
+            )
+        }
         if (showHistoryControls) {
             canvas.drawText(
                 "Undo",

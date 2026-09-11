@@ -52,6 +52,7 @@ class ChessChallengeActivity : AppCompatActivity() {
     private var opponentMoveAnimating = false
     private var pendingOpponentReply: Move? = null
     private var lastPlayerMove: Move? = null
+    private var lastPlayerMoveBeforeState: GameState? = null
     private var lastPlayerMoveState: GameState? = null
     private var boardView: BoardView? = null
     private var gameHud: StandardGameHudView? = null
@@ -215,6 +216,7 @@ class ChessChallengeActivity : AppCompatActivity() {
             showHistoryControls = false,
             labelTextSizeSp = 15f,
             backLabel = "Back",
+            sideLabel = "LEVEL ${selectedLevel.toString().padStart(2, '0')}",
             showHintControl = true,
             showMenuControl = false,
         ).apply {
@@ -341,6 +343,7 @@ class ChessChallengeActivity : AppCompatActivity() {
         playerMovesMade = 0
         pendingOpponentReply = null
         lastPlayerMove = null
+        lastPlayerMoveBeforeState = null
         lastPlayerMoveState = null
         maxPlayerMoves = puzzle.objective.targetPlayerMoves
             ?: (solutionMoves.size / 2).coerceAtLeast(1)
@@ -417,6 +420,7 @@ class ChessChallengeActivity : AppCompatActivity() {
         playerMovesMade++
         expectedMoveIndex++
         lastPlayerMove = acceptedMove
+        lastPlayerMoveBeforeState = state
         lastPlayerMoveState = nextState
         boardView?.gameState = puzzleState!!
 
@@ -566,6 +570,7 @@ class ChessChallengeActivity : AppCompatActivity() {
         pendingOpponentReply = null
         opponentReplyPending = false
         lastPlayerMove = null
+        lastPlayerMoveBeforeState = null
         lastPlayerMoveState = null
         boardView?.gameState = start
         boardView?.isFlipped = start.currentTurn == PieceColor.BLACK
@@ -709,12 +714,16 @@ class ChessChallengeActivity : AppCompatActivity() {
     private fun forkConditionSatisfied(): Boolean {
         val state = lastPlayerMoveState ?: return false
         val move = lastPlayerMove ?: return false
+        val beforeState = lastPlayerMoveBeforeState ?: return false
         if (state.get(move.to) !is ChessPiece) return false
         val attackState = state.copy(currentTurn = playerColor)
         val targets = engine.legalMovesFrom(attackState, move.to)
             .mapNotNull { attack -> state.get(attack.to) }
             .filter { it.color == playerColor.opponent() }
-        return targets.distinct().size >= 2
+        val capturedTargets = move.captures.count { capture ->
+            beforeState.get(capture)?.color == playerColor.opponent()
+        }
+        return targets.distinct().size + capturedTargets >= 2
     }
 
     private val objective: ChallengeObjective
