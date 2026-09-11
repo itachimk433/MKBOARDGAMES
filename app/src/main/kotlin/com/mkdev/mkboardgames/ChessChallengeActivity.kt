@@ -15,7 +15,6 @@ import com.mkdev.mkboardgames.challenges.ChallengeObjective
 import com.mkdev.mkboardgames.challenges.ChallengeCondition
 import com.mkdev.mkboardgames.challenges.ChessPuzzle
 import com.mkdev.mkboardgames.challenges.ChessPuzzleData
-import com.mkdev.mkboardgames.challenges.ChessPuzzleValidator
 import com.mkdev.mkboardgames.challenges.PromotionRequirement
 import com.mkdev.mkboardgames.engine.*
 import com.mkdev.mkboardgames.games.chess.*
@@ -70,6 +69,13 @@ class ChessChallengeActivity : AppCompatActivity() {
     private var attemptStarted = false
     private var retryCount = 0
     private var attemptNumber = 0
+    private var playerMovedQueen = false
+    private var playerCastledKingside = false
+    private var playerUsedNonKnightCapture = false
+    private var opponentCapturedWhiteBishop = false
+    private var promotedPawn = false
+    private var startingMaterialDeficit = 0
+    private val playerCaptureSquares = mutableSetOf<String>()
     private val playerCapturedSymbols = mutableListOf<String>()
     private val playerLostSymbols = mutableListOf<String>()
     private val initialPlayerCapturedSymbols = mutableListOf<String>()
@@ -143,8 +149,8 @@ class ChessChallengeActivity : AppCompatActivity() {
         boardView = null
         gameHud = null
         val root = verticalRoot()
-        val levelSummary = if (puzzles.size == 1) "1 level" else "${puzzles.size} guided levels"
-        root.addView(topBar("CHESS CHALLENGES", levelSummary) {
+        val challengeSummary = "${puzzles.size} custom chess challenges"
+        root.addView(topBar("CHESS CHALLENGES", challengeSummary) {
             finish()
         })
 
@@ -152,7 +158,7 @@ class ChessChallengeActivity : AppCompatActivity() {
             val earnedStars = (1..puzzles.size).sumOf { progressPrefs.getInt(starsKey(it), 0) }
             val solved = (1..puzzles.size).count { progressPrefs.getInt(starsKey(it), 0) > 0 }
             val attempts = (1..puzzles.size).sumOf { progressPrefs.getInt(attemptsKey(it), 0) }
-            text = "Guided lessons covering mates, tactics, captures, and promotion.\nSolved: $solved / ${puzzles.size} • Highest: ${highestCompleted.coerceAtMost(puzzles.size)} • Stars: $earnedStars • Attempts: $attempts"
+            text = "Custom positions with focused win conditions.\nCompleted: $solved / ${puzzles.size} • Highest completed: ${highestCompleted.coerceAtMost(puzzles.size)} • Stars: $earnedStars • Attempts: $attempts"
             setTextColor(Color.parseColor("#B7C9D1"))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             setPadding(dp(20), dp(13), dp(20), dp(12))
@@ -165,6 +171,7 @@ class ChessChallengeActivity : AppCompatActivity() {
             highestCompleted,
             IntArray(puzzles.size) { progressPrefs.getInt(starsKey(it + 1), 0) },
             subtitles = puzzles.map { it.beginnerChallenge?.title.orEmpty() },
+            lockFutureChallenges = false,
         ).apply {
             onLevelSelected = { level ->
                 selectedLevel = level
@@ -173,7 +180,7 @@ class ChessChallengeActivity : AppCompatActivity() {
             onLockedLevelSelected = { level ->
                 Toast.makeText(
                     this@ChessChallengeActivity,
-                    "Complete Level ${level - 1} to unlock this challenge.",
+                    "This challenge is available from the challenge list.",
                     Toast.LENGTH_SHORT,
                 ).show()
             }
@@ -183,14 +190,6 @@ class ChessChallengeActivity : AppCompatActivity() {
     }
 
     private fun showPuzzle(level: Int) {
-        if (!isLevelUnlocked(level)) {
-            Toast.makeText(
-                this,
-                "Complete Level ${highestCompleted.coerceAtLeast(1)} to unlock this challenge.",
-                Toast.LENGTH_SHORT,
-            ).show()
-            return
-        }
         handler.removeCallbacksAndMessages(null)
         opponentReplyPending = false
         dismissOverlay()
@@ -216,7 +215,7 @@ class ChessChallengeActivity : AppCompatActivity() {
             showHistoryControls = false,
             labelTextSizeSp = 15f,
             backLabel = "Back",
-            sideLabel = "LEVEL ${selectedLevel.toString().padStart(2, '0')}",
+             sideLabel = "CHALLENGE ${selectedLevel.toString().padStart(2, '0')}",
             showHintControl = true,
             showMenuControl = false,
         ).apply {
@@ -301,7 +300,7 @@ class ChessChallengeActivity : AppCompatActivity() {
             chessBoardStyle = ChessBoardStyle.CANVAS
             isFlipped = false
             isFocusable = true
-            contentDescription = "Chess challenge board. Follow the guided line for this level."
+            contentDescription = "Chess challenge board. Complete the custom win condition."
             onMoveMade = ::handlePlayerMove
             onPromotionChoice = ::showPromotionChoice
             onGameOverTapped = {
@@ -337,17 +336,17 @@ class ChessChallengeActivity : AppCompatActivity() {
 
     private fun loadPuzzle(puzzle: ChessPuzzle) {
         val initial = ChessFenParser.parse(puzzle.fen)
-        solutionLines = ChessPuzzleValidator.playableSolutionLines(puzzle)
-        solutionMoves = solutionLines.firstOrNull() ?: emptyList()
-        expectedMoveIndex = 1
+        solutionLines = emptyList()
+        solutionMoves = emptyList()
+        expectedMoveIndex = 0
         playerMovesMade = 0
         pendingOpponentReply = null
         lastPlayerMove = null
         lastPlayerMoveBeforeState = null
         lastPlayerMoveState = null
-        maxPlayerMoves = puzzle.objective.targetPlayerMoves
-            ?: (solutionMoves.size / 2).coerceAtLeast(1)
-        playerColor = initial.currentTurn.opponent()
+        maxPlayerMoves = puzzle.objective.targetPlayerMoves ?: Int.MAX_VALUE
+        playerColor = initial.currentTurn
+        startingMaterialDeficit = materialDeficit(initial)
         initialPlayerPiecesLost = 0
         initialOpponentPiecesCaptured = 0
         initialOpponentCapturedPlayerPiece = false
@@ -356,35 +355,10 @@ class ChessChallengeActivity : AppCompatActivity() {
         initialPlayerCapturedSymbols.clear()
         initialPlayerLostSymbols.clear()
         resetConditionTracking()
-        if (solutionLines.isEmpty()) {
-            puzzleState = initial
-            playerStartState = initial
-            boardView?.gameState = initial
-            boardView?.isLocked = true
-            setChallengeStatus("This puzzle has an incomplete solution.")
-            return
-        }
-        val firstMove = solutionMoves.firstOrNull()?.let { findMove(initial, it) }
-        if (firstMove == null) {
-            puzzleState = initial
-            playerStartState = initial
-            boardView?.gameState = initial
-            boardView?.isLocked = true
-            setChallengeStatus("This puzzle could not be loaded.")
-            return
-        }
-        val afterOpponent = engine.applyMove(initial, firstMove)
-        recordMoveEffects(initial, firstMove, initial.currentTurn)
-        initialPlayerPiecesLost = playerPiecesLost
-        initialOpponentPiecesCaptured = opponentPiecesCaptured
-        initialOpponentCapturedPlayerPiece = opponentCapturedPlayerPiece
-        initialPlayerCapturedSymbols += playerCapturedSymbols
-        initialPlayerLostSymbols += playerLostSymbols
-        puzzleState = afterOpponent.copy(status = GameStatus.IN_PROGRESS)
-        playerStartState = puzzleState
-        playerColor = puzzleState!!.currentTurn
-        boardView?.gameState = puzzleState!!
-        boardView?.isFlipped = puzzleState!!.currentTurn == PieceColor.BLACK
+        puzzleState = initial
+        playerStartState = initial
+        boardView?.gameState = initial
+        boardView?.isFlipped = initial.currentTurn == PieceColor.BLACK
         boardView?.isLocked = false
         setChallengeStatus(objectiveText())
     }
@@ -408,6 +382,10 @@ class ChessChallengeActivity : AppCompatActivity() {
         val acceptedMove = findMove(state, move.toUci())
         if (acceptedMove == null) {
             showWrongMove()
+            return
+        }
+        if (violatesChallengeRule(state, acceptedMove)) {
+            showConditionFailure()
             return
         }
         recordMoveEffects(state, acceptedMove, playerColor)
@@ -451,12 +429,13 @@ class ChessChallengeActivity : AppCompatActivity() {
     }
 
     private fun chooseOpponentReply(state: GameState): Move? {
-        val authoredReply = solutionLines.asSequence()
-            .mapNotNull { line ->
-                line.getOrNull(expectedMoveIndex)?.let { findMove(state, it) }
-            }
-            .firstOrNull()
-        return authoredReply ?: engine.allLegalMoves(state, state.currentTurn).firstOrNull()
+        val legalMoves = engine.allLegalMoves(state, state.currentTurn)
+        if (legalMoves.isEmpty()) return null
+        val safeMoves = legalMoves.filter { move ->
+            state.get(move.from) !is ChessPiece ||
+                (state.get(move.from) as ChessPiece).type != ChessPieceType.QUEEN
+        }
+        return (safeMoves.ifEmpty { legalMoves }).firstOrNull()
     }
 
     private fun applyOpponentReply(move: Move) {
@@ -490,7 +469,7 @@ class ChessChallengeActivity : AppCompatActivity() {
     }
 
     private fun finishAfterFinalPosition(state: GameState) {
-        if (playerMovesMade < maxPlayerMoves && state.status == GameStatus.IN_PROGRESS) {
+        if (state.status == GameStatus.IN_PROGRESS && playerMovesMade < maxPlayerMoves) {
             boardView?.isLocked = false
             setChallengeStatus(objectiveText())
             return
@@ -504,11 +483,13 @@ class ChessChallengeActivity : AppCompatActivity() {
 
     private fun challengeSatisfied(state: GameState): Boolean {
         if (playerMovesMade > maxPlayerMoves) return false
-        if (playerMovesMade < maxPlayerMoves && !isPlayerVictory(state)) return false
+        if (!isPlayerVictory(state)) {
+            return false
+        }
         if (currentPuzzle?.condition?.requiresCheckmate == true && !isPlayerVictory(state)) {
             return false
         }
-        return conditionSatisfied()
+        return conditionSatisfied(state)
     }
 
     private fun completeLevel() {
@@ -528,7 +509,7 @@ class ChessChallengeActivity : AppCompatActivity() {
         val resultLabel = if (currentPuzzle?.condition?.requiresCheckmate == true) {
             "Checkmate!"
         } else {
-            "Tactical line complete!"
+            "Challenge complete!"
         }
         setChallengeStatus("$resultLabel Challenge complete • ${"★".repeat(stars)} • Attempt $attemptNumber")
         markResultBoard(victory = true)
@@ -556,7 +537,7 @@ class ChessChallengeActivity : AppCompatActivity() {
         MusicPlayer.resumeMatch(this)
         val start = playerStartState ?: return
         puzzleState = start
-        expectedMoveIndex = 1
+        expectedMoveIndex = 0
         playerMovesMade = 0
         resetConditionTracking()
         completed = false
@@ -617,37 +598,26 @@ class ChessChallengeActivity : AppCompatActivity() {
             when {
                 !hintActive -> objectiveText()
                 move == null -> "No hint is available for this position."
-                else -> hintDescription()
+                else -> "Hint: highlighted next move"
             },
         )
     }
 
     private fun expectedMoveForCurrentState(): Move? {
         val state = puzzleState ?: return null
-        return solutionLines.asSequence()
-            .mapNotNull { line ->
-                line.getOrNull(expectedMoveIndex)?.let { findMove(state, it) }
-            }
+        val recommended = currentPuzzle?.recommendedMoves.orEmpty()
+            .asSequence()
+            .mapNotNull { findMove(state, it) }
             .firstOrNull()
-    }
-
-    private fun hintDescription(): String {
-        val beginnerBrief = currentPuzzle?.beginnerChallenge
-        return if (beginnerBrief != null) {
-            "Hint: ${beginnerBrief.focus}"
-        } else {
-            objectiveText()
-        }
+        return recommended ?: engine.allLegalMoves(state, state.currentTurn).firstOrNull()
     }
 
     private fun objectiveText(): String {
-        val puzzle = currentPuzzle ?: return "Find the checkmate"
-        val playerMoves = puzzle.objective.targetPlayerMoves ?: maxPlayerMoves
-        val moveLabel = if (playerMoves == 1) "move" else "moves"
-        return "$playerMoves $moveLabel to complete the objective"
+        return currentPuzzle?.winCondition ?: "Complete the challenge"
     }
 
     private fun moveCounterText(): String {
+        if (maxPlayerMoves == Int.MAX_VALUE) return "OPEN"
         val remaining = (maxPlayerMoves - playerMovesMade).coerceAtLeast(0)
         return if (remaining == 1) "1 MOVE" else "$remaining MOVES"
     }
@@ -662,9 +632,16 @@ class ChessChallengeActivity : AppCompatActivity() {
         playerCapturedSymbols += initialPlayerCapturedSymbols
         playerLostSymbols.clear()
         playerLostSymbols += initialPlayerLostSymbols
+        playerMovedQueen = false
+        playerCastledKingside = false
+        playerUsedNonKnightCapture = false
+        opponentCapturedWhiteBishop = false
+        promotedPawn = false
+        playerCaptureSquares.clear()
     }
 
     private fun recordMoveEffects(state: GameState, move: Move, mover: PieceColor) {
+        val movingPiece = state.get(move.from) as? ChessPiece
         move.captures.forEach { capturePosition ->
             val capturedColor = state.get(capturePosition)?.color
             val capturedSymbol = state.get(capturePosition)?.symbol() ?: "?"
@@ -673,73 +650,64 @@ class ChessChallengeActivity : AppCompatActivity() {
                 playerLostSymbols += capturedSymbol
                 if (mover == playerColor.opponent()) {
                     opponentCapturedPlayerPiece = true
+                    if (state.get(capturePosition) is ChessPiece &&
+                        (state.get(capturePosition) as ChessPiece).type == ChessPieceType.BISHOP
+                    ) {
+                        opponentCapturedWhiteBishop = true
+                    }
                 }
             } else if (capturedColor == playerColor.opponent()) {
                 opponentPiecesCaptured++
                 playerCapturedSymbols += capturedSymbol
+                if (mover == playerColor) {
+                    playerCaptureSquares += capturePosition.toSquare()
+                }
             }
         }
-        if (mover == playerColor && move.promotionType != null) {
-            playerPromotions++
-            playerPromotionTypes += move.promotionType
+        if (mover == playerColor) {
+            if (movingPiece?.type == ChessPieceType.QUEEN) playerMovedQueen = true
+            if (move.metadata["castle"] == "K") playerCastledKingside = true
+            if (move.isCapture && movingPiece?.type != ChessPieceType.KNIGHT) {
+                playerUsedNonKnightCapture = true
+            }
+            if (move.promotionType != null) {
+                playerPromotions++
+                playerPromotionTypes += move.promotionType
+                promotedPawn = true
+            }
         }
     }
 
-    private fun conditionSatisfied(): Boolean {
-        if (currentPuzzle == null) return false
-        if (opponentPiecesCaptured < objective.requiredCaptures) return false
-        if (objective.requiredPromotions > 0 && !promotionRequirementSatisfied()) return false
-        return when (currentPuzzle?.condition) {
-            ChallengeCondition.DIRECT_MATE -> true
-            ChallengeCondition.CLEAN_MATE -> playerPiecesLost <= objective.allowedPiecesToLose
-            ChallengeCondition.QUIET_MATE ->
-                playerPiecesLost == 0 && opponentPiecesCaptured == 0
-            ChallengeCondition.CAPTURE_MATE,
-            ChallengeCondition.DOUBLE_CAPTURE_MATE -> true
-            ChallengeCondition.SACRIFICE_TRAP,
-            ChallengeCondition.SET_TRAP -> opponentCapturedPlayerPiece
-            ChallengeCondition.MATERIAL_PRESSURE -> playerPiecesLost >= objective.allowedPiecesToLose
-            ChallengeCondition.PAWN_PROMOTION,
-            ChallengeCondition.PROMOTE_AND_MATE -> playerPromotions >= objective.requiredPromotions &&
-                promotionRequirementSatisfied()
-            ChallengeCondition.LONG_MATE -> true
-            null -> false
-            ChallengeCondition.FORK,
-            ChallengeCondition.DOUBLE_ATTACK,
-            ChallengeCondition.QUEEN_FORK -> forkConditionSatisfied()
-            else -> true
+    private fun conditionSatisfied(state: GameState): Boolean {
+        val puzzle = currentPuzzle ?: return false
+        val condition = puzzle.condition
+        if (condition == ChallengeCondition.CHECKMATE_WITHIN_LIMIT) {
+            return isPlayerVictory(state)
         }
-    }
-
-    private fun forkConditionSatisfied(): Boolean {
-        val state = lastPlayerMoveState ?: return false
-        val move = lastPlayerMove ?: return false
-        val beforeState = lastPlayerMoveBeforeState ?: return false
-        if (state.get(move.to) !is ChessPiece) return false
-        val targetsBeforeMove = attackedOpponentTargets(beforeState, move.from)
-        val targetsAfterMove = attackedOpponentTargets(state, move.to)
-        val capturedTargets = move.captures.filter { capture ->
-            beforeState.get(capture)?.color == playerColor.opponent()
+        return when (condition) {
+            ChallengeCondition.NO_QUEEN_MOVES -> !playerMovedQueen
+            ChallengeCondition.KNIGHT_HUNTER ->
+                playerCaptureSquares.containsAll(objective.requiredCaptureSquares)
+            ChallengeCondition.PROMOTE_AND_WIN ->
+                promotedPawn && promotionRequirementSatisfied()
+            ChallengeCondition.CASTLE_AND_WIN -> playerCastledKingside
+            ChallengeCondition.PRESERVE_BISHOPS -> !opponentCapturedWhiteBishop &&
+                whiteBishopsOnBoard(state) >= 2
+            ChallengeCondition.ROOK_CHECKMATE -> {
+                val before = lastPlayerMoveBeforeState ?: return false
+                val move = lastPlayerMove ?: return false
+                (before.get(move.from) as? ChessPiece)?.type == ChessPieceType.ROOK &&
+                    isPlayerVictory(state)
+            }
+            ChallengeCondition.MATERIAL_COMEBACK -> startingMaterialDeficit >= 5
+            ChallengeCondition.KNIGHT_CAPTURE_ONLY -> !playerUsedNonKnightCapture
+            ChallengeCondition.CHECKMATE_WITHIN_LIMIT -> true
         }
-        return (targetsBeforeMove + targetsAfterMove + capturedTargets).distinct().size >= 2
-    }
-
-    /**
-     * A fork is often created on one move and cashed in on the next. Looking
-     * only at the final square misses the original fork when the winning
-     * piece moves onto one of its targets.
-     */
-    private fun attackedOpponentTargets(state: GameState, origin: Position): Set<Position> {
-        if (state.get(origin) !is ChessPiece) return emptySet()
-        val attackState = state.copy(currentTurn = playerColor)
-        return engine.legalMovesFrom(attackState, origin)
-            .filter { attack -> state.get(attack.to)?.color == playerColor.opponent() }
-            .map { it.to }
-            .toSet()
     }
 
     private val objective: ChallengeObjective
-        get() = currentPuzzle?.objective ?: ChallengeObjective()
+        get() = currentPuzzle?.objective
+            ?: ChallengeObjective(ChallengeCondition.CHECKMATE_WITHIN_LIMIT)
 
     private fun promotionRequirementSatisfied(): Boolean {
         val requirement = objective.promotionRequirement
@@ -748,42 +716,55 @@ class ChessChallengeActivity : AppCompatActivity() {
             playerPromotionTypes.isNotEmpty()
     }
 
+    private fun violatesChallengeRule(state: GameState, move: Move): Boolean {
+        val movingPiece = state.get(move.from) as? ChessPiece ?: return false
+        return when (currentPuzzle?.condition) {
+            ChallengeCondition.NO_QUEEN_MOVES ->
+                movingPiece.type == ChessPieceType.QUEEN
+            ChallengeCondition.KNIGHT_HUNTER ->
+                move.isCapture &&
+                    playerCaptureSquares.size < objective.requiredCaptureSquares.size &&
+                    move.captures.none { it.toSquare() in objective.requiredCaptureSquares }
+            ChallengeCondition.KNIGHT_CAPTURE_ONLY ->
+                move.isCapture && movingPiece.type != ChessPieceType.KNIGHT
+            else -> false
+        }
+    }
+
     private fun failureMessage(): String {
-        val puzzle = currentPuzzle ?: return "The line was not completed."
-        if (puzzleState?.status != GameStatus.IN_PROGRESS && playerMovesMade >= maxPlayerMoves) {
-            return "Mate found, but the move limit was exceeded."
+        val puzzle = currentPuzzle ?: return "The challenge was not completed."
+        if (puzzle.objective.targetPlayerMoves != null &&
+            playerMovesMade >= maxPlayerMoves &&
+            puzzleState?.status == GameStatus.IN_PROGRESS
+        ) {
+            return "The checkmate move limit was reached."
         }
         return when (puzzle.condition) {
-            ChallengeCondition.CLEAN_MATE ->
-                "You found mate, but one of your pieces was captured."
-            ChallengeCondition.QUIET_MATE ->
-                "You needed to finish without any captures."
-            ChallengeCondition.CAPTURE_MATE ->
-                "You found mate, but needed ${objective.requiredCaptures} capture."
-            ChallengeCondition.DOUBLE_CAPTURE_MATE ->
-                "You found mate, but needed ${objective.requiredCaptures} captures."
-            ChallengeCondition.SACRIFICE_TRAP ->
-                "You found mate, but the opponent had to capture one of your pieces."
-            ChallengeCondition.SET_TRAP ->
-                "You found mate, but the trap was not sprung by an opponent capture."
-            ChallengeCondition.MATERIAL_PRESSURE ->
-                "You found mate, but needed to lose ${objective.allowedPiecesToLose} pieces."
-            ChallengeCondition.PAWN_PROMOTION,
-            ChallengeCondition.PROMOTE_AND_MATE ->
-                "You found mate, but the pawn must promote to ${objective.promotionRequirement.name.lowercase()} first."
-            ChallengeCondition.DIRECT_MATE ->
+            ChallengeCondition.CHECKMATE_WITHIN_LIMIT ->
                 "The king was not checkmated within the move limit."
-            ChallengeCondition.LONG_MATE ->
-                "The long mating route was not completed."
-            else ->
-                "The tactical objective was not completed within the move limit."
+            ChallengeCondition.NO_QUEEN_MOVES ->
+                "A queen was moved. Retry without moving a queen."
+            ChallengeCondition.KNIGHT_HUNTER ->
+                "Capture both black knights before taking any other black piece."
+            ChallengeCondition.PROMOTE_AND_WIN ->
+                "Promote the a-pawn before winning the game."
+            ChallengeCondition.CASTLE_AND_WIN ->
+                "Castle kingside before winning the game."
+            ChallengeCondition.PRESERVE_BISHOPS ->
+                "Both white bishops must survive the winning game."
+            ChallengeCondition.ROOK_CHECKMATE ->
+                "The final checkmate must be delivered by a rook."
+            ChallengeCondition.MATERIAL_COMEBACK ->
+                "The starting position must be converted into a winning comeback."
+            ChallengeCondition.KNIGHT_CAPTURE_ONLY ->
+                "Only a knight may capture pieces in this challenge."
         }
     }
 
     private fun earnedStars(): Int = when {
         retryCount > 0 -> 1
         hintUsed -> 2
-        playerMovesMade <= maxPlayerMoves -> 3
+        maxPlayerMoves == Int.MAX_VALUE || playerMovesMade <= maxPlayerMoves -> 3
         else -> 1
     }
 
@@ -863,7 +844,7 @@ class ChessChallengeActivity : AppCompatActivity() {
                 subtitle = "The position is saved while you decide what to do next.",
                 choices = listOf(
                     ChessChoiceView.Choice("Resume", "Return to the board", "▶", GOLD),
-                    ChessChoiceView.Choice("Restart Level", "Try this puzzle again", "↻", GOLD),
+                    ChessChoiceView.Choice("Restart Challenge", "Try this position again", "↻", GOLD),
                     ChessChoiceView.Choice("Home", "Return to the challenge home", "⌂", GOLD),
                 ),
                 gameLabel = "C H E S S",
@@ -896,9 +877,6 @@ class ChessChallengeActivity : AppCompatActivity() {
         }
     }
 
-    private fun isLevelUnlocked(level: Int): Boolean =
-        level in 1..puzzles.size && level <= highestCompleted + 1
-
     private fun showFailureScreen() {
         pauseOverlayOpen = false
         showOverlay(
@@ -907,7 +885,7 @@ class ChessChallengeActivity : AppCompatActivity() {
                 title = "Game Over",
                 subtitle = failureMessage(),
                 choices = listOf(
-                    ChessChoiceView.Choice("Retry Level", "Calculate the line again", "↻", GOLD),
+                    ChessChoiceView.Choice("Retry Challenge", "Try the position again", "↻", GOLD),
                     ChessChoiceView.Choice("Home", "Return to the challenge home", "⌂", GOLD),
                 ),
                 gameLabel = "C H E S S",
@@ -935,8 +913,8 @@ class ChessChallengeActivity : AppCompatActivity() {
                 title = "Challenge Complete",
                 subtitle = "${completionSummary()} • ${"★".repeat(earnedStars())}",
                 choices = buildList {
-                    if (nextLevel) add(ChessChoiceView.Choice("Next Level", "Continue the challenge", "→", GOLD))
-                    add(ChessChoiceView.Choice("Replay Level", "Solve this one again", "↻", GOLD))
+                    if (nextLevel) add(ChessChoiceView.Choice("Next Challenge", "Continue the challenge", "→", GOLD))
+                    add(ChessChoiceView.Choice("Replay Challenge", "Try this one again", "↻", GOLD))
                     add(ChessChoiceView.Choice("Home", "Return to the challenge home", "⌂", GOLD))
                 },
                 gameLabel = "C H E S S",
@@ -955,11 +933,7 @@ class ChessChallengeActivity : AppCompatActivity() {
     }
 
     private fun completionSummary(): String {
-        val mateLabel = if (currentPuzzle?.condition?.requiresCheckmate == true) {
-            if (maxPlayerMoves == 1) "Mate in 1" else "Mate in $maxPlayerMoves"
-        } else {
-            if (maxPlayerMoves == 1) "Objective in 1 move" else "Objective in $maxPlayerMoves moves"
-        }
+        val mateLabel = currentPuzzle?.title ?: "Challenge complete"
         val material = if (playerPiecesLost == 0) "No pieces lost" else "$playerPiecesLost piece(s) lost"
         val hint = if (hintUsed) "Hint used: Yes" else "Hint used: No"
         val best = progressPrefs.getInt(starsKey(selectedLevel), earnedStars())
@@ -1043,7 +1017,7 @@ class ChessChallengeActivity : AppCompatActivity() {
                 gravity = android.view.Gravity.CENTER
                 addView(TextView(this@ChessChallengeActivity).apply {
                     text = title
-                    tag = "level-title"
+                    tag = "challenge-title"
                     setTextColor(Color.WHITE)
                     setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
                     typeface = Typeface.DEFAULT_BOLD
@@ -1051,7 +1025,7 @@ class ChessChallengeActivity : AppCompatActivity() {
                 })
                 addView(TextView(this@ChessChallengeActivity).apply {
                     text = subtitle
-                    tag = "level-subtitle"
+                    tag = "challenge-subtitle"
                     setTextColor(Color.parseColor("#AFC6CC"))
                     setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f)
                     gravity = android.view.Gravity.CENTER
@@ -1076,6 +1050,19 @@ class ChessChallengeActivity : AppCompatActivity() {
             setStroke(dp(1), Color.parseColor(stroke))
             cornerRadius = dp(radius).toFloat()
         }
+
+    private fun materialDeficit(state: GameState): Int {
+        fun score(color: PieceColor): Int =
+            state.board.filterIsInstance<ChessPiece>()
+                .filter { it.color == color && it.type != ChessPieceType.KING }
+                .sumOf { it.type.points }
+
+        return ((score(PieceColor.BLACK) - score(PieceColor.WHITE)) / 100).coerceAtLeast(0)
+    }
+
+    private fun whiteBishopsOnBoard(state: GameState): Int =
+        state.board.filterIsInstance<ChessPiece>()
+            .count { it.color == PieceColor.WHITE && it.type == ChessPieceType.BISHOP }
 
     private fun dp(value: Int): Int =
         (value * resources.displayMetrics.density).toInt()
@@ -1172,3 +1159,5 @@ private fun Move.toNotation(): String {
 private fun Position.colLetter(): Char = ('a'.code + col).toChar()
 
 private fun Position.rowNumber(): Int = 8 - row
+
+private fun Position.toSquare(): String = "${colLetter()}${rowNumber()}"

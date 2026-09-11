@@ -27,6 +27,7 @@ class ChallengeLevelGridView(
     private val highestCompleted: Int,
     private val starsByLevel: IntArray = IntArray(levelCount),
     private val subtitles: List<String> = emptyList(),
+    private val lockFutureChallenges: Boolean = false,
 ) : View(context) {
 
     var onLevelSelected: ((Int) -> Unit)? = null
@@ -86,7 +87,7 @@ class ChallengeLevelGridView(
     init {
         isClickable = true
         isFocusable = true
-        contentDescription = "Chess challenge level selector. Locked levels must be completed in order."
+    contentDescription = "Chess challenge selector. Choose any available challenge."
         setBackgroundColor(Color.parseColor("#061321"))
     }
 
@@ -143,7 +144,7 @@ class ChallengeLevelGridView(
             canvas.scale(scale, scale, rect.centerX(), rect.centerY())
             woodCardRenderer.draw(canvas, rect, pressedIndex == index)
             canvas.drawText(
-                "Level ${(index + 1).toString().padStart(2, '0')}",
+                "Challenge ${(index + 1).toString().padStart(2, '0')}",
                 rect.centerX(),
                 rect.centerY() - 11f * unit,
                 if (index + 1 <= highestCompleted) completedLevelPaint else levelPaint,
@@ -186,7 +187,7 @@ class ChallengeLevelGridView(
                     loadingRingPaint,
                 )
             }
-            if (index + 1 > highestCompleted + 1) {
+            if (lockFutureChallenges && index + 1 > highestCompleted + 1) {
                 canvas.drawText("LOCKED", rect.centerX(), rect.bottom - 8f * unit, subtitlePaint)
             }
             canvas.restore()
@@ -258,7 +259,7 @@ class ChallengeLevelGridView(
                     abs(event.y - downY) <= 18f * unit
                 ) {
                     SoundPlayer.play("ui_click")
-                    if (selected + 1 <= highestCompleted + 1) {
+                    if (!lockFutureChallenges || selected + 1 <= highestCompleted + 1) {
                         startLoading(selected)
                     } else {
                         onLockedLevelSelected?.invoke(selected + 1)

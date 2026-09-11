@@ -1,54 +1,42 @@
 package com.mkdev.mkboardgames.challenges
 
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class ChessPuzzleValidatorTest {
     @Test
-    fun everyChallengeHasCoverageAndAValidCheckmateLine() {
+    fun catalogueContainsOnlyTheTenCustomChallenges() {
+        assertEquals(10, ChessPuzzleData.all.size)
+        assertEquals(10, ChessChallengeCatalogue.size)
+        assertEquals((1..10).toList(), ChessPuzzleData.all.map { it.level })
+        assertEquals("Fast Checkmate Challenge", ChessChallengeCatalogue.titleFor(10))
+    }
+
+    @Test
+    fun everyCustomPositionStartsWithWhiteAndHasAValidHint() {
         val issues = ChessPuzzleValidator.validateAll()
         assertTrue(issues.isEmpty(), issues.joinToString("\n"))
     }
 
     @Test
-    fun authoredObjectivesIncludeThePromotionLessons() {
-        val objectives = ChessPuzzleData.all.associateBy { it.level }
-        assertTrue(objectives.getValue(12).objective.promotionRequirement == PromotionRequirement.QUEEN)
-        assertTrue(objectives.getValue(25).objective.promotionRequirement == PromotionRequirement.QUEEN)
+    fun challengeRulesMatchTheRequestedWinConditions() {
+        val objectives = ChessPuzzleData.all.associateBy { it.level }.mapValues { it.value.objective }
+        assertEquals(ChallengeCondition.CHECKMATE_WITHIN_LIMIT, objectives.getValue(1).condition)
+        assertEquals(4, objectives.getValue(1).targetPlayerMoves)
+        assertEquals(ChallengeCondition.KNIGHT_HUNTER, objectives.getValue(3).condition)
+        assertEquals(setOf("b8", "g8"), objectives.getValue(3).requiredCaptureSquares)
+        assertEquals(ChallengeCondition.CASTLE_AND_WIN, objectives.getValue(5).condition)
+        assertEquals(ChallengeCondition.ROOK_CHECKMATE, objectives.getValue(7).condition)
+        assertEquals(10, objectives.getValue(10).targetPlayerMoves)
     }
 
     @Test
-    fun catalogueIncludesAuthoredTacticalObjectives() {
-        val puzzles = ChessPuzzleData.all.associateBy { it.level }
-        assertTrue(puzzles.getValue(3).condition == ChallengeCondition.FORK)
-        assertTrue(puzzles.getValue(25).objective.targetPlayerMoves == 2)
-        assertTrue(puzzles.getValue(25).mateIn == 2)
-    }
-
-    @Test
-    fun catalogueMatchesTheAuthoredChallengeCount() {
-        assertTrue(ChessChallengeCatalogue.size == 25)
-        assertTrue(ChessChallengeCatalogue.titleFor(25) == "Opposition Basics")
-    }
-
-    @Test
-    fun beginnerCurriculumContainsAllTwentyFiveLevelsAndStartingSetup() {
-        assertTrue(ChessBeginnerChallenges.all.size == 25)
-        assertTrue(ChessBeginnerChallenges.all.map { it.level } == (1..25).toList())
-        assertTrue(ChessBeginnerChallenges.standardInitialSetup.contains("rooks a1/h1"))
-        assertTrue(ChessBeginnerChallenges.standardInitialSetup.contains("king e8"))
-        assertTrue(ChessBeginnerChallenges.standardInitialCoordinates["white.pawns"]?.size == 8)
-        assertTrue(ChessBeginnerChallenges.standardInitialCoordinates["black.pawns"]?.contains("h7") == true)
-        assertTrue(ChessPuzzleData.all.take(25).all { it.beginnerChallenge != null })
-    }
-
-    @Test
-    fun everyPuzzleHasAtLeastOnePlayableAuthoredLine() {
-        ChessPuzzleData.all.forEach { puzzle ->
-            assertTrue(
-                ChessPuzzleValidator.playableSolutionLines(puzzle).isNotEmpty(),
-                "level ${puzzle.level} has no playable authored line",
-            )
+    fun challengeBriefsKeepSetupAndWinConditionTogether() {
+        ChessBeginnerChallenges.all.forEach { brief ->
+            assertTrue(brief.setup.isNotBlank())
+            assertTrue(brief.winCondition.isNotBlank())
+            assertEquals(brief.title, ChessChallengeCatalogue.titleFor(brief.level))
         }
     }
 }

@@ -1,7 +1,6 @@
 package com.mkdev.mkboardgames.challenges
 
 import com.mkdev.mkboardgames.engine.GameState
-import com.mkdev.mkboardgames.engine.GameStatus
 import com.mkdev.mkboardgames.engine.Piece
 import com.mkdev.mkboardgames.engine.PieceColor
 import com.mkdev.mkboardgames.engine.Position
@@ -10,180 +9,45 @@ import com.mkdev.mkboardgames.games.chess.ChessPieceType
 import com.mkdev.mkboardgames.games.chess.ChessRuleEngine
 
 /**
- * Offline validation for the challenge catalogue.
- *
- * Keeping this independent from Android makes it useful both to unit tests
- * and to a future command-line content check in CI.
+ * Content validation for the ten custom challenge positions.
  */
 object ChessPuzzleValidator {
     private val engine = ChessRuleEngine()
 
     fun validateAll(puzzles: List<ChessPuzzle> = ChessPuzzleData.all): List<String> {
         val issues = mutableListOf<String>()
-        val levels = puzzles.map { it.level }
-        if (levels != (1..25).toList()) {
-            issues += "levels must be present once each from 1 to 25"
+        val expectedNumbers = (1..10).toList()
+        if (puzzles.map { it.level } != expectedNumbers) {
+            issues += "challenges must be present once each from 1 to 10"
         }
-        if (ChessChallengeCatalogue.size != 25) {
-            issues += "challenge catalogue must contain exactly 25 titles"
+        if (ChessChallengeCatalogue.size != 10) {
+            issues += "challenge catalogue must contain exactly 10 challenges"
         }
-        if (ChessBeginnerChallenges.all.map { it.level } != (1..25).toList()) {
-            issues += "beginner challenge catalogue must contain levels 1 to 25 once each"
+        if (ChessBeginnerChallenges.all.map { it.level } != expectedNumbers) {
+            issues += "challenge descriptions must contain 1 to 10 once each"
         }
         if (ChessBeginnerChallenges.all.any { it.title != ChessChallengeCatalogue.titleFor(it.level) }) {
-            issues += "beginner challenge titles must match the challenge catalogue"
+            issues += "challenge titles must match the challenge catalogue"
         }
-        val duplicateFens = puzzles.groupBy { it.fen }.filterValues { it.size > 1 }
-        duplicateFens.values.forEach { duplicatePuzzles ->
-            issues += "duplicate puzzle FEN for levels ${duplicatePuzzles.joinToString { it.level.toString() }}"
+        if (puzzles.any { it.fen.split(Regex("\\s+")).getOrNull(1) != "w" }) {
+            issues += "all authored challenges must start with White to move"
         }
-
         puzzles.forEach { puzzle ->
-            if (puzzle.solutionLines.isEmpty()) {
-                issues += "level ${puzzle.level} has no solution line"
-                return@forEach
+            val state = parseFen(puzzle.fen)
+            if (state.board.count { it != null } == 0) {
+                issues += "challenge ${puzzle.level} has an empty position"
             }
-            puzzle.solutionLines.forEachIndexed lineLoop@{ lineIndex, line ->
-                val tokens = line.split(Regex("\\s+")).filter { it.isNotBlank() }
-                if (tokens.size < 2 || tokens.size % 2 != 0) {
-                    issues += "level ${puzzle.level} line ${lineIndex + 1} has an incomplete move pair"
-                    return@lineLoop
-                }
-                var state = parseFen(puzzle.fen)
-                val playerColor = state.currentTurn.opponent()
-                var validLine = true
-                var playerCaptures = 0
-                var playerPiecesLost = 0
-                var totalCaptures = 0
-                var playerPromotions = 0
-                val playerPromotionTypes = mutableSetOf<String>()
-                tokens.forEachIndexed moveLoop@{ moveIndex, token ->
-                    val move = findMove(state, token)
-                    if (move == null) {
-                        issues += "level ${puzzle.level} line ${lineIndex + 1} has illegal move ${moveIndex + 1}: $token"
-                        validLine = false
-                        return@moveLoop
-                    }
-                    val mover = state.currentTurn
-                    move.captures.forEach { capturePosition ->
-                        val captured = state.get(capturePosition)
-                        if (captured != null) {
-                            totalCaptures++
-                            if (captured.color == playerColor) playerPiecesLost++
-                            if (captured.color == playerColor.opponent() && mover == playerColor) {
-                                playerCaptures++
-                            }
-                        }
-                    }
-                    if (mover == playerColor && move.promotionType != null) {
-                        playerPromotions++
-                        playerPromotionTypes += move.promotionType
-                    }
-                    val nextState = engine.applyMove(state, move)
-                    if (nextState === state) {
-                        issues += "level ${puzzle.level} line ${lineIndex + 1} was rejected by the chess engine: $token"
-                        validLine = false
-                        return@moveLoop
-                    }
-                    if (moveIndex < tokens.lastIndex && nextState.status != GameStatus.IN_PROGRESS) {
-                        issues += "level ${puzzle.level} line ${lineIndex + 1} ends before its final move"
-                        validLine = false
-                        return@moveLoop
-                    }
-                    state = nextState
-                }
-                if (!validLine) return@lineLoop
-                val expectedStatus = if (playerColor == PieceColor.WHITE) {
-                    GameStatus.WHITE_WINS
-                } else {
-                    GameStatus.BLACK_WINS
-                }
-                if (puzzle.condition.requiresCheckmate && state.status != expectedStatus) {
-                    issues += "level ${puzzle.level} line ${lineIndex + 1} does not end in checkmate"
-                } else if (!puzzle.condition.requiresCheckmate) {
-                    val losingStatus = if (expectedStatus == GameStatus.WHITE_WINS) {
-                        GameStatus.BLACK_WINS
-                    } else {
-                        GameStatus.WHITE_WINS
-                    }
-                    if (state.status == losingStatus) {
-                        issues += "level ${puzzle.level} line ${lineIndex + 1} ends with the player losing"
-                    }
-                }
-                val targetMoves = puzzle.objective.targetPlayerMoves
-                if (targetMoves != null && targetMoves != tokens.size / 2) {
-                    issues += "level ${puzzle.level} target move count does not match its authored line"
-                }
-                val objective = puzzle.objective
-                if (playerCaptures < objective.requiredCaptures) {
-                    issues += "level ${puzzle.level} line ${lineIndex + 1} captures ${playerCaptures} player target(s), expected at least ${objective.requiredCaptures}"
-                }
-                if (playerPromotions < objective.requiredPromotions) {
-                    issues += "level ${puzzle.level} line ${lineIndex + 1} promotes ${playerPromotions} time(s), expected at least ${objective.requiredPromotions}"
-                }
-                if (
-                    objective.requiredPromotions > 0 &&
-                    objective.promotionRequirement != PromotionRequirement.ANY &&
-                    objective.promotionRequirement.name !in playerPromotionTypes
-                ) {
-                    issues += "level ${puzzle.level} line ${lineIndex + 1} does not promote to ${objective.promotionRequirement.name.lowercase()}"
-                }
-                when (objective.condition) {
-                    ChallengeCondition.CLEAN_MATE ->
-                        if (playerPiecesLost > objective.allowedPiecesToLose) {
-                            issues += "level ${puzzle.level} line ${lineIndex + 1} loses too many player pieces"
-                        }
-                    ChallengeCondition.QUIET_MATE ->
-                        if (totalCaptures > 0) {
-                            issues += "level ${puzzle.level} line ${lineIndex + 1} contains a capture in a quiet challenge"
-                        }
-                    ChallengeCondition.MATERIAL_PRESSURE ->
-                        if (playerPiecesLost < objective.allowedPiecesToLose) {
-                            issues += "level ${puzzle.level} line ${lineIndex + 1} loses fewer pieces than required"
-                        }
-                    else -> Unit
-                }
+            if (state.get(Position(7, 4)) == null && puzzle.level == 1) {
+                issues += "challenge ${puzzle.level} is missing the white king"
             }
-            if (puzzle.objective.condition == ChallengeCondition.LONG_MATE &&
-                (puzzle.objective.targetPlayerMoves ?: 0) < 10
+            if (puzzle.recommendedMoves.isNotEmpty() &&
+                puzzle.recommendedMoves.none { findMove(state, it) != null }
             ) {
-                issues += "level ${puzzle.level} long-mate objective must be at least mate in 10"
+                issues += "challenge ${puzzle.level} has no legal opening recommendation"
             }
         }
         return issues
     }
-
-    /**
-     * Returns only complete lines that the same engine used by the board can
-     * actually play from the puzzle FEN. The activity uses this before
-     * unlocking the board, so a bad alternate line cannot leave a screenshot-
-     * friendly but unplayable challenge on screen.
-     */
-    fun playableSolutionLines(puzzle: ChessPuzzle): List<List<String>> =
-        puzzle.solutionLines.map { it.split(Regex("\\s+")).filter(String::isNotBlank) }
-            .filter { tokens ->
-                if (tokens.size < 2 || tokens.size % 2 != 0) return@filter false
-                var state = parseFen(puzzle.fen)
-                tokens.forEachIndexed { index, token ->
-                    val move = findMove(state, token) ?: return@filter false
-                    val next = engine.applyMove(state, move)
-                    if (next === state) return@filter false
-                    if (index < tokens.lastIndex && next.status != GameStatus.IN_PROGRESS) {
-                        return@filter false
-                    }
-                    state = next
-                }
-                val winner = if (state.currentTurn == PieceColor.WHITE) {
-                    GameStatus.BLACK_WINS
-                } else {
-                    GameStatus.WHITE_WINS
-                }
-                if (puzzle.condition.requiresCheckmate) {
-                    state.status == winner
-                } else {
-                    state.status == GameStatus.IN_PROGRESS || state.status == winner
-                }
-            }
 
     private fun findMove(state: GameState, uci: String) =
         if (uci.length < 4) {
