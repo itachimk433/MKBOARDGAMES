@@ -710,7 +710,7 @@ class ChessChallengeActivity : AppCompatActivity() {
             ?: ChallengeObjective(ChallengeCondition.CHECKMATE_WITHIN_LIMIT)
 
     private fun promotionRequirementSatisfied(): Boolean {
-        val requirement = objective.promotionRequirement
+        val requirement = objective.requiredPromotion
         if (requirement == PromotionRequirement.ANY) return true
         return playerPromotionTypes.all { it == requirement.name } &&
             playerPromotionTypes.isNotEmpty()
