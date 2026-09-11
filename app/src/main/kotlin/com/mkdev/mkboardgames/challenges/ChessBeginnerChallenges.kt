@@ -43,7 +43,7 @@ object ChessBeginnerChallenges {
         challenge(
             1,
             "Mate in 1 (Back-Rank)",
-            "Deliver checkmate using a rook or queen on the opponent's back rank.",
+            "Deliver checkmate with the rook on the opponent's back rank.",
             "Force checkmate in 1 move.",
             "e8, d7, f7, g7, h7",
         ),
@@ -99,9 +99,9 @@ object ChessBeginnerChallenges {
         challenge(
             9,
             "Simple Double Attack",
-            "Threaten two separate objectives with a queen or rook.",
+            "Use the queen to threaten the rook while taking the pawn.",
             "Secure a material advantage by taking one target.",
-            "d4, a7, h8",
+            "d4, a7, d7",
         ),
         challenge(
             10,

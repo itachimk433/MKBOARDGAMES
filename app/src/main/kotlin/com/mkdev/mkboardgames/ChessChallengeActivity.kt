@@ -716,15 +716,26 @@ class ChessChallengeActivity : AppCompatActivity() {
         val move = lastPlayerMove ?: return false
         val beforeState = lastPlayerMoveBeforeState ?: return false
         if (state.get(move.to) !is ChessPiece) return false
-        val attackState = state.copy(currentTurn = playerColor)
-        val targets = engine.legalMovesFrom(attackState, move.to)
-            .filter { attack -> state.get(attack.to)?.color == playerColor.opponent() }
-            .map { it.to }
-            .distinct()
-        val capturedTargets = move.captures.count { capture ->
+        val targetsBeforeMove = attackedOpponentTargets(beforeState, move.from)
+        val targetsAfterMove = attackedOpponentTargets(state, move.to)
+        val capturedTargets = move.captures.filter { capture ->
             beforeState.get(capture)?.color == playerColor.opponent()
         }
-        return targets.size + capturedTargets >= 2
+        return (targetsBeforeMove + targetsAfterMove + capturedTargets).distinct().size >= 2
+    }
+
+    /**
+     * A fork is often created on one move and cashed in on the next. Looking
+     * only at the final square misses the original fork when the winning
+     * piece moves onto one of its targets.
+     */
+    private fun attackedOpponentTargets(state: GameState, origin: Position): Set<Position> {
+        if (state.get(origin) !is ChessPiece) return emptySet()
+        val attackState = state.copy(currentTurn = playerColor)
+        return engine.legalMovesFrom(attackState, origin)
+            .filter { attack -> state.get(attack.to)?.color == playerColor.opponent() }
+            .map { it.to }
+            .toSet()
     }
 
     private val objective: ChallengeObjective

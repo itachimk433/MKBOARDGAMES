@@ -104,7 +104,7 @@ object ChessPuzzleData {
         ChessPuzzle(6, "4k3/p7/2n5/1B6/8/8/8/4K3 b - - 0 1", "a7a6 b5c6", 750, "authored-beginner-pin"),
         ChessPuzzle(7, "4r1k1/p7/8/8/4q3/8/8/4R1K1 b - - 0 1", "a7a6 e1e4 a6a5 e4e8", 800, "authored-beginner-skewer"),
         ChessPuzzle(8, "4k3/p6p/2b5/4N3/3r4/8/8/4K3 b - - 0 1", "a7a6 e5c6 h7h6 c6d4", 800, "authored-beginner-remove-defender"),
-        ChessPuzzle(9, "4k3/p6p/8/8/3Q4/8/8/4K3 b - - 0 1", "h7h6 d4a7", 750, "authored-beginner-double-attack"),
+        ChessPuzzle(9, "4k3/p2r3p/8/8/3Q4/8/8/4K3 b - - 0 1", "h7h6 d4a7", 750, "authored-beginner-double-attack"),
         ChessPuzzle(10, "3qk3/p6p/8/6B1/3N4/8/8/3R2K1 b - - 0 1", "a7a6 d4b5 h7h6 d1d8", 850, "authored-beginner-discovered-attack"),
         ChessPuzzle(11, "6nk/p5pp/7N/8/8/8/8/R3K3 b - - 0 1", "a7a6 a1a2 a6a5 h6f7", 850, "authored-beginner-smothered-mate"),
         ChessPuzzle(12, "8/p1k1P3/8/4K3/8/8/8/8 b - - 0 1", "a7a6 e7e8Q", 850, "authored-beginner-promotion-race"),
