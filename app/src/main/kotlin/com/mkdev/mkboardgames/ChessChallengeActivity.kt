@@ -50,6 +50,9 @@ class ChessChallengeActivity : AppCompatActivity() {
     private var initialOpponentPiecesCaptured = 0
     private var initialOpponentCapturedPlayerPiece = false
     private var opponentMoveAnimating = false
+    private var pendingOpponentReply: Move? = null
+    private var lastPlayerMove: Move? = null
+    private var lastPlayerMoveState: GameState? = null
     private var boardView: BoardView? = null
     private var gameHud: StandardGameHudView? = null
     private var moveHistoryView: TextView? = null
@@ -336,6 +339,9 @@ class ChessChallengeActivity : AppCompatActivity() {
         solutionMoves = solutionLines.firstOrNull() ?: emptyList()
         expectedMoveIndex = 1
         playerMovesMade = 0
+        pendingOpponentReply = null
+        lastPlayerMove = null
+        lastPlayerMoveState = null
         maxPlayerMoves = puzzle.objective.targetPlayerMoves
             ?: (solutionMoves.size / 2).coerceAtLeast(1)
         playerColor = initial.currentTurn.opponent()
@@ -396,38 +402,26 @@ class ChessChallengeActivity : AppCompatActivity() {
         hintActive = false
         gameHud?.setHintActive(false)
         boardView?.setHintMove(null)
-        val expectedLine = solutionLines.firstOrNull { line ->
-            line.getOrNull(expectedMoveIndex)?.let { expected ->
-                findMove(state, expected)?.toUci() == move.toUci()
-            } == true
-        }
-        val acceptsAnyMate = currentPuzzle?.condition?.requiresCheckmate == true &&
-            playerMovesMade == 0 &&
-            maxPlayerMoves == 1 &&
-            isPlayerVictory(engine.applyMove(state, move))
-        if (expectedLine == null && !acceptsAnyMate) {
+        val acceptedMove = findMove(state, move.toUci())
+        if (acceptedMove == null) {
             showWrongMove()
             return
         }
-        if (expectedLine != null) {
-            solutionMoves = expectedLine
-        } else {
-            solutionMoves = solutionMoves.take(expectedMoveIndex) + move.toUci()
-        }
-        val acceptedMove = findMove(state, move.toUci()) ?: move
         recordMoveEffects(state, acceptedMove, playerColor)
         val nextState = engine.applyMove(state, acceptedMove)
-        if (nextState === state) return
+        if (nextState === state) {
+            showWrongMove()
+            return
+        }
         puzzleState = nextState
         playerMovesMade++
         expectedMoveIndex++
+        lastPlayerMove = acceptedMove
+        lastPlayerMoveState = nextState
         boardView?.gameState = puzzleState!!
 
-        val authoredLineComplete = expectedMoveIndex >= solutionMoves.size
-        if ((isPlayerVictory(nextState) || authoredLineComplete) && playerMovesMade <= maxPlayerMoves) {
-            if (conditionSatisfied()) completeLevel() else showConditionFailure()
-        } else if (nextState.status != GameStatus.IN_PROGRESS || playerMovesMade >= maxPlayerMoves) {
-            showWrongMove()
+        if (nextState.status != GameStatus.IN_PROGRESS) {
+            finishAfterFinalPosition(nextState)
         } else {
             boardView?.isLocked = true
             opponentReplyPending = true
@@ -440,26 +434,37 @@ class ChessChallengeActivity : AppCompatActivity() {
         if (completed || resetting) return
         opponentReplyPending = false
         val state = puzzleState ?: return
-        val reply = solutionMoves.getOrNull(expectedMoveIndex)?.let { findMove(state, it) }
+        val reply = chooseOpponentReply(state)
         if (reply == null) {
             showWrongMove()
             return
         }
+        pendingOpponentReply = reply
         opponentMoveAnimating = true
         boardView?.isLocked = true
         setChallengeStatus("Opponent is moving…")
         boardView?.animateExternalMove(reply)
     }
 
+    private fun chooseOpponentReply(state: GameState): Move? {
+        val authoredReply = solutionLines.asSequence()
+            .mapNotNull { line ->
+                line.getOrNull(expectedMoveIndex)?.let { findMove(state, it) }
+            }
+            .firstOrNull()
+        return authoredReply ?: engine.allLegalMoves(state, state.currentTurn).firstOrNull()
+    }
+
     private fun applyOpponentReply(move: Move) {
         val state = puzzleState ?: return
-        val expectedMove = solutionMoves.getOrNull(expectedMoveIndex)?.let { findMove(state, it) }
-        if (expectedMove == null || move.toUci() != expectedMove.toUci()) {
+        val reply = pendingOpponentReply
+        pendingOpponentReply = null
+        if (reply == null || move.toUci() != reply.toUci()) {
             showWrongMove()
             return
         }
-        recordMoveEffects(state, expectedMove, playerColor.opponent())
-        val nextState = engine.applyMove(state, expectedMove)
+        recordMoveEffects(state, reply, playerColor.opponent())
+        val nextState = engine.applyMove(state, reply)
         if (nextState === state) {
             showWrongMove()
             return
@@ -470,12 +475,36 @@ class ChessChallengeActivity : AppCompatActivity() {
         boardView?.setHintMove(null)
         boardView?.isFlipped = nextState.currentTurn == PieceColor.BLACK
         if (nextState.status != GameStatus.IN_PROGRESS) {
-            showWrongMove()
+            finishAfterFinalPosition(nextState)
+        } else if (playerMovesMade >= maxPlayerMoves) {
+            finishAfterFinalPosition(nextState)
         } else {
             opponentReplyPending = false
             boardView?.isLocked = false
             setChallengeStatus(objectiveText())
         }
+    }
+
+    private fun finishAfterFinalPosition(state: GameState) {
+        if (playerMovesMade < maxPlayerMoves && state.status == GameStatus.IN_PROGRESS) {
+            boardView?.isLocked = false
+            setChallengeStatus(objectiveText())
+            return
+        }
+        if (challengeSatisfied(state)) {
+            completeLevel()
+        } else {
+            showConditionFailure()
+        }
+    }
+
+    private fun challengeSatisfied(state: GameState): Boolean {
+        if (playerMovesMade > maxPlayerMoves) return false
+        if (playerMovesMade < maxPlayerMoves && !isPlayerVictory(state)) return false
+        if (currentPuzzle?.condition?.requiresCheckmate == true && !isPlayerVictory(state)) {
+            return false
+        }
+        return conditionSatisfied()
     }
 
     private fun completeLevel() {
@@ -505,6 +534,8 @@ class ChessChallengeActivity : AppCompatActivity() {
     private fun showWrongMove() {
         resetting = true
         opponentMoveAnimating = false
+        pendingOpponentReply = null
+        opponentReplyPending = false
         boardView?.isLocked = true
         gameHud?.controlsEnabled = false
         hintActive = false
@@ -532,7 +563,10 @@ class ChessChallengeActivity : AppCompatActivity() {
         attemptStarted = false
         retryCount++
         opponentMoveAnimating = false
+        pendingOpponentReply = null
         opponentReplyPending = false
+        lastPlayerMove = null
+        lastPlayerMoveState = null
         boardView?.gameState = start
         boardView?.isFlipped = start.currentTurn == PieceColor.BLACK
         boardView?.isLocked = false
@@ -585,7 +619,11 @@ class ChessChallengeActivity : AppCompatActivity() {
 
     private fun expectedMoveForCurrentState(): Move? {
         val state = puzzleState ?: return null
-        return solutionMoves.getOrNull(expectedMoveIndex)?.let { findMove(state, it) }
+        return solutionLines.asSequence()
+            .mapNotNull { line ->
+                line.getOrNull(expectedMoveIndex)?.let { findMove(state, it) }
+            }
+            .firstOrNull()
     }
 
     private fun hintDescription(): String {
@@ -601,7 +639,7 @@ class ChessChallengeActivity : AppCompatActivity() {
         val puzzle = currentPuzzle ?: return "Find the checkmate"
         val playerMoves = puzzle.objective.targetPlayerMoves ?: maxPlayerMoves
         val moveLabel = if (playerMoves == 1) "move" else "moves"
-        return "$playerMoves $moveLabel to solve"
+        return "$playerMoves $moveLabel to complete the objective"
     }
 
     private fun moveCounterText(): String {
@@ -661,8 +699,22 @@ class ChessChallengeActivity : AppCompatActivity() {
                 promotionRequirementSatisfied()
             ChallengeCondition.LONG_MATE -> true
             null -> false
+            ChallengeCondition.FORK,
+            ChallengeCondition.DOUBLE_ATTACK,
+            ChallengeCondition.QUEEN_FORK -> forkConditionSatisfied()
             else -> true
         }
+    }
+
+    private fun forkConditionSatisfied(): Boolean {
+        val state = lastPlayerMoveState ?: return false
+        val move = lastPlayerMove ?: return false
+        if (state.get(move.to) !is ChessPiece) return false
+        val attackState = state.copy(currentTurn = playerColor)
+        val targets = engine.legalMovesFrom(attackState, move.to)
+            .mapNotNull { attack -> state.get(attack.to) }
+            .filter { it.color == playerColor.opponent() }
+        return targets.distinct().size >= 2
     }
 
     private val objective: ChallengeObjective
@@ -699,11 +751,11 @@ class ChessChallengeActivity : AppCompatActivity() {
             ChallengeCondition.PROMOTE_AND_MATE ->
                 "You found mate, but the pawn must promote to ${objective.promotionRequirement.name.lowercase()} first."
             ChallengeCondition.DIRECT_MATE ->
-                "That move did not complete the authored mating line."
+                "The king was not checkmated within the move limit."
             ChallengeCondition.LONG_MATE ->
                 "The long mating route was not completed."
             else ->
-                "The authored tactical line was not completed."
+                "The tactical objective was not completed within the move limit."
         }
     }
 
@@ -885,7 +937,7 @@ class ChessChallengeActivity : AppCompatActivity() {
         val mateLabel = if (currentPuzzle?.condition?.requiresCheckmate == true) {
             if (maxPlayerMoves == 1) "Mate in 1" else "Mate in $maxPlayerMoves"
         } else {
-            if (maxPlayerMoves == 1) "Guided line in 1 move" else "Guided line in $maxPlayerMoves moves"
+            if (maxPlayerMoves == 1) "Objective in 1 move" else "Objective in $maxPlayerMoves moves"
         }
         val material = if (playerPiecesLost == 0) "No pieces lost" else "$playerPiecesLost piece(s) lost"
         val hint = if (hintUsed) "Hint used: Yes" else "Hint used: No"
