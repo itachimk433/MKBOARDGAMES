@@ -16,6 +16,11 @@ import com.mkdev.mkboardgames.SoundPlayer
 import kotlin.math.abs
 import kotlin.math.ceil
 
+data class ChallengeSection(
+    val firstLevel: Int,
+    val title: String,
+)
+
 /**
  * Four-column challenge selector using the same wood/gold card language as the
  * game catalogue. The view owns scrolling so the level cards stay compact on
@@ -28,6 +33,7 @@ class ChallengeLevelGridView(
     private val starsByLevel: IntArray = IntArray(levelCount),
     private val subtitles: List<String> = emptyList(),
     private val lockFutureChallenges: Boolean = false,
+    private val sections: List<ChallengeSection> = emptyList(),
 ) : View(context) {
 
     var onLevelSelected: ((Int) -> Unit)? = null
@@ -65,8 +71,20 @@ class ChallengeLevelGridView(
         strokeWidth = 1.76f * unit
         strokeCap = Paint.Cap.ROUND
     }
+    private val sectionTitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#F7D99B")
+        textAlign = Paint.Align.LEFT
+        isFakeBoldText = true
+        textSize = 13f * textScale
+    }
+    private val sectionRulePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#6D5132")
+        strokeWidth = unit
+    }
 
     private val cardRects = ArrayList<RectF>(levelCount)
+    private data class SectionHeaderLayout(val top: Float, val title: String)
+    private val sectionHeaders = ArrayList<SectionHeaderLayout>()
     private val cardScales = FloatArray(levelCount) { 1f }
     private var pressedIndex = -1
     private var loadingIndex = -1
@@ -114,21 +132,38 @@ class ChallengeLevelGridView(
             .coerceAtLeast(1f)
         val cardHeight = 64f * unit
         val rowGap = 10f * unit
-        val firstTop = 8f * unit
-        val rowCount = ceil(levelCount / 4f).toInt()
+        val sectionHeaderHeight = 34f * unit
+        val sectionGap = 12f * unit
 
         cardRects.clear()
-        repeat(levelCount) { index ->
-            val row = index / 4
-            val column = index % 4
-            val left = sidePadding + column * (cardWidth + columnGap)
-            val top = firstTop + row * (cardHeight + rowGap)
-            cardRects += RectF(left, top, left + cardWidth, top + cardHeight)
+        sectionHeaders.clear()
+        val configuredSections = sections
+            .filter { it.firstLevel in 1..levelCount }
+            .associateBy { it.firstLevel }
+        val sectionStarts = (listOf(1) + configuredSections.keys)
+            .distinct()
+            .sorted()
+        var contentTop = 8f * unit
+        sectionStarts.forEachIndexed { sectionIndex, startLevel ->
+            val endLevel = sectionStarts.getOrNull(sectionIndex + 1) ?: (levelCount + 1)
+            val itemCount = (endLevel - startLevel).coerceAtLeast(0)
+            configuredSections[startLevel]?.let { section ->
+                sectionHeaders += SectionHeaderLayout(contentTop, section.title)
+                contentTop += sectionHeaderHeight
+            }
+            val rowCount = ceil(itemCount / 4f).toInt()
+            repeat(itemCount) { offset ->
+                val row = offset / 4
+                val column = offset % 4
+                val left = sidePadding + column * (cardWidth + columnGap)
+                val top = contentTop + row * (cardHeight + rowGap)
+                cardRects += RectF(left, top, left + cardWidth, top + cardHeight)
+            }
+            contentTop += rowCount * cardHeight +
+                (rowCount - 1).coerceAtLeast(0) * rowGap + sectionGap
         }
 
-        val contentBottom = firstTop + rowCount * cardHeight +
-            (rowCount - 1).coerceAtLeast(0) * rowGap + 14f * unit
-        maxScroll = (contentBottom - height).coerceAtLeast(0f)
+        maxScroll = (contentTop - height + 6f * unit).coerceAtLeast(0f)
         scrollOffset = scrollOffset.coerceIn(0f, maxScroll)
     }
 
@@ -137,6 +172,22 @@ class ChallengeLevelGridView(
         canvas.drawColor(Color.parseColor("#061321"))
         canvas.save()
         canvas.translate(0f, -scrollOffset)
+
+        sectionHeaders.forEach { header ->
+            canvas.drawText(
+                header.title,
+                14f * unit,
+                header.top + 20f * unit,
+                sectionTitlePaint,
+            )
+            canvas.drawLine(
+                14f * unit,
+                header.top + 27f * unit,
+                width - 14f * unit,
+                header.top + 27f * unit,
+                sectionRulePaint,
+            )
+        }
 
         cardRects.forEachIndexed { index, rect ->
             val scale = cardScales[index]

@@ -21,6 +21,7 @@ import com.mkdev.mkboardgames.games.chess.*
 import com.mkdev.mkboardgames.ui.BoardView
 import com.mkdev.mkboardgames.ui.BoardStyleSwitchView
 import com.mkdev.mkboardgames.ui.ChessBoardStyle
+import com.mkdev.mkboardgames.ui.ChallengeSection
 import com.mkdev.mkboardgames.ui.ChallengeLevelGridView
 import com.mkdev.mkboardgames.ui.ChessChoiceView
 import com.mkdev.mkboardgames.ui.StandardGameHudView
@@ -179,8 +180,13 @@ class ChessChallengeActivity : AppCompatActivity() {
             puzzles.size,
             highestCompleted,
             IntArray(puzzles.size) { progressPrefs.getInt(starsKey(it + 1), 0) },
-            subtitles = puzzles.map { it.beginnerChallenge?.title.orEmpty() },
+            subtitles = puzzles.map { it.title },
             lockFutureChallenges = false,
+            sections = listOf(
+                ChallengeSection(1, "Beginner"),
+                ChallengeSection(11, "Getting Started"),
+                ChallengeSection(21, "Easy"),
+            ),
         ).apply {
             onLevelSelected = { level ->
                 selectedLevel = level
@@ -690,7 +696,7 @@ class ChessChallengeActivity : AppCompatActivity() {
             return isPlayerVictory(state)
         }
         return when (condition) {
-            ChallengeCondition.NO_QUEEN_MOVES -> !playerMovedQueen
+            ChallengeCondition.NO_QUEEN_USE -> !playerMovedQueen
             ChallengeCondition.KNIGHT_HUNTER ->
                 playerCapturedBlackKnights >= 2
             ChallengeCondition.PROMOTE_AND_WIN ->
@@ -724,8 +730,8 @@ class ChessChallengeActivity : AppCompatActivity() {
     private fun violatesChallengeRule(state: GameState, move: Move): Boolean {
         val movingPiece = state.get(move.from) as? ChessPiece ?: return false
         return when (currentPuzzle?.condition) {
-            ChallengeCondition.NO_QUEEN_MOVES ->
-                movingPiece.type == ChessPieceType.QUEEN
+            ChallengeCondition.NO_QUEEN_USE ->
+                movingPiece.type == ChessPieceType.QUEEN || move.promotionType == "QUEEN"
             ChallengeCondition.KNIGHT_HUNTER ->
                 move.captures
                     .mapNotNull { state.get(it) as? ChessPiece }
@@ -751,8 +757,8 @@ class ChessChallengeActivity : AppCompatActivity() {
         return when (puzzle.condition) {
             ChallengeCondition.CHECKMATE_WITHIN_LIMIT ->
                 "The king was not checkmated within the move limit."
-            ChallengeCondition.NO_QUEEN_MOVES ->
-                "A queen was moved. Retry without moving a queen."
+            ChallengeCondition.NO_QUEEN_USE ->
+                "A queen was used. Retry without moving or promoting to a queen."
             ChallengeCondition.KNIGHT_HUNTER ->
                 "Capture both black knights before taking any other black piece."
             ChallengeCondition.PROMOTE_AND_WIN ->

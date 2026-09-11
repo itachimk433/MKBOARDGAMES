@@ -16,14 +16,15 @@ object ChessPuzzleValidator {
 
     fun validateAll(puzzles: List<ChessPuzzle> = ChessPuzzleData.all): List<String> {
         val issues = mutableListOf<String>()
-        val expectedNumbers = (1..10).toList()
+        val expectedNumbers = (1..30).toList()
+        val expectedBeginnerNumbers = (1..10).toList()
         if (puzzles.map { it.level } != expectedNumbers) {
-            issues += "challenges must be present once each from 1 to 10"
+            issues += "challenges must be present once each from 1 to 30"
         }
-        if (ChessChallengeCatalogue.size != 10) {
-            issues += "challenge catalogue must contain exactly 10 challenges"
+        if (ChessChallengeCatalogue.size != 30) {
+            issues += "challenge catalogue must contain exactly 30 challenges"
         }
-        if (ChessBeginnerChallenges.all.map { it.level } != expectedNumbers) {
+        if (ChessBeginnerChallenges.all.map { it.level } != expectedBeginnerNumbers) {
             issues += "challenge descriptions must contain 1 to 10 once each"
         }
         if (ChessBeginnerChallenges.all.any { it.title != ChessChallengeCatalogue.titleFor(it.level) }) {

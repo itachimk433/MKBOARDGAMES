@@ -18,7 +18,7 @@ enum class ChallengeCondition(
     val requiresCheckmate: Boolean = false,
 ) {
     CHECKMATE_WITHIN_LIMIT("Checkmate within the move limit", requiresCheckmate = true),
-    NO_QUEEN_MOVES("Win without moving a queen"),
+    NO_QUEEN_USE("Win without using a queen"),
     KNIGHT_HUNTER("Capture both black knights first"),
     PROMOTE_AND_WIN("Promote, then win"),
     CASTLE_AND_WIN("Castle kingside, then win"),

@@ -20,15 +20,16 @@ object ChessPuzzleData {
     private val challengeObjectives = listOf(
         ChallengeObjective(
             condition = ChallengeCondition.CHECKMATE_WITHIN_LIMIT,
-            targetPlayerMoves = 4,
+            targetPlayerMoves = 39,
             difficulty = 1,
         ),
         ChallengeObjective(
-            condition = ChallengeCondition.NO_QUEEN_MOVES,
+            condition = ChallengeCondition.NO_QUEEN_USE,
             difficulty = 2,
         ),
         ChallengeObjective(
-            condition = ChallengeCondition.KNIGHT_HUNTER,
+            condition = ChallengeCondition.CHECKMATE_WITHIN_LIMIT,
+            targetPlayerMoves = 25,
             difficulty = 2,
         ),
         ChallengeObjective(
@@ -57,8 +58,8 @@ object ChessPuzzleData {
             difficulty = 3,
         ),
         ChallengeObjective(
-            condition = ChallengeCondition.CHECKMATE_WITHIN_LIMIT,
-            targetPlayerMoves = 10,
+            condition = ChallengeCondition.KNIGHT_HUNTER,
+            targetPlayerMoves = 25,
             difficulty = 2,
         ),
     )
@@ -90,14 +91,14 @@ object ChessPuzzleData {
         ),
         ChessPuzzle(
             3,
-            "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+            "4k3/5ppp/8/8/2B5/8/8/3QK1N1 w - - 0 1",
             1100,
-            "custom-knight-hunter",
+            "custom-fast-checkmate",
             challengeObjectives[2],
             ChessChallengeCatalogue.titleFor(3),
             ChessBeginnerChallenges.forLevel(3)!!.setup,
             ChessBeginnerChallenges.forLevel(3)!!.winCondition,
-            listOf("b1c3", "g1f3", "c3b5", "f3g5"),
+            listOf("d1h5", "c4f7"),
             ChessBeginnerChallenges.forLevel(3),
         ),
         ChessPuzzle(
@@ -174,17 +175,76 @@ object ChessPuzzleData {
         ),
         ChessPuzzle(
             10,
-            "4k3/5ppp/8/8/2B5/8/8/3QK1N1 w - - 0 1",
+            "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
             1100,
-            "custom-fast-checkmate",
+            "custom-knight-hunter",
             challengeObjectives[9],
             ChessChallengeCatalogue.titleFor(10),
             ChessBeginnerChallenges.forLevel(10)!!.setup,
             ChessBeginnerChallenges.forLevel(10)!!.winCondition,
-            listOf("d1h5", "c4f7"),
+            listOf("b1c3", "g1f3", "c3b5", "f3g5"),
             ChessBeginnerChallenges.forLevel(10),
         ),
     )
 
-    val all: List<ChessPuzzle> = beginnerPuzzles
+    private val gettingStartedPuzzles = listOf(
+        puzzle(11, "7k/5Q2/6K1/8/8/8/8/8 w - - 0 1", ChallengeCondition.CHECKMATE_WITHIN_LIMIT, 6, "f7g7"),
+        puzzle(12, "7k/6R1/6K1/8/8/8/8/8 w - - 0 1", ChallengeCondition.CHECKMATE_WITHIN_LIMIT, 8, "g7h7"),
+        puzzle(13, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB1KBNR w KQkq - 0 1", ChallengeCondition.NO_QUEEN_USE, null, "e2e4"),
+        puzzle(14, "6k1/P6p/8/8/8/8/7P/6K1 w - - 0 1", ChallengeCondition.PROMOTE_AND_WIN, null, "a7a8R"),
+        puzzle(15, "4k1nr/5ppp/8/8/8/8/5PPP/4KBNR w K - 0 1", ChallengeCondition.CASTLE_AND_WIN, null, "f1e2", "g1f3", "e1g1"),
+        puzzle(16, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/2BQKB2 w KQkq - 0 1", ChallengeCondition.PRESERVE_BISHOPS, null, "e2e4"),
+        puzzle(17, "6k1/5ppp/2B5/8/8/8/8/3Q2KR w - - 0 1", ChallengeCondition.ROOK_CHECKMATE, null, "d1h5"),
+        puzzle(18, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQK3 w KQkq - 0 1", ChallengeCondition.MATERIAL_COMEBACK, null, "e2e4"),
+        puzzle(19, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/1N2K1N1 w KQkq - 0 1", ChallengeCondition.KNIGHT_CAPTURE_ONLY, null, "b1c3"),
+        puzzle(20, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", ChallengeCondition.KNIGHT_HUNTER, 25, "b1c3"),
+    )
+
+    private val easyPuzzles = listOf(
+        puzzle(21, "4k3/5ppp/8/8/2B5/8/4PPPP/3QK1N1 w - - 0 1", ChallengeCondition.CHECKMATE_WITHIN_LIMIT, 15, "c4f7"),
+        puzzle(22, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB1KBNR w KQkq - 0 1", ChallengeCondition.NO_QUEEN_USE, null, "e2e4"),
+        puzzle(23, "6k1/P6p/8/8/8/8/7P/6K1 w - - 0 1", ChallengeCondition.PROMOTE_AND_WIN, null, "a7a8Q"),
+        puzzle(24, "4k1nr/5ppp/8/8/8/8/5PPP/4KBNR w K - 0 1", ChallengeCondition.CASTLE_AND_WIN, null, "f1e2", "g1f3", "e1g1"),
+        puzzle(25, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/2BQKB2 w KQkq - 0 1", ChallengeCondition.PRESERVE_BISHOPS, null, "e2e4"),
+        puzzle(26, "6k1/5ppp/2B5/8/8/8/8/3Q2KR w - - 0 1", ChallengeCondition.ROOK_CHECKMATE, null, "d1h5"),
+        puzzle(27, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQK3 w KQkq - 0 1", ChallengeCondition.MATERIAL_COMEBACK, null, "e2e4"),
+        puzzle(28, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/1N2K1N1 w KQkq - 0 1", ChallengeCondition.KNIGHT_CAPTURE_ONLY, null, "b1c3"),
+        puzzle(29, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", ChallengeCondition.KNIGHT_HUNTER, 25, "b1c3"),
+        puzzle(30, "4k3/5ppp/8/8/2B5/8/8/3QK1N1 w - - 0 1", ChallengeCondition.CHECKMATE_WITHIN_LIMIT, 25, "d1h5"),
+    )
+
+    val all: List<ChessPuzzle> = beginnerPuzzles + gettingStartedPuzzles + easyPuzzles
+
+    private fun puzzle(
+        level: Int,
+        fen: String,
+        condition: ChallengeCondition,
+        targetPlayerMoves: Int?,
+        vararg recommendedMoves: String,
+    ) = ChessPuzzle(
+        level = level,
+        fen = fen,
+        rating = 900 + level * 25,
+        sourceId = "custom-challenge-$level",
+        objective = ChallengeObjective(
+            condition = condition,
+            targetPlayerMoves = targetPlayerMoves,
+            difficulty = if (level < 21) 1 else 2,
+        ),
+        title = ChessChallengeCatalogue.titleFor(level),
+        setup = "White to move. Complete the challenge objective.",
+        winCondition = when (condition) {
+            ChallengeCondition.CHECKMATE_WITHIN_LIMIT ->
+                "Deliver checkmate in ${targetPlayerMoves ?: 25} moves or fewer."
+            ChallengeCondition.NO_QUEEN_USE -> "Win without using a queen, including on pawn promotion."
+            ChallengeCondition.PROMOTE_AND_WIN -> "Promote a pawn, then win the game."
+            ChallengeCondition.CASTLE_AND_WIN -> "Castle kingside, then win the game."
+            ChallengeCondition.PRESERVE_BISHOPS -> "Win while keeping both white bishops alive."
+            ChallengeCondition.ROOK_CHECKMATE -> "Deliver the final checkmate using a rook."
+            ChallengeCondition.MATERIAL_COMEBACK -> "Win despite starting at least 5 points down in material."
+            ChallengeCondition.KNIGHT_CAPTURE_ONLY -> "Only knights may capture pieces, then win."
+            ChallengeCondition.KNIGHT_HUNTER -> "Capture both black knights before any other black piece, then win."
+        },
+        recommendedMoves = recommendedMoves.toList(),
+    )
 }
