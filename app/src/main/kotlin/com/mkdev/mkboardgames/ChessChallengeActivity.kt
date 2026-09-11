@@ -903,7 +903,7 @@ class ChessChallengeActivity : AppCompatActivity() {
                 fullScreenOverride = false,
                 dismissOnEmptyTap = true,
             ).apply {
-                onDismissRequested = { showLevelList() }
+                onDismissRequested = { dismissOverlay() }
                 onChoiceSelected = { which ->
                     when (which) {
                         0 -> resetPuzzle()
@@ -932,7 +932,7 @@ class ChessChallengeActivity : AppCompatActivity() {
                 fullScreenOverride = false,
                 dismissOnEmptyTap = true,
             ).apply {
-                onDismissRequested = { showLevelList() }
+                onDismissRequested = { dismissOverlay() }
                 onChoiceSelected = { which ->
                     if (nextLevel && which == 0) showPuzzle(selectedLevel + 1)
                     else if (which == if (nextLevel) 1 else 0) resetPuzzle()
