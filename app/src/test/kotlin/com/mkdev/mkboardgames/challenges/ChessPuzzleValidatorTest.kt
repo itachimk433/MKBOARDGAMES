@@ -11,24 +11,24 @@ class ChessPuzzleValidatorTest {
     }
 
     @Test
-    fun authoredObjectivesIncludeThePromotionVariants() {
+    fun authoredObjectivesIncludeThePromotionLessons() {
         val objectives = ChessPuzzleData.all.associateBy { it.level }
-        assertTrue(objectives.getValue(31).objective.promotionRequirement == PromotionRequirement.KNIGHT)
-        assertTrue(objectives.getValue(98).objective.promotionRequirement == PromotionRequirement.KNIGHT)
+        assertTrue(objectives.getValue(12).objective.promotionRequirement == PromotionRequirement.QUEEN)
+        assertTrue(objectives.getValue(25).objective.promotionRequirement == PromotionRequirement.QUEEN)
     }
 
     @Test
-    fun catalogueIncludesAuthoredTrapAndLongMateObjectives() {
+    fun catalogueIncludesAuthoredTacticalObjectives() {
         val puzzles = ChessPuzzleData.all.associateBy { it.level }
-        assertTrue(puzzles.getValue(39).condition == ChallengeCondition.SET_TRAP)
-        assertTrue(puzzles.getValue(100).objective.targetPlayerMoves == 10)
-        assertTrue(puzzles.getValue(100).mateIn == 10)
+        assertTrue(puzzles.getValue(3).condition == ChallengeCondition.FORK)
+        assertTrue(puzzles.getValue(25).objective.targetPlayerMoves == 2)
+        assertTrue(puzzles.getValue(25).mateIn == 2)
     }
 
     @Test
     fun catalogueMatchesTheAuthoredChallengeCount() {
-        assertTrue(ChessChallengeCatalogue.size == 100)
-        assertTrue(ChessChallengeCatalogue.titleFor(100) == "The Grandmaster Immortal Test")
+        assertTrue(ChessChallengeCatalogue.size == 25)
+        assertTrue(ChessChallengeCatalogue.titleFor(25) == "Opposition Basics")
     }
 
     @Test

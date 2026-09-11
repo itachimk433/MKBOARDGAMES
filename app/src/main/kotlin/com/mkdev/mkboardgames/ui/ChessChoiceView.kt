@@ -230,6 +230,8 @@ class ChessChoiceView(
 
     init {
         isClickable = true
+        isFocusable = true
+        contentDescription = "$title. $subtitle"
         hits.forEach { scales[it.index] = 1f }
     }
 
@@ -370,7 +372,7 @@ class ChessChoiceView(
         titlePaint.color = Color.WHITE
         canvas.drawText(title, center, topOffset + 99f * unit, titlePaint)
         subtitlePaint.color = Color.parseColor("#D6E8FF")
-        canvas.drawText(subtitle, center, topOffset + 125f * unit, subtitlePaint)
+        drawWrappedSubtitle(canvas, subtitle, center, topOffset + 125f * unit, width)
     }
 
     private fun drawChessFamilyHeader(canvas: Canvas, width: Float, topOffset: Float) {
@@ -404,7 +406,7 @@ class ChessChoiceView(
         titlePaint.color = Color.WHITE
         canvas.drawText(title, center, topOffset + 99f * unit, titlePaint)
         subtitlePaint.color = Color.parseColor("#D6E8FF")
-        canvas.drawText(subtitle, center, topOffset + 125f * unit, subtitlePaint)
+        drawWrappedSubtitle(canvas, subtitle, center, topOffset + 125f * unit, width)
     }
 
     private fun drawCompactGridHeader(canvas: Canvas, width: Float) {
@@ -456,7 +458,7 @@ class ChessChoiceView(
         titlePaint.color = Color.WHITE
         canvas.drawText(title, center, topOffset + 99f * unit, titlePaint)
         subtitlePaint.color = Color.parseColor("#D6E8FF")
-        canvas.drawText(subtitle, center, topOffset + 125f * unit, subtitlePaint)
+        drawWrappedSubtitle(canvas, subtitle, center, topOffset + 125f * unit, width)
     }
 
     private fun drawOthelloHeader(canvas: Canvas, width: Float, topOffset: Float) {
@@ -487,7 +489,7 @@ class ChessChoiceView(
         titlePaint.color = Color.WHITE
         canvas.drawText(title, center, topOffset + 99f * unit, titlePaint)
         subtitlePaint.color = Color.parseColor("#D6E8FF")
-        canvas.drawText(subtitle, center, topOffset + 125f * unit, subtitlePaint)
+        drawWrappedSubtitle(canvas, subtitle, center, topOffset + 125f * unit, width)
     }
 
     private fun drawMorabarabaHeader(canvas: Canvas, width: Float, topOffset: Float) {
@@ -518,7 +520,7 @@ class ChessChoiceView(
         titlePaint.color = Color.WHITE
         canvas.drawText(title, center, topOffset + 99f * unit, titlePaint)
         subtitlePaint.color = Color.parseColor("#D6E8FF")
-        canvas.drawText(subtitle, center, topOffset + 125f * unit, subtitlePaint)
+        drawWrappedSubtitle(canvas, subtitle, center, topOffset + 125f * unit, width)
     }
 
     private fun drawHeader(canvas: Canvas, width: Float, topOffset: Float) {
@@ -544,7 +546,36 @@ class ChessChoiceView(
         canvas.drawText(headerSymbol, center, topOffset + 43f * unit, crownPaint)
         canvas.drawText(gameLabel, center, topOffset + 58f * unit, eyebrowPaint)
         canvas.drawText(title, center, topOffset + 99f * unit, titlePaint)
-        canvas.drawText(subtitle, center, topOffset + 125f * unit, subtitlePaint)
+        drawWrappedSubtitle(canvas, subtitle, center, topOffset + 125f * unit, width)
+    }
+
+    private fun drawWrappedSubtitle(
+        canvas: Canvas,
+        text: String,
+        centerX: Float,
+        centerY: Float,
+        availableWidth: Float,
+    ) {
+        val lines = mutableListOf<String>()
+        text.split('\n').forEach { paragraph ->
+            var line = ""
+            paragraph.split(Regex("\\s+")).filter { it.isNotBlank() }.forEach { word ->
+                val candidate = if (line.isEmpty()) word else "$line $word"
+                if (line.isNotEmpty() && subtitlePaint.measureText(candidate) > availableWidth - 44f * unit) {
+                    lines += line
+                    line = word
+                } else {
+                    line = candidate
+                }
+            }
+            if (line.isNotEmpty()) lines += line
+        }
+        val visible = lines.take(5).ifEmpty { listOf("") }
+        val lineHeight = 16f * unit
+        val firstBaseline = centerY - (visible.size - 1) * lineHeight / 2f
+        visible.forEachIndexed { index, line ->
+            canvas.drawText(line, centerX, firstBaseline + index * lineHeight, subtitlePaint)
+        }
     }
 
     private fun drawChoice(canvas: Canvas, hit: ChoiceHit) {

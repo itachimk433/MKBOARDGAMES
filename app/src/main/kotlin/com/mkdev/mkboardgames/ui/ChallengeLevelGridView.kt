@@ -30,6 +30,7 @@ class ChallengeLevelGridView(
 ) : View(context) {
 
     var onLevelSelected: ((Int) -> Unit)? = null
+    var onLockedLevelSelected: ((Int) -> Unit)? = null
 
     private val unit = resources.displayMetrics.density.coerceAtLeast(1f)
     private val textScale = resources.displayMetrics.scaledDensity.coerceAtMost(2f)
@@ -84,6 +85,8 @@ class ChallengeLevelGridView(
 
     init {
         isClickable = true
+        isFocusable = true
+        contentDescription = "Chess challenge level selector. Locked levels must be completed in order."
         setBackgroundColor(Color.parseColor("#061321"))
     }
 
@@ -183,6 +186,9 @@ class ChallengeLevelGridView(
                     loadingRingPaint,
                 )
             }
+            if (index + 1 > highestCompleted + 1) {
+                canvas.drawText("LOCKED", rect.centerX(), rect.bottom - 8f * unit, subtitlePaint)
+            }
             canvas.restore()
         }
         canvas.restore()
@@ -252,7 +258,11 @@ class ChallengeLevelGridView(
                     abs(event.y - downY) <= 18f * unit
                 ) {
                     SoundPlayer.play("ui_click")
-                    startLoading(selected)
+                    if (selected + 1 <= highestCompleted + 1) {
+                        startLoading(selected)
+                    } else {
+                        onLockedLevelSelected?.invoke(selected + 1)
+                    }
                 }
                 dragging = false
                 invalidate()

@@ -83,6 +83,25 @@ class StandardGameHudView(
     private val hintRect = RectF()
     private val menuRect = RectF()
 
+    init {
+        isClickable = true
+        isFocusable = true
+        contentDescription = if (showHintControl) {
+            "Chess controls. Back button. Hint button."
+        } else {
+            "Game controls. Back button."
+        }
+    }
+
+    override fun onInitializeAccessibilityNodeInfo(
+        info: android.view.accessibility.AccessibilityNodeInfo,
+    ) {
+        super.onInitializeAccessibilityNodeInfo(info)
+        info.className = StandardGameHudView::class.java.name
+        info.isClickable = true
+        info.text = contentDescription
+    }
+
     fun setInfo(
         value: String,
         undo: Boolean,

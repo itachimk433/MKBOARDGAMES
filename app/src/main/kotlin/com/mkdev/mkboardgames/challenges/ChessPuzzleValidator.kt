@@ -52,12 +52,32 @@ object ChessPuzzleValidator {
                 var state = parseFen(puzzle.fen)
                 val playerColor = state.currentTurn.opponent()
                 var validLine = true
+                var playerCaptures = 0
+                var playerPiecesLost = 0
+                var totalCaptures = 0
+                var playerPromotions = 0
+                val playerPromotionTypes = mutableSetOf<String>()
                 tokens.forEachIndexed moveLoop@{ moveIndex, token ->
                     val move = findMove(state, token)
                     if (move == null) {
                         issues += "level ${puzzle.level} line ${lineIndex + 1} has illegal move ${moveIndex + 1}: $token"
                         validLine = false
                         return@moveLoop
+                    }
+                    val mover = state.currentTurn
+                    move.captures.forEach { capturePosition ->
+                        val captured = state.get(capturePosition)
+                        if (captured != null) {
+                            totalCaptures++
+                            if (captured.color == playerColor) playerPiecesLost++
+                            if (captured.color == playerColor.opponent() && mover == playerColor) {
+                                playerCaptures++
+                            }
+                        }
+                    }
+                    if (mover == playerColor && move.promotionType != null) {
+                        playerPromotions++
+                        playerPromotionTypes += move.promotionType
                     }
                     val nextState = engine.applyMove(state, move)
                     if (nextState === state) {
@@ -93,6 +113,35 @@ object ChessPuzzleValidator {
                 val targetMoves = puzzle.objective.targetPlayerMoves
                 if (targetMoves != null && targetMoves != tokens.size / 2) {
                     issues += "level ${puzzle.level} target move count does not match its authored line"
+                }
+                val objective = puzzle.objective
+                if (playerCaptures < objective.requiredCaptures) {
+                    issues += "level ${puzzle.level} line ${lineIndex + 1} captures ${playerCaptures} player target(s), expected at least ${objective.requiredCaptures}"
+                }
+                if (playerPromotions < objective.requiredPromotions) {
+                    issues += "level ${puzzle.level} line ${lineIndex + 1} promotes ${playerPromotions} time(s), expected at least ${objective.requiredPromotions}"
+                }
+                if (
+                    objective.requiredPromotions > 0 &&
+                    objective.promotionRequirement != PromotionRequirement.ANY &&
+                    objective.promotionRequirement.name !in playerPromotionTypes
+                ) {
+                    issues += "level ${puzzle.level} line ${lineIndex + 1} does not promote to ${objective.promotionRequirement.name.lowercase()}"
+                }
+                when (objective.condition) {
+                    ChallengeCondition.CLEAN_MATE ->
+                        if (playerPiecesLost > objective.allowedPiecesToLose) {
+                            issues += "level ${puzzle.level} line ${lineIndex + 1} loses too many player pieces"
+                        }
+                    ChallengeCondition.QUIET_MATE ->
+                        if (totalCaptures > 0) {
+                            issues += "level ${puzzle.level} line ${lineIndex + 1} contains a capture in a quiet challenge"
+                        }
+                    ChallengeCondition.MATERIAL_PRESSURE ->
+                        if (playerPiecesLost < objective.allowedPiecesToLose) {
+                            issues += "level ${puzzle.level} line ${lineIndex + 1} loses fewer pieces than required"
+                        }
+                    else -> Unit
                 }
             }
             if (puzzle.objective.condition == ChallengeCondition.LONG_MATE &&
