@@ -36,7 +36,7 @@ import com.mkdev.mkboardgames.games.ludo.LudoPiece
 import com.mkdev.mkboardgames.games.ludo.LudoPlayerEconomy
 import com.mkdev.mkboardgames.games.ludo.LudoSetup
 import com.mkdev.mkboardgames.ui.LudoBoardView
-import com.mkdev.mkboardgames.ui.LudoDiceView
+import com.mkdev.mkboardgames.ui.GlbDiceView
 import com.mkdev.mkboardgames.ui.MotionDiceDirection
 import com.mkdev.mkboardgames.ui.ChessMenuView
 import com.mkdev.mkboardgames.ui.StyledDialogs
@@ -48,7 +48,7 @@ import kotlin.random.Random
 class LudoActivity : AppCompatActivity() {
     private lateinit var boardView: LudoBoardView
     private lateinit var boardStage: FrameLayout
-    private lateinit var playerDiceViews: Array<LudoDiceView>
+    private lateinit var playerDiceViews: Array<GlbDiceView>
     private lateinit var turnView: TextView
     private lateinit var economyView: TextView
     private lateinit var storeView: TextView
@@ -166,22 +166,19 @@ class LudoActivity : AppCompatActivity() {
         }
         boardStage = FrameLayout(this)
         boardStage.clipChildren = true
-        val diceRail = dp(40)
+        val diceRail = dp(56)
         boardStage.addView(
             boardView,
             FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT,
             ).apply {
-                leftMargin = diceRail
                 topMargin = diceRail
-                rightMargin = diceRail
                 bottomMargin = diceRail
             },
         )
         playerDiceViews = Array(LudoSetup.PLAYER_COUNT) { player ->
-            LudoDiceView(this).apply {
-                accentColor = LudoSetup.PLAYER_COLORS[player]
+            GlbDiceView(this).apply {
                 contentDescription = "${LudoSetup.PLAYER_NAMES[player]} die"
                 onRoll = {
                     if (player == LudoSetup.playerFromState(state) &&
@@ -197,7 +194,7 @@ class LudoActivity : AppCompatActivity() {
         playerDiceViews.forEach { die ->
             boardStage.addView(
                 die,
-                FrameLayout.LayoutParams(dp(38), dp(38)).apply {
+                FrameLayout.LayoutParams(dp(52), dp(52)).apply {
                     gravity = android.view.Gravity.TOP or android.view.Gravity.START
                 },
             )
@@ -1122,20 +1119,19 @@ class LudoActivity : AppCompatActivity() {
 
         val boardLeft = boardView.left
         val boardTop = boardView.top
-        val boardRight = boardView.right
+        val boardWidth = boardView.width
         val boardBottom = boardView.bottom
-        val boardHeight = boardBottom - boardTop
-        val diceSize = dp(38)
-        val leftX = (boardLeft - diceSize) / 2
-        val rightX = boardRight + (boardStage.width - boardRight - diceSize) / 2
-        val topY = boardTop + (boardHeight * 0.25f).roundToInt() - diceSize / 2
-        val bottomY = boardTop + (boardHeight * 0.75f).roundToInt() - diceSize / 2
-        // Keep dice in the side rails, aligned with each colour's home yard.
+        val diceSize = dp(52)
+        val leftX = boardLeft + (boardWidth * 0.25f).roundToInt() - diceSize / 2
+        val rightX = boardLeft + (boardWidth * 0.75f).roundToInt() - diceSize / 2
+        val topY = (boardTop - diceSize) / 2
+        val bottomY = boardBottom + (boardStage.height - boardBottom - diceSize) / 2
+        // Keep dice in the top/bottom rails, aligned with each colour's home yard.
         val playerPositions = arrayOf(
-            leftX to bottomY,  // Red: bottom-left
-            rightX to bottomY, // Blue: bottom-right
-            leftX to topY,     // Green: top-left
-            rightX to topY,    // Yellow: top-right
+            leftX to bottomY,  // Red: below the bottom-left home
+            rightX to bottomY, // Blue: below the bottom-right home
+            leftX to topY,     // Green: above the top-left home
+            rightX to topY,    // Yellow: above the top-right home
         )
 
         playerDiceViews.forEachIndexed { player, die ->
@@ -1151,7 +1147,10 @@ class LudoActivity : AppCompatActivity() {
 
     private fun setPlayerDiceVisible(visible: Boolean) {
         if (!::playerDiceViews.isInitialized) return
-        playerDiceViews.forEach { it.visibility = if (visible) View.VISIBLE else View.INVISIBLE }
+        playerDiceViews.forEach {
+            it.visibility = if (visible) View.VISIBLE else View.INVISIBLE
+            it.setGameplayVisible(visible)
+        }
     }
 
     private fun cancelPlayerDiceRolls() {

@@ -57,7 +57,7 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
     private val glRenderer = DiceRenderer(context.applicationContext)
 
     init {
-        setBackgroundColor(Color.rgb(16, 21, 26))
+        setBackgroundColor(Color.TRANSPARENT)
         addView(
             fallbackView,
             LayoutParams(
