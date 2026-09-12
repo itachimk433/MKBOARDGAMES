@@ -350,6 +350,7 @@ class LudoBoardView(context: Context) : View(context) {
                 piece.symbol(),
                 point.x,
                 point.y - (textPaint.ascent() + textPaint.descent()) / 2f,
+                textPaint,
             )
             canvas.restore()
         }
