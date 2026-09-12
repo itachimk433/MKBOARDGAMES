@@ -145,6 +145,10 @@ class ChessChallengeAutoplayAi(
                 if (next.status == GameStatus.IN_PROGRESS &&
                     engine.isInCheck(next, playerColor.opponent())
                 ) score += 8_000
+            ChallengeCondition.CHECK_OR_CHECKMATE_WITHIN_LIMIT ->
+                if (next.status == GameStatus.IN_PROGRESS &&
+                    engine.isInCheck(next, playerColor.opponent())
+                ) score += 8_000
             ChallengeCondition.PROMOTE_AND_WIN ->
                 if (move.promotionType != null) score += 60_000
             ChallengeCondition.CASTLE_AND_WIN ->
@@ -226,6 +230,8 @@ class ChessChallengeAutoplayAi(
         if (!isSuccessfulResolution(state, playerColor, puzzle)) return false
         return when (puzzle.condition) {
             ChallengeCondition.CHECKMATE_WITHIN_LIMIT -> true
+            ChallengeCondition.CHECK_OR_CHECKMATE_WITHIN_LIMIT ->
+                engine.isInCheck(state, playerColor.opponent())
             ChallengeCondition.NO_QUEEN_USE -> !progress.playerMovedQueen
             ChallengeCondition.KNIGHT_HUNTER -> progress.playerCapturedBlackKnights >= 2
             ChallengeCondition.PROMOTE_AND_WIN -> progress.promotedPawn &&
@@ -345,7 +351,9 @@ class ChessChallengeAutoplayAi(
     ): Boolean =
         state.status == playerWinStatus(playerColor) ||
             (puzzle.condition == ChallengeCondition.CHECKMATE_WITHIN_LIMIT &&
-                state.status == GameStatus.DRAW)
+                state.status == GameStatus.DRAW) ||
+            (puzzle.condition == ChallengeCondition.CHECK_OR_CHECKMATE_WITHIN_LIMIT &&
+                engine.isInCheck(state, playerColor.opponent()))
 
     private fun findMove(state: GameState, uci: String): Move? {
         if (uci.length < 4) return null

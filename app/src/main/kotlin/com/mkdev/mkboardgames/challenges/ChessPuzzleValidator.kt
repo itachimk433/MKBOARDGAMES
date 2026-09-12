@@ -9,31 +9,42 @@ import com.mkdev.mkboardgames.games.chess.ChessPieceType
 import com.mkdev.mkboardgames.games.chess.ChessRuleEngine
 
 /**
- * Content validation for the Missing Piece challenge positions.
+ * Content validation for the chess challenge positions.
  */
 object ChessPuzzleValidator {
     private val engine = ChessRuleEngine()
 
     fun validateAll(puzzles: List<ChessPuzzle> = ChessPuzzleData.all): List<String> {
         val issues = mutableListOf<String>()
-        val expectedNumbers = (1..15).toList()
+        val expectedNumbers = (1..30).toList()
         if (puzzles.map { it.level } != expectedNumbers) {
-            issues += "Missing Piece challenges must be present once each from 1 to 15"
+            issues += "challenges must be present once each from 1 to 30"
         }
-        if (ChessChallengeCatalogue.size != 15) {
-            issues += "Missing Piece catalogue must contain exactly 15 challenges"
+        if (ChessChallengeCatalogue.size != 30) {
+            issues += "challenge catalogue must contain exactly 30 challenges"
         }
         if (puzzles.any { it.title != ChessChallengeCatalogue.titleFor(it.level) }) {
-            issues += "Missing Piece titles must match the challenge catalogue"
+            issues += "challenge titles must match the challenge catalogue"
         }
-        if (puzzles.any { it.missingPieces < 1 }) {
+        val missingPiecePuzzles = puzzles.filter { it.level in 1..15 }
+        if (missingPiecePuzzles.any { it.missingPieces < 1 }) {
             issues += "every Missing Piece challenge must start at least one piece short"
         }
-        if (puzzles.zipWithNext().any { (current, next) ->
+        if (missingPiecePuzzles.zipWithNext().any { (current, next) ->
                 next.missingPieces < current.missingPieces
             }
         ) {
             issues += "higher Missing Piece levels cannot give White more pieces"
+        }
+        val limitedMovePuzzles = puzzles.filter { it.level in 16..30 }
+        if (limitedMovePuzzles.any {
+                val limit = it.objective.targetPlayerMoves
+                it.condition != ChallengeCondition.CHECK_OR_CHECKMATE_WITHIN_LIMIT ||
+                    limit == null ||
+                    limit > 25
+            }
+        ) {
+            issues += "Limited Moves challenges must use a check objective capped at 25 moves"
         }
         if (puzzles.any { it.fen.split(Regex("\\s+")).getOrNull(1) != "w" }) {
             issues += "all authored challenges must start with White to move"

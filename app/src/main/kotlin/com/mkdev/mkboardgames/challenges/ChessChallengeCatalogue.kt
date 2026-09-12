@@ -17,6 +17,21 @@ object ChessChallengeCatalogue {
         "Stalemate Pressure",
         "Endgame Squeeze",
         "Last Piece Standing",
+        "Check in Three",
+        "Check in Four",
+        "Check in Five",
+        "Check in Six",
+        "Check in Seven",
+        "Check in Eight",
+        "Check in Ten",
+        "Check in Twelve",
+        "Check in Fourteen",
+        "Check in Sixteen",
+        "Check in Eighteen",
+        "Check in Twenty",
+        "Check in Twenty-Two",
+        "Check in Twenty-Four",
+        "Check in Twenty-Five",
     )
 
     val size: Int

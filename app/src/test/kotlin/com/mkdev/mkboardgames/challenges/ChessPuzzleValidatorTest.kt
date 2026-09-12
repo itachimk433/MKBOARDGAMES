@@ -6,12 +6,14 @@ import kotlin.test.assertTrue
 
 class ChessPuzzleValidatorTest {
     @Test
-    fun catalogueContainsFifteenMissingPieceChallenges() {
-        assertEquals(15, ChessPuzzleData.all.size)
-        assertEquals(15, ChessChallengeCatalogue.size)
-        assertEquals((1..15).toList(), ChessPuzzleData.all.map { it.level })
+    fun catalogueContainsTwoFifteenChallengeSections() {
+        assertEquals(30, ChessPuzzleData.all.size)
+        assertEquals(30, ChessChallengeCatalogue.size)
+        assertEquals((1..30).toList(), ChessPuzzleData.all.map { it.level })
         assertEquals("Three Pieces Short", ChessChallengeCatalogue.titleFor(3))
         assertEquals("Last Piece Standing", ChessChallengeCatalogue.titleFor(15))
+        assertEquals("Check in Three", ChessChallengeCatalogue.titleFor(16))
+        assertEquals("Check in Twenty-Five", ChessChallengeCatalogue.titleFor(30))
     }
 
     @Test
@@ -35,10 +37,33 @@ class ChessPuzzleValidatorTest {
     }
 
     @Test
-    fun missingPieceChallengesKeepSetupAndWinConditionTogether() {
+    fun limitedMoveChallengesUseCheckObjectivesCappedAtTwentyFive() {
+        val limited = ChessPuzzleData.all.filter { it.level in 16..30 }
+        assertEquals(15, limited.size)
+        assertTrue(
+            limited.all {
+                val limit = it.objective.targetPlayerMoves
+                it.condition == ChallengeCondition.CHECK_OR_CHECKMATE_WITHIN_LIMIT &&
+                    limit != null &&
+                    limit in 1..25 &&
+                    it.winCondition.contains("check or checkmate")
+            },
+        )
+        assertTrue(
+            limited.zipWithNext().all { (current, next) ->
+                current.objective.targetPlayerMoves!! < next.objective.targetPlayerMoves!!
+            },
+        )
+    }
+
+    @Test
+    fun allChallengesKeepSetupAndWinConditionTogether() {
         ChessPuzzleData.all.forEach { puzzle ->
             assertTrue(puzzle.setup.isNotBlank())
-            assertTrue(puzzle.winCondition.contains("checkmate or stalemate"))
+            assertTrue(
+                puzzle.winCondition.contains("checkmate or stalemate") ||
+                    puzzle.winCondition.contains("check or checkmate"),
+            )
             assertEquals(puzzle.title, ChessChallengeCatalogue.titleFor(puzzle.level))
         }
     }
