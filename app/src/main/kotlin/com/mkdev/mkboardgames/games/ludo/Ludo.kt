@@ -48,6 +48,8 @@ object LudoSetup {
         0xFF5F4A20.toInt()
     )
 
+    fun facesOppositeSide(player: Int): Boolean = player >= PLAYER_COUNT / 2
+
     /**
      * The 52 common track cells in clockwise order, beginning at the yellow
      * starting square on the supplied 15x15 board. The four player starts are

@@ -210,6 +210,7 @@ class LudoActivity : AppCompatActivity() {
                 accentColor = LudoSetup.PLAYER_COLORS[player]
                 label = playerDisplayName(player)
                 labelBelow = player == 0 || player == 1
+                facesOppositeSide = LudoSetup.facesOppositeSide(player)
                 bind(
                     playerBadgeViews[player],
                     playerDiceViews[player],

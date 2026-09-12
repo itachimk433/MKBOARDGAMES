@@ -333,7 +333,12 @@ class LudoBoardView(context: Context) : View(context) {
         canvas.drawCircle(point.x, point.y, radius, piecePaint)
         piecePaint.style = Paint.Style.FILL
         textPaint.color = Color.WHITE
+        canvas.save()
+        if (LudoSetup.facesOppositeSide(piece.player)) {
+            canvas.rotate(180f, point.x, point.y)
+        }
         canvas.drawText(piece.symbol(), point.x, point.y - (textPaint.ascent() + textPaint.descent()) / 2f, textPaint)
+        canvas.restore()
         if (isProtected) {
             drawProtectionShield(canvas, point.x, point.y + radius * 1.18f)
         }
