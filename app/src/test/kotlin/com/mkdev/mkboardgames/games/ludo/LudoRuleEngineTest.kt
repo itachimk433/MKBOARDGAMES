@@ -50,6 +50,21 @@ class LudoRuleEngineTest {
         assertNotNull(rejected.exceptionOrNull())
     }
 
+    @Test
+    fun sixLaunchesAnyTokenWhenThePlayerHasOnlyYardTokens() {
+        val state = LudoSetup.initialState()
+
+        val moves = engine.legalMovesForDice(
+            state = state,
+            player = 3,
+            dice = 6,
+        )
+
+        assertEquals(LudoSetup.TOKENS_PER_PLAYER, moves.size)
+        assertEquals(setOf(0, 1, 2, 3), moves.map { it.metadata["token"] }.toSet())
+        assertEquals(setOf(0), moves.map { it.metadata["targetProgress"] }.toSet())
+    }
+
     private fun stateWithPiece(progress: Int) =
         LudoSetup.initialState().let { initial ->
             val pieces = LudoSetup.allPieces(initial).map { piece ->

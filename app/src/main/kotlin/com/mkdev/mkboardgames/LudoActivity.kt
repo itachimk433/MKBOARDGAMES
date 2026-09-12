@@ -1722,12 +1722,24 @@ class LudoActivity : AppCompatActivity() {
 
     private fun finishTurnAfterNoMove() {
         if (!gameplayActive() ||
-            state.status != GameStatus.IN_PROGRESS || rolledValue == 0
+            state.status != GameStatus.IN_PROGRESS || rolledValue == 0 ||
+            boardView.isLocked
         ) return
+        if (boardView.legalMoves.isNotEmpty()) return
+
+        // A delayed recovery/skip callback must not discard a valid move if
+        // the move list was rebuilt after the callback was scheduled.
+        val player = LudoSetup.playerFromState(state)
+        val legal = engine.legalMovesForDice(state, player, rolledValue)
+        if (legal.isNotEmpty()) {
+            boardView.legalMoves = legal
+            updateHud()
+            return
+        }
+
         pendingMove = null
         celebrationGeneration++
         celebrationMessage = null
-        val player = LudoSetup.playerFromState(state)
         val sixStreak = state.metadata[LudoSetup.SIX_STREAK_METADATA] as? Int ?: 0
         val forfeitsAfterThreeSixes = rolledValue == 6 && sixStreak >= 3
         val nextPlayer = if (rolledValue == 6 && !forfeitsAfterThreeSixes) {
