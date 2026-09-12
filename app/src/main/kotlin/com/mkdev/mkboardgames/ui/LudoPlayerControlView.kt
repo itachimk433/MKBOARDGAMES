@@ -132,7 +132,7 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
         if (isActive) {
             val glowAlpha = (110 + (125 * glowPulse)).roundToInt()
             fillPaint.setShadowLayer(
-                dp(7f + (13f * glowPulse)),
+                dp((7f + (13f * glowPulse)) * GLOW_THICKNESS_SCALE),
                 0f,
                 0f,
                 Color.argb(
@@ -162,7 +162,11 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
                 Color.blue(accentColor),
             )
         }
-        borderPaint.strokeWidth = if (isActive) dp(2).toFloat() else dp(1).toFloat()
+        borderPaint.strokeWidth = if (isActive) {
+            dp(2f * GLOW_THICKNESS_SCALE)
+        } else {
+            dp(1).toFloat()
+        }
         canvas.drawRoundRect(frameRect, radius, radius, borderPaint)
     }
 
@@ -215,6 +219,7 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
     }
 
     companion object {
+        private const val GLOW_THICKNESS_SCALE = 1.2f
         private const val LABEL_HEIGHT = 29
         private const val FRAME_HEIGHT = 74
         private const val AVATAR_SIZE = 70

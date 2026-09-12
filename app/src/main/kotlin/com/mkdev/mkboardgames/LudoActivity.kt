@@ -58,6 +58,7 @@ class LudoActivity : AppCompatActivity() {
     private lateinit var storeView: TextView
     private lateinit var overlay: FrameLayout
     private lateinit var notificationHost: LinearLayout
+    private lateinit var modeBar: LinearLayout
     private val engine = LudoRuleEngine()
     private val handler = Handler(Looper.getMainLooper())
     private val moves = mutableListOf<Move>()
@@ -131,7 +132,7 @@ class LudoActivity : AppCompatActivity() {
             setPadding(12, (6 * dp).toInt(), 12, (6 * dp).toInt())
             elevation = 4 * dp
         }
-        val economyBar = LinearLayout(this).apply {
+        modeBar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding((10 * dp).toInt(), 0, (6 * dp).toInt(), 0)
@@ -160,8 +161,8 @@ class LudoActivity : AppCompatActivity() {
             }
             setOnClickListener { if (economyEnabled && humanPlayerCanUseStore()) showStoreDialog() }
         }
-        economyBar.addView(economyView, LinearLayout.LayoutParams(0, (38 * dp).toInt(), 1f))
-        economyBar.addView(storeView, LinearLayout.LayoutParams(
+        modeBar.addView(economyView, LinearLayout.LayoutParams(0, (38 * dp).toInt(), 1f))
+        modeBar.addView(storeView, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.WRAP_CONTENT, (32 * dp).toInt(),
         ))
         boardView = LudoBoardView(this)
@@ -232,7 +233,7 @@ class LudoActivity : AppCompatActivity() {
             positionPlayerDice()
         }
 
-        contentRoot.addView(economyBar, LinearLayout.LayoutParams(
+        contentRoot.addView(modeBar, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
             (42 * dp).toInt(),
         ).apply {
@@ -492,6 +493,7 @@ class LudoActivity : AppCompatActivity() {
         MusicPlayer.enterMatch(this)
         if (gameplayActive()) SoundPlayer.playMovement("ludo_start")
         economyEnabled = irregularMode && vsAI
+        modeBar.visibility = if (vsAI) View.VISIBLE else View.GONE
         if (vsAI) SettingsManager.setActiveGame(this, "ludo")
         aiDifficulty = SettingsManager.getLudoDifficulty(this)
         val initialState = engine.initialState()
@@ -1838,7 +1840,22 @@ class LudoActivity : AppCompatActivity() {
         }
     }
 
+    private fun restoreHumanLegalMovesIfNeeded() {
+        if (!matchStarted ||
+            state.status != GameStatus.IN_PROGRESS ||
+            rolledValue == 0 ||
+            boardView.isLocked ||
+            isAiTurn() ||
+            boardView.legalMoves.isNotEmpty()
+        ) {
+            return
+        }
+        val player = LudoSetup.playerFromState(state)
+        boardView.legalMoves = engine.legalMovesForDice(state, player, rolledValue)
+    }
+
     private fun updateHud() {
+        restoreHumanLegalMovesIfNeeded()
         val player = LudoSetup.playerFromState(state)
         val text = celebrationMessage ?: when {
             state.status != GameStatus.IN_PROGRESS -> "${LudoSetup.PLAYER_NAMES[state.metadata["ludo_winner"] as? Int ?: player]} wins"

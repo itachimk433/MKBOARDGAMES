@@ -33,7 +33,9 @@ class LudoBoardView(context: Context) : View(context) {
         set(value) {
             field = value
             selectedFrom = null
-            legalMoves = emptyList()
+            // State refreshes can happen while a player is choosing a token
+            // (for example after an economy/profile update). Keep the current
+            // legal destinations until the activity explicitly replaces them.
             updateGeometry()
             invalidate()
         }
