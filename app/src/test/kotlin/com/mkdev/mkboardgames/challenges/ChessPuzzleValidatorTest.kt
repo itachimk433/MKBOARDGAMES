@@ -28,6 +28,7 @@ class ChessPuzzleValidatorTest {
         assertEquals(ChallengeCondition.CHECKMATE_WITHIN_LIMIT, objectives.getValue(1).condition)
         assertEquals(ChallengeCondition.CHECKMATE_WITHIN_LIMIT, objectives.getValue(3).condition)
         assertEquals(ChallengeCondition.CHECKMATE_WITHIN_LIMIT, objectives.getValue(15).condition)
+        assertTrue((1..15).all { objectives.getValue(it).targetPlayerMoves == null })
         assertEquals(1, ChessPuzzleData.all.first().missingPieces)
         assertTrue(
             ChessPuzzleData.all.zipWithNext().all { (current, next) ->
@@ -64,6 +65,9 @@ class ChessPuzzleValidatorTest {
                 puzzle.winCondition.contains("checkmate or stalemate") ||
                     puzzle.winCondition.contains("check or checkmate"),
             )
+            if (puzzle.level in 1..15) {
+                assertTrue(!puzzle.winCondition.contains("moves"))
+            }
             assertEquals(puzzle.title, ChessChallengeCatalogue.titleFor(puzzle.level))
         }
     }

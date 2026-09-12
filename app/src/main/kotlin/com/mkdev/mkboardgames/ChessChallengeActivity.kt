@@ -179,7 +179,7 @@ class ChessChallengeActivity : AppCompatActivity() {
             val earnedStars = (1..puzzles.size).sumOf { progressPrefs.getInt(starsKey(it), 0) }
             val solved = (1..puzzles.size).count { progressPrefs.getInt(starsKey(it), 0) > 0 }
             val attempts = (1..puzzles.size).sumOf { progressPrefs.getInt(attemptsKey(it), 0) }
-            text = "Checkmate, stalemate, or check within a move limit.\nCompleted: $solved / ${puzzles.size} • Highest completed: ${highestCompleted.coerceAtMost(puzzles.size)} • Stars: $earnedStars • Attempts: $attempts"
+            text = "Open-ended checkmate or stalemate, plus limited-move checks.\nCompleted: $solved / ${puzzles.size} • Highest completed: ${highestCompleted.coerceAtMost(puzzles.size)} • Stars: $earnedStars • Attempts: $attempts"
             setTextColor(Color.parseColor("#B7C9D1"))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             setPadding(dp(20), dp(13), dp(20), dp(12))
@@ -868,7 +868,7 @@ class ChessChallengeActivity : AppCompatActivity() {
         }
         return when (puzzle.condition) {
             ChallengeCondition.CHECKMATE_WITHIN_LIMIT ->
-                "The position was not resolved by checkmate or stalemate within the move limit."
+                "The position was not resolved by checkmate or stalemate."
             ChallengeCondition.CHECK_OR_CHECKMATE_WITHIN_LIMIT ->
                 "The black king was not put in check within the move limit."
             ChallengeCondition.NO_QUEEN_USE ->

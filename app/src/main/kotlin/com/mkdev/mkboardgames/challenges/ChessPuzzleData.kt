@@ -254,12 +254,11 @@ object ChessPuzzleData {
         sourceId = "missing-piece-$level",
         objective = ChallengeObjective(
             condition = ChallengeCondition.CHECKMATE_WITHIN_LIMIT,
-            targetPlayerMoves = (20 + level * 2).coerceAtMost(50),
             difficulty = ((level + 2) / 3).coerceIn(1, 5),
         ),
         title = ChessChallengeCatalogue.titleFor(level),
         setup = setup,
-        winCondition = "Deliver checkmate or stalemate in ${20 + level * 2} moves or fewer.",
+        winCondition = "Deliver checkmate or stalemate.",
         recommendedMoves = recommendedMoves,
         missingPieces = missingPieces,
     )

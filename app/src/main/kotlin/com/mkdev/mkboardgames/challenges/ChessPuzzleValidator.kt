@@ -30,6 +30,9 @@ object ChessPuzzleValidator {
         if (missingPiecePuzzles.any { it.missingPieces < 1 }) {
             issues += "every Missing Piece challenge must start at least one piece short"
         }
+        if (missingPiecePuzzles.any { it.objective.targetPlayerMoves != null }) {
+            issues += "Missing Piece challenges must not have move limits"
+        }
         if (missingPiecePuzzles.zipWithNext().any { (current, next) ->
                 next.missingPieces < current.missingPieces
             }
