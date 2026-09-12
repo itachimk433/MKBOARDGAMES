@@ -37,6 +37,7 @@ import com.mkdev.mkboardgames.games.ludo.LudoPlayerEconomy
 import com.mkdev.mkboardgames.games.ludo.LudoSetup
 import com.mkdev.mkboardgames.ui.LudoBoardView
 import com.mkdev.mkboardgames.ui.GlbDiceView
+import com.mkdev.mkboardgames.ui.LudoPlayerBadgeView
 import com.mkdev.mkboardgames.ui.MotionDiceDirection
 import com.mkdev.mkboardgames.ui.ChessMenuView
 import com.mkdev.mkboardgames.ui.StyledDialogs
@@ -49,6 +50,7 @@ class LudoActivity : AppCompatActivity() {
     private lateinit var boardView: LudoBoardView
     private lateinit var boardStage: FrameLayout
     private lateinit var playerDiceViews: Array<GlbDiceView>
+    private lateinit var playerBadgeViews: Array<LudoPlayerBadgeView>
     private lateinit var turnView: TextView
     private lateinit var economyView: TextView
     private lateinit var storeView: TextView
@@ -190,6 +192,24 @@ class LudoActivity : AppCompatActivity() {
                     }
                 }
             }
+        }
+        playerBadgeViews = Array(LudoSetup.PLAYER_COUNT) { player ->
+            LudoPlayerBadgeView(this).apply {
+                accentColor = LudoSetup.PLAYER_COLORS[player]
+                avatarOnEnd = player == 1 || player == 3
+                label = playerDisplayName(player)
+                setOnClickListener {
+                    if (profilesEnabled() && matchStarted) showPlayerProfile(player)
+                }
+            }
+        }
+        playerBadgeViews.forEach { badge ->
+            boardStage.addView(
+                badge,
+                FrameLayout.LayoutParams(dp(86), dp(52)).apply {
+                    gravity = android.view.Gravity.TOP or android.view.Gravity.START
+                },
+            )
         }
         playerDiceViews.forEach { die ->
             boardStage.addView(
@@ -1122,22 +1142,41 @@ class LudoActivity : AppCompatActivity() {
         val boardWidth = boardView.width
         val boardBottom = boardView.bottom
         val diceSize = dp(52)
-        val leftX = boardLeft + (boardWidth * 0.25f).roundToInt() - diceSize / 2
-        val rightX = boardLeft + (boardWidth * 0.75f).roundToInt() - diceSize / 2
+        val badgeWidth = dp(86)
+        val pairOverlap = dp(2)
+        val pairWidth = badgeWidth + diceSize - pairOverlap
+        val outerMargin = dp(4)
+        val leftPairX = boardLeft + outerMargin
+        val rightPairX = boardLeft + boardWidth - pairWidth - outerMargin
         val topY = (boardTop - diceSize) / 2
         val bottomY = boardBottom + (boardStage.height - boardBottom - diceSize) / 2
-        // Keep dice in the top/bottom rails, aligned with each colour's home yard.
+        // Keep each profile and die together in the top/bottom rails.
         val playerPositions = arrayOf(
-            leftX to bottomY,  // Red: below the bottom-left home
-            rightX to bottomY, // Blue: below the bottom-right home
-            leftX to topY,     // Green: above the top-left home
-            rightX to topY,    // Yellow: above the top-right home
+            leftPairX + badgeWidth - pairOverlap to bottomY, // Red: badge, die
+            rightPairX to bottomY, // Blue: die, badge
+            leftPairX + badgeWidth - pairOverlap to topY, // Green: badge, die
+            rightPairX to topY, // Yellow: die, badge
+        )
+        val badgePositions = arrayOf(
+            leftPairX to bottomY,
+            rightPairX + diceSize - pairOverlap to bottomY,
+            leftPairX to topY,
+            rightPairX + diceSize - pairOverlap to topY,
         )
 
         playerDiceViews.forEachIndexed { player, die ->
             val (left, top) = playerPositions[player]
             die.layoutParams = (die.layoutParams as FrameLayout.LayoutParams).apply {
                 width = diceSize
+                height = diceSize
+                leftMargin = left
+                topMargin = top
+            }
+        }
+        playerBadgeViews.forEachIndexed { player, badge ->
+            val (left, top) = badgePositions[player]
+            badge.layoutParams = (badge.layoutParams as FrameLayout.LayoutParams).apply {
+                width = badgeWidth
                 height = diceSize
                 leftMargin = left
                 topMargin = top
@@ -1150,6 +1189,11 @@ class LudoActivity : AppCompatActivity() {
         playerDiceViews.forEach {
             it.visibility = if (visible) View.VISIBLE else View.INVISIBLE
             it.setGameplayVisible(visible)
+        }
+        if (::playerBadgeViews.isInitialized) {
+            playerBadgeViews.forEach {
+                it.visibility = if (visible) View.VISIBLE else View.INVISIBLE
+            }
         }
     }
 
@@ -1764,6 +1808,25 @@ class LudoActivity : AppCompatActivity() {
     private fun isHumanTurn(): Boolean = !vsAI || LudoSetup.playerFromState(state) == humanPlayer
     private fun isAiTurn(): Boolean = vsAI && !isHumanTurn()
 
+    private fun playerDisplayName(player: Int): String {
+        if (!vsAI) return "P${player + 1}"
+        if (player == humanPlayer) return "You"
+        val cpuNumber = (0 until player).count { it != humanPlayer } + 2
+        return "CPU$cpuNumber"
+    }
+
+    private fun updatePlayerBadges() {
+        if (!::playerBadgeViews.isInitialized) return
+        val activePlayer = LudoSetup.playerFromState(state)
+        playerBadgeViews.forEachIndexed { player, badge ->
+            badge.label = playerDisplayName(player)
+            badge.isActive = matchStarted &&
+                state.status == GameStatus.IN_PROGRESS &&
+                player == activePlayer
+            badge.isClickable = profilesEnabled() && matchStarted
+        }
+    }
+
     private fun updateHud() {
         val player = LudoSetup.playerFromState(state)
         val text = celebrationMessage ?: when {
@@ -1785,6 +1848,7 @@ class LudoActivity : AppCompatActivity() {
                 Color.blue(accent),
             ))
         }
+        updatePlayerBadges()
         if (economyEnabled) {
             val economy = LudoEconomy.player(state, humanPlayer)
             economyView.text = "IRREGULAR  •  COINS ${economy.coins}"
