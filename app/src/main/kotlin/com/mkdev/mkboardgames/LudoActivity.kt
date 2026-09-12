@@ -170,7 +170,7 @@ class LudoActivity : AppCompatActivity() {
         }
         boardStage = FrameLayout(this)
         boardStage.clipChildren = true
-        val diceRail = dp(76)
+        val diceRail = dp(LudoPlayerControlView.RAIL_HEIGHT)
         boardStage.addView(
             boardView,
             FrameLayout.LayoutParams(
@@ -179,6 +179,7 @@ class LudoActivity : AppCompatActivity() {
             ).apply {
                 topMargin = diceRail
                 bottomMargin = diceRail
+                gravity = Gravity.CENTER
             },
         )
         playerDiceViews = Array(LudoSetup.PLAYER_COUNT) { player ->
@@ -221,7 +222,7 @@ class LudoActivity : AppCompatActivity() {
                 control,
                 FrameLayout.LayoutParams(
                     dp(LudoPlayerControlView.PAIR_WIDTH),
-                    dp(72),
+                    dp(LudoPlayerControlView.CONTROL_HEIGHT),
                 ).apply {
                     gravity = android.view.Gravity.TOP or android.view.Gravity.START
                 },
@@ -239,7 +240,8 @@ class LudoActivity : AppCompatActivity() {
         })
         contentRoot.addView(boardStage, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.WRAP_CONTENT,
+            0,
+            1f,
         ))
         AdManager.attachBanner(contentRoot)
         setContentView(overlay)
@@ -1145,7 +1147,7 @@ class LudoActivity : AppCompatActivity() {
         val boardWidth = boardView.width
         val boardBottom = boardView.bottom
         val controlWidth = dp(LudoPlayerControlView.PAIR_WIDTH)
-        val controlHeight = dp(72)
+        val controlHeight = dp(LudoPlayerControlView.CONTROL_HEIGHT)
         val outerMargin = dp(4)
         val leftPairX = boardLeft + outerMargin
         val rightPairX = boardLeft + boardWidth - controlWidth - outerMargin

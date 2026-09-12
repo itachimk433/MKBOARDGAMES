@@ -64,8 +64,8 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
         removeAllViews()
         val frameTop = if (labelBelow) 0 else dp(LABEL_HEIGHT)
         val frameHeight = dp(FRAME_HEIGHT)
-        val avatarWidth = dp(48)
-        val dieSize = dp(52)
+        val avatarWidth = dp(AVATAR_SIZE)
+        val dieSize = dp(DIE_SIZE)
         val overlap = dp(2)
         val profileLeft = if (profileOnEnd) {
             dp(PAIR_WIDTH) - avatarWidth
@@ -96,11 +96,11 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val width = resolveSize(dp(PAIR_WIDTH), widthMeasureSpec)
-        val height = resolveSize(dp(LABEL_HEIGHT + FRAME_HEIGHT), heightMeasureSpec)
+        val height = resolveSize(dp(CONTROL_HEIGHT), heightMeasureSpec)
         setMeasuredDimension(width, height)
         val childHeightSpec = MeasureSpec.makeMeasureSpec(dp(FRAME_HEIGHT), MeasureSpec.EXACTLY)
         for (index in 0 until childCount) {
-            val childWidth = if (index == 0) 48 else 52
+            val childWidth = if (index == 0) AVATAR_SIZE else DIE_SIZE
             val childWidthSpec = MeasureSpec.makeMeasureSpec(dp(childWidth), MeasureSpec.EXACTLY)
             getChildAt(index).measure(childWidthSpec, childHeightSpec)
         }
@@ -168,8 +168,12 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
         (value * resources.displayMetrics.density).roundToInt()
 
     companion object {
-        private const val LABEL_HEIGHT = 20
-        private const val FRAME_HEIGHT = 52
-        const val PAIR_WIDTH = 98
+        private const val LABEL_HEIGHT = 24
+        private const val FRAME_HEIGHT = 62
+        private const val AVATAR_SIZE = 58
+        private const val DIE_SIZE = 62
+        const val CONTROL_HEIGHT = LABEL_HEIGHT + FRAME_HEIGHT
+        const val PAIR_WIDTH = AVATAR_SIZE + DIE_SIZE - 2
+        const val RAIL_HEIGHT = 92
     }
 }
