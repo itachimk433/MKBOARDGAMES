@@ -191,7 +191,6 @@ class ChessChallengeActivity : AppCompatActivity() {
             puzzles.size,
             highestCompleted,
             IntArray(puzzles.size) { progressPrefs.getInt(starsKey(it + 1), 0) },
-            subtitles = puzzles.map { it.title },
             lockFutureChallenges = false,
             sections = listOf(
                 ChallengeSection(1, "Missing Piece"),

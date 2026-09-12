@@ -46,13 +46,13 @@ class ChallengeLevelGridView(
         color = Color.parseColor("#F7D99B")
         textAlign = Paint.Align.CENTER
         isFakeBoldText = true
-        textSize = 12f * textScale
+        textSize = 12f * 0.991f * textScale
     }
     private val completedLevelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#FFE5A8")
         textAlign = Paint.Align.CENTER
         isFakeBoldText = true
-        textSize = 12f * textScale
+        textSize = 12f * 0.991f * textScale
     }
     private val starPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#E3B86A")
