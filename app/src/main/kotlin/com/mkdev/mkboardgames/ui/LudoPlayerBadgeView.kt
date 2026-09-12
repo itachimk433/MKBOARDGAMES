@@ -84,16 +84,6 @@ class LudoPlayerBadgeView(context: Context) : View(context) {
         val baseline = centerY - (textPaint.ascent() + textPaint.descent()) / 2f
         canvas.drawText(initial, centerX, baseline, textPaint)
 
-        if (isActive) {
-            avatarPaint.clearShadowLayer()
-            avatarPaint.color = Color.WHITE
-            canvas.drawCircle(
-                width - dp(6).toFloat(),
-                dp(7).toFloat(),
-                dp(3).toFloat(),
-                avatarPaint,
-            )
-        }
     }
 
     private fun dp(value: Int): Int =

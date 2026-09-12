@@ -236,6 +236,7 @@ class LudoActivity : AppCompatActivity() {
             ViewGroup.LayoutParams.MATCH_PARENT,
             (42 * dp).toInt(),
         ).apply {
+            topMargin = (8 * dp).toInt()
             bottomMargin = (6 * dp).toInt()
         })
         contentRoot.addView(boardStage, LinearLayout.LayoutParams(

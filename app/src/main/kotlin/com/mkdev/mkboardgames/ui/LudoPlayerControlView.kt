@@ -1,5 +1,6 @@
 package com.mkdev.mkboardgames.ui
 
+import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
@@ -7,6 +8,7 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.view.View
+import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.FrameLayout
 import kotlin.math.roundToInt
 
@@ -41,8 +43,12 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
     var isActive: Boolean = false
         set(value) {
             field = value
+            if (value) startGlowAnimation() else stopGlowAnimation()
             invalidate()
         }
+
+    private var glowAnimator: ValueAnimator? = null
+    private var glowPulse = 0f
 
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -123,24 +129,31 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
         val radius = dp(13).toFloat()
 
         fillPaint.color = Color.argb(238, 10, 18, 27)
-        fillPaint.clearShadowLayer()
         if (isActive) {
+            val glowAlpha = (110 + (125 * glowPulse)).roundToInt()
             fillPaint.setShadowLayer(
-                dp(10).toFloat(),
+                dp(7f + (13f * glowPulse)),
                 0f,
                 0f,
                 Color.argb(
-                    220,
+                    glowAlpha,
                     Color.red(accentColor),
                     Color.green(accentColor),
                     Color.blue(accentColor),
                 ),
             )
+        } else {
+            fillPaint.clearShadowLayer()
         }
         canvas.drawRoundRect(frameRect, radius, radius, fillPaint)
 
         borderPaint.color = if (isActive) {
-            Color.WHITE
+            Color.argb(
+                (190 + (65 * glowPulse)).roundToInt(),
+                Color.red(accentColor),
+                Color.green(accentColor),
+                Color.blue(accentColor),
+            )
         } else {
             Color.argb(
                 210,
@@ -166,6 +179,40 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
 
     private fun dp(value: Int): Int =
         (value * resources.displayMetrics.density).roundToInt()
+
+    private fun dp(value: Float): Float =
+        value * resources.displayMetrics.density
+
+    private fun startGlowAnimation() {
+        if (!isAttachedToWindow || glowAnimator?.isRunning == true) return
+        glowAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = 900L
+            repeatMode = ValueAnimator.REVERSE
+            repeatCount = ValueAnimator.INFINITE
+            interpolator = AccelerateDecelerateInterpolator()
+            addUpdateListener {
+                glowPulse = it.animatedValue as Float
+                invalidate()
+            }
+            start()
+        }
+    }
+
+    private fun stopGlowAnimation() {
+        glowAnimator?.cancel()
+        glowAnimator = null
+        glowPulse = 0f
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        if (isActive) startGlowAnimation()
+    }
+
+    override fun onDetachedFromWindow() {
+        stopGlowAnimation()
+        super.onDetachedFromWindow()
+    }
 
     companion object {
         private const val LABEL_HEIGHT = 29
