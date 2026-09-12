@@ -40,6 +40,12 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
             invalidate()
         }
 
+    var labelUpsideDown: Boolean = false
+        set(value) {
+            field = value
+            invalidate()
+        }
+
     var isActive: Boolean = false
         set(value) {
             field = value
@@ -178,7 +184,13 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
         } else {
             dp(14).toFloat()
         }
+        val labelCenterY = baseline - (textPaint.ascent() + textPaint.descent()) / 2f
+        canvas.save()
+        if (labelUpsideDown) {
+            canvas.rotate(180f, width / 2f, labelCenterY)
+        }
         canvas.drawText(label, width / 2f, baseline, textPaint)
+        canvas.restore()
     }
 
     private fun dp(value: Int): Int =

@@ -505,6 +505,7 @@ class LudoActivity : AppCompatActivity() {
             ),
         )
         boardView.gameState = state
+        boardView.showTokenNumbers = irregularMode
         // Keep every player's token labels readable from the same orientation.
         // The opposite-side rotation made the four-player path look inverted
         // and was not used in the CPU layout.
@@ -1191,11 +1192,12 @@ class LudoActivity : AppCompatActivity() {
     private fun syncPlayerOrientations() {
         if (!::playerDiceViews.isInitialized || !::playerBadgeViews.isInitialized) return
         playerDiceViews.forEachIndexed { player, die ->
-            // P3/P4 use the same readable orientation as P1/P2 and vs CPU.
-            // This is presentation-only; it must not alter turn ownership or
-            // the board coordinates used by the rule engine.
+            val rotateTopPlayerIdentity = !vsAI && LudoSetup.facesOppositeSide(player)
+            // Keep dice readable, while turning only the top players' identity
+            // elements toward those players.
             die.facesOppositeSide = false
-            playerBadgeViews[player].facesOppositeSide = false
+            playerBadgeViews[player].facesOppositeSide = rotateTopPlayerIdentity
+            playerControlViews[player].labelUpsideDown = rotateTopPlayerIdentity
         }
     }
 

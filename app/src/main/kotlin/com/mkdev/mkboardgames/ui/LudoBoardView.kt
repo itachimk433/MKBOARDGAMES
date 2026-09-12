@@ -46,6 +46,11 @@ class LudoBoardView(context: Context) : View(context) {
             invalidate()
         }
     var isLocked: Boolean = false
+    var showTokenNumbers: Boolean = true
+        set(value) {
+            field = value
+            invalidate()
+        }
     var rotateOppositeSideTokenNumbers: Boolean = false
     var onMoveSelected: ((Move) -> Unit)? = null
     var onMoveStep: (() -> Unit)? = null
@@ -335,13 +340,19 @@ class LudoBoardView(context: Context) : View(context) {
         piecePaint.color = Color.argb(230, 255, 255, 255)
         canvas.drawCircle(point.x, point.y, radius, piecePaint)
         piecePaint.style = Paint.Style.FILL
-        textPaint.color = Color.WHITE
-        canvas.save()
-        if (rotateOppositeSideTokenNumbers && LudoSetup.facesOppositeSide(piece.player)) {
-            canvas.rotate(180f, point.x, point.y)
+        if (showTokenNumbers) {
+            textPaint.color = Color.WHITE
+            canvas.save()
+            if (rotateOppositeSideTokenNumbers && LudoSetup.facesOppositeSide(piece.player)) {
+                canvas.rotate(180f, point.x, point.y)
+            }
+            canvas.drawText(
+                piece.symbol(),
+                point.x,
+                point.y - (textPaint.ascent() + textPaint.descent()) / 2f,
+            )
+            canvas.restore()
         }
-        canvas.drawText(piece.symbol(), point.x, point.y - (textPaint.ascent() + textPaint.descent()) / 2f, textPaint)
-        canvas.restore()
         if (isProtected) {
             drawProtectionShield(canvas, point.x, point.y + radius * 1.18f)
         }
