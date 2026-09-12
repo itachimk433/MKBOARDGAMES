@@ -16,17 +16,17 @@ object ChessPuzzleValidator {
 
     fun validateAll(puzzles: List<ChessPuzzle> = ChessPuzzleData.all): List<String> {
         val issues = mutableListOf<String>()
-        val expectedNumbers = (1..30).toList()
+        val expectedNumbers = (1..10).toList()
         if (puzzles.map { it.level } != expectedNumbers) {
-            issues += "challenges must be present once each from 1 to 30"
+            issues += "challenges must be present once each from 1 to 10"
         }
-        if (ChessChallengeCatalogue.size != 30) {
-            issues += "challenge catalogue must contain exactly 30 challenges"
+        if (ChessChallengeCatalogue.size != 10) {
+            issues += "challenge catalogue must contain exactly 10 challenges"
         }
         if (puzzles.any { it.title != ChessChallengeCatalogue.titleFor(it.level) }) {
             issues += "challenge titles must match the challenge catalogue"
         }
-        val missingPiecePuzzles = puzzles.filter { it.level in 1..15 }
+        val missingPiecePuzzles = puzzles.filter { it.level in 1..10 }
         if (missingPiecePuzzles.any { it.missingPieces < 1 }) {
             issues += "every Missing Piece challenge must start at least one piece short"
         }
@@ -38,16 +38,6 @@ object ChessPuzzleValidator {
             }
         ) {
             issues += "higher Missing Piece levels cannot give White more pieces"
-        }
-        val limitedMovePuzzles = puzzles.filter { it.level in 16..30 }
-        if (limitedMovePuzzles.any {
-                val limit = it.objective.targetPlayerMoves
-                it.condition != ChallengeCondition.CHECK_OR_CHECKMATE_WITHIN_LIMIT ||
-                    limit == null ||
-                    limit > 25
-            }
-        ) {
-            issues += "Limited Moves challenges must use a check objective capped at 25 moves"
         }
         if (puzzles.any { it.fen.split(Regex("\\s+")).getOrNull(1) != "w" }) {
             issues += "all authored challenges must start with White to move"

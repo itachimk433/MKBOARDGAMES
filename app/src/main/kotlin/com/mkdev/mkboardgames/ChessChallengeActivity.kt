@@ -170,7 +170,7 @@ class ChessChallengeActivity : AppCompatActivity() {
         gameHud = null
         autoplayButton = null
         val root = verticalRoot()
-        val challengeSummary = "15 Missing Piece + 15 Limited Moves chess challenges"
+        val challengeSummary = "10 Missing Piece chess challenges"
         root.addView(topBar("CHESS CHALLENGES", challengeSummary) {
             finish()
         })
@@ -179,7 +179,7 @@ class ChessChallengeActivity : AppCompatActivity() {
             val earnedStars = (1..puzzles.size).sumOf { progressPrefs.getInt(starsKey(it), 0) }
             val solved = (1..puzzles.size).count { progressPrefs.getInt(starsKey(it), 0) > 0 }
             val attempts = (1..puzzles.size).sumOf { progressPrefs.getInt(attemptsKey(it), 0) }
-            text = "Open-ended checkmate or stalemate, plus limited-move checks.\nCompleted: $solved / ${puzzles.size} • Highest completed: ${highestCompleted.coerceAtMost(puzzles.size)} • Stars: $earnedStars • Attempts: $attempts"
+            text = "Open-ended checkmate or stalemate from positions with selected material missing.\nCompleted: $solved / ${puzzles.size} • Highest completed: ${highestCompleted.coerceAtMost(puzzles.size)} • Stars: $earnedStars • Attempts: $attempts"
             setTextColor(Color.parseColor("#B7C9D1"))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             setPadding(dp(20), dp(13), dp(20), dp(12))
@@ -194,7 +194,6 @@ class ChessChallengeActivity : AppCompatActivity() {
             lockFutureChallenges = false,
             sections = listOf(
                 ChallengeSection(1, "Missing Piece"),
-                ChallengeSection(16, "Limited Moves"),
             ),
         ).apply {
             onLevelSelected = { level ->
@@ -490,7 +489,7 @@ class ChessChallengeActivity : AppCompatActivity() {
         lastPlayerMoveState = nextState
         boardView?.gameState = puzzleState!!
 
-        if (nextState.status != GameStatus.IN_PROGRESS || isLimitedMovesSuccess(nextState)) {
+        if (nextState.status != GameStatus.IN_PROGRESS) {
             finishAfterFinalPosition(nextState)
         } else {
             boardView?.isLocked = true
@@ -574,9 +573,6 @@ class ChessChallengeActivity : AppCompatActivity() {
 
     private fun challengeSatisfied(state: GameState): Boolean {
         if (playerMovesMade > maxPlayerMoves) return false
-        if (currentPuzzle?.condition == ChallengeCondition.CHECK_OR_CHECKMATE_WITHIN_LIMIT) {
-            return isLimitedMovesSuccess(state)
-        }
         if (!isSuccessfulResolution(state)) {
             return false
         }
@@ -599,8 +595,6 @@ class ChessChallengeActivity : AppCompatActivity() {
             progressPrefs.edit().putInt(starsKey(selectedLevel), stars).apply()
         }
         val resultLabel = when {
-            currentPuzzle?.condition == ChallengeCondition.CHECK_OR_CHECKMATE_WITHIN_LIMIT &&
-                puzzleState?.status == GameStatus.IN_PROGRESS -> "Check!"
             puzzleState?.status == GameStatus.DRAW -> "Stalemate!"
             else -> "Checkmate!"
         }
@@ -798,10 +792,7 @@ class ChessChallengeActivity : AppCompatActivity() {
     private fun conditionSatisfied(state: GameState): Boolean {
         val puzzle = currentPuzzle ?: return false
         val condition = puzzle.condition
-        if (condition == ChallengeCondition.CHECK_OR_CHECKMATE_WITHIN_LIMIT) {
-            return isOpponentInCheck(state)
-        }
-        if (condition == ChallengeCondition.CHECKMATE_WITHIN_LIMIT) {
+        if (condition == ChallengeCondition.CHECKMATE_OR_STALEMATE) {
             return isSuccessfulResolution(state)
         }
         return when (condition) {
@@ -821,14 +812,13 @@ class ChessChallengeActivity : AppCompatActivity() {
             }
             ChallengeCondition.MATERIAL_COMEBACK -> startingMaterialDeficit >= 5
             ChallengeCondition.KNIGHT_CAPTURE_ONLY -> !playerUsedNonKnightCapture
-            ChallengeCondition.CHECKMATE_WITHIN_LIMIT -> true
-            ChallengeCondition.CHECK_OR_CHECKMATE_WITHIN_LIMIT -> true
+            ChallengeCondition.CHECKMATE_OR_STALEMATE -> true
         }
     }
 
     private val objective: ChallengeObjective
         get() = currentPuzzle?.objective
-            ?: ChallengeObjective(ChallengeCondition.CHECKMATE_WITHIN_LIMIT)
+            ?: ChallengeObjective(ChallengeCondition.CHECKMATE_OR_STALEMATE)
 
     private fun promotionRequirementSatisfied(): Boolean {
         val requirement = objective.requiredPromotion
@@ -858,21 +848,9 @@ class ChessChallengeActivity : AppCompatActivity() {
 
     private fun failureMessage(): String {
         val puzzle = currentPuzzle ?: return "The challenge was not completed."
-        if (puzzle.objective.targetPlayerMoves != null &&
-            playerMovesMade >= maxPlayerMoves &&
-            puzzleState?.status == GameStatus.IN_PROGRESS
-        ) {
-            return if (puzzle.condition == ChallengeCondition.CHECK_OR_CHECKMATE_WITHIN_LIMIT) {
-                "The check move limit was reached."
-            } else {
-                "The checkmate move limit was reached."
-            }
-        }
         return when (puzzle.condition) {
-            ChallengeCondition.CHECKMATE_WITHIN_LIMIT ->
+            ChallengeCondition.CHECKMATE_OR_STALEMATE ->
                 "The position was not resolved by checkmate or stalemate."
-            ChallengeCondition.CHECK_OR_CHECKMATE_WITHIN_LIMIT ->
-                "The black king was not put in check within the move limit."
             ChallengeCondition.NO_QUEEN_USE ->
                 "A queen was used. Retry without moving or promoting to a queen."
             ChallengeCondition.KNIGHT_HUNTER ->
@@ -965,10 +943,6 @@ class ChessChallengeActivity : AppCompatActivity() {
 
     private fun isOpponentInCheck(state: GameState): Boolean =
         engine.isInCheck(state, playerColor.opponent())
-
-    private fun isLimitedMovesSuccess(state: GameState): Boolean =
-        currentPuzzle?.condition == ChallengeCondition.CHECK_OR_CHECKMATE_WITHIN_LIMIT &&
-            isOpponentInCheck(state)
 
     private fun showPauseScreen() {
         if (activeOverlay != null || boardView == null) return

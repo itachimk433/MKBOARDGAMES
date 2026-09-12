@@ -6,14 +6,12 @@ import kotlin.test.assertTrue
 
 class ChessPuzzleValidatorTest {
     @Test
-    fun catalogueContainsTwoFifteenChallengeSections() {
-        assertEquals(30, ChessPuzzleData.all.size)
-        assertEquals(30, ChessChallengeCatalogue.size)
-        assertEquals((1..30).toList(), ChessPuzzleData.all.map { it.level })
+    fun catalogueContainsTenMissingPieceChallenges() {
+        assertEquals(10, ChessPuzzleData.all.size)
+        assertEquals(10, ChessChallengeCatalogue.size)
+        assertEquals((1..10).toList(), ChessPuzzleData.all.map { it.level })
         assertEquals("Three Pieces Short", ChessChallengeCatalogue.titleFor(3))
-        assertEquals("Last Piece Standing", ChessChallengeCatalogue.titleFor(15))
-        assertEquals("Check in Three", ChessChallengeCatalogue.titleFor(16))
-        assertEquals("Check in Twenty-Five", ChessChallengeCatalogue.titleFor(30))
+        assertEquals("Queen's Final Test", ChessChallengeCatalogue.titleFor(10))
     }
 
     @Test
@@ -25,11 +23,11 @@ class ChessPuzzleValidatorTest {
     @Test
     fun missingPieceChallengesUseTheResolutionObjective() {
         val objectives = ChessPuzzleData.all.associateBy { it.level }.mapValues { it.value.objective }
-        assertEquals(ChallengeCondition.CHECKMATE_WITHIN_LIMIT, objectives.getValue(1).condition)
-        assertEquals(ChallengeCondition.CHECKMATE_WITHIN_LIMIT, objectives.getValue(3).condition)
-        assertEquals(ChallengeCondition.CHECKMATE_WITHIN_LIMIT, objectives.getValue(15).condition)
-        assertTrue((1..15).all { objectives.getValue(it).targetPlayerMoves == null })
-        assertEquals(1, ChessPuzzleData.all.first().missingPieces)
+        assertTrue((1..10).all {
+            objectives.getValue(it).condition == ChallengeCondition.CHECKMATE_OR_STALEMATE &&
+                objectives.getValue(it).targetPlayerMoves == null
+        })
+        assertEquals(2, ChessPuzzleData.all.first().missingPieces)
         assertTrue(
             ChessPuzzleData.all.zipWithNext().all { (current, next) ->
                 next.missingPieces >= current.missingPieces
@@ -38,22 +36,47 @@ class ChessPuzzleValidatorTest {
     }
 
     @Test
-    fun limitedMoveChallengesUseCheckObjectivesCappedAtTwentyFive() {
-        val limited = ChessPuzzleData.all.filter { it.level in 16..30 }
-        assertEquals(15, limited.size)
-        assertTrue(
-            limited.all {
-                val limit = it.objective.targetPlayerMoves
-                it.condition == ChallengeCondition.CHECK_OR_CHECKMATE_WITHIN_LIMIT &&
-                    limit != null &&
-                    limit in 1..25 &&
-                    it.winCondition.contains("check or checkmate")
-            },
+    fun requestedStartingMaterialIsEncodedInEachPosition() {
+        val fens = ChessPuzzleData.all.associateBy { it.level }.mapValues { it.value.fen }
+        assertEquals(
+            "rnbqkbnr/pppppppp/8/8/8/8/PPP1PPPP/RNB1KBNR w KQkq - 0 1",
+            fens.getValue(1),
         )
-        assertTrue(
-            limited.zipWithNext().all { (current, next) ->
-                current.objective.targetPlayerMoves!! < next.objective.targetPlayerMoves!!
-            },
+        assertEquals(
+            "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RN2K1NR w KQkq - 0 1",
+            fens.getValue(2),
+        )
+        assertEquals(
+            "rnbqkbnr/pppppppp/8/8/8/8/PPP2PPP/R1BQKB1R w KQkq - 0 1",
+            fens.getValue(3),
+        )
+        assertEquals(
+            "rnbqkbnr/pppppppp/8/8/8/8/PPP1PPPP/R2QKBN1 w KQkq - 0 1",
+            fens.getValue(4),
+        )
+        assertEquals(
+            "rnbqkbnr/pppppppp/8/8/8/8/P2PP2P/R3K1N1 w KQkq - 0 1",
+            fens.getValue(5),
+        )
+        assertEquals(
+            "4k3/ppp5/8/8/8/8/PPP5/2B1K1N1 w - - 0 1",
+            fens.getValue(6),
+        )
+        assertEquals(
+            "4k3/ppp5/8/8/8/8/PP6/1N2K1N1 w - - 0 1",
+            fens.getValue(7),
+        )
+        assertEquals(
+            "4k3/ppp5/8/8/8/8/PP6/R3K2R w - - 0 1",
+            fens.getValue(8),
+        )
+        assertEquals(
+            "4k3/ppp5/8/8/8/8/P7/R1B1K3 w - - 0 1",
+            fens.getValue(9),
+        )
+        assertEquals(
+            "4k3/ppp5/8/8/8/8/PP6/3QK3 w - - 0 1",
+            fens.getValue(10),
         )
     }
 
@@ -62,12 +85,9 @@ class ChessPuzzleValidatorTest {
         ChessPuzzleData.all.forEach { puzzle ->
             assertTrue(puzzle.setup.isNotBlank())
             assertTrue(
-                puzzle.winCondition.contains("checkmate or stalemate") ||
-                    puzzle.winCondition.contains("check or checkmate"),
+                puzzle.winCondition.contains("checkmate or stalemate"),
             )
-            if (puzzle.level in 1..15) {
-                assertTrue(!puzzle.winCondition.contains("moves"))
-            }
+            assertTrue(!puzzle.winCondition.contains("moves"))
             assertEquals(puzzle.title, ChessChallengeCatalogue.titleFor(puzzle.level))
         }
     }

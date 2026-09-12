@@ -141,11 +141,7 @@ class ChessChallengeAutoplayAi(
 
         val movingPiece = state.get(move.from) as? ChessPiece
         when (puzzle.condition) {
-            ChallengeCondition.CHECKMATE_WITHIN_LIMIT ->
-                if (next.status == GameStatus.IN_PROGRESS &&
-                    engine.isInCheck(next, playerColor.opponent())
-                ) score += 8_000
-            ChallengeCondition.CHECK_OR_CHECKMATE_WITHIN_LIMIT ->
+            ChallengeCondition.CHECKMATE_OR_STALEMATE ->
                 if (next.status == GameStatus.IN_PROGRESS &&
                     engine.isInCheck(next, playerColor.opponent())
                 ) score += 8_000
@@ -229,9 +225,7 @@ class ChessChallengeAutoplayAi(
     ): Boolean {
         if (!isSuccessfulResolution(state, playerColor, puzzle)) return false
         return when (puzzle.condition) {
-            ChallengeCondition.CHECKMATE_WITHIN_LIMIT -> true
-            ChallengeCondition.CHECK_OR_CHECKMATE_WITHIN_LIMIT ->
-                engine.isInCheck(state, playerColor.opponent())
+            ChallengeCondition.CHECKMATE_OR_STALEMATE -> true
             ChallengeCondition.NO_QUEEN_USE -> !progress.playerMovedQueen
             ChallengeCondition.KNIGHT_HUNTER -> progress.playerCapturedBlackKnights >= 2
             ChallengeCondition.PROMOTE_AND_WIN -> progress.promotedPawn &&
@@ -350,10 +344,8 @@ class ChessChallengeAutoplayAi(
         puzzle: ChessPuzzle,
     ): Boolean =
         state.status == playerWinStatus(playerColor) ||
-            (puzzle.condition == ChallengeCondition.CHECKMATE_WITHIN_LIMIT &&
-                state.status == GameStatus.DRAW) ||
-            (puzzle.condition == ChallengeCondition.CHECK_OR_CHECKMATE_WITHIN_LIMIT &&
-                engine.isInCheck(state, playerColor.opponent()))
+            (puzzle.condition == ChallengeCondition.CHECKMATE_OR_STALEMATE &&
+                state.status == GameStatus.DRAW)
 
     private fun findMove(state: GameState, uci: String): Move? {
         if (uci.length < 4) return null
