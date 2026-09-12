@@ -405,7 +405,7 @@ class ChessChallengeActivity : AppCompatActivity() {
         puzzleState = initial
         playerStartState = initial
         boardView?.gameState = initial
-        boardView?.isFlipped = initial.currentTurn == PieceColor.BLACK
+        boardView?.isFlipped = playerColor == PieceColor.BLACK
         boardView?.isLocked = false
         setChallengeStatus(objectiveText())
     }
@@ -454,6 +454,10 @@ class ChessChallengeActivity : AppCompatActivity() {
         }
         if (completed || resetting) return
         val state = puzzleState ?: return
+        if (state.currentTurn != playerColor) {
+            boardView?.isLocked = true
+            return
+        }
         if (!attemptStarted) {
             beginAttempt()
             attemptStarted = true
@@ -543,7 +547,6 @@ class ChessChallengeActivity : AppCompatActivity() {
         expectedMoveIndex++
         boardView?.gameState = nextState
         boardView?.setHintMove(null)
-        boardView?.isFlipped = nextState.currentTurn == PieceColor.BLACK
         if (nextState.status != GameStatus.IN_PROGRESS) {
             finishAfterFinalPosition(nextState)
         } else if (playerMovesMade >= maxPlayerMoves) {
@@ -557,16 +560,16 @@ class ChessChallengeActivity : AppCompatActivity() {
     }
 
     private fun finishAfterFinalPosition(state: GameState) {
+        if (challengeSatisfied(state)) {
+            completeLevel()
+            return
+        }
         if (state.status == GameStatus.IN_PROGRESS && playerMovesMade < maxPlayerMoves) {
             boardView?.isLocked = false
             setChallengeStatus(objectiveText())
             return
         }
-        if (challengeSatisfied(state)) {
-            completeLevel()
-        } else {
-            showConditionFailure()
-        }
+        showConditionFailure()
     }
 
     private fun challengeSatisfied(state: GameState): Boolean {
@@ -646,7 +649,7 @@ class ChessChallengeActivity : AppCompatActivity() {
         lastPlayerMoveBeforeState = null
         lastPlayerMoveState = null
         boardView?.gameState = start
-        boardView?.isFlipped = start.currentTurn == PieceColor.BLACK
+        boardView?.isFlipped = playerColor == PieceColor.BLACK
         boardView?.isLocked = false
         gameHud?.controlsEnabled = true
         gameHud?.setHintActive(false, animate = false)
@@ -899,7 +902,8 @@ class ChessChallengeActivity : AppCompatActivity() {
     private fun renderHistory() {
         val state = puzzleState ?: return
         val moves = state.moveHistory.mapIndexed { index, move ->
-            "${index + 1}.${if (index % 2 == 0) ".." else ""}${move.toNotation()}"
+            val moveNumber = index / 2 + 1
+            "$moveNumber${if (index % 2 == 0) "." else "..."}${move.toNotation()}"
         }
         moveHistoryView?.text = if (moves.isEmpty()) {
             "Moves: —"
