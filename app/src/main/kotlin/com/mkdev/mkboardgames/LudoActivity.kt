@@ -501,6 +501,8 @@ class LudoActivity : AppCompatActivity() {
             ),
         )
         boardView.gameState = state
+        boardView.rotateOppositeSideTokenNumbers = !vsAI
+        syncPlayerOrientations()
         boardView.legalMoves = emptyList()
         boardView.isLocked = false
         playerDiceViews.forEach { it.value = 1 }
@@ -1171,6 +1173,16 @@ class LudoActivity : AppCompatActivity() {
                 leftMargin = left
                 topMargin = top
             }
+        }
+    }
+
+    private fun syncPlayerOrientations() {
+        if (!::playerDiceViews.isInitialized || !::playerBadgeViews.isInitialized) return
+        val isFourPlayerMatch = !vsAI
+        playerDiceViews.forEachIndexed { player, die ->
+            val facesOppositeSide = isFourPlayerMatch && LudoSetup.facesOppositeSide(player)
+            die.facesOppositeSide = facesOppositeSide
+            playerBadgeViews[player].facesOppositeSide = facesOppositeSide
         }
     }
 

@@ -27,6 +27,13 @@ class LudoPlayerBadgeView(context: Context) : View(context) {
             invalidate()
         }
 
+    var facesOppositeSide: Boolean = false
+        set(value) {
+            field = value
+            rotation = if (value) 180f else 0f
+            invalidate()
+        }
+
     var isActive: Boolean = false
         set(value) {
             field = value

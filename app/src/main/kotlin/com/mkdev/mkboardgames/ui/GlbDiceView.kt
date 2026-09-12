@@ -45,6 +45,12 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
             field = newValue.coerceIn(1, 6)
             fallbackView.value = field
         }
+    var facesOppositeSide: Boolean = false
+        set(value) {
+            field = value
+            fallbackView.facesOppositeSide = value
+            glRenderer.setFacingRotation(if (value) 180f else 0f)
+        }
     var isRolling: Boolean = false
         private set
     var onRoll: (() -> Unit)? = null
@@ -211,11 +217,16 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         @Volatile private var rotationX = -18f
         @Volatile private var rotationY = -28f
         @Volatile private var rotationZ = 0f
+        @Volatile private var facingRotation = 0f
 
         fun setRotation(x: Float, y: Float, z: Float) {
             rotationX = x
             rotationY = y
             rotationZ = z
+        }
+
+        fun setFacingRotation(rotation: Float) {
+            facingRotation = rotation
         }
 
         override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
@@ -272,6 +283,7 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
             Matrix.rotateM(modelMatrix, 0, rotationX, 1f, 0f, 0f)
             Matrix.rotateM(modelMatrix, 0, rotationY, 0f, 1f, 0f)
             Matrix.rotateM(modelMatrix, 0, rotationZ, 0f, 0f, 1f)
+            Matrix.rotateM(modelMatrix, 0, facingRotation, 0f, 0f, 1f)
             Matrix.scaleM(
                 modelMatrix,
                 0,

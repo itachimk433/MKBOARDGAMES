@@ -28,6 +28,11 @@ enum class MotionDiceDirection {
 class LudoDiceView(context: Context) : View(context) {
     var value: Int = 1
     var accentColor: Int = Color.WHITE
+    var facesOppositeSide: Boolean = false
+        set(value) {
+            field = value
+            invalidate()
+        }
     var isRolling: Boolean = false
         private set
     var onRoll: (() -> Unit)? = null
@@ -119,6 +124,7 @@ class LudoDiceView(context: Context) : View(context) {
         val radius = size * 0.18f
 
         canvas.save()
+        if (facesOppositeSide) canvas.rotate(180f, centerX, centerY)
         canvas.rotate(rotation, centerX, centerY)
         val shadow = RectF(
             centerX - half + density,
