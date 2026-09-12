@@ -36,9 +36,7 @@ import com.mkdev.mkboardgames.games.ludo.LudoPiece
 import com.mkdev.mkboardgames.games.ludo.LudoPlayerEconomy
 import com.mkdev.mkboardgames.games.ludo.LudoSetup
 import com.mkdev.mkboardgames.ui.LudoBoardView
-import com.mkdev.mkboardgames.ui.LudoControlTileView
 import com.mkdev.mkboardgames.ui.LudoDiceView
-import com.mkdev.mkboardgames.ui.LudoStatusStripView
 import com.mkdev.mkboardgames.ui.MotionDiceDirection
 import com.mkdev.mkboardgames.ui.ChessMenuView
 import com.mkdev.mkboardgames.ui.StyledDialogs
@@ -51,9 +49,6 @@ class LudoActivity : AppCompatActivity() {
     private lateinit var boardView: LudoBoardView
     private lateinit var boardStage: FrameLayout
     private lateinit var playerDiceViews: Array<LudoDiceView>
-    private lateinit var statusView: LudoStatusStripView
-    private lateinit var motionView: LudoControlTileView
-    private lateinit var tapRollView: LudoControlTileView
     private lateinit var turnView: TextView
     private lateinit var economyView: TextView
     private lateinit var storeView: TextView
@@ -99,10 +94,7 @@ class LudoActivity : AppCompatActivity() {
         val contentRoot = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding((8 * dp).toInt(), (8 * dp).toInt(), (8 * dp).toInt(), (6 * dp).toInt())
-            background = GradientDrawable(
-                GradientDrawable.Orientation.TL_BR,
-                intArrayOf(Color.parseColor("#2A3035"), Color.parseColor("#0C1014")),
-            )
+            setBackgroundColor(Color.parseColor("#10151A"))
         }
         overlay = FrameLayout(this)
         overlay.addView(contentRoot, FrameLayout.LayoutParams(
@@ -168,21 +160,28 @@ class LudoActivity : AppCompatActivity() {
         economyBar.addView(storeView, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.WRAP_CONTENT, (32 * dp).toInt(),
         ))
-        statusView = LudoStatusStripView(this)
         boardView = LudoBoardView(this)
         boardView.onMoveStep = {
             if (gameplayActive()) SoundPlayer.playMovement("ludo_move")
         }
         boardStage = FrameLayout(this)
+        boardStage.clipChildren = true
+        val diceRail = dp(40)
         boardStage.addView(
             boardView,
             FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT,
-            ),
+            ).apply {
+                leftMargin = diceRail
+                topMargin = diceRail
+                rightMargin = diceRail
+                bottomMargin = diceRail
+            },
         )
         playerDiceViews = Array(LudoSetup.PLAYER_COUNT) { player ->
             LudoDiceView(this).apply {
+                accentColor = LudoSetup.PLAYER_COLORS[player]
                 contentDescription = "${LudoSetup.PLAYER_NAMES[player]} die"
                 onRoll = {
                     if (player == LudoSetup.playerFromState(state) &&
@@ -198,7 +197,7 @@ class LudoActivity : AppCompatActivity() {
         playerDiceViews.forEach { die ->
             boardStage.addView(
                 die,
-                FrameLayout.LayoutParams(dp(68), dp(68)).apply {
+                FrameLayout.LayoutParams(dp(38), dp(38)).apply {
                     gravity = android.view.Gravity.TOP or android.view.Gravity.START
                 },
             )
@@ -206,8 +205,6 @@ class LudoActivity : AppCompatActivity() {
         boardStage.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
             positionPlayerDice()
         }
-        motionView = LudoControlTileView(this, LudoControlTileView.ControlType.MOTION)
-        tapRollView = LudoControlTileView(this, LudoControlTileView.ControlType.TAP_TO_ROLL)
 
         contentRoot.addView(turnView, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, (54 * dp).toInt()
@@ -220,27 +217,9 @@ class LudoActivity : AppCompatActivity() {
         ).apply {
             bottomMargin = (6 * dp).toInt()
         })
-        contentRoot.addView(statusView, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            (92 * dp).toInt(),
-        ).apply {
-            bottomMargin = (6 * dp).toInt()
-        })
         contentRoot.addView(boardStage, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
             ViewGroup.LayoutParams.WRAP_CONTENT,
-        ))
-        val controls = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = android.view.Gravity.CENTER
-            setPadding(0, (4 * dp).toInt(), 0, 0)
-        }
-        controls.addView(motionView, LinearLayout.LayoutParams(0, (88 * dp).toInt(), 1f).apply {
-            marginEnd = (6 * dp).toInt()
-        })
-        controls.addView(tapRollView, LinearLayout.LayoutParams(0, (88 * dp).toInt(), 1f))
-        contentRoot.addView(controls, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, (96 * dp).toInt()
         ))
         AdManager.attachBanner(contentRoot)
         setContentView(overlay)
@@ -250,21 +229,6 @@ class LudoActivity : AppCompatActivity() {
         }
         boardView.onTokenLongPressed = { piece -> showTokenAbilityDialog(piece) }
         boardView.onGameOverTapped = { showResultDialog() }
-        statusView.onPlayerProfileTapped = { player ->
-            if (profilesEnabled()) showPlayerProfile(player) else showRenameDialog(player)
-        }
-        statusView.profilesEnabled = true
-        tapRollView.onTap = { if (gameplayActive() && matchStarted && isHumanTurn()) rollDice() }
-        motionView.motionEnabled = SettingsManager.isMotionDiceEnabled(this)
-        motionView.onMotionToggle = { enabled ->
-            SettingsManager.setMotionDiceEnabled(this, enabled)
-            syncMotionSensor()
-            Toast.makeText(
-                this,
-                if (enabled) "Motion dice enabled" else "Motion dice disabled",
-                Toast.LENGTH_SHORT,
-            ).show()
-        }
         sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
         motionSensor = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION)
             ?: sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)?.also {
@@ -281,7 +245,6 @@ class LudoActivity : AppCompatActivity() {
         if (::boardView.isInitialized) boardView.resumeAnimations()
         if (::playerDiceViews.isInitialized && !dialogOpen) setPlayerDiceVisible(true)
         SoundPlayer.movementSoundsEnabled = SettingsManager.isMovementSoundsEnabled(this)
-        motionView.motionEnabled = SettingsManager.isMotionDiceEnabled(this)
         syncMotionSensor()
         recoverInterruptedGameplay()
     }
@@ -518,7 +481,6 @@ class LudoActivity : AppCompatActivity() {
         boardView.legalMoves = emptyList()
         boardView.isLocked = false
         playerDiceViews.forEach { it.value = 1 }
-        motionView.motionEnabled = SettingsManager.isMotionDiceEnabled(this)
         syncMotionSensor()
         updateHud()
         if (isAiTurn()) postGameplay(650L) { rollDice() }
@@ -1158,28 +1120,31 @@ class LudoActivity : AppCompatActivity() {
     private fun positionPlayerDice() {
         if (!::boardStage.isInitialized || boardStage.width <= 0 || boardStage.height <= 0) return
 
-        val boardSize = minOf(boardStage.width, boardStage.height) * 0.98f
-        val boardLeft = (boardStage.width - boardSize) / 2f
-        val boardTop = (boardStage.height - boardSize) / 2f
-        val cell = boardSize / LudoSetup.BOARD_SIZE
-        val diceSize = (cell * 2.8f)
-            .roundToInt()
-            .coerceIn(dp(52), dp(76))
-        // Match the four home yards: red, blue, green, then yellow.
-        val homeCenters = arrayOf(
-            3f to 12f,
-            12f to 12f,
-            3f to 3f,
-            12f to 3f,
+        val boardLeft = boardView.left
+        val boardTop = boardView.top
+        val boardRight = boardView.right
+        val boardBottom = boardView.bottom
+        val boardHeight = boardBottom - boardTop
+        val diceSize = dp(38)
+        val leftX = (boardLeft - diceSize) / 2
+        val rightX = boardRight + (boardStage.width - boardRight - diceSize) / 2
+        val topY = boardTop + (boardHeight * 0.25f).roundToInt() - diceSize / 2
+        val bottomY = boardTop + (boardHeight * 0.75f).roundToInt() - diceSize / 2
+        // Keep dice in the side rails, aligned with each colour's home yard.
+        val playerPositions = arrayOf(
+            leftX to bottomY,  // Red: bottom-left
+            rightX to bottomY, // Blue: bottom-right
+            leftX to topY,     // Green: top-left
+            rightX to topY,    // Yellow: top-right
         )
 
         playerDiceViews.forEachIndexed { player, die ->
-            val (column, row) = homeCenters[player]
+            val (left, top) = playerPositions[player]
             die.layoutParams = (die.layoutParams as FrameLayout.LayoutParams).apply {
                 width = diceSize
                 height = diceSize
-                leftMargin = (boardLeft + column * cell - diceSize / 2f).roundToInt()
-                topMargin = (boardTop + row * cell - diceSize / 2f).roundToInt()
+                leftMargin = left
+                topMargin = top
             }
         }
     }
@@ -1821,10 +1786,6 @@ class LudoActivity : AppCompatActivity() {
                 Color.blue(accent),
             ))
         }
-        statusView.gameState = state
-        statusView.activePlayer = player
-        statusView.rolledValue = rolledValue
-        statusView.profilesEnabled = true
         if (economyEnabled) {
             val economy = LudoEconomy.player(state, humanPlayer)
             economyView.text = "IRREGULAR  •  COINS ${economy.coins}"
@@ -1833,7 +1794,6 @@ class LudoActivity : AppCompatActivity() {
             economyView.text = "NORMAL  •  CLASSIC LUDO"
             storeView.visibility = View.GONE
         }
-        motionView.motionEnabled = SettingsManager.isMotionDiceEnabled(this)
     }
 
     private fun showHudMessage(message: String) {
