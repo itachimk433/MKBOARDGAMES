@@ -198,7 +198,7 @@ class ChallengeLevelGridView(
             canvas.drawText(
                 "Challenge ${(index + 1).toString().padStart(2, '0')}",
                 rect.centerX(),
-                rect.centerY() - 11f * unit,
+                rect.centerY() - (levelPaint.ascent() + levelPaint.descent()) / 2f,
                 if (index + 1 <= highestCompleted) completedLevelPaint else levelPaint,
             )
             val subtitle = subtitles.getOrNull(index)
@@ -209,7 +209,7 @@ class ChallengeLevelGridView(
                 canvas.drawText(
                     subtitle,
                     rect.centerX(),
-                    rect.centerY() + 3f * unit,
+                    rect.centerY() + 17f * unit,
                     subtitlePaint,
                 )
             }
@@ -218,7 +218,7 @@ class ChallengeLevelGridView(
                 canvas.drawText(
                     "★".repeat(stars),
                     rect.centerX(),
-                    rect.centerY() + 19f * unit,
+                    rect.bottom - 5f * unit,
                     starPaint,
                 )
             }
