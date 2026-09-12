@@ -1185,6 +1185,9 @@ class LudoActivity : AppCompatActivity() {
             val facesOppositeSide = isFourPlayerMatch && LudoSetup.facesOppositeSide(player)
             die.facesOppositeSide = facesOppositeSide
             playerBadgeViews[player].facesOppositeSide = facesOppositeSide
+            if (::playerControlViews.isInitialized) {
+                playerControlViews[player].facesOppositeSide = facesOppositeSide
+            }
         }
     }
 

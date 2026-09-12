@@ -40,6 +40,16 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
             invalidate()
         }
 
+    /**
+     * Rotates only the player name. The frame stays anchored to the board edge,
+     * while the profile and die rotate themselves inside it.
+     */
+    var facesOppositeSide: Boolean = false
+        set(value) {
+            field = value
+            invalidate()
+        }
+
     var isActive: Boolean = false
         set(value) {
             field = value
@@ -178,7 +188,13 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
         } else {
             dp(14).toFloat()
         }
+        val centerY = baseline - (textPaint.ascent() + textPaint.descent()) / 2f
+        canvas.save()
+        if (facesOppositeSide) {
+            canvas.rotate(180f, width / 2f, centerY)
+        }
         canvas.drawText(label, width / 2f, baseline, textPaint)
+        canvas.restore()
     }
 
     private fun dp(value: Int): Int =
