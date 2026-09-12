@@ -57,7 +57,7 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
     init {
         setWillNotDraw(false)
         setLayerType(View.LAYER_TYPE_SOFTWARE, null)
-        minimumHeight = dp(74)
+        minimumHeight = dp(CONTROL_HEIGHT)
     }
 
     fun bind(profile: View, die: View, profileOnEnd: Boolean) {
@@ -155,7 +155,7 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
 
     private fun drawLabel(canvas: Canvas) {
         textPaint.color = if (isActive) Color.WHITE else Color.rgb(224, 232, 240)
-        textPaint.textSize = dp(13).toFloat()
+        textPaint.textSize = dp(16).toFloat()
         val baseline = if (labelBelow) {
             dp(FRAME_HEIGHT + 15).toFloat()
         } else {
@@ -168,12 +168,13 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
         (value * resources.displayMetrics.density).roundToInt()
 
     companion object {
-        private const val LABEL_HEIGHT = 24
-        private const val FRAME_HEIGHT = 62
-        private const val AVATAR_SIZE = 58
-        private const val DIE_SIZE = 62
+        private const val LABEL_HEIGHT = 29
+        private const val FRAME_HEIGHT = 74
+        private const val AVATAR_SIZE = 70
+        private const val DIE_SIZE = 74
         const val CONTROL_HEIGHT = LABEL_HEIGHT + FRAME_HEIGHT
         const val PAIR_WIDTH = AVATAR_SIZE + DIE_SIZE - 2
-        const val RAIL_HEIGHT = 92
+        const val RAIL_HEIGHT = 112
+        const val CONTROL_GAP = 8
     }
 }

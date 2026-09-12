@@ -1151,8 +1151,9 @@ class LudoActivity : AppCompatActivity() {
         val outerMargin = dp(4)
         val leftPairX = boardLeft + outerMargin
         val rightPairX = boardLeft + boardWidth - controlWidth - outerMargin
-        val topY = (boardTop - controlHeight) / 2
-        val bottomY = boardBottom + (boardStage.height - boardBottom - controlHeight) / 2
+        val controlGap = dp(LudoPlayerControlView.CONTROL_GAP)
+        val topY = boardTop - controlHeight - controlGap
+        val bottomY = boardBottom + controlGap
         // Keep the avatar and die together inside one shared frame.
         val playerPositions = arrayOf(
             leftPairX to bottomY, // Red: bottom-left
