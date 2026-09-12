@@ -78,6 +78,7 @@ class LudoActivity : AppCompatActivity() {
     private var pendingRollDirection = MotionDiceDirection.UP
     private var pendingRollIsReroll = false
     private var pendingMove: Move? = null
+    private var rollGeneration = 0
     private var resultDialogVisible = false
     private var celebrationMessage: String? = null
     private var celebrationGeneration = 0
@@ -487,6 +488,7 @@ class LudoActivity : AppCompatActivity() {
         pendingRollDirection = MotionDiceDirection.UP
         pendingRollIsReroll = false
         pendingMove = null
+        rollGeneration++
         celebrationMessage = null
         celebrationGeneration++
         matchStarted = true
@@ -555,6 +557,7 @@ class LudoActivity : AppCompatActivity() {
             pendingRollValue = 0
             val previousRolledValue = rolledValue
             rolledValue = completedValue
+            val currentRollGeneration = ++rollGeneration
             val storedSixStreak =
                 (state.metadata[LudoSetup.SIX_STREAK_METADATA] as? Int ?: 0).coerceAtLeast(0)
             val previousSixStreak = if (pendingRollIsReroll && previousRolledValue == 6) {
@@ -592,10 +595,14 @@ class LudoActivity : AppCompatActivity() {
                 if (completedValue == 6 && sixStreak >= 3) {
                     showHudMessage("THREE SIXES — turn forfeited")
                     Toast.makeText(this, "Three sixes — turn forfeited", Toast.LENGTH_SHORT).show()
-                    postGameplay(760L) { finishTurnAfterNoMove() }
+                    postGameplay(760L) {
+                        finishTurnAfterNoMove(currentRollGeneration, player, completedValue)
+                    }
                 } else {
                     Toast.makeText(this, "No move possible — turn skipped", Toast.LENGTH_SHORT).show()
-                    postGameplay(520L) { finishTurnAfterNoMove() }
+                    postGameplay(520L) {
+                        finishTurnAfterNoMove(currentRollGeneration, player, completedValue)
+                    }
                 }
             } else if (isAiTurn()) {
                 postGameplay(420L) { playMove(chooseAiMove(preparedMoves)) }
@@ -1720,10 +1727,18 @@ class LudoActivity : AppCompatActivity() {
         }
     }
 
-    private fun finishTurnAfterNoMove() {
+    private fun finishTurnAfterNoMove(
+        expectedRollGeneration: Int,
+        expectedPlayer: Int,
+        expectedDice: Int,
+    ) {
         if (!gameplayActive() ||
             state.status != GameStatus.IN_PROGRESS || rolledValue == 0 ||
             boardView.isLocked
+        ) return
+        if (rollGeneration != expectedRollGeneration ||
+            rolledValue != expectedDice ||
+            LudoSetup.playerFromState(state) != expectedPlayer
         ) return
         if (boardView.legalMoves.isNotEmpty()) return
 
@@ -1816,7 +1831,12 @@ class LudoActivity : AppCompatActivity() {
         if (legal.isEmpty()) {
             val sixStreak = state.metadata[LudoSetup.SIX_STREAK_METADATA] as? Int ?: 0
             val delay = if (rolledValue == 6 && sixStreak >= 3) 760L else 520L
-            postGameplay(delay) { finishTurnAfterNoMove() }
+            val player = LudoSetup.playerFromState(state)
+            val expectedRollGeneration = rollGeneration
+            val expectedDice = rolledValue
+            postGameplay(delay) {
+                finishTurnAfterNoMove(expectedRollGeneration, player, expectedDice)
+            }
         } else if (isAiTurn()) {
             postGameplay(420L) {
                 if (rolledValue != 0 && isAiTurn() && !boardView.isLocked) {

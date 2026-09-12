@@ -65,6 +65,28 @@ class LudoRuleEngineTest {
         assertEquals(setOf(0), moves.map { it.metadata["targetProgress"] }.toSet())
     }
 
+    @Test
+    fun p4SixLaunchesATokenAndKeepsTheTurn() {
+        val initial = LudoSetup.initialState()
+        val state = initial.copy(
+            currentTurn = LudoSetup.colorForPlayer(3),
+            metadata = initial.metadata + mapOf(
+                "ludo_turn" to 3,
+                "ludo_dice" to 6,
+                LudoSetup.SIX_STREAK_METADATA to 1,
+            ),
+        )
+        val move = engine.legalMovesForDice(state, player = 3, dice = 6).first()
+
+        val next = engine.applyMove(state, move)
+
+        assertEquals(0, LudoSetup.allPieces(next)
+            .first { it.player == 3 && it.token == move.metadata["token"] }.progress)
+        assertEquals(3, LudoSetup.playerFromState(next))
+        assertEquals(1, next.metadata[LudoSetup.SIX_STREAK_METADATA])
+        assertEquals(LudoSetup.colorForPlayer(3), next.currentTurn)
+    }
+
     private fun stateWithPiece(progress: Int) =
         LudoSetup.initialState().let { initial ->
             val pieces = LudoSetup.allPieces(initial).map { piece ->
