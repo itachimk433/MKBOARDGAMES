@@ -13,8 +13,6 @@ import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import com.mkdev.mkboardgames.challenges.ChallengeObjective
 import com.mkdev.mkboardgames.challenges.ChallengeCondition
-import com.mkdev.mkboardgames.challenges.ChessChallengeAutoplayAi
-import com.mkdev.mkboardgames.challenges.ChessChallengeAutoplayProgress
 import com.mkdev.mkboardgames.challenges.ChessPuzzle
 import com.mkdev.mkboardgames.challenges.ChessPuzzleData
 import com.mkdev.mkboardgames.challenges.PromotionRequirement
@@ -22,17 +20,16 @@ import com.mkdev.mkboardgames.engine.*
 import com.mkdev.mkboardgames.games.chess.*
 import com.mkdev.mkboardgames.ui.BoardView
 import com.mkdev.mkboardgames.ui.BoardStyleSwitchView
+import com.mkdev.mkboardgames.ui.CaptureStripView
 import com.mkdev.mkboardgames.ui.ChessBoardStyle
 import com.mkdev.mkboardgames.ui.ChallengeSection
 import com.mkdev.mkboardgames.ui.ChallengeLevelGridView
 import com.mkdev.mkboardgames.ui.ChessChoiceView
-import com.mkdev.mkboardgames.ui.AutoplayButtonView
 import com.mkdev.mkboardgames.ui.StandardGameHudView
 
 class ChessChallengeActivity : AppCompatActivity() {
 
     private val engine = ChessRuleEngine()
-    private val autoplayAi by lazy { ChessChallengeAutoplayAi(engine) }
     private val easyChessAi by lazy {
         val profile = SettingsManager.chessAiProfileForLevel(0)
         AIPlayer(
@@ -54,14 +51,8 @@ class ChessChallengeActivity : AppCompatActivity() {
     private var playerColor = PieceColor.WHITE
     private var playerMovesMade = 0
     private var maxPlayerMoves = 1
-    private var playerPiecesLost = 0
-    private var opponentPiecesCaptured = 0
-    private var opponentCapturedPlayerPiece = false
     private var playerPromotions = 0
     private val playerPromotionTypes = mutableListOf<String>()
-    private var initialPlayerPiecesLost = 0
-    private var initialOpponentPiecesCaptured = 0
-    private var initialOpponentCapturedPlayerPiece = false
     private var opponentMoveAnimating = false
     private var pendingOpponentReply: Move? = null
     private var lastPlayerMove: Move? = null
@@ -69,21 +60,15 @@ class ChessChallengeActivity : AppCompatActivity() {
     private var lastPlayerMoveState: GameState? = null
     private var boardView: BoardView? = null
     private var gameHud: StandardGameHudView? = null
-    private var moveHistoryView: TextView? = null
-    private var capturedPiecesView: TextView? = null
+    private var topCaptureView: CaptureStripView? = null
+    private var bottomCaptureView: CaptureStripView? = null
     private var challengeStatusView: TextView? = null
     private var screenRoot: FrameLayout? = null
     private var activeOverlay: View? = null
     private var completed = false
     private var resetting = false
-    private var hintActive = false
-    private var hintUsed = false
     private var pauseOverlayOpen = false
     private var opponentReplyPending = false
-    private var autoplayEnabled = false
-    private var autoplayMoveInProgress = false
-    private var autoplayButton: AutoplayButtonView? = null
-    private val autoplayRunnable = Runnable { playAutoplayMove() }
     private var attemptStarted = false
     private var retryCount = 0
     private var attemptNumber = 0
@@ -94,10 +79,8 @@ class ChessChallengeActivity : AppCompatActivity() {
     private var promotedPawn = false
     private var startingMaterialDeficit = 0
     private var playerCapturedBlackKnights = 0
-    private val playerCapturedSymbols = mutableListOf<String>()
-    private val playerLostSymbols = mutableListOf<String>()
-    private val initialPlayerCapturedSymbols = mutableListOf<String>()
-    private val initialPlayerLostSymbols = mutableListOf<String>()
+    private val capturedByWhite = mutableListOf<Piece>()
+    private val capturedByBlack = mutableListOf<Piece>()
 
     private val progressPrefs by lazy {
         getSharedPreferences("chess_challenge_progress", Context.MODE_PRIVATE)
@@ -129,7 +112,6 @@ class ChessChallengeActivity : AppCompatActivity() {
 
     override fun onPause() {
         SoundPlayer.stopAll()
-        stopAutoplay()
         super.onPause()
     }
 
@@ -165,10 +147,10 @@ class ChessChallengeActivity : AppCompatActivity() {
     private fun showLevelList() {
         handler.removeCallbacksAndMessages(null)
         dismissOverlay()
-        stopAutoplay()
         boardView = null
         gameHud = null
-        autoplayButton = null
+        topCaptureView = null
+        bottomCaptureView = null
         val root = verticalRoot()
         val challengeSummary = "10 Missing Piece chess challenges"
         root.addView(topBar("CHESS CHALLENGES", challengeSummary) {
@@ -216,19 +198,16 @@ class ChessChallengeActivity : AppCompatActivity() {
         handler.removeCallbacksAndMessages(null)
         opponentReplyPending = false
         dismissOverlay()
-        stopAutoplay()
         selectedLevel = level.coerceIn(1, puzzles.size)
         currentPuzzle = puzzles[selectedLevel - 1]
         MusicPlayer.enterMatch(this)
         completed = false
         resetting = false
-        hintActive = false
-        hintUsed = false
         attemptStarted = false
         retryCount = 0
         opponentMoveAnimating = false
-        moveHistoryView = null
-        capturedPiecesView = null
+        topCaptureView = null
+        bottomCaptureView = null
         challengeStatusView = null
         val root = verticalRoot()
         val compactLayout = resources.displayMetrics.heightPixels /
@@ -240,19 +219,16 @@ class ChessChallengeActivity : AppCompatActivity() {
             labelTextSizeSp = 15f,
             backLabel = "Back",
              sideLabel = "CHALLENGE ${selectedLevel.toString().padStart(2, '0')}",
-            showHintControl = true,
+            showHintControl = false,
             showMenuControl = false,
         ).apply {
             setInfo(
-                value = "MOVES",
+                value = "",
                 undo = false,
                 detail = "",
                 accentColor = Color.parseColor("#F7D99B"),
             )
             onBack = { showPauseScreen() }
-            onHint = {
-                if (!completed && !resetting) toggleHint()
-            }
         }
         gameHud = hud
         root.addView(hud, LinearLayout.LayoutParams(-1, dp(if (compactLayout) 52 else 56)))
@@ -283,30 +259,6 @@ class ChessChallengeActivity : AppCompatActivity() {
         )
         root.addView(styleRow, LinearLayout.LayoutParams(-1, dp(if (compactLayout) 38 else 44)))
 
-        val historyView = TextView(this).apply {
-            setTextColor(Color.parseColor("#AFC6CC"))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f)
-            gravity = android.view.Gravity.CENTER_VERTICAL
-            maxLines = 2
-            ellipsize = android.text.TextUtils.TruncateAt.END
-            setPadding(dp(14), dp(2), dp(14), dp(2))
-            setBackgroundColor(Color.parseColor("#081821"))
-        }
-        moveHistoryView = historyView
-        root.addView(historyView, LinearLayout.LayoutParams(-1, dp(if (compactLayout) 28 else 34)))
-
-        val capturesView = TextView(this).apply {
-            setTextColor(Color.parseColor("#D7E4DE"))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
-            gravity = android.view.Gravity.CENTER
-            maxLines = 1
-            ellipsize = android.text.TextUtils.TruncateAt.END
-            setPadding(dp(12), 0, dp(12), 0)
-            setBackgroundColor(Color.parseColor("#0B2028"))
-        }
-        capturedPiecesView = capturesView
-        root.addView(capturesView, LinearLayout.LayoutParams(-1, dp(if (compactLayout) 22 else 28)))
-
         val statusView = TextView(this).apply {
             setTextColor(Color.parseColor("#D7E4DE"))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, if (compactLayout) 10f else 11f)
@@ -319,27 +271,14 @@ class ChessChallengeActivity : AppCompatActivity() {
         challengeStatusView = statusView
         root.addView(statusView, LinearLayout.LayoutParams(-1, dp(if (compactLayout) 36 else 44)))
 
-        val autoplay = AutoplayButtonView(this).apply {
-            onAutoplayChanged = { enabled ->
-                autoplayEnabled = enabled
-                if (enabled) {
-                    scheduleAutoplayMove(160L)
-                } else {
-                    handler.removeCallbacks(autoplayRunnable)
-                    autoplayMoveInProgress = false
-                    if (!completed && !resetting && !opponentMoveAnimating && !opponentReplyPending) {
-                        boardView?.isLocked = false
-                    }
-                }
-            }
+        val captureHeight = dp(if (compactLayout) 30 else 36)
+        val topCaptures = CaptureStripView(this).apply {
+            setLabel("Black's captures")
+            dividerOnTop = false
+            setSelectable(false)
         }
-        autoplayButton = autoplay
-        root.addView(
-            autoplay,
-            LinearLayout.LayoutParams(dp(104), dp(if (compactLayout) 58 else 66)).apply {
-                gravity = android.view.Gravity.CENTER_HORIZONTAL
-            },
-        )
+        topCaptureView = topCaptures
+        root.addView(topCaptures, LinearLayout.LayoutParams(-1, captureHeight))
 
         val board = BoardView(this).apply {
             ruleEngine = engine
@@ -359,6 +298,14 @@ class ChessChallengeActivity : AppCompatActivity() {
         boardView = board
         root.addView(board, LinearLayout.LayoutParams(-1, 0, 1f))
 
+        val bottomCaptures = CaptureStripView(this).apply {
+            setLabel("White's captures")
+            dividerOnTop = true
+            setSelectable(false)
+        }
+        bottomCaptureView = bottomCaptures
+        root.addView(bottomCaptures, LinearLayout.LayoutParams(-1, captureHeight))
+
         screenRoot = FrameLayout(this).apply {
             setBackgroundColor(Color.parseColor("#102C32"))
             addView(root, FrameLayout.LayoutParams(-1, -1))
@@ -366,18 +313,10 @@ class ChessChallengeActivity : AppCompatActivity() {
         setContentView(screenRoot!!)
         val puzzle = currentPuzzle!!
         loadPuzzle(puzzle)
-        renderHistory()
     }
 
     private fun setChallengeStatus(text: String) {
-        renderHistory()
         challengeStatusView?.text = text.replace('\n', ' ').take(120)
-        gameHud?.setInfo(
-            value = moveCounterText(),
-            undo = false,
-            detail = "",
-            accentColor = Color.parseColor("#F7D99B"),
-        )
     }
 
     private fun loadPuzzle(puzzle: ChessPuzzle) {
@@ -393,56 +332,14 @@ class ChessChallengeActivity : AppCompatActivity() {
         maxPlayerMoves = puzzle.objective.targetPlayerMoves ?: Int.MAX_VALUE
         playerColor = initial.currentTurn
         startingMaterialDeficit = materialDeficit(initial)
-        initialPlayerPiecesLost = 0
-        initialOpponentPiecesCaptured = 0
-        initialOpponentCapturedPlayerPiece = false
-        playerCapturedSymbols.clear()
-        playerLostSymbols.clear()
-        initialPlayerCapturedSymbols.clear()
-        initialPlayerLostSymbols.clear()
         resetConditionTracking()
         puzzleState = initial
         playerStartState = initial
         boardView?.gameState = initial
         boardView?.isFlipped = playerColor == PieceColor.BLACK
         boardView?.isLocked = false
+        refreshCaptureViews()
         setChallengeStatus(objectiveText())
-    }
-
-    private fun scheduleAutoplayMove(delayMs: Long = 220L) {
-        if (!autoplayEnabled || completed || resetting || opponentMoveAnimating ||
-            opponentReplyPending || activeOverlay != null
-        ) return
-        handler.removeCallbacks(autoplayRunnable)
-        handler.postDelayed(autoplayRunnable, delayMs)
-    }
-
-    private fun playAutoplayMove() {
-        if (!autoplayEnabled || completed || resetting || opponentMoveAnimating ||
-            opponentReplyPending || activeOverlay != null
-        ) return
-        val state = puzzleState ?: return
-        if (state.status != GameStatus.IN_PROGRESS || state.currentTurn != playerColor) return
-
-        if (!attemptStarted) {
-            beginAttempt()
-            attemptStarted = true
-        }
-        val puzzle = currentPuzzle ?: return
-        val move = autoplayAi.choosePlayerMove(
-            state = state,
-            puzzle = puzzle,
-            playerColor = playerColor,
-            progress = autoplayProgress(),
-        )
-        if (move == null) {
-            showWrongMove()
-            return
-        }
-        autoplayMoveInProgress = true
-        boardView?.isLocked = true
-        setChallengeStatus("Autoplay is selecting an objective-safe move…")
-        boardView?.animateExternalMove(move)
     }
 
     private fun handlePlayerMove(move: Move) {
@@ -462,10 +359,6 @@ class ChessChallengeActivity : AppCompatActivity() {
             attemptStarted = true
         }
 
-        autoplayMoveInProgress = false
-        hintActive = false
-        gameHud?.setHintActive(false)
-        boardView?.setHintMove(null)
         val acceptedMove = findMove(state, move.toUci())
         if (acceptedMove == null) {
             showWrongMove()
@@ -516,14 +409,6 @@ class ChessChallengeActivity : AppCompatActivity() {
     }
 
     private fun chooseOpponentReply(state: GameState): Move? {
-        if (autoplayEnabled) {
-            return autoplayAi.chooseOpponentMove(
-                state = state,
-                puzzle = currentPuzzle ?: return null,
-                playerColor = playerColor,
-                progress = autoplayProgress(),
-            )
-        }
         return easyChessAi.bestMove(state)
             ?: engine.allLegalMoves(state, state.currentTurn).firstOrNull()
     }
@@ -545,7 +430,6 @@ class ChessChallengeActivity : AppCompatActivity() {
         puzzleState = nextState
         expectedMoveIndex++
         boardView?.gameState = nextState
-        boardView?.setHintMove(null)
         if (nextState.status != GameStatus.IN_PROGRESS) {
             finishAfterFinalPosition(nextState)
         } else if (playerMovesMade >= maxPlayerMoves) {
@@ -554,7 +438,6 @@ class ChessChallengeActivity : AppCompatActivity() {
             opponentReplyPending = false
             boardView?.isLocked = false
             setChallengeStatus(objectiveText())
-            scheduleAutoplayMove()
         }
     }
 
@@ -580,7 +463,6 @@ class ChessChallengeActivity : AppCompatActivity() {
     }
 
     private fun completeLevel() {
-        stopAutoplay()
         completed = true
         opponentMoveAnimating = false
         boardView?.isLocked = true
@@ -604,16 +486,12 @@ class ChessChallengeActivity : AppCompatActivity() {
     }
 
     private fun showWrongMove() {
-        stopAutoplay()
         resetting = true
         opponentMoveAnimating = false
         pendingOpponentReply = null
         opponentReplyPending = false
         boardView?.isLocked = true
         gameHud?.controlsEnabled = false
-        hintActive = false
-        gameHud?.setHintActive(false)
-        boardView?.setHintMove(null)
         setChallengeStatus(failureMessage())
         markResultBoard()
         showFailureScreen()
@@ -621,7 +499,6 @@ class ChessChallengeActivity : AppCompatActivity() {
 
     private fun resetPuzzle() {
         handler.removeCallbacksAndMessages(null)
-        stopAutoplay()
         dismissOverlay()
         MusicPlayer.resumeMatch(this)
         val start = playerStartState ?: return
@@ -631,8 +508,6 @@ class ChessChallengeActivity : AppCompatActivity() {
         resetConditionTracking()
         completed = false
         resetting = false
-        hintActive = false
-        hintUsed = false
         pauseOverlayOpen = false
         attemptStarted = false
         retryCount++
@@ -646,8 +521,7 @@ class ChessChallengeActivity : AppCompatActivity() {
         boardView?.isFlipped = playerColor == PieceColor.BLACK
         boardView?.isLocked = false
         gameHud?.controlsEnabled = true
-        gameHud?.setHintActive(false, animate = false)
-        boardView?.setHintMove(null)
+        refreshCaptureViews()
         setChallengeStatus(objectiveText())
     }
 
@@ -676,72 +550,15 @@ class ChessChallengeActivity : AppCompatActivity() {
         showOverlay(view)
     }
 
-    private fun toggleHint() {
-        if (currentPuzzle == null || puzzleState == null) return
-        hintUsed = true
-        hintActive = !hintActive
-        val move = expectedMoveForCurrentState()
-        boardView?.setHintMove(if (hintActive) move else null)
-        gameHud?.setHintActive(hintActive)
-        setChallengeStatus(
-            when {
-                !hintActive -> objectiveText()
-                move == null -> "No hint is available for this position."
-                else -> "Hint: highlighted next move"
-            },
-        )
-    }
-
-    private fun expectedMoveForCurrentState(): Move? {
-        val state = puzzleState ?: return null
-        val recommended = currentPuzzle?.recommendedMoves.orEmpty()
-            .asSequence()
-            .mapNotNull { findMove(state, it) }
-            .firstOrNull()
-        return recommended ?: engine.allLegalMoves(state, state.currentTurn).firstOrNull()
-    }
-
     private fun objectiveText(): String {
         return currentPuzzle?.winCondition ?: "Complete the challenge"
     }
 
-    private fun moveCounterText(): String {
-        if (maxPlayerMoves == Int.MAX_VALUE) return "OPEN"
-        val remaining = (maxPlayerMoves - playerMovesMade).coerceAtLeast(0)
-        return if (remaining == 1) "1 MOVE" else "$remaining MOVES"
-    }
-
-    private fun autoplayProgress() = ChessChallengeAutoplayProgress(
-        startingMaterialDeficit = startingMaterialDeficit,
-        playerMovedQueen = playerMovedQueen,
-        playerCastledKingside = playerCastledKingside,
-        playerUsedNonKnightCapture = playerUsedNonKnightCapture,
-        promotedPawn = promotedPawn,
-        playerPromotionTypes = playerPromotionTypes.toList(),
-        playerCapturedBlackKnights = playerCapturedBlackKnights,
-        opponentCapturedWhiteBishop = opponentCapturedWhiteBishop,
-        lastPlayerMoveWasRook = lastPlayerMove?.let { move ->
-            lastPlayerMoveBeforeState?.get(move.from) as? ChessPiece
-        }?.type == ChessPieceType.ROOK,
-    )
-
-    private fun stopAutoplay() {
-        handler.removeCallbacks(autoplayRunnable)
-        autoplayEnabled = false
-        autoplayMoveInProgress = false
-        autoplayButton?.setAutoplayEnabled(false, animate = false)
-    }
-
     private fun resetConditionTracking() {
-        playerPiecesLost = initialPlayerPiecesLost
-        opponentPiecesCaptured = initialOpponentPiecesCaptured
-        opponentCapturedPlayerPiece = initialOpponentCapturedPlayerPiece
         playerPromotions = 0
         playerPromotionTypes.clear()
-        playerCapturedSymbols.clear()
-        playerCapturedSymbols += initialPlayerCapturedSymbols
-        playerLostSymbols.clear()
-        playerLostSymbols += initialPlayerLostSymbols
+        capturedByWhite.clear()
+        capturedByBlack.clear()
         playerMovedQueen = false
         playerCastledKingside = false
         playerUsedNonKnightCapture = false
@@ -755,19 +572,17 @@ class ChessChallengeActivity : AppCompatActivity() {
         move.captures.forEach { capturePosition ->
             val capturedPiece = state.get(capturePosition) as? ChessPiece
             val capturedColor = capturedPiece?.color
-            val capturedSymbol = capturedPiece?.symbol() ?: "?"
+            capturedPiece?.let {
+                if (mover == PieceColor.WHITE) capturedByWhite += it
+                else capturedByBlack += it
+            }
             if (capturedColor == playerColor) {
-                playerPiecesLost++
-                playerLostSymbols += capturedSymbol
                 if (mover == playerColor.opponent()) {
-                    opponentCapturedPlayerPiece = true
                     if (capturedPiece?.type == ChessPieceType.BISHOP) {
                         opponentCapturedWhiteBishop = true
                     }
                 }
             } else if (capturedColor == playerColor.opponent()) {
-                opponentPiecesCaptured++
-                playerCapturedSymbols += capturedSymbol
                 if (mover == playerColor) {
                     if (capturedPiece?.type == ChessPieceType.KNIGHT) {
                         playerCapturedBlackKnights++
@@ -787,6 +602,7 @@ class ChessChallengeActivity : AppCompatActivity() {
                 promotedPawn = true
             }
         }
+        refreshCaptureViews()
     }
 
     private fun conditionSatisfied(state: GameState): Boolean {
@@ -870,27 +686,11 @@ class ChessChallengeActivity : AppCompatActivity() {
         }
     }
 
-    private fun earnedStars(): Int = when {
-        retryCount > 0 -> 1
-        hintUsed -> 2
-        maxPlayerMoves == Int.MAX_VALUE || playerMovesMade <= maxPlayerMoves -> 3
-        else -> 1
-    }
+    private fun earnedStars(): Int = if (retryCount > 0) 1 else 3
 
-    private fun renderHistory() {
-        val state = puzzleState ?: return
-        val moves = state.moveHistory.mapIndexed { index, move ->
-            val moveNumber = index / 2 + 1
-            "$moveNumber${if (index % 2 == 0) "." else "..."}${move.toNotation()}"
-        }
-        moveHistoryView?.text = if (moves.isEmpty()) {
-            "Moves: —"
-        } else {
-            "Moves: ${moves.joinToString(" ")}"
-        }
-        val captured = playerCapturedSymbols.joinToString(" ").ifEmpty { "—" }
-        val lost = playerLostSymbols.joinToString(" ").ifEmpty { "—" }
-        capturedPiecesView?.text = "Captured: $captured   Lost: $lost"
+    private fun refreshCaptureViews() {
+        topCaptureView?.update(capturedByWhite)
+        bottomCaptureView?.update(capturedByBlack)
     }
 
     private fun starsKey(level: Int) = "level_${level}_stars"
@@ -903,14 +703,10 @@ class ChessChallengeActivity : AppCompatActivity() {
     }
 
     private fun showConditionFailure() {
-        stopAutoplay()
         resetting = true
         opponentMoveAnimating = false
         boardView?.isLocked = true
         gameHud?.controlsEnabled = false
-        hintActive = false
-        gameHud?.setHintActive(false)
-        boardView?.setHintMove(null)
         setChallengeStatus(failureMessage())
         markResultBoard()
         showFailureScreen()
@@ -946,7 +742,6 @@ class ChessChallengeActivity : AppCompatActivity() {
 
     private fun showPauseScreen() {
         if (activeOverlay != null || boardView == null) return
-        stopAutoplay()
         boardView?.isLocked = true
         if (opponentMoveAnimating) {
             boardView?.cancelMoveAnimation()
@@ -999,7 +794,6 @@ class ChessChallengeActivity : AppCompatActivity() {
 
     private fun returnToLevelList() {
         handler.removeCallbacksAndMessages(null)
-        stopAutoplay()
         dismissOverlay()
         MusicPlayer.resumeMatch(this)
         showLevelList()
@@ -1062,10 +856,8 @@ class ChessChallengeActivity : AppCompatActivity() {
 
     private fun completionSummary(): String {
         val mateLabel = currentPuzzle?.title ?: "Challenge complete"
-        val material = if (playerPiecesLost == 0) "No pieces lost" else "$playerPiecesLost piece(s) lost"
-        val hint = if (hintUsed) "Hint used: Yes" else "Hint used: No"
         val best = progressPrefs.getInt(starsKey(selectedLevel), earnedStars())
-        return "$mateLabel • $material • $hint • Attempt $attemptNumber • Best ${"★".repeat(best)}"
+        return "$mateLabel • Attempt $attemptNumber • Best ${"★".repeat(best)}"
     }
 
     private fun showOverlay(view: View, cardOverlay: Boolean = false) {
