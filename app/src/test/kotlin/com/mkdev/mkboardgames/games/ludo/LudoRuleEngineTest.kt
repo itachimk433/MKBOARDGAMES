@@ -87,6 +87,41 @@ class LudoRuleEngineTest {
         assertEquals(LudoSetup.colorForPlayer(3), next.currentTurn)
     }
 
+    @Test
+    fun p3AndP4CanLaunchOnSixEvenWhenTheirStartHasAnOpposingBlock() {
+        listOf(2, 3).forEach { player ->
+            val initial = LudoSetup.initialState()
+            val start = LudoSetup.trackPosition(player, 0)
+            val opponents = listOf(0, 1)
+            val pieces = LudoSetup.allPieces(initial).map { piece ->
+                when {
+                    piece.player == opponents[0] && piece.token == 0 ->
+                        piece.copy(progress = progressAt(start, opponents[0]))
+                    piece.player == opponents[1] && piece.token == 0 ->
+                        piece.copy(progress = progressAt(start, opponents[1]))
+                    else -> piece
+                }
+            }
+            val state = initial.copy(
+                board = LudoSetup.boardFor(pieces),
+                currentTurn = LudoSetup.colorForPlayer(player),
+                metadata = initial.metadata + mapOf(
+                    "ludo_turn" to player,
+                    LudoSetup.PIECES_METADATA to pieces,
+                    LudoSetup.SIX_STREAK_METADATA to 1,
+                ),
+            )
+
+            val moves = engine.legalMovesForDice(state, player, 6)
+
+            assertEquals(LudoSetup.TOKENS_PER_PLAYER, moves.size)
+        }
+    }
+
+    private fun progressAt(position: com.mkdev.mkboardgames.engine.Position, player: Int): Int =
+        (LudoSetup.PATH.indexOf(position) - LudoSetup.startOffset(player) + LudoSetup.PATH_LENGTH) %
+            LudoSetup.PATH_LENGTH
+
     private fun stateWithPiece(progress: Int) =
         LudoSetup.initialState().let { initial ->
             val pieces = LudoSetup.allPieces(initial).map { piece ->

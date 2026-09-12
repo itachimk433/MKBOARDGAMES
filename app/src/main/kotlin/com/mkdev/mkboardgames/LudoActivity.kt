@@ -1717,6 +1717,13 @@ class LudoActivity : AppCompatActivity() {
                 }
             }
             if (state.status == GameStatus.IN_PROGRESS) {
+                val nextPlayer = LudoSetup.playerFromState(state)
+                if (nextPlayer != movingPlayer) {
+                    // Do not leave the previous player's six displayed while
+                    // the next player is active; it makes a valid turn change
+                    // look like P3/P4 was skipped.
+                    playerDiceViews[movingPlayer].value = 1
+                }
                 updateHud()
                 if (isAiTurn()) postGameplay(420L) { rollDice() }
             } else {
@@ -1762,6 +1769,9 @@ class LudoActivity : AppCompatActivity() {
         } else {
             (player + 1) % LudoSetup.PLAYER_COUNT
         }
+        // A die face belongs to the completed roll, not to the next player.
+        // Reset it when the no-move path advances the turn.
+        playerDiceViews[player].value = 1
         state = state.copy(
             currentTurn = LudoSetup.colorForPlayer(nextPlayer),
             metadata = state.metadata + mapOf(

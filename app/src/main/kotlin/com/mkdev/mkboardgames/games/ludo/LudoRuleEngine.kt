@@ -50,7 +50,14 @@ class LudoRuleEngine : RuleEngine {
             }
             // Two opposing tokens form a block in standard Ludo. A token may
             // not land on or pass through the occupied destination square.
-            if (occupants.size >= 2 && occupants.all { it.player != player }) {
+            val isYardLaunch = piece.progress < 0 && targetProgress == 0
+            if (occupants.size >= 2 &&
+                occupants.all { it.player != player } &&
+                !isYardLaunch
+            ) {
+                // A six must always give the player a launch choice. A
+                // blockade on the coloured start square must not turn a
+                // yard-only six into an automatic skip.
                 continue
             }
             val protectedTarget = occupants.singleOrNull()?.let { occupant ->
