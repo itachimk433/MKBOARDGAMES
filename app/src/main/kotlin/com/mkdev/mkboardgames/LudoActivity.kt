@@ -38,6 +38,7 @@ import com.mkdev.mkboardgames.games.ludo.LudoSetup
 import com.mkdev.mkboardgames.ui.LudoBoardView
 import com.mkdev.mkboardgames.ui.GlbDiceView
 import com.mkdev.mkboardgames.ui.LudoPlayerBadgeView
+import com.mkdev.mkboardgames.ui.LudoPlayerControlView
 import com.mkdev.mkboardgames.ui.MotionDiceDirection
 import com.mkdev.mkboardgames.ui.ChessMenuView
 import com.mkdev.mkboardgames.ui.StyledDialogs
@@ -51,6 +52,7 @@ class LudoActivity : AppCompatActivity() {
     private lateinit var boardStage: FrameLayout
     private lateinit var playerDiceViews: Array<GlbDiceView>
     private lateinit var playerBadgeViews: Array<LudoPlayerBadgeView>
+    private lateinit var playerControlViews: Array<LudoPlayerControlView>
     private lateinit var turnView: TextView
     private lateinit var economyView: TextView
     private lateinit var storeView: TextView
@@ -168,7 +170,7 @@ class LudoActivity : AppCompatActivity() {
         }
         boardStage = FrameLayout(this)
         boardStage.clipChildren = true
-        val diceRail = dp(56)
+        val diceRail = dp(76)
         boardStage.addView(
             boardView,
             FrameLayout.LayoutParams(
@@ -196,25 +198,31 @@ class LudoActivity : AppCompatActivity() {
         playerBadgeViews = Array(LudoSetup.PLAYER_COUNT) { player ->
             LudoPlayerBadgeView(this).apply {
                 accentColor = LudoSetup.PLAYER_COLORS[player]
-                avatarOnEnd = player == 1 || player == 3
                 label = playerDisplayName(player)
                 setOnClickListener {
                     if (profilesEnabled() && matchStarted) showPlayerProfile(player)
                 }
             }
         }
-        playerBadgeViews.forEach { badge ->
-            boardStage.addView(
-                badge,
-                FrameLayout.LayoutParams(dp(86), dp(52)).apply {
-                    gravity = android.view.Gravity.TOP or android.view.Gravity.START
-                },
-            )
+        playerControlViews = Array(LudoSetup.PLAYER_COUNT) { player ->
+            LudoPlayerControlView(this).apply {
+                accentColor = LudoSetup.PLAYER_COLORS[player]
+                label = playerDisplayName(player)
+                labelBelow = player == 0 || player == 1
+                bind(
+                    playerBadgeViews[player],
+                    playerDiceViews[player],
+                    profileOnEnd = player == 1 || player == 3,
+                )
+            }
         }
-        playerDiceViews.forEach { die ->
+        playerControlViews.forEach { control ->
             boardStage.addView(
-                die,
-                FrameLayout.LayoutParams(dp(52), dp(52)).apply {
+                control,
+                FrameLayout.LayoutParams(
+                    dp(LudoPlayerControlView.PAIR_WIDTH),
+                    dp(72),
+                ).apply {
                     gravity = android.view.Gravity.TOP or android.view.Gravity.START
                 },
             )
@@ -223,11 +231,6 @@ class LudoActivity : AppCompatActivity() {
             positionPlayerDice()
         }
 
-        contentRoot.addView(turnView, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, (54 * dp).toInt()
-        ).apply {
-            bottomMargin = (8 * dp).toInt()
-        })
         contentRoot.addView(economyBar, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
             (42 * dp).toInt(),
@@ -1141,43 +1144,26 @@ class LudoActivity : AppCompatActivity() {
         val boardTop = boardView.top
         val boardWidth = boardView.width
         val boardBottom = boardView.bottom
-        val diceSize = dp(52)
-        val badgeWidth = dp(86)
-        val pairOverlap = dp(2)
-        val pairWidth = badgeWidth + diceSize - pairOverlap
+        val controlWidth = dp(LudoPlayerControlView.PAIR_WIDTH)
+        val controlHeight = dp(72)
         val outerMargin = dp(4)
         val leftPairX = boardLeft + outerMargin
-        val rightPairX = boardLeft + boardWidth - pairWidth - outerMargin
-        val topY = (boardTop - diceSize) / 2
-        val bottomY = boardBottom + (boardStage.height - boardBottom - diceSize) / 2
-        // Keep each profile and die together in the top/bottom rails.
+        val rightPairX = boardLeft + boardWidth - controlWidth - outerMargin
+        val topY = (boardTop - controlHeight) / 2
+        val bottomY = boardBottom + (boardStage.height - boardBottom - controlHeight) / 2
+        // Keep the avatar and die together inside one shared frame.
         val playerPositions = arrayOf(
-            leftPairX + badgeWidth - pairOverlap to bottomY, // Red: badge, die
-            rightPairX to bottomY, // Blue: die, badge
-            leftPairX + badgeWidth - pairOverlap to topY, // Green: badge, die
-            rightPairX to topY, // Yellow: die, badge
-        )
-        val badgePositions = arrayOf(
-            leftPairX to bottomY,
-            rightPairX + diceSize - pairOverlap to bottomY,
-            leftPairX to topY,
-            rightPairX + diceSize - pairOverlap to topY,
+            leftPairX to bottomY, // Red: bottom-left
+            rightPairX to bottomY, // Blue: bottom-right
+            leftPairX to topY, // Green: top-left
+            rightPairX to topY, // Yellow: top-right
         )
 
-        playerDiceViews.forEachIndexed { player, die ->
+        playerControlViews.forEachIndexed { player, control ->
             val (left, top) = playerPositions[player]
-            die.layoutParams = (die.layoutParams as FrameLayout.LayoutParams).apply {
-                width = diceSize
-                height = diceSize
-                leftMargin = left
-                topMargin = top
-            }
-        }
-        playerBadgeViews.forEachIndexed { player, badge ->
-            val (left, top) = badgePositions[player]
-            badge.layoutParams = (badge.layoutParams as FrameLayout.LayoutParams).apply {
-                width = badgeWidth
-                height = diceSize
+            control.layoutParams = (control.layoutParams as FrameLayout.LayoutParams).apply {
+                width = controlWidth
+                height = controlHeight
                 leftMargin = left
                 topMargin = top
             }
@@ -1192,6 +1178,11 @@ class LudoActivity : AppCompatActivity() {
         }
         if (::playerBadgeViews.isInitialized) {
             playerBadgeViews.forEach {
+                it.visibility = if (visible) View.VISIBLE else View.INVISIBLE
+            }
+        }
+        if (::playerControlViews.isInitialized) {
+            playerControlViews.forEach {
                 it.visibility = if (visible) View.VISIBLE else View.INVISIBLE
             }
         }
@@ -1824,6 +1815,10 @@ class LudoActivity : AppCompatActivity() {
                 state.status == GameStatus.IN_PROGRESS &&
                 player == activePlayer
             badge.isClickable = profilesEnabled() && matchStarted
+            if (::playerControlViews.isInitialized) {
+                playerControlViews[player].label = badge.label
+                playerControlViews[player].isActive = badge.isActive
+            }
         }
     }
 
