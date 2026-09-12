@@ -22,7 +22,7 @@ data class ChallengeSection(
 )
 
 /**
- * Four-column challenge selector using the same wood/gold card language as the
+ * Two-column challenge selector using the same wood/gold card language as the
  * game catalogue. The view owns scrolling so the level cards stay compact on
  * phones without introducing a second widget style.
  */
@@ -126,9 +126,10 @@ class ChallengeLevelGridView(
     }
 
     override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
-        val sidePadding = 14f * unit
-        val columnGap = 8f * unit
-        val cardWidth = ((width - sidePadding * 2f - columnGap * 3f) / 4f)
+        val columnCount = 2
+        val sidePadding = 12f * unit
+        val columnGap = 6f * unit
+        val cardWidth = ((width - sidePadding * 2f - columnGap) / columnCount)
             .coerceAtLeast(1f)
         val cardHeight = 64f * unit
         val rowGap = 10f * unit
@@ -151,10 +152,10 @@ class ChallengeLevelGridView(
                 sectionHeaders += SectionHeaderLayout(contentTop, section.title)
                 contentTop += sectionHeaderHeight
             }
-            val rowCount = ceil(itemCount / 4f).toInt()
+            val rowCount = ceil(itemCount / columnCount.toFloat()).toInt()
             repeat(itemCount) { offset ->
-                val row = offset / 4
-                val column = offset % 4
+                val row = offset / columnCount
+                val column = offset % columnCount
                 val left = sidePadding + column * (cardWidth + columnGap)
                 val top = contentTop + row * (cardHeight + rowGap)
                 cardRects += RectF(left, top, left + cardWidth, top + cardHeight)
