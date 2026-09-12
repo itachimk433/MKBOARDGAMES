@@ -1185,9 +1185,6 @@ class LudoActivity : AppCompatActivity() {
             val facesOppositeSide = isFourPlayerMatch && LudoSetup.facesOppositeSide(player)
             die.facesOppositeSide = facesOppositeSide
             playerBadgeViews[player].facesOppositeSide = facesOppositeSide
-            if (::playerControlViews.isInitialized) {
-                playerControlViews[player].facesOppositeSide = facesOppositeSide
-            }
         }
     }
 
@@ -1860,9 +1857,16 @@ class LudoActivity : AppCompatActivity() {
     private fun updateHud() {
         restoreHumanLegalMovesIfNeeded()
         val player = LudoSetup.playerFromState(state)
+        val playerPieces = LudoSetup.allPieces(state).filter { it.player == player }
+        val allTokensInYard = playerPieces.all { it.progress < 0 }
+        val hasNoLegalMove = rolledValue != 0 && boardView.legalMoves.isEmpty()
         val text = celebrationMessage ?: when {
             state.status != GameStatus.IN_PROGRESS -> "${LudoSetup.PLAYER_NAMES[state.metadata["ludo_winner"] as? Int ?: player]} wins"
             isAiTurn() -> "${LudoSetup.PLAYER_NAMES[player]} is thinking"
+            hasNoLegalMove && allTokensInYard ->
+                "${LudoSetup.PLAYER_NAMES[player]} rolled $rolledValue • need a 6 to place a token"
+            hasNoLegalMove ->
+                "${LudoSetup.PLAYER_NAMES[player]} rolled $rolledValue • no legal moves"
             rolledValue != 0 -> "${LudoSetup.PLAYER_NAMES[player]}: choose a token • move $rolledValue spaces"
             else -> "${LudoSetup.PLAYER_NAMES[player]}: roll the die"
         }
