@@ -25,6 +25,7 @@ import com.mkdev.mkboardgames.games.ludo.LudoEconomy
 import com.mkdev.mkboardgames.games.ludo.LudoPiece
 import com.mkdev.mkboardgames.games.ludo.LudoSetup
 import kotlin.math.PI
+import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.sin
 
@@ -80,12 +81,23 @@ class LudoBoardView(context: Context) : View(context) {
     private var moveAnimator: ValueAnimator? = null
     private var moveGeneration = 0
     private var protectionPulse = 0f
+    private var tokenIdlePulse = 0f
     private val protectionPulseAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
         duration = 950L
         repeatCount = ValueAnimator.INFINITE
         repeatMode = ValueAnimator.REVERSE
         addUpdateListener {
             protectionPulse = it.animatedValue as Float
+            invalidate()
+        }
+    }
+    private val tokenIdleAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
+        duration = 1600L
+        repeatCount = ValueAnimator.INFINITE
+        repeatMode = ValueAnimator.RESTART
+        interpolator = LinearInterpolator()
+        addUpdateListener {
+            tokenIdlePulse = it.animatedValue as Float
             invalidate()
         }
     }
@@ -123,6 +135,10 @@ class LudoBoardView(context: Context) : View(context) {
     private val protectionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
     }
+    private val tokenOrbitPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(210, 0, 0, 0)
+        style = Paint.Style.FILL
+    }
 
     init {
         setLayerType(View.LAYER_TYPE_SOFTWARE, null)
@@ -150,12 +166,16 @@ class LudoBoardView(context: Context) : View(context) {
         animatedSoundStep = -1
         isLocked = false
         protectionPulseAnimator.cancel()
+        tokenIdleAnimator.cancel()
         invalidate()
     }
 
     fun resumeAnimations() {
         if (isAttachedToWindow && !protectionPulseAnimator.isStarted) {
             protectionPulseAnimator.start()
+        }
+        if (isAttachedToWindow && !tokenIdleAnimator.isStarted) {
+            tokenIdleAnimator.start()
         }
     }
 
@@ -336,6 +356,10 @@ class LudoBoardView(context: Context) : View(context) {
         val radius = cell * 0.34f
         val isProtected = piece.progress in 0 until LudoSetup.FINISH &&
             LudoEconomy.player(gameState, piece.player).protectedToken == piece.token
+        val isIdle = animatedMove == null
+        if (isIdle && piece.progress < 0) {
+            drawTokenOrbit(canvas, point)
+        }
         if (isProtected) {
             protectionPaint.style = Paint.Style.FILL
             protectionPaint.color = Color.argb(75, 255, 216, 91)
@@ -347,14 +371,21 @@ class LudoBoardView(context: Context) : View(context) {
         }
         val tokenBitmap = tokenBitmaps.getOrNull(piece.player)
         if (tokenBitmap != null) {
-            val tokenHeight = cell * 0.92f
+            val breathScale = 1f + 0.045f * (
+                0.5f - 0.5f * cos(tokenIdlePulse * 2f * PI).toFloat()
+            )
+            val tokenHeight = cell * 0.92f * 1.6f * breathScale
             val tokenWidth = tokenHeight * tokenBitmap.width.toFloat() / tokenBitmap.height.toFloat()
-            val tokenBottom = point.y + cell * 0.44f
+            // The colored circular head occupies the upper third of the
+            // pin asset. Anchor that head to the board cell center so the
+            // pointer lands in the correct starting circle.
+            val tokenHeadCenter = tokenHeight * 0.34f
+            val tokenTop = point.y - tokenHeadCenter
             val tokenRect = RectF(
                 point.x - tokenWidth / 2f,
-                tokenBottom - tokenHeight,
+                tokenTop,
                 point.x + tokenWidth / 2f,
-                tokenBottom,
+                tokenTop + tokenHeight,
             )
             canvas.drawBitmap(tokenBitmap, null, tokenRect, tokenBitmapPaint)
         } else {
@@ -378,13 +409,31 @@ class LudoBoardView(context: Context) : View(context) {
             canvas.drawText(
                 piece.symbol(),
                 point.x,
-                point.y - cell * 0.15f - (textPaint.ascent() + textPaint.descent()) / 2f,
+                point.y - (textPaint.ascent() + textPaint.descent()) / 2f,
                 textPaint,
             )
             canvas.restore()
         }
         if (isProtected) {
             drawProtectionShield(canvas, point.x, point.y + radius * 1.18f)
+        }
+    }
+
+    private fun drawTokenOrbit(canvas: Canvas, point: PointF) {
+        val dotCount = 14
+        val orbitRadius = cell * 0.43f
+        val dotRadius = cell * 0.032f
+        val rotation = tokenIdlePulse * 360f
+        for (index in 0 until dotCount) {
+            val angle = Math.toRadians(
+                (rotation + index * (360f / dotCount)).toDouble()
+            )
+            canvas.drawCircle(
+                point.x + cos(angle).toFloat() * orbitRadius,
+                point.y + sin(angle).toFloat() * orbitRadius,
+                dotRadius,
+                tokenOrbitPaint,
+            )
         }
     }
 
