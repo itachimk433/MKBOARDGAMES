@@ -115,6 +115,14 @@ class LudoBoardView(context: Context) : View(context) {
             context.assets.open(assetName).use { BitmapFactory.decodeStream(it) }
         }.getOrNull()
     }.toTypedArray()
+    // The supplied pin images have a small transparent margin below their
+    // sharp tips. These fractions locate the visible tip in the 128px asset.
+    private val tokenTipFractions = floatArrayOf(
+        0.961f, // red
+        0.977f, // blue
+        0.977f, // green
+        0.953f, // yellow
+    )
     private val boardPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val tokenBitmapPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
         isDither = true
@@ -357,9 +365,6 @@ class LudoBoardView(context: Context) : View(context) {
         val isProtected = piece.progress in 0 until LudoSetup.FINISH &&
             LudoEconomy.player(gameState, piece.player).protectedToken == piece.token
         val isIdle = animatedMove == null
-        if (isIdle && piece.progress < 0) {
-            drawTokenOrbit(canvas, point)
-        }
         if (isProtected) {
             protectionPaint.style = Paint.Style.FILL
             protectionPaint.color = Color.argb(75, 255, 216, 91)
@@ -370,17 +375,18 @@ class LudoBoardView(context: Context) : View(context) {
             canvas.drawCircle(point.x, point.y, radius + cell * 0.10f, protectionPaint)
         }
         val tokenBitmap = tokenBitmaps.getOrNull(piece.player)
+        var labelY = point.y
         if (tokenBitmap != null) {
             val breathScale = 1f + 0.045f * (
                 0.5f - 0.5f * cos(tokenIdlePulse * 2f * PI).toFloat()
             )
             val tokenHeight = cell * 0.92f * 1.6f * breathScale
             val tokenWidth = tokenHeight * tokenBitmap.width.toFloat() / tokenBitmap.height.toFloat()
-            // The colored circular head occupies the upper third of the
-            // pin asset. Anchor that head to the board cell center so the
-            // pointer lands in the correct starting circle.
-            val tokenHeadCenter = tokenHeight * 0.34f
-            val tokenTop = point.y - tokenHeadCenter
+            // The board position is the sharp tip's landing point, not the
+            // center of the round head. Keep that tip fixed while the token
+            // breathes so it stays inside its starting circle.
+            val tokenTipFraction = tokenTipFractions[piece.player]
+            val tokenTop = point.y - tokenHeight * tokenTipFraction
             val tokenRect = RectF(
                 point.x - tokenWidth / 2f,
                 tokenTop,
@@ -388,6 +394,7 @@ class LudoBoardView(context: Context) : View(context) {
                 tokenTop + tokenHeight,
             )
             canvas.drawBitmap(tokenBitmap, null, tokenRect, tokenBitmapPaint)
+            labelY = tokenTop + tokenHeight * 0.34f
         } else {
             // Keep the board usable if an asset is unavailable on an older
             // install or is removed during packaging.
@@ -400,16 +407,22 @@ class LudoBoardView(context: Context) : View(context) {
             canvas.drawCircle(point.x, point.y, radius, piecePaint)
             piecePaint.style = Paint.Style.FILL
         }
+        if (isIdle && piece.progress < 0) {
+            // Draw this after the enlarged image so the black orbit remains
+            // visible instead of being covered by the token's transparent
+            // pin and white outline.
+            drawTokenOrbit(canvas, point)
+        }
         if (showTokenNumbers) {
             textPaint.color = Color.WHITE
             canvas.save()
             if (rotateOppositeSideTokenNumbers && LudoSetup.facesOppositeSide(piece.player)) {
-                canvas.rotate(180f, point.x, point.y)
+                canvas.rotate(180f, point.x, labelY)
             }
             canvas.drawText(
                 piece.symbol(),
                 point.x,
-                point.y - (textPaint.ascent() + textPaint.descent()) / 2f,
+                labelY - (textPaint.ascent() + textPaint.descent()) / 2f,
                 textPaint,
             )
             canvas.restore()
@@ -420,9 +433,9 @@ class LudoBoardView(context: Context) : View(context) {
     }
 
     private fun drawTokenOrbit(canvas: Canvas, point: PointF) {
-        val dotCount = 14
-        val orbitRadius = cell * 0.43f
-        val dotRadius = cell * 0.032f
+        val dotCount = 18
+        val orbitRadius = cell * 0.52f
+        val dotRadius = cell * 0.026f
         val rotation = tokenIdlePulse * 360f
         for (index in 0 until dotCount) {
             val angle = Math.toRadians(
