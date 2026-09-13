@@ -40,12 +40,20 @@ class SnakesLaddersActivity : AppCompatActivity() {
     private var exitPosted = false
 
     private val ladders = mapOf(
-        4 to 14, 9 to 31, 20 to 38, 28 to 84,
-        40 to 59, 51 to 67, 63 to 81, 71 to 91,
+        7 to 45,
+        34 to 66,
+        40 to 77,
+        62 to 81,
+        48 to 91,
+        74 to 96,
     )
     private val snakes = mapOf(
-        17 to 7, 54 to 34, 62 to 19, 64 to 60,
-        87 to 24, 93 to 73, 95 to 75, 99 to 78,
+        33 to 10,
+        37 to 5,
+        57 to 19,
+        70 to 31,
+        92 to 55,
+        97 to 56,
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -240,6 +248,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
             player = player,
             from = from,
             to = stepped,
+            path = SnakesLaddersBoardView.MovePath.NUMBERED_SQUARES,
             onStep = { SoundPlayer.playMovement("ludo_move") },
         ) {
             positions[player] = stepped
@@ -256,6 +265,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
                         player = player,
                         from = stepped,
                         to = destination,
+                        path = SnakesLaddersBoardView.MovePath.DIRECT_TRANSITION,
                         onStep = { SoundPlayer.playMovement("ludo_move", 0.8f) },
                     ) {
                         positions[player] = destination
