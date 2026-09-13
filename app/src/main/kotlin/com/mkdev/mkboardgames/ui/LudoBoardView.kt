@@ -123,13 +123,9 @@ class LudoBoardView(context: Context) : View(context) {
         0.977f, // green
         0.953f, // yellow
     )
-    private companion object {
-        const val YARD_HEAD_ANCHOR_FRACTION = 0.34f
-    }
     private data class RenderedPiece(
         val piece: LudoPiece,
         val point: PointF,
-        val yardAnchored: Boolean,
     )
     private val boardPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val tokenBitmapPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
@@ -361,7 +357,6 @@ class LudoBoardView(context: Context) : View(context) {
                 renderedPieces += RenderedPiece(
                     piece = piece,
                     point = PointF(center.x + offset.x, center.y + offset.y),
-                    yardAnchored = piece.progress < 0,
                 )
             }
         }
@@ -372,7 +367,6 @@ class LudoBoardView(context: Context) : View(context) {
             renderedPieces += RenderedPiece(
                 piece = moving,
                 point = animatedPiecePoint(),
-                yardAnchored = false,
             )
         }
 
@@ -380,14 +374,13 @@ class LudoBoardView(context: Context) : View(context) {
         // Drawing these inside the token loop lets a later token's orbit
         // appear on top of an earlier token when pieces overlap.
         renderedPieces.forEach { rendered ->
-            drawPieceUnderlay(canvas, rendered.piece, rendered.point, rendered.yardAnchored)
+            drawPieceUnderlay(canvas, rendered.piece, rendered.point)
         }
         renderedPieces.forEach { rendered ->
             drawPiece(
                 canvas,
                 rendered.piece,
                 rendered.point,
-                rendered.yardAnchored,
             )
         }
     }
@@ -433,7 +426,6 @@ class LudoBoardView(context: Context) : View(context) {
         canvas: Canvas,
         piece: LudoPiece,
         point: PointF,
-        yardAnchored: Boolean,
     ) {
         val isProtected = piece.progress in 0 until LudoSetup.FINISH &&
             LudoEconomy.player(gameState, piece.player).protectedToken == piece.token
@@ -445,7 +437,7 @@ class LudoBoardView(context: Context) : View(context) {
         if (piece.progress < LudoSetup.FINISH) {
             drawTokenBaseIndicator(
                 canvas,
-                indicatorCenter(piece, point, yardAnchored),
+                point,
                 baseIndicatorRadius,
             )
         }
@@ -465,7 +457,6 @@ class LudoBoardView(context: Context) : View(context) {
         canvas: Canvas,
         piece: LudoPiece,
         point: PointF,
-        yardAnchored: Boolean = piece.progress < 0,
     ) {
         val radius = cell * 0.34f
         val isProtected = piece.progress in 0 until LudoSetup.FINISH &&
@@ -478,14 +469,10 @@ class LudoBoardView(context: Context) : View(context) {
         var labelY = point.y
         if (tokenBitmap != null) {
             val tokenWidth = tokenHeight!! * tokenBitmap.width.toFloat() / tokenBitmap.height.toFloat()
-            // In the yard, the colored head is the part that belongs inside
-            // the board's home-start circle. Once the token is moving, the
-            // sharp tip becomes the board-position anchor instead.
-            val anchorFraction = if (yardAnchored) {
-                YARD_HEAD_ANCHOR_FRACTION
-            } else {
-                tokenTipFractions[piece.player]
-            }
+            // The sharp bottom tip is the board-position anchor in both the
+            // yard and on the track. This places the tip and dotted indicator
+            // in the measured home-circle instead of aligning by the head.
+            val anchorFraction = tokenTipFractions[piece.player]
             val tokenTop = point.y - tokenHeight!! * anchorFraction
             val tokenRect = RectF(
                 point.x - tokenWidth / 2f,
@@ -526,32 +513,10 @@ class LudoBoardView(context: Context) : View(context) {
         }
     }
 
-    private fun indicatorCenter(piece: LudoPiece, point: PointF, yardAnchored: Boolean): PointF {
-        val tokenBitmap = tokenBitmaps.getOrNull(piece.player)
-        val tokenHeight = tokenBitmap?.let { cell * 0.92f * 1.6f * (
-            1f + 0.045f * (
-                0.5f - 0.5f * cos(tokenIdlePulse * 2f * PI).toFloat()
-            )
-        ) }
-        return if (tokenHeight != null && yardAnchored) {
-            // Yard tokens are head-anchored so the colored circle sits in the
-            // board artwork's circle. The indicator belongs to the visible
-            // sharp tip, not to that head anchor.
-            PointF(
-                point.x,
-                point.y + tokenHeight * (
-                    tokenTipFractions[piece.player] - YARD_HEAD_ANCHOR_FRACTION
-                ),
-            )
-        } else {
-            // Moving tokens are tip-anchored at their board position.
-            point
-        }
-    }
-
     private fun drawTokenBaseIndicator(canvas: Canvas, point: PointF, radius: Float) {
         // The indicator is a single shared geometry: its outline and dots
-        // have the same center, which is the token's visible sharp tip.
+        // have the same center as the board position. In a yard, that is the
+        // measured home-circle center; on the track, it is the token tip.
         // Draw it before the token so the pin remains in front of it.
         tokenBaseHighlightPaint.strokeWidth = cell * 0.04f
         tokenBaseHighlightPaint.color = Color.argb(95, 0, 0, 0)
