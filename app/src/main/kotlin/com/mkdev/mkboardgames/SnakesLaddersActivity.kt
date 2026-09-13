@@ -39,9 +39,11 @@ class SnakesLaddersActivity : AppCompatActivity() {
     private var lifecycleActive = false
     private var exitPosted = false
 
-    private val snakesAndLadders = mapOf(
+    private val ladders = mapOf(
         4 to 14, 9 to 31, 20 to 38, 28 to 84,
         40 to 59, 51 to 67, 63 to 81, 71 to 91,
+    )
+    private val snakes = mapOf(
         17 to 7, 54 to 34, 62 to 19, 64 to 60,
         87 to 24, 93 to 73, 95 to 75, 99 to 78,
     )
@@ -212,9 +214,11 @@ class SnakesLaddersActivity : AppCompatActivity() {
         SoundPlayer.playMovement("ludo_start")
     }
 
-    private fun rollDice() {
+    private fun rollDice(automated: Boolean = false) {
         if (!gameplayActive() || !matchStarted || gameOver || diceView.isRolling) return
-        if (vsAI && currentPlayer == 1) return
+        // A die tap is always a human action. CPU turns call this method with
+        // automated=true so they are not blocked by the human-turn guard.
+        if (!automated && vsAI && currentPlayer == 1) return
         val player = currentPlayer
         val value = Random.nextInt(1, 7)
         diceView.rollTo(value, MotionDiceDirection.UP) {
@@ -227,18 +231,33 @@ class SnakesLaddersActivity : AppCompatActivity() {
         if (player != currentPlayer || gameOver) return
         val from = positions[player]
         val stepped = if (from + value <= 100) from + value else from
-        val destination = snakesAndLadders[stepped] ?: stepped
+        val destination = ladders[stepped] ?: snakes[stepped] ?: stepped
         animateMove(player, from, stepped, destination, value)
     }
 
     private fun animateMove(player: Int, from: Int, stepped: Int, destination: Int, roll: Int) {
-        boardView.animateMove(player, from, stepped) {
+        boardView.animateMove(
+            player = player,
+            from = from,
+            to = stepped,
+            onStep = { SoundPlayer.playMovement("ludo_move") },
+        ) {
             positions[player] = stepped
-            SoundPlayer.playMovement("ludo_move")
             if (destination != stepped) {
+                val isLadder = destination > stepped
+                turnView.text = if (isLadder) {
+                    "Ladder! $stepped → $destination"
+                } else {
+                    "Snake! $stepped → $destination"
+                }
                 handler.postDelayed({
                     if (!gameplayActive() || gameOver) return@postDelayed
-                    boardView.animateMove(player, stepped, destination) {
+                    boardView.animateMove(
+                        player = player,
+                        from = stepped,
+                        to = destination,
+                        onStep = { SoundPlayer.playMovement("ludo_move", 0.8f) },
+                    ) {
                         positions[player] = destination
                         finishTurn(player, roll, destination)
                     }
@@ -261,7 +280,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
         if (roll != 6) currentPlayer = 1 - player
         updateHud()
         if (vsAI && currentPlayer == 1) {
-            handler.postDelayed({ if (gameplayActive()) rollDice() }, 700L)
+            handler.postDelayed({ if (gameplayActive()) rollDice(automated = true) }, 700L)
         }
     }
 
@@ -351,7 +370,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
         diceView.setGameplayVisible(true)
         updateHud()
         if (vsAI && currentPlayer == 1 && !gameOver) {
-            handler.postDelayed({ if (gameplayActive()) rollDice() }, 500L)
+            handler.postDelayed({ if (gameplayActive()) rollDice(automated = true) }, 500L)
         }
     }
 

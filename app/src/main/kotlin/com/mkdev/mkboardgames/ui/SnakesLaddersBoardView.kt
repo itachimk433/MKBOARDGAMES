@@ -133,16 +133,34 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
 
     fun playerPosition(player: Int): Int = positions[player.coerceIn(0, 1)]
 
-    fun animateMove(player: Int, from: Int, to: Int, onEnd: () -> Unit) {
+    fun animateMove(
+        player: Int,
+        from: Int,
+        to: Int,
+        onStep: () -> Unit = {},
+        onEnd: () -> Unit,
+    ) {
         val index = player.coerceIn(0, 1)
         val generation = ++animationGeneration
         moveAnimator?.cancel()
         animatedNumbers[index] = from.toFloat()
-        moveAnimator = ValueAnimator.ofFloat(from.toFloat(), to.toFloat()).apply {
-            duration = ((kotlin.math.abs(to - from).coerceAtLeast(1)) * 105L + 90L)
+        val stepCount = kotlin.math.abs(to - from).coerceAtLeast(1)
+        var lastCompletedStep = 0
+        moveAnimator = ValueAnimator.ofFloat(0f, stepCount.toFloat()).apply {
+            duration = (stepCount * 105L + 90L)
                 .coerceIn(180L, 1250L)
             addUpdateListener {
-                animatedNumbers[index] = it.animatedValue as Float
+                val progress = it.animatedValue as Float
+                val completedStep = progress.toInt().coerceAtMost(stepCount)
+                if (completedStep > lastCompletedStep) {
+                    repeat(completedStep - lastCompletedStep) { onStep() }
+                    lastCompletedStep = completedStep
+                }
+                animatedNumbers[index] = if (to >= from) {
+                    from + progress
+                } else {
+                    from - progress
+                }
                 invalidate()
             }
             addListener(object : AnimatorListenerAdapter() {
