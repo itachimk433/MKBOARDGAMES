@@ -232,6 +232,7 @@ class LudoBoardView(context: Context) : View(context) {
         drawBoard(canvas)
         drawMoveHints(canvas)
         drawPieces(canvas)
+        drawMoveSourceHighlights(canvas)
         drawTurnMarker(canvas)
     }
 
@@ -255,11 +256,6 @@ class LudoBoardView(context: Context) : View(context) {
             // the route markers between source and destination so intermediate
             // cells cannot be mistaken for separate legal destinations.
             drawRoutePreview(canvas, path.drop(1).dropLast(1), accent)
-            val sourcePoint = sourcePointFor(move)
-            highlightPaint.color = Color.argb(235, Color.red(accent), Color.green(accent), Color.blue(accent))
-            canvas.drawCircle(sourcePoint.x, sourcePoint.y, cell * 0.43f, highlightPaint)
-            highlightPaint.color = Color.argb(230, 255, 255, 255)
-            canvas.drawCircle(sourcePoint.x, sourcePoint.y, cell * 0.36f, highlightPaint)
             val point = centerOf(move.to)
             highlightPaint.color = Color.argb(245, Color.red(accent), Color.green(accent), Color.blue(accent))
             canvas.drawCircle(point.x, point.y, cell * 0.34f, highlightPaint)
@@ -267,6 +263,32 @@ class LudoBoardView(context: Context) : View(context) {
             canvas.drawCircle(point.x, point.y, cell * 0.08f, highlightPaint)
         }
         animatedMove?.let { drawPathHighlight(canvas, animatedPath, accentColorFor(it)) }
+    }
+
+    private fun drawMoveSourceHighlights(canvas: Canvas) {
+        // Keep the roll-six/source ring above the token bitmap. Drawing it
+        // before the token made the white pin body hide most of the ring,
+        // especially for a yard launch.
+        val sourceMoves = legalMoves.distinctBy { move ->
+            Triple(
+                move.from,
+                move.metadata["player"] as? Int,
+                move.metadata["token"] as? Int,
+            )
+        }
+        for (move in sourceMoves) {
+            val accent = accentColorFor(move)
+            val sourcePoint = sourcePointFor(move)
+            highlightPaint.color = Color.argb(
+                245,
+                Color.red(accent),
+                Color.green(accent),
+                Color.blue(accent),
+            )
+            canvas.drawCircle(sourcePoint.x, sourcePoint.y, cell * 0.43f, highlightPaint)
+            highlightPaint.color = Color.argb(235, 255, 255, 255)
+            canvas.drawCircle(sourcePoint.x, sourcePoint.y, cell * 0.36f, highlightPaint)
+        }
         selectedFrom?.let { from ->
             val point = pointForPosition(from)
             highlightPaint.color = Color.argb(240, 255, 255, 255)
@@ -776,17 +798,51 @@ class LudoBoardView(context: Context) : View(context) {
             left + (position.col + 1) * cell, top + (position.row + 1) * cell)
 
     /**
-     * The four yard circles in the board artwork are centered on grid lines,
-     * rather than in the center of the abstract cells used by the game model.
-     * The model keeps the original cell positions for rules and hit targets;
-     * rendering them half a cell inward makes the pins and their indicators
-     * line up with the artwork.
+     * Circle centroids measured from ludo_board_reference.webp at its native
+     * 1254x1254 resolution. The model positions remain unchanged for rules;
+     * these artwork coordinates are only used for rendering and hit targets.
+     *
+     * Player order is red, blue, green, yellow. Token order is the same as
+     * LudoSetup.yardPosition(): top-left, top-right, bottom-left, bottom-right.
      */
+    private val yardArtworkCenters = arrayOf(
+        // red
+        arrayOf(
+            PointF(169.6f, 922.5f),
+            PointF(330.9f, 922.5f),
+            PointF(169.3f, 1084.3f),
+            PointF(330.7f, 1084.3f),
+        ),
+        // blue
+        arrayOf(
+            PointF(922.1f, 922.5f),
+            PointF(1083.4f, 922.6f),
+            PointF(921.9f, 1084.3f),
+            PointF(1083.3f, 1084.4f),
+        ),
+        // green
+        arrayOf(
+            PointF(169.5f, 169.4f),
+            PointF(330.9f, 169.4f),
+            PointF(169.4f, 331.1f),
+            PointF(330.8f, 331.1f),
+        ),
+        // yellow
+        arrayOf(
+            PointF(922.1f, 169.4f),
+            PointF(1083.5f, 169.4f),
+            PointF(922.1f, 331.0f),
+            PointF(1083.4f, 331.0f),
+        ),
+    )
+
     private fun yardCenter(player: Int, token: Int): PointF {
-        val position = LudoSetup.yardPosition(player, token)
+        val artworkCenter = yardArtworkCenters[player][token]
+        val boardReferenceSize = boardBitmap?.width?.toFloat() ?: 1254f
+        val boardPixelScale = LudoSetup.BOARD_SIZE * cell / boardReferenceSize
         return PointF(
-            left + (position.col + 1f) * cell,
-            top + (position.row + 1f) * cell,
+            left + artworkCenter.x * boardPixelScale,
+            top + artworkCenter.y * boardPixelScale,
         )
     }
 
