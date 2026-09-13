@@ -171,7 +171,11 @@ class LudoActivity : AppCompatActivity() {
             if (gameplayActive()) SoundPlayer.playMovement("ludo_move")
         }
         boardStage = FrameLayout(this)
-        boardStage.clipChildren = true
+        // Moving tokens can extend just beyond the board square while their
+        // sharp tip remains on the edge cell. Let that artwork overflow into
+        // the reserved rail space instead of clipping it at the stage bounds.
+        boardStage.clipChildren = false
+        boardStage.clipToPadding = false
         val diceRail = dp(LudoPlayerControlView.RAIL_HEIGHT)
         boardStage.addView(
             boardView,
