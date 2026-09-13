@@ -20,3 +20,9 @@ Automatic workspace syncing can leave a nested project copy without its own `.gi
 **Why:** A nested copy accepted local commits but only exposed the workspace backup remote, so the first retry could not reach GitHub.
 
 **How to apply:** Confirm `git rev-parse --show-toplevel` and `git remote -v` immediately before pushing; use the explicit clone when either points to the outer workspace or backup remote.
+
+The workspace backup history can be unrelated to the canonical GitHub history even when the source trees look identical; use the fetched GitHub commit as the base and reapply only the intended patch.
+
+**Why:** A normal push from the backup lineage was rejected, while the canonical branch already contained the prior Ludo fixes.
+
+**How to apply:** Save the focused working-file change, reset only after confirming the fetched tree has the expected root-level project paths, restore the change there, and push without force.
