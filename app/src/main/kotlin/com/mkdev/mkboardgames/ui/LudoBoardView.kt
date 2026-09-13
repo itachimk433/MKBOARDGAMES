@@ -311,12 +311,16 @@ class LudoBoardView(context: Context) : View(context) {
         val piecesByPosition = LudoSetup.allPieces(gameState)
             .groupBy { LudoSetup.positionOf(it) }
         for ((position, stack) in piecesByPosition) {
-            val center = centerOf(position)
             stack.forEachIndexed { index, piece ->
                 if (moving != null && piece.player == moving.player && piece.token == moving.token) {
                     return@forEachIndexed
                 }
-                val offset = stackOffset(index, stack.size)
+                val center = pointFor(piece, position)
+                val offset = if (piece.progress < 0) {
+                    PointF()
+                } else {
+                    stackOffset(index, stack.size)
+                }
                 drawPiece(
                     canvas,
                     piece,
@@ -355,8 +359,11 @@ class LudoBoardView(context: Context) : View(context) {
         val lowerIndex = floor(progress).toInt().coerceIn(0, lastIndex)
         val upperIndex = (lowerIndex + 1).coerceAtMost(lastIndex)
         val segmentProgress = progress - lowerIndex
-        val from = centerOf(path[lowerIndex])
-        val to = centerOf(path[upperIndex])
+        val piece = animatedPiece
+        val from = piece?.let { pointFor(it, path[lowerIndex]) }
+            ?: centerOf(path[lowerIndex])
+        val to = piece?.let { pointFor(it, path[upperIndex]) }
+            ?: centerOf(path[upperIndex])
         val jumpHeight = sin(segmentProgress * PI).toFloat() * cell * 0.18f
         return PointF(
             from.x + (to.x - from.x) * segmentProgress,
@@ -603,8 +610,12 @@ class LudoBoardView(context: Context) : View(context) {
         val index = piece?.let { stack.indexOfFirst { candidate ->
             candidate.player == it.player && candidate.token == it.token
         } } ?: 0
-        val center = centerOf(move.from)
-        val offset = stackOffset(index.coerceAtLeast(0), stack.size.coerceAtLeast(1))
+        val center = piece?.let { pointFor(it, move.from) } ?: centerOf(move.from)
+        val offset = if ((piece?.progress ?: 0) < 0) {
+            PointF()
+        } else {
+            stackOffset(index.coerceAtLeast(0), stack.size.coerceAtLeast(1))
+        }
         val dx = x - center.x - offset.x
         val dy = y - center.y - offset.y
         return dx * dx + dy * dy
@@ -684,10 +695,45 @@ class LudoBoardView(context: Context) : View(context) {
         RectF(left + position.col * cell, top + position.row * cell,
             left + (position.col + 1) * cell, top + (position.row + 1) * cell)
 
+    /**
+     * The four yard circles in the board artwork are centered on grid lines,
+     * rather than in the center of the abstract cells used by the game model.
+     * The model keeps the original cell positions for rules and hit targets;
+     * rendering them half a cell inward makes the pins and their indicators
+     * line up with the artwork.
+     */
+    private fun yardCenter(player: Int, token: Int): PointF {
+        val position = LudoSetup.yardPosition(player, token)
+        return PointF(
+            left + (position.col + 1f) * cell,
+            top + (position.row + 1f) * cell,
+        )
+    }
+
+    private fun pointFor(piece: LudoPiece, position: Position): PointF =
+        if (piece.progress < 0 &&
+            position == LudoSetup.yardPosition(piece.player, piece.token)
+        ) {
+            yardCenter(piece.player, piece.token)
+        } else {
+            centerOf(position)
+        }
+
     private fun centerOf(position: Position): PointF =
         PointF(left + (position.col + 0.5f) * cell, top + (position.row + 0.5f) * cell)
 
     private fun positionAt(x: Float, y: Float): Position? {
+        val yardPiece = LudoSetup.allPieces(gameState)
+            .firstOrNull { piece ->
+                if (piece.progress >= 0) return@firstOrNull false
+                val center = yardCenter(piece.player, piece.token)
+                val dx = x - center.x
+                val dy = y - center.y
+                dx * dx + dy * dy <= (cell * 0.62f) * (cell * 0.62f)
+            }
+        if (yardPiece != null) {
+            return LudoSetup.yardPosition(yardPiece.player, yardPiece.token)
+        }
         val col = ((x - left) / cell).toInt()
         val row = ((y - top) / cell).toInt()
         return if (row in 0 until LudoSetup.BOARD_SIZE && col in 0 until LudoSetup.BOARD_SIZE)
