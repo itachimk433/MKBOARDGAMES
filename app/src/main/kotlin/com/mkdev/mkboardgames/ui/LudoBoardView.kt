@@ -227,9 +227,11 @@ class LudoBoardView(context: Context) : View(context) {
         canvas.drawColor(Color.parseColor("#10151A"))
         drawBoard(canvas)
         drawMoveHints(canvas)
-        drawPieces(canvas)
         drawMoveSourceHighlights(canvas)
         drawTurnMarker(canvas)
+        // Tokens are the top layer. Board highlights and turn markers must
+        // stay behind them so no overlay can cover the token bitmap or tip.
+        drawPieces(canvas)
     }
 
     private fun drawBoard(canvas: Canvas) {
