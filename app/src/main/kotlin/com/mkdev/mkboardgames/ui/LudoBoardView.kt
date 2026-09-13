@@ -126,6 +126,11 @@ class LudoBoardView(context: Context) : View(context) {
     private companion object {
         const val YARD_HEAD_ANCHOR_FRACTION = 0.34f
     }
+    private data class RenderedPiece(
+        val piece: LudoPiece,
+        val point: PointF,
+        val yardAnchored: Boolean,
+    )
     private val boardPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val tokenBitmapPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
         isDither = true
@@ -250,7 +255,7 @@ class LudoBoardView(context: Context) : View(context) {
             // the route markers between source and destination so intermediate
             // cells cannot be mistaken for separate legal destinations.
             drawRoutePreview(canvas, path.drop(1).dropLast(1), accent)
-            val sourcePoint = centerOf(move.from)
+            val sourcePoint = sourcePointFor(move)
             highlightPaint.color = Color.argb(235, Color.red(accent), Color.green(accent), Color.blue(accent))
             canvas.drawCircle(sourcePoint.x, sourcePoint.y, cell * 0.43f, highlightPaint)
             highlightPaint.color = Color.argb(230, 255, 255, 255)
@@ -263,7 +268,7 @@ class LudoBoardView(context: Context) : View(context) {
         }
         animatedMove?.let { drawPathHighlight(canvas, animatedPath, accentColorFor(it)) }
         selectedFrom?.let { from ->
-            val point = centerOf(from)
+            val point = pointForPosition(from)
             highlightPaint.color = Color.argb(240, 255, 255, 255)
             canvas.drawCircle(point.x, point.y, cell * 0.42f, highlightPaint)
         }
@@ -309,10 +314,17 @@ class LudoBoardView(context: Context) : View(context) {
         return LudoSetup.PLAYER_COLORS[player.coerceIn(0, LudoSetup.PLAYER_COUNT - 1)]
     }
 
+    private fun sourcePointFor(move: Move): PointF {
+        val piece = LudoSetup.pieceForMove(gameState, move)
+            ?: (gameState.get(move.from) as? LudoPiece)
+        return piece?.let { pointFor(it, move.from) } ?: pointForPosition(move.from)
+    }
+
     private fun drawPieces(canvas: Canvas) {
         val moving = animatedPiece
         val piecesByPosition = LudoSetup.allPieces(gameState)
             .groupBy { LudoSetup.positionOf(it) }
+        val renderedPieces = mutableListOf<RenderedPiece>()
         for ((position, stack) in piecesByPosition) {
             stack.forEachIndexed { index, piece ->
                 if (moving != null && piece.player == moving.player && piece.token == moving.token) {
@@ -324,16 +336,37 @@ class LudoBoardView(context: Context) : View(context) {
                 } else {
                     stackOffset(index, stack.size)
                 }
-                drawPiece(
-                    canvas,
-                    piece,
-                    PointF(center.x + offset.x, center.y + offset.y),
+                renderedPieces += RenderedPiece(
+                    piece = piece,
+                    point = PointF(center.x + offset.x, center.y + offset.y),
+                    yardAnchored = piece.progress < 0,
                 )
             }
         }
         val move = animatedMove
         if (moving != null && move != null) {
-            drawPiece(canvas, moving, animatedPiecePoint())
+            // A token leaving the yard transitions to the track position, so
+            // it must use its sharp tip as the anchor for the whole animation.
+            renderedPieces += RenderedPiece(
+                piece = moving,
+                point = animatedPiecePoint(),
+                yardAnchored = false,
+            )
+        }
+
+        // Draw every orbit and protection underlay before any token bitmap.
+        // Drawing these inside the token loop lets a later token's orbit
+        // appear on top of an earlier token when pieces overlap.
+        renderedPieces.forEach { rendered ->
+            drawPieceUnderlay(canvas, rendered.piece, rendered.point, rendered.yardAnchored)
+        }
+        renderedPieces.forEach { rendered ->
+            drawPiece(
+                canvas,
+                rendered.piece,
+                rendered.point,
+                rendered.yardAnchored,
+            )
         }
     }
 
@@ -374,38 +407,28 @@ class LudoBoardView(context: Context) : View(context) {
         )
     }
 
-    private fun drawPiece(canvas: Canvas, piece: LudoPiece, point: PointF) {
-        val radius = cell * 0.34f
+    private fun drawPieceUnderlay(
+        canvas: Canvas,
+        piece: LudoPiece,
+        point: PointF,
+        yardAnchored: Boolean,
+    ) {
         val isProtected = piece.progress in 0 until LudoSetup.FINISH &&
             LudoEconomy.player(gameState, piece.player).protectedToken == piece.token
-        val tokenBitmap = tokenBitmaps.getOrNull(piece.player)
-        val breathScale = 1f + 0.045f * (
-            0.5f - 0.5f * cos(tokenIdlePulse * 2f * PI).toFloat()
-        )
-        val tokenHeight = tokenBitmap?.let { cell * 0.92f * 1.6f * breathScale }
-        val indicatorCenter = if (tokenBitmap != null && piece.progress < 0) {
-            // Yard tokens are head-anchored so the colored circle sits in the
-            // board artwork's circle. The indicator belongs to the visible
-            // sharp tip, not to that head anchor.
-            PointF(
-                point.x,
-                point.y + tokenHeight!! * (
-                    tokenTipFractions[piece.player] - YARD_HEAD_ANCHOR_FRACTION
-                ),
-            )
-        } else {
-            // Moving tokens are already tip-anchored at their board position.
-            point
-        }
         val baseIndicatorRadius = if (piece.progress < 0) {
             cell * 0.47f
         } else {
             cell * 0.47f / 1.5f
         }
         if (piece.progress < LudoSetup.FINISH) {
-            drawTokenBaseIndicator(canvas, indicatorCenter, baseIndicatorRadius)
+            drawTokenBaseIndicator(
+                canvas,
+                indicatorCenter(piece, point, yardAnchored),
+                baseIndicatorRadius,
+            )
         }
         if (isProtected) {
+            val radius = cell * 0.34f
             protectionPaint.style = Paint.Style.FILL
             protectionPaint.color = Color.argb(75, 255, 216, 91)
             canvas.drawCircle(point.x, point.y, radius + cell * 0.15f, protectionPaint)
@@ -414,13 +437,29 @@ class LudoBoardView(context: Context) : View(context) {
             protectionPaint.color = Color.rgb(255, 216, 91)
             canvas.drawCircle(point.x, point.y, radius + cell * 0.10f, protectionPaint)
         }
+    }
+
+    private fun drawPiece(
+        canvas: Canvas,
+        piece: LudoPiece,
+        point: PointF,
+        yardAnchored: Boolean = piece.progress < 0,
+    ) {
+        val radius = cell * 0.34f
+        val isProtected = piece.progress in 0 until LudoSetup.FINISH &&
+            LudoEconomy.player(gameState, piece.player).protectedToken == piece.token
+        val tokenBitmap = tokenBitmaps.getOrNull(piece.player)
+        val breathScale = 1f + 0.045f * (
+            0.5f - 0.5f * cos(tokenIdlePulse * 2f * PI).toFloat()
+        )
+        val tokenHeight = tokenBitmap?.let { cell * 0.92f * 1.6f * breathScale }
         var labelY = point.y
         if (tokenBitmap != null) {
             val tokenWidth = tokenHeight!! * tokenBitmap.width.toFloat() / tokenBitmap.height.toFloat()
             // In the yard, the colored head is the part that belongs inside
             // the board's home-start circle. Once the token is moving, the
             // sharp tip becomes the board-position anchor instead.
-            val anchorFraction = if (piece.progress < 0) {
+            val anchorFraction = if (yardAnchored) {
                 YARD_HEAD_ANCHOR_FRACTION
             } else {
                 tokenTipFractions[piece.player]
@@ -462,6 +501,29 @@ class LudoBoardView(context: Context) : View(context) {
         }
         if (isProtected) {
             drawProtectionShield(canvas, point.x, point.y + radius * 1.18f)
+        }
+    }
+
+    private fun indicatorCenter(piece: LudoPiece, point: PointF, yardAnchored: Boolean): PointF {
+        val tokenBitmap = tokenBitmaps.getOrNull(piece.player)
+        val tokenHeight = tokenBitmap?.let { cell * 0.92f * 1.6f * (
+            1f + 0.045f * (
+                0.5f - 0.5f * cos(tokenIdlePulse * 2f * PI).toFloat()
+            )
+        ) }
+        return if (tokenHeight != null && yardAnchored) {
+            // Yard tokens are head-anchored so the colored circle sits in the
+            // board artwork's circle. The indicator belongs to the visible
+            // sharp tip, not to that head anchor.
+            PointF(
+                point.x,
+                point.y + tokenHeight * (
+                    tokenTipFractions[piece.player] - YARD_HEAD_ANCHOR_FRACTION
+                ),
+            )
+        } else {
+            // Moving tokens are tip-anchored at their board position.
+            point
         }
     }
 
@@ -611,11 +673,12 @@ class LudoBoardView(context: Context) : View(context) {
 
     private fun pieceAt(position: Position, x: Float, y: Float): LudoPiece? {
         val stack = LudoSetup.piecesAt(gameState, position)
+        val positionCenter = pointForPosition(position)
         return stack.minByOrNull { piece ->
             val index = stack.indexOf(piece)
             val offset = stackOffset(index, stack.size)
-            val dx = x - centerOf(position).x - offset.x
-            val dy = y - centerOf(position).y - offset.y
+            val dx = x - positionCenter.x - offset.x
+            val dy = y - positionCenter.y - offset.y
             dx * dx + dy * dy
         }
     }
@@ -735,6 +798,13 @@ class LudoBoardView(context: Context) : View(context) {
         } else {
             centerOf(position)
         }
+
+    private fun pointForPosition(position: Position): PointF {
+        val yardPiece = LudoSetup.allPieces(gameState).firstOrNull {
+            it.progress < 0 && LudoSetup.positionOf(it) == position
+        }
+        return yardPiece?.let { pointFor(it, position) } ?: centerOf(position)
+    }
 
     private fun centerOf(position: Position): PointF =
         PointF(left + (position.col + 0.5f) * cell, top + (position.row + 0.5f) * cell)
