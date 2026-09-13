@@ -29,11 +29,11 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
             Color.rgb(226, 67, 76),
             Color.rgb(54, 126, 218),
         )
+    }
 
-        enum class MovePath {
-            NUMBERED_SQUARES,
-            DIRECT_TRANSITION,
-        }
+    enum class MovePath {
+        NUMBERED_SQUARES,
+        DIRECT_TRANSITION,
     }
 
     var onGameOverTapped: (() -> Unit)? = null
