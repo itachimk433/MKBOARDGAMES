@@ -123,6 +123,9 @@ class LudoBoardView(context: Context) : View(context) {
         0.977f, // green
         0.953f, // yellow
     )
+    private companion object {
+        const val YARD_HEAD_ANCHOR_FRACTION = 0.34f
+    }
     private val boardPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val tokenBitmapPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
         isDither = true
@@ -375,13 +378,32 @@ class LudoBoardView(context: Context) : View(context) {
         val radius = cell * 0.34f
         val isProtected = piece.progress in 0 until LudoSetup.FINISH &&
             LudoEconomy.player(gameState, piece.player).protectedToken == piece.token
+        val tokenBitmap = tokenBitmaps.getOrNull(piece.player)
+        val breathScale = 1f + 0.045f * (
+            0.5f - 0.5f * cos(tokenIdlePulse * 2f * PI).toFloat()
+        )
+        val tokenHeight = tokenBitmap?.let { cell * 0.92f * 1.6f * breathScale }
+        val indicatorCenter = if (tokenBitmap != null && piece.progress < 0) {
+            // Yard tokens are head-anchored so the colored circle sits in the
+            // board artwork's circle. The indicator belongs to the visible
+            // sharp tip, not to that head anchor.
+            PointF(
+                point.x,
+                point.y + tokenHeight!! * (
+                    tokenTipFractions[piece.player] - YARD_HEAD_ANCHOR_FRACTION
+                ),
+            )
+        } else {
+            // Moving tokens are already tip-anchored at their board position.
+            point
+        }
         val baseIndicatorRadius = if (piece.progress < 0) {
             cell * 0.47f
         } else {
             cell * 0.47f / 1.5f
         }
         if (piece.progress < LudoSetup.FINISH) {
-            drawTokenBaseIndicator(canvas, point, baseIndicatorRadius)
+            drawTokenBaseIndicator(canvas, indicatorCenter, baseIndicatorRadius)
         }
         if (isProtected) {
             protectionPaint.style = Paint.Style.FILL
@@ -392,31 +414,26 @@ class LudoBoardView(context: Context) : View(context) {
             protectionPaint.color = Color.rgb(255, 216, 91)
             canvas.drawCircle(point.x, point.y, radius + cell * 0.10f, protectionPaint)
         }
-        val tokenBitmap = tokenBitmaps.getOrNull(piece.player)
         var labelY = point.y
         if (tokenBitmap != null) {
-            val breathScale = 1f + 0.045f * (
-                0.5f - 0.5f * cos(tokenIdlePulse * 2f * PI).toFloat()
-            )
-            val tokenHeight = cell * 0.92f * 1.6f * breathScale
-            val tokenWidth = tokenHeight * tokenBitmap.width.toFloat() / tokenBitmap.height.toFloat()
+            val tokenWidth = tokenHeight!! * tokenBitmap.width.toFloat() / tokenBitmap.height.toFloat()
             // In the yard, the colored head is the part that belongs inside
             // the board's home-start circle. Once the token is moving, the
             // sharp tip becomes the board-position anchor instead.
             val anchorFraction = if (piece.progress < 0) {
-                0.34f
+                YARD_HEAD_ANCHOR_FRACTION
             } else {
                 tokenTipFractions[piece.player]
             }
-            val tokenTop = point.y - tokenHeight * anchorFraction
+            val tokenTop = point.y - tokenHeight!! * anchorFraction
             val tokenRect = RectF(
                 point.x - tokenWidth / 2f,
                 tokenTop,
                 point.x + tokenWidth / 2f,
-                tokenTop + tokenHeight,
+                tokenTop + tokenHeight!!,
             )
             canvas.drawBitmap(tokenBitmap, null, tokenRect, tokenBitmapPaint)
-            labelY = tokenTop + tokenHeight * 0.34f
+            labelY = tokenTop + tokenHeight!! * 0.34f
         } else {
             // Keep the board usable if an asset is unavailable on an older
             // install or is removed during packaging.
@@ -449,9 +466,9 @@ class LudoBoardView(context: Context) : View(context) {
     }
 
     private fun drawTokenBaseIndicator(canvas: Canvas, point: PointF, radius: Float) {
-        // Match the board's existing turn-highlight circle. Everything in
-        // this indicator is drawn before the token, so it never sits on top
-        // of the pin or its circular head.
+        // The indicator is a single shared geometry: its outline and dots
+        // have the same center, which is the token's visible sharp tip.
+        // Draw it before the token so the pin remains in front of it.
         tokenBaseHighlightPaint.strokeWidth = cell * 0.04f
         tokenBaseHighlightPaint.color = Color.argb(95, 0, 0, 0)
         tokenBaseHighlightPaint.style = Paint.Style.STROKE
