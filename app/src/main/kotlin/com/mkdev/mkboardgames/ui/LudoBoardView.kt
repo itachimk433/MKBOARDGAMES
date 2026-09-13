@@ -93,7 +93,20 @@ class LudoBoardView(context: Context) : View(context) {
     private val boardBitmap: Bitmap? = runCatching {
         context.assets.open("ludo_board_reference.webp").use { BitmapFactory.decodeStream(it) }
     }.getOrNull()
+    private val tokenBitmaps: Array<Bitmap?> = arrayOf(
+        "ludo_token_red.webp",
+        "ludo_token_blue.webp",
+        "ludo_token_green.webp",
+        "ludo_token_yellow.webp",
+    ).map { assetName ->
+        runCatching {
+            context.assets.open(assetName).use { BitmapFactory.decodeStream(it) }
+        }.getOrNull()
+    }.toTypedArray()
     private val boardPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val tokenBitmapPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
+        isDither = true
+    }
     private val piecePaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.CENTER
@@ -332,14 +345,30 @@ class LudoBoardView(context: Context) : View(context) {
             protectionPaint.color = Color.rgb(255, 216, 91)
             canvas.drawCircle(point.x, point.y, radius + cell * 0.10f, protectionPaint)
         }
-        canvas.drawCircle(point.x + cell * 0.05f, point.y + cell * 0.08f, radius, shadowPaint)
-        piecePaint.color = LudoSetup.PLAYER_COLORS[piece.player]
-        canvas.drawCircle(point.x, point.y, radius, piecePaint)
-        piecePaint.style = Paint.Style.STROKE
-        piecePaint.strokeWidth = cell * 0.055f
-        piecePaint.color = Color.argb(230, 255, 255, 255)
-        canvas.drawCircle(point.x, point.y, radius, piecePaint)
-        piecePaint.style = Paint.Style.FILL
+        val tokenBitmap = tokenBitmaps.getOrNull(piece.player)
+        if (tokenBitmap != null) {
+            val tokenHeight = cell * 0.92f
+            val tokenWidth = tokenHeight * tokenBitmap.width.toFloat() / tokenBitmap.height.toFloat()
+            val tokenBottom = point.y + cell * 0.44f
+            val tokenRect = RectF(
+                point.x - tokenWidth / 2f,
+                tokenBottom - tokenHeight,
+                point.x + tokenWidth / 2f,
+                tokenBottom,
+            )
+            canvas.drawBitmap(tokenBitmap, null, tokenRect, tokenBitmapPaint)
+        } else {
+            // Keep the board usable if an asset is unavailable on an older
+            // install or is removed during packaging.
+            canvas.drawCircle(point.x + cell * 0.05f, point.y + cell * 0.08f, radius, shadowPaint)
+            piecePaint.color = LudoSetup.PLAYER_COLORS[piece.player]
+            canvas.drawCircle(point.x, point.y, radius, piecePaint)
+            piecePaint.style = Paint.Style.STROKE
+            piecePaint.strokeWidth = cell * 0.055f
+            piecePaint.color = Color.argb(230, 255, 255, 255)
+            canvas.drawCircle(point.x, point.y, radius, piecePaint)
+            piecePaint.style = Paint.Style.FILL
+        }
         if (showTokenNumbers) {
             textPaint.color = Color.WHITE
             canvas.save()
@@ -349,7 +378,7 @@ class LudoBoardView(context: Context) : View(context) {
             canvas.drawText(
                 piece.symbol(),
                 point.x,
-                point.y - (textPaint.ascent() + textPaint.descent()) / 2f,
+                point.y - cell * 0.15f - (textPaint.ascent() + textPaint.descent()) / 2f,
                 textPaint,
             )
             canvas.restore()
