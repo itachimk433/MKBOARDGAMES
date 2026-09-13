@@ -244,7 +244,9 @@ class LudoBoardView(context: Context) : View(context) {
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        canvas.drawColor(Color.parseColor("#10151A"))
+        // The view extends into the top rail so edge tokens have room to
+        // render. Keep that overflow transparent; an opaque fill here would
+        // cover the CPU profile cards below this view's z-layer.
         drawBoard(canvas)
         drawMoveHints(canvas)
         drawMoveSourceHighlights(canvas)
