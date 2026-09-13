@@ -30,6 +30,13 @@ import kotlin.math.floor
 import kotlin.math.sin
 
 class LudoBoardView(context: Context) : View(context) {
+    companion object {
+        // The pin bitmap extends above its sharp-tip anchor by roughly one
+        // board cell. Reserve this much space above the square so edge tokens
+        // are not clipped by this View's own canvas bounds.
+        const val EDGE_OVERFLOW_DP = 30
+    }
+
     var gameState: GameState = LudoSetup.initialState()
         set(value) {
             field = value
@@ -205,8 +212,9 @@ class LudoBoardView(context: Context) : View(context) {
             heightMode != MeasureSpec.UNSPECIFIED && heightSize > 0 -> heightSize
             else -> suggestedMinimumWidth
         }
+        val edgeOverflow = edgeOverflowPixels().toFloat()
         val measuredWidth = resolveSize(boardSize, widthMeasureSpec)
-        val measuredHeight = resolveSize(boardSize, heightMeasureSpec)
+        val measuredHeight = resolveSize(boardSize + edgeOverflow, heightMeasureSpec)
         setMeasuredDimension(measuredWidth, measuredHeight)
     }
 
@@ -214,13 +222,25 @@ class LudoBoardView(context: Context) : View(context) {
 
     private fun updateGeometry() {
         if (width == 0 || height == 0) return
-        val boardSize = minOf(width, height) * 0.98f
+        val edgeOverflow = edgeOverflowPixels().toFloat()
+        val availableBoardHeight = (height - edgeOverflow).coerceAtLeast(0f)
+        val boardSize = minOf(width.toFloat(), availableBoardHeight) * 0.98f
         cell = boardSize / LudoSetup.BOARD_SIZE
         left = (width - boardSize) / 2f
-        top = (height - boardSize) / 2f
+        // Keep the board artwork where it was while adding all extra height
+        // above it. The token can then extend upward without leaving the View.
+        top = edgeOverflow + (availableBoardHeight - boardSize) / 2f
         highlightPaint.strokeWidth = cell * 0.08f
         textPaint.textSize = cell * 0.35f
     }
+
+    fun edgeOverflowPixels(): Int =
+        (EDGE_OVERFLOW_DP * resources.displayMetrics.density).toInt()
+
+    fun boardArtworkTopPixels(): Int = top.toInt()
+
+    fun boardArtworkBottomPixels(): Int =
+        (top + LudoSetup.BOARD_SIZE * cell).toInt()
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)

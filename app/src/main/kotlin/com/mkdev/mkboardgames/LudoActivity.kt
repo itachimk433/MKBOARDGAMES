@@ -177,13 +177,17 @@ class LudoActivity : AppCompatActivity() {
         boardStage.clipChildren = false
         boardStage.clipToPadding = false
         val diceRail = dp(LudoPlayerControlView.RAIL_HEIGHT)
+        val boardEdgeOverflow = boardView.edgeOverflowPixels()
         boardStage.addView(
             boardView,
             FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT,
             ).apply {
-                topMargin = diceRail
+                // The board view reserves its overflow space above the
+                // artwork. Move the view into the existing top rail so the
+                // artwork itself stays in the same position.
+                topMargin = (diceRail - boardEdgeOverflow).coerceAtLeast(0)
                 bottomMargin = diceRail
                 gravity = Gravity.CENTER
             },
@@ -234,6 +238,9 @@ class LudoActivity : AppCompatActivity() {
                 },
             )
         }
+        // Edge tokens intentionally render into the rail area. Keep the
+        // board view above the corner controls for that overflow region.
+        boardView.bringToFront()
         boardStage.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
             positionPlayerDice()
         }
@@ -1163,9 +1170,9 @@ class LudoActivity : AppCompatActivity() {
         if (!::boardStage.isInitialized || boardStage.width <= 0 || boardStage.height <= 0) return
 
         val boardLeft = boardView.left
-        val boardTop = boardView.top
+        val boardTop = boardView.top + boardView.boardArtworkTopPixels()
         val boardWidth = boardView.width
-        val boardBottom = boardView.bottom
+        val boardBottom = boardView.top + boardView.boardArtworkBottomPixels()
         val controlWidth = dp(LudoPlayerControlView.PAIR_WIDTH)
         val controlHeight = dp(LudoPlayerControlView.CONTROL_HEIGHT)
         val outerMargin = dp(4)
