@@ -214,7 +214,7 @@ class LudoBoardView(context: Context) : View(context) {
         }
         val edgeOverflow = edgeOverflowPixels().toFloat()
         val measuredWidth = resolveSize(boardSize, widthMeasureSpec)
-        val measuredHeight = resolveSize(boardSize + edgeOverflow, heightMeasureSpec)
+        val measuredHeight = resolveSize((boardSize + edgeOverflow).toInt(), heightMeasureSpec)
         setMeasuredDimension(measuredWidth, measuredHeight)
     }
 
