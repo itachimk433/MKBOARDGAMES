@@ -101,6 +101,8 @@ class MainActivity : AppCompatActivity() {
                 startActivity(Intent(this, ConnectFourActivity::class.java).withGameMode(modeExtra))
             MenuView.GameType.LUDO ->
                 startActivity(Intent(this, LudoActivity::class.java).withGameMode(modeExtra))
+            MenuView.GameType.SNAKES_LADDERS ->
+                startActivity(Intent(this, SnakesLaddersActivity::class.java).withGameMode(modeExtra))
             MenuView.GameType.MANCALA ->
                 startActivity(Intent(this, MancalaActivity::class.java).withGameMode(modeExtra))
             MenuView.GameType.YOTE ->

@@ -48,7 +48,7 @@ class MenuView(
 
     enum class GameType {
         CHESS, CHECKERS, INTERNATIONAL_DRAUGHTS, OTHELLO, MORABARABA, TICTACTOE, CONNECT_FOUR,
-        FOX_AND_GEESE, LUDO, XIANGQI, SHOGI, GO, MANCALA, YOTE, ONITAMA
+        FOX_AND_GEESE, LUDO, SNAKES_LADDERS, XIANGQI, SHOGI, GO, MANCALA, YOTE, ONITAMA
     }
 
     private data class Card(val type: GameType, var rect: RectF = RectF())
@@ -57,7 +57,7 @@ class MenuView(
         Card(GameType.INTERNATIONAL_DRAUGHTS),
         Card(GameType.OTHELLO), Card(GameType.MORABARABA),
         Card(GameType.TICTACTOE), Card(GameType.CONNECT_FOUR),
-        Card(GameType.FOX_AND_GEESE), Card(GameType.LUDO),
+         Card(GameType.FOX_AND_GEESE), Card(GameType.LUDO), Card(GameType.SNAKES_LADDERS),
         Card(GameType.XIANGQI), Card(GameType.SHOGI), Card(GameType.GO),
         Card(GameType.MANCALA), Card(GameType.YOTE), Card(GameType.ONITAMA)
     )
@@ -129,6 +129,9 @@ class MenuView(
     } catch (e: Exception) { null }
     private val onitamaHomeIconBitmap: Bitmap? = try {
         context.assets.open("onitama_home_icon.webp").use { BitmapFactory.decodeStream(it) }
+    } catch (e: Exception) { null }
+    private val snakesLaddersBoardBitmap: Bitmap? = try {
+        context.assets.open("snakes_ladders_board.jpg").use { BitmapFactory.decodeStream(it) }
     } catch (e: Exception) { null }
 
     private val bgPaint        = Paint().apply { color = Color.parseColor("#121212") }
@@ -424,6 +427,7 @@ class MenuView(
             GameType.CONNECT_FOUR -> "Connect Four" to "vs CPU  •  2 Players"
             GameType.FOX_AND_GEESE -> "Fox and Geese" to "vs CPU  •  2 Players"
             GameType.LUDO         -> "Ludo"         to "vs CPU  •  4 Players"
+            GameType.SNAKES_LADDERS -> "Snakes & Ladders" to "vs CPU  •  2 Players"
             GameType.XIANGQI      -> "Xiangqi 象棋"  to "vs CPU  •  2 Players"
             GameType.SHOGI        -> "Shogi 将棋"    to "vs CPU  •  2 Players"
             GameType.GO           -> "Go 围棋"       to "vs CPU  •  2 Players"
@@ -512,6 +516,7 @@ class MenuView(
             GameType.CONNECT_FOUR -> drawConnectFourMini(canvas, left, top, size)
             GameType.FOX_AND_GEESE -> drawFoxAndGeeseMini(canvas, left, top, size)
             GameType.LUDO -> drawLudoMini(canvas, left, top, size)
+            GameType.SNAKES_LADDERS -> drawSnakesLaddersMini(canvas, left, top, size)
             GameType.XIANGQI -> drawXiangqiMini(canvas, left, top, size)
             GameType.SHOGI -> drawShogiMini(canvas, left, top, size)
             GameType.GO -> drawGoMini(canvas, left, top, size)
@@ -763,6 +768,61 @@ class MenuView(
                 cell * 0.28f, board
             )
         }
+    }
+
+    private fun drawSnakesLaddersMini(canvas: Canvas, left: Float, top: Float, size: Float) {
+        snakesLaddersBoardBitmap?.let {
+            canvas.drawBitmap(it, null, RectF(left, top, left + size, top + size), bitmapPaint)
+            return
+        }
+        val cell = size / 10f
+        val light = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#FFE36B") }
+        val dark = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#B9D9B6") }
+        val line = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(170, 255, 255, 255)
+            style = Paint.Style.STROKE
+            strokeWidth = maxOf(1f, cell * 0.04f)
+        }
+        for (row in 0 until 10) {
+            for (column in 0 until 10) {
+                val paint = if ((row + column) % 2 == 0) light else dark
+                canvas.drawRect(
+                    left + column * cell,
+                    top + row * cell,
+                    left + (column + 1) * cell,
+                    top + (row + 1) * cell,
+                    paint,
+                )
+            }
+        }
+        canvas.drawRect(left, top, left + size, top + size, line)
+        val ladder = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.rgb(35, 62, 66)
+            strokeWidth = cell * 0.11f
+            strokeCap = Paint.Cap.ROUND
+        }
+        canvas.drawLine(left + cell * 1.2f, top + cell * 8.8f, left + cell * 4.4f, top + cell * 2.0f, ladder)
+        canvas.drawLine(left + cell * 7.1f, top + cell * 8.5f, left + cell * 8.9f, top + cell * 1.1f, ladder)
+        val snake = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.rgb(224, 35, 75)
+            style = Paint.Style.STROKE
+            strokeWidth = cell * 0.22f
+            strokeCap = Paint.Cap.ROUND
+        }
+        val path = Path().apply {
+            moveTo(left + cell * 7.0f, top + cell * 1.3f)
+            cubicTo(
+                left + cell * 5.4f, top + cell * 2.6f,
+                left + cell * 8.6f, top + cell * 4.8f,
+                left + cell * 6.4f, top + cell * 6.4f,
+            )
+            cubicTo(
+                left + cell * 4.9f, top + cell * 7.6f,
+                left + cell * 6.6f, top + cell * 8.5f,
+                left + cell * 5.6f, top + cell * 9.1f,
+            )
+        }
+        canvas.drawPath(path, snake)
     }
 
     private fun drawChessCheckersMini(canvas: Canvas, left: Float, top: Float, size: Float, type: GameType) {

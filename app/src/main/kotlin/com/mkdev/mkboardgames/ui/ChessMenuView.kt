@@ -57,12 +57,15 @@ class ChessMenuView(
     private val isTicTacToe = gameLabel.replace(" ", "").replace("·", "").equals("TICTACTOE", ignoreCase = true)
     private val isConnectFour = gameLabel.replace(" ", "").replace("·", "").equals("CONNECTFOUR", ignoreCase = true)
     private val isLudo = gameLabel.replace(" ", "").equals("LUDO", ignoreCase = true)
+    private val isSnakesLadders =
+        gameLabel.replace(" ", "").replace("&", "").equals("SNAKESLADDERS", ignoreCase = true)
     private val isMancala = gameLabel.replace(" ", "").equals("MANCALA", ignoreCase = true)
     private val isYote = gameLabel.replace(" ", "").replace("É", "E").equals("YOTE", ignoreCase = true)
     private val isOnitama = gameLabel.replace(" ", "").equals("ONITAMA", ignoreCase = true)
     private val isChessFamily =
         isChess || isDraughts || isOthello || isFoxAndGeese || isGo || isShogi ||
-            isXiangqi || isTicTacToe || isConnectFour || isLudo || isMancala || isYote || isOnitama
+            isXiangqi || isTicTacToe || isConnectFour || isLudo || isSnakesLadders ||
+            isMancala || isYote || isOnitama
     private val isInternationalDraughts =
         gameLabel.replace(" ", "").equals("INTLDRAUGHTS", ignoreCase = true)
     private val contentHeightDp = when {
@@ -85,6 +88,7 @@ class ChessMenuView(
             isTicTacToe -> "tictactoe_home_icon.png"
             isConnectFour -> "connect_four_home_icon.png"
             isLudo -> "ludo_home_icon.png"
+            isSnakesLadders -> "snakes_ladders_board.jpg"
             isMancala -> "mancala_home_icon.webp"
             isYote -> "yote_home_icon.webp"
             isOnitama -> "onitama_home_icon.webp"

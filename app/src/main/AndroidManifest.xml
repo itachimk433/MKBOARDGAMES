@@ -101,6 +101,12 @@
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize" />
 
         <activity
+            android:name=".SnakesLaddersActivity"
+            android:exported="false"
+            android:screenOrientation="unspecified"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize" />
+
+        <activity
             android:name=".MancalaActivity"
             android:exported="false"
             android:screenOrientation="unspecified"

@@ -182,6 +182,7 @@ object StyledDialogs {
             normalizedLabel.contains("FOX") -> "🦊"
             normalizedLabel.contains("TICTACTOE") -> "✕"
             gameLabel == "L U D O" -> "⚄"
+            normalizedLabel.replace("&", "").contains("SNAKESLADDERS") -> "⚄"
             else -> "♛"
         }
         val view = ChessRulesView(context, gameName, rules, gameLabel, headerSymbol)
