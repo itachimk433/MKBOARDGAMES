@@ -373,7 +373,9 @@ class LudoBoardView(context: Context) : View(context) {
         } else {
             cell * 0.47f / 1.5f
         }
-        drawTokenBaseIndicator(canvas, point, baseIndicatorRadius)
+        if (piece.progress < LudoSetup.FINISH) {
+            drawTokenBaseIndicator(canvas, point, baseIndicatorRadius)
+        }
         if (isProtected) {
             protectionPaint.style = Paint.Style.FILL
             protectionPaint.color = Color.argb(75, 255, 216, 91)
@@ -391,11 +393,15 @@ class LudoBoardView(context: Context) : View(context) {
             )
             val tokenHeight = cell * 0.92f * 1.6f * breathScale
             val tokenWidth = tokenHeight * tokenBitmap.width.toFloat() / tokenBitmap.height.toFloat()
-            // The board position is the sharp tip's landing point, not the
-            // center of the round head. Keep that tip fixed while the token
-            // breathes so it stays inside its starting circle.
-            val tokenTipFraction = tokenTipFractions[piece.player]
-            val tokenTop = point.y - tokenHeight * tokenTipFraction
+            // In the yard, the colored head is the part that belongs inside
+            // the board's home-start circle. Once the token is moving, the
+            // sharp tip becomes the board-position anchor instead.
+            val anchorFraction = if (piece.progress < 0) {
+                0.34f
+            } else {
+                tokenTipFractions[piece.player]
+            }
+            val tokenTop = point.y - tokenHeight * anchorFraction
             val tokenRect = RectF(
                 point.x - tokenWidth / 2f,
                 tokenTop,
