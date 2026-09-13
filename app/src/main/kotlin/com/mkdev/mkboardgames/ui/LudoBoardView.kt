@@ -368,10 +368,12 @@ class LudoBoardView(context: Context) : View(context) {
         val radius = cell * 0.34f
         val isProtected = piece.progress in 0 until LudoSetup.FINISH &&
             LudoEconomy.player(gameState, piece.player).protectedToken == piece.token
-        val isIdle = animatedMove == null
-        if (isIdle && piece.progress < 0) {
-            drawTokenBaseIndicator(canvas, point)
+        val baseIndicatorRadius = if (piece.progress < 0) {
+            cell * 0.47f
+        } else {
+            cell * 0.47f / 1.5f
         }
+        drawTokenBaseIndicator(canvas, point, baseIndicatorRadius)
         if (isProtected) {
             protectionPaint.style = Paint.Style.FILL
             protectionPaint.color = Color.argb(75, 255, 216, 91)
@@ -433,19 +435,20 @@ class LudoBoardView(context: Context) : View(context) {
         }
     }
 
-    private fun drawTokenBaseIndicator(canvas: Canvas, point: PointF) {
+    private fun drawTokenBaseIndicator(canvas: Canvas, point: PointF, radius: Float) {
         // Match the board's existing turn-highlight circle. Everything in
         // this indicator is drawn before the token, so it never sits on top
         // of the pin or its circular head.
-        val radius = cell * 0.47f
         tokenBaseHighlightPaint.strokeWidth = cell * 0.04f
         tokenBaseHighlightPaint.color = Color.argb(95, 0, 0, 0)
         tokenBaseHighlightPaint.style = Paint.Style.STROKE
         canvas.drawCircle(point.x, point.y, radius, tokenBaseHighlightPaint)
 
-        val dotCount = 18
+        // Larger dots with fewer positions leave a little more breathing
+        // room between each dot while keeping the ring easy to read.
+        val dotCount = 13
         val orbitRadius = radius
-        val dotRadius = cell * 0.026f
+        val dotRadius = cell * 0.052f
         val rotation = tokenIdlePulse * 360f
         for (index in 0 until dotCount) {
             val angle = Math.toRadians(
