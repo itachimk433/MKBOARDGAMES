@@ -6,6 +6,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.Rect
 import android.graphics.RectF
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
@@ -173,7 +174,7 @@ class SnakesLaddersBoardSelectionView(
             drawBoardCard(canvas, index, board)
         }
         canvas.drawText(
-            "Both boards use the same Snakes & Ladders rules.",
+            "Each board has its own ladder and snake layout.",
             width / 2f,
             height - dp(22f),
             footerPaint,
@@ -206,7 +207,7 @@ class SnakesLaddersBoardSelectionView(
         canvas.save()
         canvas.clipPath(clipPath)
         bitmaps[index]?.let { bitmap ->
-            canvas.drawBitmap(bitmap, null, image, imagePaint)
+            drawBitmapCover(canvas, bitmap, image)
         } ?: run {
             cardPaint.color = Color.parseColor("#2A4145")
             canvas.drawRect(image, cardPaint)
@@ -221,6 +222,29 @@ class SnakesLaddersBoardSelectionView(
             card.bottom - dp(14f),
             boardDetailPaint,
         )
+    }
+
+    private fun drawBitmapCover(canvas: Canvas, bitmap: Bitmap, destination: RectF) {
+        val sourceAspect = bitmap.width.toFloat() / bitmap.height
+        val destinationAspect = destination.width() / destination.height()
+        val source = if (sourceAspect > destinationAspect) {
+            val croppedWidth = (bitmap.height * destinationAspect).toInt()
+            Rect(
+                (bitmap.width - croppedWidth) / 2,
+                0,
+                (bitmap.width + croppedWidth) / 2,
+                bitmap.height,
+            )
+        } else {
+            val croppedHeight = (bitmap.width / destinationAspect).toInt()
+            Rect(
+                0,
+                (bitmap.height - croppedHeight) / 2,
+                bitmap.width,
+                (bitmap.height + croppedHeight) / 2,
+            )
+        }
+        canvas.drawBitmap(bitmap, source, destination, imagePaint)
     }
 
     private fun drawBackButton(canvas: Canvas) {

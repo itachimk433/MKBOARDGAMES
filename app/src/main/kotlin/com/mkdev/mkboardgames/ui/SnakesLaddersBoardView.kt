@@ -22,9 +22,6 @@ import kotlin.math.sin
 class SnakesLaddersBoardView(context: Context) : View(context) {
     companion object {
         const val BOARD_SIZE = 10
-        // The board artwork is 740x740, while its numbered grid is the
-        // measured 710x710 area from (15, 15) through (725, 725).
-        private const val ARTWORK_SIZE = 740f
         val PLAYER_COLORS = intArrayOf(
             Color.rgb(226, 67, 76),
             Color.rgb(54, 126, 218),
@@ -38,6 +35,8 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
         val assetName: String,
         val gridInset: Float,
         val gridSize: Float,
+        val artworkAspectRatio: Float,
+        val artworkScale: Float,
         val accentColor: Int,
     ) {
         ONE(
@@ -45,6 +44,8 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
             assetName = "snakes_ladders_board.jpg",
             gridInset = 15f / 740f,
             gridSize = 710f / 740f,
+            artworkAspectRatio = 1f,
+            artworkScale = 0.97f,
             accentColor = Color.parseColor("#E3B86A"),
         ),
         TWO(
@@ -52,6 +53,8 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
             assetName = "snakes_ladders_board_two.jpg",
             gridInset = 0f,
             gridSize = 1f,
+            artworkAspectRatio = 768f / 1376f,
+            artworkScale = 1f,
             accentColor = Color.parseColor("#8EC7B9"),
         ),
     }
@@ -78,8 +81,11 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
     private var activePlayerCount = 2
     private var moveAnimator: ValueAnimator? = null
     private var animationGeneration = 0
-    private var artworkSize = 0f
+    private var artworkWidth = 0f
+    private var artworkHeight = 0f
     private var cell = 0f
+    private var cellWidth = 0f
+    private var cellHeight = 0f
     private var left = 0f
     private var top = 0f
     private var gridLeft = 0f
@@ -114,11 +120,7 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
         if (selectedBoard == board) return
         selectedBoard = board
         boardBitmap = loadBoardBitmap(board)
-        gridLeft = left + artworkSize * board.gridInset
-        gridTop = top + artworkSize * board.gridInset
-        cell = artworkSize * board.gridSize / BOARD_SIZE
-        tokenTextPaint.textSize = cell * 0.27f
-        tokenEdgePaint.strokeWidth = cell * 0.045f
+        updateGeometry()
         contentDescription = "Snakes and Ladders ${board.displayName}"
         invalidate()
     }
@@ -133,19 +135,30 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
     }
 
     override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
-        artworkSize = min(width, height).toFloat() * 0.97f
-        cell = artworkSize * selectedBoard.gridSize / BOARD_SIZE
-        left = (width - artworkSize) / 2f
-        top = (height - artworkSize) / 2f
-        gridLeft = left + artworkSize * selectedBoard.gridInset
-        gridTop = top + artworkSize * selectedBoard.gridInset
+        updateGeometry()
+    }
+
+    private fun updateGeometry() {
+        if (width <= 0 || height <= 0) return
+        val board = selectedBoard
+        val fittedWidth = min(width.toFloat(), height * board.artworkAspectRatio)
+        val fittedHeight = fittedWidth / board.artworkAspectRatio
+        artworkWidth = fittedWidth * board.artworkScale
+        artworkHeight = fittedHeight * board.artworkScale
+        left = (width - artworkWidth) / 2f
+        top = (height - artworkHeight) / 2f
+        gridLeft = left + artworkWidth * board.gridInset
+        gridTop = top + artworkHeight * board.gridInset
+        cellWidth = artworkWidth * board.gridSize / BOARD_SIZE
+        cellHeight = artworkHeight * board.gridSize / BOARD_SIZE
+        cell = min(cellWidth, cellHeight)
         tokenTextPaint.textSize = cell * 0.27f
         tokenEdgePaint.strokeWidth = cell * 0.045f
     }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        val boardRect = RectF(left, top, left + artworkSize, top + artworkSize)
+        val boardRect = RectF(left, top, left + artworkWidth, top + artworkHeight)
         val bitmap = boardBitmap
         if (bitmap != null) {
             canvas.drawBitmap(bitmap, null, boardRect, bitmapPaint)
@@ -218,9 +231,13 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
     fun playerPosition(player: Int): Int =
         positions[player.coerceIn(0, positions.lastIndex)]
 
+    fun boardArtworkLeftPixels(): Int = left.roundToInt()
+
+    fun boardArtworkWidthPixels(): Int = artworkWidth.roundToInt()
+
     fun boardArtworkTopPixels(): Int = top.roundToInt()
 
-    fun boardArtworkBottomPixels(): Int = (top + artworkSize).roundToInt()
+    fun boardArtworkBottomPixels(): Int = (top + artworkHeight).roundToInt()
 
     fun animateMove(
         player: Int,
@@ -311,8 +328,8 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
         val column = if (rowFromBottom % 2 == 0) positionInRow else BOARD_SIZE - 1 - positionInRow
         val row = BOARD_SIZE - 1 - rowFromBottom
         return PointF(
-            gridLeft + (column + 0.5f) * cell,
-            gridTop + (row + 0.5f) * cell,
+            gridLeft + (column + 0.5f) * cellWidth,
+            gridTop + (row + 0.5f) * cellHeight,
         )
     }
 
@@ -346,12 +363,12 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
     private fun startPointForPlayer(player: Int): PointF {
         if (cell == 0f) return PointF()
         startAnchors[player]?.let { return PointF(it.x, it.y) }
-        val x = gridLeft + cell * if (player % 2 == 0) 1.5f else 8.5f
+        val x = gridLeft + cellWidth * if (player % 2 == 0) 1.5f else 8.5f
         val radius = cell * 0.25f
         val y = if (player < 2) {
-            gridTop + BOARD_SIZE * cell + cell * 0.38f
+            gridTop + BOARD_SIZE * cellHeight + cellHeight * 0.38f
         } else {
-            gridTop - cell * 0.38f
+            gridTop - cellHeight * 0.38f
         }
         val outsideBoard = PointF(x, y)
         if (outsideBoard.y - radius >= 0f && outsideBoard.y + radius <= height) {
@@ -363,9 +380,10 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
         return PointF(
             x,
             if (player < 2) {
-                (gridTop + BOARD_SIZE * cell - cell * 0.08f).coerceAtMost(height - radius)
+                (gridTop + BOARD_SIZE * cellHeight - cellHeight * 0.08f)
+                    .coerceAtMost(height - radius)
             } else {
-                (gridTop + cell * 0.08f).coerceAtLeast(radius)
+                (gridTop + cellHeight * 0.08f).coerceAtLeast(radius)
             },
         )
     }
