@@ -52,27 +52,25 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
     var isActive: Boolean = false
         set(value) {
             field = value
-            if (value && !winterFrameEnabled) startGlowAnimation() else stopGlowAnimation()
+            if (value && frameAssetName == null) startGlowAnimation() else stopGlowAnimation()
             invalidate()
         }
 
-    var winterFrameEnabled: Boolean = false
+    var frameAssetName: String? = null
         set(value) {
             if (field == value) return
             field = value
-            if (value && winterFrameBitmap == null) {
-                winterFrameBitmap = loadWinterFrameBitmap()
-            }
-            if (value) stopGlowAnimation() else if (isActive) startGlowAnimation()
+            themedFrameBitmap = value?.let(::loadFrameBitmap)
+            if (value != null) stopGlowAnimation() else if (isActive) startGlowAnimation()
             invalidate()
         }
 
     private var glowAnimator: ValueAnimator? = null
     private var glowPulse = 0f
-    private var winterFrameBitmap: Bitmap? = null
+    private var themedFrameBitmap: Bitmap? = null
 
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val winterFramePaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+    private val themedFramePaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
     }
@@ -171,10 +169,10 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
         )
         val radius = dp(13).toFloat()
 
-        val usesWinterFrame = winterFrameEnabled && winterFrameBitmap != null
-        if (usesWinterFrame) {
+        val usesThemedFrame = frameAssetName != null && themedFrameBitmap != null
+        if (usesThemedFrame) {
             fillPaint.clearShadowLayer()
-            canvas.drawBitmap(winterFrameBitmap!!, null, frameRect, winterFramePaint)
+            canvas.drawBitmap(themedFrameBitmap!!, null, frameRect, themedFramePaint)
         } else {
             fillPaint.color = Color.argb(238, 10, 18, 27)
             if (isActive) {
@@ -223,7 +221,7 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
         textPaint.color = if (isActive) Color.WHITE else Color.rgb(224, 232, 240)
         textPaint.textSize = dp(16).toFloat()
         textPaint.clearShadowLayer()
-        if (winterFrameEnabled) {
+        if (frameAssetName != null) {
             textPaint.setShadowLayer(
                 dp(7f),
                 0f,
@@ -257,10 +255,10 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
         value * resources.displayMetrics.density
 
     private fun renderedDieSizeDp(): Int =
-        if (winterFrameEnabled) (DIE_SIZE / 1.2f).roundToInt() else DIE_SIZE
+        if (frameAssetName != null) (DIE_SIZE / 1.2f).roundToInt() else DIE_SIZE
 
-    private fun loadWinterFrameBitmap(): Bitmap? = runCatching {
-        context.assets.open("snakes_ladders_board_two_profile_dice.webp").use {
+    private fun loadFrameBitmap(assetName: String): Bitmap? = runCatching {
+        context.assets.open(assetName).use {
             BitmapFactory.decodeStream(it)
         }
     }.getOrNull()
@@ -288,7 +286,7 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
-        if (isActive && !winterFrameEnabled) startGlowAnimation()
+        if (isActive && frameAssetName == null) startGlowAnimation()
     }
 
     override fun onDetachedFromWindow() {

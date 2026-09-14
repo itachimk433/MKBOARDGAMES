@@ -108,17 +108,27 @@ class SnakesLaddersBoardSelectionView(
         val horizontalPadding = dp(18f)
         val gap = dp(10f)
         val cardWidth = ((width - horizontalPadding * 2f - gap) / 2f).coerceAtLeast(1f)
+        val rowCount = (boards.size + 1) / 2
         val availableHeight = (height - top - dp(58f)).coerceAtLeast(dp(120f))
-        val cardHeight = min(cardWidth * 1.18f, availableHeight)
+        val rowGap = if (rowCount > 1) gap else 0f
+        val cardHeight = min(
+            cardWidth * 1.18f,
+            ((availableHeight - rowGap * (rowCount - 1)) / rowCount).coerceAtLeast(dp(120f)),
+        )
 
         boards.forEachIndexed { index, _ ->
-            val left = horizontalPadding + index * (cardWidth + gap)
-            cardRects[index].set(left, top, left + cardWidth, top + cardHeight)
+            val row = index / 2
+            val column = index % 2
+            val itemsInRow = min(2, boards.size - row * 2)
+            val rowWidth = itemsInRow * cardWidth + (itemsInRow - 1) * gap
+            val left = (width - rowWidth) / 2f + column * (cardWidth + gap)
+            val rowTop = top + row * (cardHeight + rowGap)
+            cardRects[index].set(left, rowTop, left + cardWidth, rowTop + cardHeight)
             imageRects[index].set(
                 left + dp(9f),
-                top + dp(9f),
+                rowTop + dp(9f),
                 left + cardWidth - dp(9f),
-                top + cardHeight - dp(58f),
+                rowTop + cardHeight - dp(58f),
             )
         }
 
@@ -199,7 +209,11 @@ class SnakesLaddersBoardSelectionView(
 
         canvas.drawText(board.displayName, drawnCard.centerX(), drawnCard.bottom - dp(31f), boardTitlePaint)
         canvas.drawText(
-            if (index == 0) "Classic board" else "Winter board",
+            when (board) {
+                SnakesLaddersBoardView.Board.ONE -> "Classic board"
+                SnakesLaddersBoardView.Board.TWO -> "Winter board"
+                SnakesLaddersBoardView.Board.THREE -> "Haunted board"
+            },
             drawnCard.centerX(),
             drawnCard.bottom - dp(14f),
             boardDetailPaint,

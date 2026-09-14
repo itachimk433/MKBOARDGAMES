@@ -28,7 +28,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
     private lateinit var boardView: SnakesLaddersBoardView
     private lateinit var boardStage: FrameLayout
     private lateinit var screenRoot: FrameLayout
-    private lateinit var boardTwoBackgroundView: ImageView
+    private lateinit var boardBackdropView: ImageView
     private var modeMenuView: ChessMenuView? = null
     private var boardSelectionView: SnakesLaddersBoardSelectionView? = null
     private lateinit var playerDiceViews: Array<GlbDiceView>
@@ -78,7 +78,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
                 },
             )
         }
-        boardTwoBackgroundView = ImageView(this).apply {
+        boardBackdropView = ImageView(this).apply {
             scaleType = ImageView.ScaleType.CENTER_CROP
             setImageBitmap(loadAssetBitmap("snakes_ladders_board_two_background.webp"))
             visibility = View.GONE
@@ -94,7 +94,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
 
         screenRoot = FrameLayout(this).apply {
             addView(
-                boardTwoBackgroundView,
+                boardBackdropView,
                 FrameLayout.LayoutParams(-1, -1),
             )
             addView(
@@ -148,7 +148,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
     override fun finish() {
         if (exitPosted) return
         exitPosted = true
-        boardTwoBackgroundView.visibility = View.GONE
+        boardBackdropView.visibility = View.GONE
         gameRoot.visibility = View.GONE
         handler.postDelayed({
             super.finish()
@@ -174,7 +174,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
     }
 
     private fun showModeDialog() {
-        boardTwoBackgroundView.visibility = View.GONE
+        boardBackdropView.visibility = View.GONE
         // Keep the activity's game surface mounted while the mode menu is
         // shown. The menu is a child of the same root, so switching modes
         // only removes the menu instead of revealing a hidden/recreated
@@ -209,7 +209,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
     }
 
     private fun showBoardSelection(cpuEnabled: Boolean, players: Int) {
-        boardTwoBackgroundView.visibility = View.GONE
+        boardBackdropView.visibility = View.GONE
         modeMenuView?.let { menu ->
             (menu.parent as? ViewGroup)?.removeView(menu)
         }
@@ -238,8 +238,9 @@ class SnakesLaddersActivity : AppCompatActivity() {
         selectedBoard = board
         ladders = board.ladders
         snakes = board.snakes
-        boardTwoBackgroundView.visibility =
-            if (board == SnakesLaddersBoardView.Board.TWO) View.VISIBLE else View.GONE
+        val backgroundAsset = board.matchBackgroundAssetName
+        boardBackdropView.setImageBitmap(backgroundAsset?.let(::loadAssetBitmap))
+        boardBackdropView.visibility = if (backgroundAsset == null) View.GONE else View.VISIBLE
     }
 
     private fun beginMatch(cpuEnabled: Boolean, players: Int) {
@@ -508,8 +509,8 @@ class SnakesLaddersActivity : AppCompatActivity() {
 
     private fun showBoardAfterDialog() {
         dialogOpen = false
-        boardTwoBackgroundView.visibility =
-            if (selectedBoard == SnakesLaddersBoardView.Board.TWO) View.VISIBLE else View.GONE
+        boardBackdropView.visibility =
+            if (selectedBoard.matchBackgroundAssetName == null) View.GONE else View.VISIBLE
         gameRoot.visibility = View.VISIBLE
         setPlayerControlsVisible(true)
         updateHud()
@@ -555,7 +556,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
         playerControlViews = Array(count) { player ->
             LudoPlayerControlView(this).apply {
                 accentColor = SnakesLaddersBoardView.PLAYER_COLORS[player]
-                winterFrameEnabled = selectedBoard == SnakesLaddersBoardView.Board.TWO
+                frameAssetName = selectedBoard.playerFrameAssetName
                 label = playerName(player)
                 labelBelow = if (count == 2) player == 0 else player < 2
                 labelUpsideDown = false
@@ -577,7 +578,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
             val isBottomPlayer = if (playerCount == 2) player == 0 else player < 2
             control.labelBelow = isBottomPlayer
             control.labelUpsideDown = false
-            control.winterFrameEnabled = selectedBoard == SnakesLaddersBoardView.Board.TWO
+            control.frameAssetName = selectedBoard.playerFrameAssetName
             playerBadgeViews[player].avatarScale =
                 if (selectedBoard == SnakesLaddersBoardView.Board.TWO) 0.9f else 1f
             playerBadgeViews[player].ringAndGlowEnabled =
