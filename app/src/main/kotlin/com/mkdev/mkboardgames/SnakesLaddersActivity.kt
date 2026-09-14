@@ -23,6 +23,8 @@ class SnakesLaddersActivity : AppCompatActivity() {
     private lateinit var gameRoot: LinearLayout
     private lateinit var boardView: SnakesLaddersBoardView
     private lateinit var boardStage: FrameLayout
+    private lateinit var screenRoot: FrameLayout
+    private var modeMenuView: ChessMenuView? = null
     private lateinit var playerDiceViews: Array<GlbDiceView>
     private lateinit var playerBadgeViews: Array<LudoPlayerBadgeView>
     private lateinit var playerControlViews: Array<LudoPlayerControlView>
@@ -99,7 +101,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
         }
         gameRoot.visibility = View.GONE
 
-        val screenRoot = FrameLayout(this).apply {
+        screenRoot = FrameLayout(this).apply {
             addView(
                 gameRoot,
                 FrameLayout.LayoutParams(-1, -1),
@@ -158,7 +160,11 @@ class SnakesLaddersActivity : AppCompatActivity() {
 
     private fun showModeDialog() {
         hideBoardWhileDialogIsOpen()
+        modeMenuView?.let { existing ->
+            (existing.parent as? ViewGroup)?.removeView(existing)
+        }
         val menu = ChessMenuView(this, false, gameLabel = "S N A K E S & L A D D E R S")
+        modeMenuView = menu
         menu.onVsAi = {
             beginMatch(cpuEnabled = true, players = 2)
         }
@@ -169,12 +175,13 @@ class SnakesLaddersActivity : AppCompatActivity() {
             beginMatch(cpuEnabled = false, players = 4)
         }
         menu.onHowToPlay = {
-            StyledDialogs.dismiss()
+            modeMenuView?.let { current ->
+                (current.parent as? ViewGroup)?.removeView(current)
+            }
+            modeMenuView = null
             showRules(showModeAfter = !matchStarted)
         }
-        StyledDialogs.showFullScreenView(this, menu) {
-            if (matchStarted) showBoardAfterDialog() else finish()
-        }
+        screenRoot.addView(menu, FrameLayout.LayoutParams(-1, -1))
     }
 
     private fun beginMatch(cpuEnabled: Boolean, players: Int) {
@@ -184,6 +191,10 @@ class SnakesLaddersActivity : AppCompatActivity() {
         // the overlay's exit callback from treating a valid mode selection
         // as an attempt to leave the activity.
         matchStarted = true
+        modeMenuView?.let { menu ->
+            (menu.parent as? ViewGroup)?.removeView(menu)
+        }
+        modeMenuView = null
         StyledDialogs.dismiss()
         startGame()
     }
