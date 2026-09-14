@@ -159,7 +159,11 @@ class SnakesLaddersActivity : AppCompatActivity() {
     }
 
     private fun showModeDialog() {
-        hideBoardWhileDialogIsOpen()
+        // Keep the activity's game surface mounted while the mode menu is
+        // shown. The menu is a child of the same root, so switching modes
+        // only removes the menu instead of revealing a hidden/recreated
+        // activity surface.
+        hideBoardWhileDialogIsOpen(hideGameRoot = false)
         modeMenuView?.let { existing ->
             (existing.parent as? ViewGroup)?.removeView(existing)
         }
@@ -195,7 +199,6 @@ class SnakesLaddersActivity : AppCompatActivity() {
             (menu.parent as? ViewGroup)?.removeView(menu)
         }
         modeMenuView = null
-        StyledDialogs.dismiss()
         startGame()
     }
 
@@ -402,13 +405,13 @@ class SnakesLaddersActivity : AppCompatActivity() {
         }
     }
 
-    private fun hideBoardWhileDialogIsOpen() {
+    private fun hideBoardWhileDialogIsOpen(hideGameRoot: Boolean = true) {
         dialogOpen = true
         handler.removeCallbacksAndMessages(null)
         setPlayerControlsVisible(false)
         boardView.cancelAnimations()
         SoundPlayer.stopAll()
-        gameRoot.visibility = View.GONE
+        gameRoot.visibility = if (hideGameRoot) View.GONE else View.VISIBLE
     }
 
     private fun showBoardAfterDialog() {
