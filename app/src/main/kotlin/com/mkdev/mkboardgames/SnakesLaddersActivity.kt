@@ -45,43 +45,8 @@ class SnakesLaddersActivity : AppCompatActivity() {
     private var lifecycleActive = false
     private var exitPosted = false
 
-    private val boardOneLadders = mapOf(
-        7 to 45,
-        34 to 66,
-        40 to 77,
-        62 to 81,
-        48 to 91,
-        74 to 96,
-    )
-    private val boardOneSnakes = mapOf(
-        33 to 10,
-        37 to 5,
-        57 to 19,
-        70 to 31,
-        92 to 55,
-        97 to 56,
-    )
-    private val boardTwoLadders = mapOf(
-        7 to 30,
-        16 to 33,
-        20 to 38,
-        36 to 83,
-        50 to 68,
-        63 to 81,
-        71 to 89,
-        86 to 97,
-    )
-    private val boardTwoSnakes = mapOf(
-        25 to 3,
-        42 to 1,
-        61 to 43,
-        56 to 48,
-        92 to 67,
-        94 to 12,
-        98 to 80,
-    )
-    private var ladders = boardOneLadders
-    private var snakes = boardOneSnakes
+    private var ladders = SnakesLaddersBoardView.Board.ONE.ladders
+    private var snakes = SnakesLaddersBoardView.Board.ONE.snakes
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -251,13 +216,8 @@ class SnakesLaddersActivity : AppCompatActivity() {
     }
 
     private fun setBoardRules(board: SnakesLaddersBoardView.Board) {
-        if (board == SnakesLaddersBoardView.Board.TWO) {
-            ladders = boardTwoLadders
-            snakes = boardTwoSnakes
-        } else {
-            ladders = boardOneLadders
-            snakes = boardOneSnakes
-        }
+        ladders = board.ladders
+        snakes = board.snakes
     }
 
     private fun beginMatch(cpuEnabled: Boolean, players: Int) {

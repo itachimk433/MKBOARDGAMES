@@ -6,7 +6,9 @@ import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.PointF
+import android.graphics.Rect
 import android.graphics.RectF
 import android.view.MotionEvent
 import android.view.View
@@ -37,6 +39,9 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
         val gridSize: Float,
         val artworkAspectRatio: Float,
         val artworkScale: Float,
+        val fullBleedBackground: Boolean,
+        val ladders: Map<Int, Int>,
+        val snakes: Map<Int, Int>,
         val accentColor: Int,
     ) {
         ONE(
@@ -46,6 +51,23 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
             gridSize = 710f / 740f,
             artworkAspectRatio = 1f,
             artworkScale = 0.97f,
+            fullBleedBackground = false,
+            ladders = mapOf(
+                7 to 45,
+                34 to 66,
+                40 to 77,
+                62 to 81,
+                48 to 91,
+                74 to 96,
+            ),
+            snakes = mapOf(
+                33 to 10,
+                37 to 5,
+                57 to 19,
+                70 to 31,
+                92 to 55,
+                97 to 56,
+            ),
             accentColor = Color.parseColor("#E3B86A"),
         ),
         TWO(
@@ -53,8 +75,28 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
             assetName = "snakes_ladders_board_two.jpg",
             gridInset = 0f,
             gridSize = 1f,
-            artworkAspectRatio = 768f / 1376f,
+            artworkAspectRatio = 640f / 1132f,
             artworkScale = 1f,
+            fullBleedBackground = true,
+            ladders = mapOf(
+                7 to 30,
+                16 to 33,
+                20 to 38,
+                36 to 83,
+                50 to 68,
+                63 to 81,
+                71 to 89,
+                86 to 97,
+            ),
+            snakes = mapOf(
+                25 to 3,
+                42 to 1,
+                61 to 43,
+                56 to 48,
+                92 to 67,
+                94 to 12,
+                98 to 80,
+            ),
             accentColor = Color.parseColor("#8EC7B9"),
         ),
     }
@@ -109,6 +151,47 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
     private val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(105, 0, 0, 0)
     }
+    private val boardCellPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val boardGridPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        color = Color.argb(195, 20, 55, 61)
+    }
+    private val boardNumberPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textAlign = Paint.Align.CENTER
+        isFakeBoldText = true
+        color = Color.WHITE
+        setShadowLayer(3f, 0f, 1f, Color.argb(220, 0, 0, 0))
+    }
+    private val ladderRailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+        color = Color.rgb(78, 49, 31)
+    }
+    private val ladderRungPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+        color = Color.rgb(231, 197, 132)
+    }
+    private val snakeOutlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+        color = Color.argb(225, 20, 42, 45)
+    }
+    private val snakeBodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+    }
+    private val snakeEyePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
+    }
+    private val snakePupilPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.rgb(24, 42, 44)
+    }
+    private val snakeMouthPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+        color = Color.rgb(75, 20, 29)
+    }
 
     init {
         setLayerType(View.LAYER_TYPE_SOFTWARE, null)
@@ -141,12 +224,19 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
     private fun updateGeometry() {
         if (width <= 0 || height <= 0) return
         val board = selectedBoard
-        val fittedWidth = min(width.toFloat(), height * board.artworkAspectRatio)
-        val fittedHeight = fittedWidth / board.artworkAspectRatio
-        artworkWidth = fittedWidth * board.artworkScale
-        artworkHeight = fittedHeight * board.artworkScale
-        left = (width - artworkWidth) / 2f
-        top = (height - artworkHeight) / 2f
+        if (board.fullBleedBackground) {
+            artworkWidth = width.toFloat()
+            artworkHeight = height.toFloat()
+            left = 0f
+            top = 0f
+        } else {
+            val fittedWidth = min(width.toFloat(), height * board.artworkAspectRatio)
+            val fittedHeight = fittedWidth / board.artworkAspectRatio
+            artworkWidth = fittedWidth * board.artworkScale
+            artworkHeight = fittedHeight * board.artworkScale
+            left = (width - artworkWidth) / 2f
+            top = (height - artworkHeight) / 2f
+        }
         gridLeft = left + artworkWidth * board.gridInset
         gridTop = top + artworkHeight * board.gridInset
         cellWidth = artworkWidth * board.gridSize / BOARD_SIZE
@@ -161,15 +251,203 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
         val boardRect = RectF(left, top, left + artworkWidth, top + artworkHeight)
         val bitmap = boardBitmap
         if (bitmap != null) {
-            canvas.drawBitmap(bitmap, null, boardRect, bitmapPaint)
+            if (selectedBoard.fullBleedBackground) {
+                drawBitmapCover(canvas, bitmap, boardRect)
+            } else {
+                canvas.drawBitmap(bitmap, null, boardRect, bitmapPaint)
+            }
         } else {
             tokenPaint.color = Color.rgb(185, 217, 182)
             canvas.drawRect(boardRect, tokenPaint)
         }
 
+        drawBoardOverlay(canvas)
         for (player in 0 until activePlayerCount) {
             drawToken(canvas, player, animatedPoints[player])
         }
+    }
+
+    private fun drawBoardOverlay(canvas: Canvas) {
+        if (selectedBoard != Board.TWO || cellWidth == 0f || cellHeight == 0f) return
+
+        for (row in 0 until BOARD_SIZE) {
+            for (column in 0 until BOARD_SIZE) {
+                boardCellPaint.color = if ((row + column) % 2 == 0) {
+                    Color.argb(24, 255, 255, 255)
+                } else {
+                    Color.argb(18, 12, 49, 54)
+                }
+                canvas.drawRect(
+                    gridLeft + column * cellWidth,
+                    gridTop + row * cellHeight,
+                    gridLeft + (column + 1) * cellWidth,
+                    gridTop + (row + 1) * cellHeight,
+                    boardCellPaint,
+                )
+            }
+        }
+
+        boardGridPaint.strokeWidth = maxOf(1f, cell * 0.035f)
+        for (row in 0..BOARD_SIZE) {
+            val y = gridTop + row * cellHeight
+            canvas.drawLine(gridLeft, y, gridLeft + BOARD_SIZE * cellWidth, y, boardGridPaint)
+        }
+        for (column in 0..BOARD_SIZE) {
+            val x = gridLeft + column * cellWidth
+            canvas.drawLine(x, gridTop, x, gridTop + BOARD_SIZE * cellHeight, boardGridPaint)
+        }
+
+        selectedBoard.ladders.entries.forEach { entry ->
+            drawLadder(canvas, entry.key, entry.value)
+        }
+        selectedBoard.snakes.entries.forEachIndexed { index, entry ->
+            drawSnake(canvas, entry.key, entry.value, index)
+        }
+
+        boardNumberPaint.textSize = cell * 0.2f
+        for (number in 1..100) {
+            val point = pointForNumber(number.toFloat())
+            canvas.drawText(
+                number.toString(),
+                point.x,
+                point.y - (boardNumberPaint.ascent() + boardNumberPaint.descent()) / 2f,
+                boardNumberPaint,
+            )
+        }
+    }
+
+    private fun drawLadder(canvas: Canvas, fromNumber: Int, toNumber: Int) {
+        val from = pointForNumber(fromNumber.toFloat())
+        val to = pointForNumber(toNumber.toFloat())
+        val dx = to.x - from.x
+        val dy = to.y - from.y
+        val length = kotlin.math.sqrt(dx * dx + dy * dy).coerceAtLeast(1f)
+        val perpendicularX = -dy / length
+        val perpendicularY = dx / length
+        val railOffset = cell * 0.16f
+        val railWidth = maxOf(2f, cell * 0.065f)
+        ladderRailPaint.strokeWidth = railWidth
+        ladderRungPaint.strokeWidth = maxOf(1.5f, cell * 0.035f)
+
+        val firstRailStart = PointF(
+            from.x + perpendicularX * railOffset,
+            from.y + perpendicularY * railOffset,
+        )
+        val firstRailEnd = PointF(
+            to.x + perpendicularX * railOffset,
+            to.y + perpendicularY * railOffset,
+        )
+        val secondRailStart = PointF(
+            from.x - perpendicularX * railOffset,
+            from.y - perpendicularY * railOffset,
+        )
+        val secondRailEnd = PointF(
+            to.x - perpendicularX * railOffset,
+            to.y - perpendicularY * railOffset,
+        )
+        canvas.drawLine(
+            firstRailStart.x,
+            firstRailStart.y,
+            firstRailEnd.x,
+            firstRailEnd.y,
+            ladderRailPaint,
+        )
+        canvas.drawLine(
+            secondRailStart.x,
+            secondRailStart.y,
+            secondRailEnd.x,
+            secondRailEnd.y,
+            ladderRailPaint,
+        )
+
+        val rungCount = (length / (cell * 0.75f)).toInt().coerceIn(3, 14)
+        for (rung in 1 until rungCount) {
+            val progress = rung.toFloat() / rungCount
+            val centerX = from.x + dx * progress
+            val centerY = from.y + dy * progress
+            canvas.drawLine(
+                centerX + perpendicularX * railOffset,
+                centerY + perpendicularY * railOffset,
+                centerX - perpendicularX * railOffset,
+                centerY - perpendicularY * railOffset,
+                ladderRungPaint,
+            )
+        }
+    }
+
+    private fun drawSnake(canvas: Canvas, fromNumber: Int, toNumber: Int, colorIndex: Int) {
+        val from = pointForNumber(fromNumber.toFloat())
+        val to = pointForNumber(toNumber.toFloat())
+        val dx = to.x - from.x
+        val dy = to.y - from.y
+        val length = kotlin.math.sqrt(dx * dx + dy * dy).coerceAtLeast(1f)
+        val perpendicularX = -dy / length
+        val perpendicularY = dx / length
+        val waveSize = cell * 0.23f
+        val path = Path()
+        val segmentCount = 16
+        for (segment in 0..segmentCount) {
+            val progress = segment.toFloat() / segmentCount
+            val wave = sin(progress.toDouble() * PI * 2.5).toFloat() * waveSize
+            val x = from.x + dx * progress + perpendicularX * wave
+            val y = from.y + dy * progress + perpendicularY * wave
+            if (segment == 0) path.moveTo(x, y) else path.lineTo(x, y)
+        }
+
+        val bodyColor = when (colorIndex % 4) {
+            0 -> Color.rgb(212, 71, 91)
+            1 -> Color.rgb(64, 126, 170)
+            2 -> Color.rgb(69, 143, 104)
+            else -> Color.rgb(153, 93, 169)
+        }
+        snakeOutlinePaint.strokeWidth = maxOf(3f, cell * 0.18f)
+        snakeBodyPaint.strokeWidth = maxOf(2f, cell * 0.12f)
+        snakeBodyPaint.color = bodyColor
+        canvas.drawPath(path, snakeOutlinePaint)
+        canvas.drawPath(path, snakeBodyPaint)
+
+        val headRadius = cell * 0.24f
+        canvas.drawCircle(from.x, from.y, headRadius, snakeOutlinePaint)
+        canvas.drawCircle(from.x, from.y, headRadius * 0.82f, snakeBodyPaint)
+        val eyeOffsetX = cell * 0.08f
+        val eyeOffsetY = -cell * 0.07f
+        for (direction in listOf(-1f, 1f)) {
+            val eyeX = from.x + eyeOffsetX * direction
+            val eyeY = from.y + eyeOffsetY
+            canvas.drawCircle(eyeX, eyeY, cell * 0.045f, snakeEyePaint)
+            canvas.drawCircle(eyeX, eyeY, cell * 0.018f, snakePupilPaint)
+        }
+        snakeMouthPaint.strokeWidth = maxOf(1f, cell * 0.018f)
+        canvas.drawLine(
+            from.x - cell * 0.09f,
+            from.y + cell * 0.1f,
+            from.x + cell * 0.09f,
+            from.y + cell * 0.1f,
+            snakeMouthPaint,
+        )
+    }
+
+    private fun drawBitmapCover(canvas: Canvas, bitmap: Bitmap, destination: RectF) {
+        val sourceAspect = bitmap.width.toFloat() / bitmap.height
+        val destinationAspect = destination.width() / destination.height()
+        val source = if (sourceAspect > destinationAspect) {
+            val croppedWidth = (bitmap.height * destinationAspect).toInt()
+            Rect(
+                (bitmap.width - croppedWidth) / 2,
+                0,
+                (bitmap.width + croppedWidth) / 2,
+                bitmap.height,
+            )
+        } else {
+            val croppedHeight = (bitmap.width / destinationAspect).toInt()
+            Rect(
+                0,
+                (bitmap.height - croppedHeight) / 2,
+                bitmap.width,
+                (bitmap.height + croppedHeight) / 2,
+            )
+        }
+        canvas.drawBitmap(bitmap, source, destination, bitmapPaint)
     }
 
     private fun drawToken(canvas: Canvas, player: Int, animatedPoint: PointF?) {
