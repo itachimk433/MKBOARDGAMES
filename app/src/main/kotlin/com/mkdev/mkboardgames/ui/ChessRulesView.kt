@@ -194,10 +194,12 @@ private class ChessMancalaRulesView(
     private val isTicTacToe = gameLabel.replace(" ", "").replace("·", "").equals("TICTACTOE", ignoreCase = true)
     private val isConnectFour = gameLabel.replace(" ", "").replace("·", "").equals("CONNECTFOUR", ignoreCase = true)
     private val isLudo = gameLabel.replace(" ", "").equals("LUDO", ignoreCase = true)
+    private val isSnakesLadders =
+        gameLabel.replace(" ", "").replace("&", "").equals("SNAKESLADDERS", ignoreCase = true)
     private val isOnitama = gameLabel.replace(" ", "").equals("ONITAMA", ignoreCase = true)
     private val isChessFamily =
         isChess || isDraughts || isOthello || isFoxAndGeese || isGo || isShogi ||
-            isXiangqi || isTicTacToe || isConnectFour || isLudo || isOnitama
+            isXiangqi || isTicTacToe || isConnectFour || isLudo || isSnakesLadders || isOnitama
     private val gameIconBitmap = run {
         val assetName = when {
             isChess -> "chess_home_icon.png"
@@ -396,7 +398,28 @@ private class ChessMancalaRulesView(
             )
             drawBackButton(canvas, viewCardsRect, "View Cards")
         }
-        drawBackButton(canvas, backRect, "Back")
+        if (isSnakesLadders) {
+            drawSnakesLaddersButton(
+                canvas,
+                backRect,
+                pressed = false,
+                unit = density,
+                accent = Color.parseColor("#8EC7B9"),
+            )
+            bodyPaint.textAlign = Paint.Align.CENTER
+            bodyPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            bodyPaint.color = Color.WHITE
+            bodyPaint.textSize = minOf(dp(19f), backRect.height() * 0.4f)
+            val metrics = bodyPaint.fontMetrics
+            canvas.drawText(
+                "Back",
+                backRect.centerX(),
+                backRect.centerY() - (metrics.ascent + metrics.descent) / 2f,
+                bodyPaint,
+            )
+        } else {
+            drawBackButton(canvas, backRect, "Back")
+        }
     }
 
     private fun drawWrapped(

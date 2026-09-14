@@ -588,6 +588,10 @@ class ChessChoiceView(
             drawGridChoice(canvas, hit)
             return
         }
+        if (isSnakesLadders) {
+            drawSnakesLaddersChoice(canvas, hit)
+            return
+        }
         if (isChessFamily || isMorabaraba) {
             if (isMorabaraba) drawOthelloChoice(canvas, hit) else drawChessChoice(canvas, hit)
             return
@@ -613,6 +617,29 @@ class ChessChoiceView(
             canvas.drawText(hit.choice.label, rect.centerX(), rect.top + 56f * unit, labelPaint)
             canvas.drawText(hit.choice.detail, rect.centerX(), rect.top + 74f * unit, detailPaint)
         } else {
+            drawCenteredChoiceText(canvas, rect, hit.choice)
+        }
+        canvas.restore()
+    }
+
+    private fun drawSnakesLaddersChoice(canvas: Canvas, hit: ChoiceHit) {
+        val scale = scales[hit.index] ?: 1f
+        val rect = hit.rect
+        val pressed = pressedIndex == hit.index
+
+        canvas.save()
+        canvas.scale(scale, scale, rect.centerX(), rect.centerY())
+        drawSnakesLaddersButton(canvas, rect, pressed, unit, hit.choice.accent)
+        if (hit.choice.symbol.isNotBlank()) {
+            iconPaint.color = hit.choice.accent
+            canvas.drawText(hit.choice.symbol, rect.centerX(), rect.top + 29f * unit, iconPaint)
+            labelPaint.color = SnakesLaddersTheme.TEXT
+            canvas.drawText(hit.choice.label, rect.centerX(), rect.top + 56f * unit, labelPaint)
+            detailPaint.color = Color.parseColor(SnakesLaddersTheme.DETAIL)
+            canvas.drawText(hit.choice.detail, rect.centerX(), rect.top + 74f * unit, detailPaint)
+        } else {
+            labelPaint.color = SnakesLaddersTheme.TEXT
+            detailPaint.color = Color.parseColor(SnakesLaddersTheme.DETAIL)
             drawCenteredChoiceText(canvas, rect, hit.choice)
         }
         canvas.restore()
