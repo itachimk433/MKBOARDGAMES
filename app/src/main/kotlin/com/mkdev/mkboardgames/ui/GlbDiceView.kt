@@ -31,24 +31,17 @@ import javax.microedition.khronos.opengles.GL10
 
 /**
  * OpenGL ES renderer for the supplied embedded glTF dice model.
- *
- * The hardware renderer is primary. A software-rendered die remains underneath
- * it so devices that cannot composite the transparent GL surface still show a
- * usable dice control instead of a blank area.
  */
 class GlbDiceView(context: Context) : FrameLayout(context) {
-    private val fallbackView = LudoDiceView(context)
     private val glSurfaceView = GLSurfaceView(context)
 
     var value: Int = 1
         set(newValue) {
             field = newValue.coerceIn(1, 6)
-            fallbackView.value = field
         }
     var facesOppositeSide: Boolean = false
         set(value) {
             field = value
-            fallbackView.facesOppositeSide = value
             glRenderer.setFacingRotation(if (value) 180f else 0f)
         }
     var isRolling: Boolean = false
@@ -60,26 +53,10 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
     private var rotationX = -18f
     private var rotationY = -28f
     private var rotationZ = 0f
-    private var glFrameReady = false
-    private var fallbackEnabled = true
     private val glRenderer = DiceRenderer(context.applicationContext)
 
     init {
         setBackgroundColor(Color.TRANSPARENT)
-        addView(
-            fallbackView,
-            LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT,
-            ),
-        )
-
-        glRenderer.onFrameRendered = {
-            post {
-                glFrameReady = true
-                if (fallbackEnabled && !isRolling) fallbackView.visibility = GONE
-            }
-        }
         glSurfaceView.setEGLContextClientVersion(2)
         glSurfaceView.setEGLConfigChooser(8, 8, 8, 8, 16, 0)
         glSurfaceView.holder.setFormat(PixelFormat.TRANSLUCENT)
@@ -101,21 +78,6 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
                 ViewGroup.LayoutParams.MATCH_PARENT,
             ),
         )
-        fallbackView.onRoll = { if (!isRolling) onRoll?.invoke() }
-    }
-
-    /**
-     * Keep the software renderer out of the composition when the 3D model is
-     * required. This leaves the GL surface as the only visible die.
-     */
-    fun setFallbackEnabled(enabled: Boolean) {
-        fallbackEnabled = enabled
-        if (!enabled) {
-            fallbackView.cancelRoll()
-            fallbackView.visibility = GONE
-        } else {
-            fallbackView.visibility = if (glFrameReady && !isRolling) GONE else VISIBLE
-        }
     }
 
     fun rollTo(
@@ -127,12 +89,6 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         animator?.cancel()
         isRolling = true
         val targetValue = nextValue.coerceIn(1, 6)
-        if (fallbackEnabled) {
-            fallbackView.visibility = VISIBLE
-            fallbackView.rollTo(targetValue, motionDirection) {
-                // The GL renderer owns the authoritative animation callback.
-            }
-        }
         val target = DiceOrientation.forValue(targetValue)
         val startX = rotationX
         val startY = rotationY
@@ -176,7 +132,6 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
                     rotationY = target.y
                     rotationZ = target.z
                     glRenderer.setRotation(rotationX, rotationY, rotationZ)
-                    if (fallbackEnabled && glFrameReady) fallbackView.visibility = GONE
                     onFinished()
                 }
             })
@@ -188,7 +143,6 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         rollGeneration++
         animator?.cancel()
         animator = null
-        fallbackView.cancelRoll()
         isRolling = false
     }
 
@@ -198,13 +152,6 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
      */
     fun setGameplayVisible(visible: Boolean) {
         glSurfaceView.visibility = if (visible) VISIBLE else INVISIBLE
-        fallbackView.visibility = if (
-            fallbackEnabled && visible && (!glFrameReady || isRolling)
-        ) {
-            VISIBLE
-        } else {
-            GONE
-        }
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
@@ -238,8 +185,6 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         private var textureHandle = 0
         private var useTextureHandle = 0
         private var baseColorHandle = 0
-        private var hasReportedFirstFrame = false
-        var onFrameRendered: (() -> Unit)? = null
         private var projection = FloatArray(16)
         private var view = FloatArray(16)
         private var width = 1
@@ -388,11 +333,6 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
                     part.indices,
                 )
             }
-            if (!hasReportedFirstFrame && GLES20.glGetError() == GLES20.GL_NO_ERROR) {
-                hasReportedFirstFrame = true
-                onFrameRendered?.invoke()
-            }
-
             GLES20.glDisableVertexAttribArray(positionHandle)
             GLES20.glDisableVertexAttribArray(normalHandle)
             GLES20.glDisableVertexAttribArray(texCoordHandle)

@@ -39,6 +39,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
     private var gameOver = false
     private var winner = -1
     private var resultDialogVisible = false
+    private var turnResolutionPending = false
     private var lifecycleActive = false
     private var exitPosted = false
 
@@ -244,6 +245,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
         gameOver = false
         winner = -1
         resultDialogVisible = false
+        turnResolutionPending = false
         matchStarted = true
         boardView.gameOver = false
         boardView.setActivePlayerCount(playerCount)
@@ -259,14 +261,21 @@ class SnakesLaddersActivity : AppCompatActivity() {
     }
 
     private fun rollDice(automated: Boolean = false) {
-        if (!gameplayActive() || !matchStarted || gameOver || playerDiceViews.any { it.isRolling }) return
+        if (!gameplayActive() || !matchStarted || gameOver ||
+            turnResolutionPending || playerDiceViews.any { it.isRolling }
+        ) return
         // A die tap is always a human action. CPU turns call this method with
         // automated=true so they are not blocked by the human-turn guard.
         if (!automated && vsAI && currentPlayer == 1) return
         val player = currentPlayer
         val value = Random.nextInt(1, 7)
+        turnResolutionPending = true
         playerDiceViews[player].rollTo(value, MotionDiceDirection.UP) {
-            if (gameplayActive()) applyRoll(player, value)
+            if (gameplayActive() && !gameOver) {
+                applyRoll(player, value)
+            } else {
+                turnResolutionPending = false
+            }
         }
         SoundPlayer.playMovement("ludo_dice")
     }
@@ -338,6 +347,17 @@ class SnakesLaddersActivity : AppCompatActivity() {
     }
 
     private fun finishTurn(player: Int, roll: Int, destination: Int) {
+        handler.postDelayed({
+            if (gameplayActive() && !gameOver) {
+                completeTurn(player, roll, destination)
+            } else {
+                turnResolutionPending = false
+            }
+        }, TURN_RESOLUTION_DELAY_MS)
+    }
+
+    private fun completeTurn(player: Int, roll: Int, destination: Int) {
+        turnResolutionPending = false
         if (destination >= 100) {
             winner = player
             gameOver = true
@@ -461,7 +481,6 @@ class SnakesLaddersActivity : AppCompatActivity() {
     private fun createPlayerControls(count: Int) {
         playerDiceViews = Array(count) { player ->
             GlbDiceView(this).apply {
-                setFallbackEnabled(false)
                 contentDescription = "Player ${player + 1} dice"
                 onRoll = {
                     if (player == currentPlayer &&
@@ -583,4 +602,8 @@ class SnakesLaddersActivity : AppCompatActivity() {
 
     private fun dp(value: Int): Int =
         (value * resources.displayMetrics.density).toInt()
+
+    private companion object {
+        const val TURN_RESOLUTION_DELAY_MS = 1_100L
+    }
 }
