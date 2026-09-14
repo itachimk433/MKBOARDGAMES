@@ -101,7 +101,7 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
             0
         }
         val dieLeft = if (profileOnEnd) {
-            0
+            ((profileLeft - dieSize) / 2).coerceAtLeast(0)
         } else {
             avatarWidth - overlap
         }
