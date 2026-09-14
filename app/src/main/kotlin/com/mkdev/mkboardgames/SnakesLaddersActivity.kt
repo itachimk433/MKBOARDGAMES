@@ -1,5 +1,7 @@
 package com.mkdev.mkboardgames
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -7,6 +9,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -25,6 +28,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
     private lateinit var boardView: SnakesLaddersBoardView
     private lateinit var boardStage: FrameLayout
     private lateinit var screenRoot: FrameLayout
+    private lateinit var boardTwoBackgroundView: ImageView
     private var modeMenuView: ChessMenuView? = null
     private var boardSelectionView: SnakesLaddersBoardSelectionView? = null
     private lateinit var playerDiceViews: Array<GlbDiceView>
@@ -47,6 +51,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
 
     private var ladders = SnakesLaddersBoardView.Board.ONE.ladders
     private var snakes = SnakesLaddersBoardView.Board.ONE.snakes
+    private var selectedBoard = SnakesLaddersBoardView.Board.ONE
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -73,14 +78,25 @@ class SnakesLaddersActivity : AppCompatActivity() {
                 },
             )
         }
+        boardTwoBackgroundView = ImageView(this).apply {
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            setImageBitmap(loadAssetBitmap("snakes_ladders_board_two_background.webp"))
+            visibility = View.GONE
+            isClickable = false
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        }
         gameRoot = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(android.graphics.Color.parseColor("#10151A"))
+            setBackgroundColor(android.graphics.Color.TRANSPARENT)
             addView(boardStage, LinearLayout.LayoutParams(-1, 0, 1f))
         }
         gameRoot.visibility = View.GONE
 
         screenRoot = FrameLayout(this).apply {
+            addView(
+                boardTwoBackgroundView,
+                FrameLayout.LayoutParams(-1, -1),
+            )
             addView(
                 gameRoot,
                 FrameLayout.LayoutParams(-1, -1),
@@ -132,6 +148,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
     override fun finish() {
         if (exitPosted) return
         exitPosted = true
+        boardTwoBackgroundView.visibility = View.GONE
         gameRoot.visibility = View.GONE
         handler.postDelayed({
             super.finish()
@@ -157,6 +174,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
     }
 
     private fun showModeDialog() {
+        boardTwoBackgroundView.visibility = View.GONE
         // Keep the activity's game surface mounted while the mode menu is
         // shown. The menu is a child of the same root, so switching modes
         // only removes the menu instead of revealing a hidden/recreated
@@ -191,6 +209,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
     }
 
     private fun showBoardSelection(cpuEnabled: Boolean, players: Int) {
+        boardTwoBackgroundView.visibility = View.GONE
         modeMenuView?.let { menu ->
             (menu.parent as? ViewGroup)?.removeView(menu)
         }
@@ -216,8 +235,11 @@ class SnakesLaddersActivity : AppCompatActivity() {
     }
 
     private fun setBoardRules(board: SnakesLaddersBoardView.Board) {
+        selectedBoard = board
         ladders = board.ladders
         snakes = board.snakes
+        boardTwoBackgroundView.visibility =
+            if (board == SnakesLaddersBoardView.Board.TWO) View.VISIBLE else View.GONE
     }
 
     private fun beginMatch(cpuEnabled: Boolean, players: Int) {
@@ -486,6 +508,8 @@ class SnakesLaddersActivity : AppCompatActivity() {
 
     private fun showBoardAfterDialog() {
         dialogOpen = false
+        boardTwoBackgroundView.visibility =
+            if (selectedBoard == SnakesLaddersBoardView.Board.TWO) View.VISIBLE else View.GONE
         gameRoot.visibility = View.VISIBLE
         setPlayerControlsVisible(true)
         updateHud()
@@ -628,6 +652,10 @@ class SnakesLaddersActivity : AppCompatActivity() {
 
     private fun dp(value: Int): Int =
         (value * resources.displayMetrics.density).toInt()
+
+    private fun loadAssetBitmap(assetName: String): Bitmap? = runCatching {
+        assets.open(assetName).use { BitmapFactory.decodeStream(it) }
+    }.getOrNull()
 
     private companion object {
         const val TURN_RESOLUTION_DELAY_MS = 500L
