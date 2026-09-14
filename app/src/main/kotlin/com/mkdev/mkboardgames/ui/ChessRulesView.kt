@@ -398,28 +398,7 @@ private class ChessMancalaRulesView(
             )
             drawBackButton(canvas, viewCardsRect, "View Cards")
         }
-        if (isSnakesLadders) {
-            drawSnakesLaddersButton(
-                canvas,
-                backRect,
-                pressed = false,
-                unit = density,
-                accent = Color.parseColor("#8EC7B9"),
-            )
-            bodyPaint.textAlign = Paint.Align.CENTER
-            bodyPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-            bodyPaint.color = Color.WHITE
-            bodyPaint.textSize = minOf(dp(19f), backRect.height() * 0.4f)
-            val metrics = bodyPaint.fontMetrics
-            canvas.drawText(
-                "Back",
-                backRect.centerX(),
-                backRect.centerY() - (metrics.ascent + metrics.descent) / 2f,
-                bodyPaint,
-            )
-        } else {
-            drawBackButton(canvas, backRect, "Back")
-        }
+        drawBackButton(canvas, backRect, "Back")
     }
 
     private fun drawWrapped(

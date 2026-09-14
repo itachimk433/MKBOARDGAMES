@@ -822,10 +822,6 @@ class ChessMenuView(
     }
 
     private fun drawAction(canvas: Canvas, action: MenuAction) {
-        if (isSnakesLadders) {
-            drawSnakesLaddersAction(canvas, action)
-            return
-        }
         if (isChessFamily || isMorabaraba) {
             if (isOthello) drawOthelloAction(canvas, action) else drawChessAction(canvas, action)
             return
@@ -855,31 +851,6 @@ class ChessMenuView(
             canvas.drawText(action.label, rect.centerX(), rect.top + 52f * unit, actionLabelPaint)
             canvas.drawText(action.detail, rect.centerX(), rect.top + 69f * unit, actionDetailPaint)
         } else {
-            drawCenteredActionText(canvas, rect, action)
-        }
-        canvas.restore()
-    }
-
-    private fun drawSnakesLaddersAction(canvas: Canvas, action: MenuAction) {
-        val scale = actionScale[action.label] ?: 1f
-        val rect = action.rect
-        val pressed = pressedAction == action
-
-        canvas.save()
-        canvas.scale(scale, scale, rect.centerX(), rect.centerY())
-        drawSnakesLaddersButton(canvas, rect, pressed, unit, action.accent)
-
-        if (action.symbol.isNotBlank()) {
-            actionSymbolPaint.color = action.accent
-            actionSymbolPaint.textSize = 20f * textScale
-            canvas.drawText(action.symbol, rect.centerX(), rect.top + 25f * unit, actionSymbolPaint)
-            actionLabelPaint.color = SnakesLaddersTheme.TEXT
-            canvas.drawText(action.label, rect.centerX(), rect.top + 52f * unit, actionLabelPaint)
-            actionDetailPaint.color = Color.parseColor(SnakesLaddersTheme.DETAIL)
-            canvas.drawText(action.detail, rect.centerX(), rect.top + 69f * unit, actionDetailPaint)
-        } else {
-            actionLabelPaint.color = SnakesLaddersTheme.TEXT
-            actionDetailPaint.color = Color.parseColor(SnakesLaddersTheme.DETAIL)
             drawCenteredActionText(canvas, rect, action)
         }
         canvas.restore()
@@ -943,10 +914,6 @@ class ChessMenuView(
     }
 
     private fun drawResumeAction(canvas: Canvas, width: Float) {
-        if (isSnakesLadders) {
-            drawSnakesLaddersResumeAction(canvas, width)
-            return
-        }
         if (isChessFamily || isMorabaraba) {
             if (isOthello) drawOthelloResumeAction(canvas, width) else drawChessResumeAction(canvas, width)
             return
@@ -957,15 +924,6 @@ class ChessMenuView(
         canvas.drawRoundRect(resumeRect, 8f * unit, 8f * unit, panelBorderPaint)
         canvas.drawText("RESUME SAVED MATCH", width / 2f, resumeRect.top + 20f * unit, resumePaint)
         canvas.drawText("Tap here to continue your last game", width / 2f, resumeRect.top + 38f * unit, footerPaint)
-    }
-
-    private fun drawSnakesLaddersResumeAction(canvas: Canvas, width: Float) {
-        drawSnakesLaddersButton(canvas, resumeRect, resumePressed, unit)
-        val drawnTop = resumeRect.top + if (resumePressed) 2f * unit else 0f
-        resumePaint.color = Color.parseColor("#8EC7B9")
-        canvas.drawText("RESUME SAVED MATCH", width / 2f, drawnTop + 20f * unit, resumePaint)
-        footerPaint.color = Color.parseColor(SnakesLaddersTheme.DETAIL)
-        canvas.drawText("Tap here to continue your last game", width / 2f, drawnTop + 38f * unit, footerPaint)
     }
 
     private fun drawDraughtsResumeAction(canvas: Canvas, width: Float) {

@@ -40,10 +40,6 @@ class SnakesLaddersBoardSelectionView(
     private val cardRects = boards.map { RectF() }
     private val imageRects = boards.map { RectF() }
     private val cardPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-        strokeWidth = dp(1f)
-    }
     private val imagePaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
@@ -64,13 +60,13 @@ class SnakesLaddersBoardSelectionView(
         textSize = sp(12f)
     }
     private val boardTitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.WHITE
+        color = Color.parseColor("#4A1714")
         textAlign = Paint.Align.CENTER
         isFakeBoldText = true
         textSize = sp(15f)
     }
     private val boardDetailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#AFC2C4")
+        color = Color.parseColor("#6A2D1B")
         textAlign = Paint.Align.CENTER
         textSize = sp(10f)
     }
@@ -79,16 +75,8 @@ class SnakesLaddersBoardSelectionView(
         textAlign = Paint.Align.CENTER
         textSize = sp(10f)
     }
-    private val backPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(220, 34, 18, 13)
-    }
-    private val backBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#D3A05F")
-        style = Paint.Style.STROKE
-        strokeWidth = dp(1f)
-    }
     private val backArrowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#F7D99B")
+        color = Color.parseColor("#4A1714")
         style = Paint.Style.STROKE
         strokeWidth = dp(2.2f)
         strokeCap = Paint.Cap.ROUND
@@ -189,37 +177,31 @@ class SnakesLaddersBoardSelectionView(
         val card = cardRects[index]
         val image = imageRects[index]
         val pressed = pressedBoard == index
-        val radius = dp(14f)
+        val offset = if (pressed) 2f * density else 0f
+        val drawnCard = RectF(card.left, card.top + offset, card.right, card.bottom + offset)
+        val drawnImage = RectF(image.left, image.top + offset, image.right, image.bottom + offset)
 
-        cardPaint.color = if (pressed) Color.parseColor("#21454A") else Color.parseColor("#16353B")
-        canvas.drawRoundRect(card, radius, radius, cardPaint)
-        borderPaint.color = if (pressed) board.accentColor else Color.parseColor("#2C5960")
-        canvas.drawRoundRect(
-            RectF(card.left + dp(0.5f), card.top + dp(0.5f), card.right - dp(0.5f), card.bottom - dp(0.5f)),
-            radius,
-            radius,
-            borderPaint,
-        )
+        drawChessWoodButton(canvas, card, pressed, density)
 
         val clipPath = Path().apply {
-            addRoundRect(image, dp(9f), dp(9f), Path.Direction.CW)
+            addRoundRect(drawnImage, dp(9f), dp(9f), Path.Direction.CW)
         }
         canvas.save()
         canvas.clipPath(clipPath)
         bitmaps[index]?.let { bitmap ->
-            drawBitmapCover(canvas, bitmap, image)
+            drawBitmapCover(canvas, bitmap, drawnImage)
         } ?: run {
             cardPaint.color = Color.parseColor("#2A4145")
-            canvas.drawRect(image, cardPaint)
+            canvas.drawRect(drawnImage, cardPaint)
         }
-        canvas.drawRect(image, scrimPaint)
+        canvas.drawRect(drawnImage, scrimPaint)
         canvas.restore()
 
-        canvas.drawText(board.displayName, card.centerX(), card.bottom - dp(31f), boardTitlePaint)
+        canvas.drawText(board.displayName, drawnCard.centerX(), drawnCard.bottom - dp(31f), boardTitlePaint)
         canvas.drawText(
             if (index == 0) "Classic board" else "Winter board",
-            card.centerX(),
-            card.bottom - dp(14f),
+            drawnCard.centerX(),
+            drawnCard.bottom - dp(14f),
             boardDetailPaint,
         )
     }
@@ -248,10 +230,10 @@ class SnakesLaddersBoardSelectionView(
     }
 
     private fun drawBackButton(canvas: Canvas) {
-        val radius = dp(10f)
-        canvas.drawRoundRect(backRect, radius, radius, backPaint)
-        canvas.drawRoundRect(backRect, radius, radius, backBorderPaint)
-        val cy = backRect.centerY()
+        drawChessWoodButton(canvas, backRect, pressedBack, density)
+        backArrowPaint.color = Color.parseColor("#4A1714")
+        val offset = if (pressedBack) 2f * density else 0f
+        val cy = backRect.centerY() + offset
         val tipX = backRect.left + dp(9f)
         canvas.drawLine(tipX, cy, backRect.right - dp(8f), cy, backArrowPaint)
         canvas.drawLine(tipX, cy, tipX + dp(9f), cy - dp(8f), backArrowPaint)
