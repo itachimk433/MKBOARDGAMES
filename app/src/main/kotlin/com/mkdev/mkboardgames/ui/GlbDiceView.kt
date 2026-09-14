@@ -61,6 +61,7 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
     private var rotationY = -28f
     private var rotationZ = 0f
     private var glFrameReady = false
+    private var softwareRenderingOnly = false
     private val glRenderer = DiceRenderer(context.applicationContext)
 
     init {
@@ -76,7 +77,7 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         glRenderer.onFrameRendered = {
             post {
                 glFrameReady = true
-                if (!isRolling) fallbackView.visibility = GONE
+                if (!softwareRenderingOnly && !isRolling) fallbackView.visibility = GONE
             }
         }
         glSurfaceView.setEGLContextClientVersion(2)
@@ -103,6 +104,18 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         fallbackView.onRoll = { if (!isRolling) onRoll?.invoke() }
     }
 
+    /**
+     * Use the software die as the only renderer for screens where a separate
+     * GL surface cannot reliably remain composited during animation.
+     */
+    fun setSoftwareRenderingOnly(enabled: Boolean) {
+        softwareRenderingOnly = enabled
+        glSurfaceView.visibility = if (enabled) INVISIBLE else VISIBLE
+        fallbackView.visibility = if (enabled) VISIBLE else {
+            if (glFrameReady && !isRolling) GONE else VISIBLE
+        }
+    }
+
     fun rollTo(
         nextValue: Int,
         motionDirection: MotionDiceDirection = MotionDiceDirection.UP,
@@ -116,6 +129,17 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         // healthy, but prevents a blank control during the transition.
         fallbackView.visibility = VISIBLE
         val targetValue = nextValue.coerceIn(1, 6)
+        if (softwareRenderingOnly) {
+            animator = null
+            fallbackView.rollTo(targetValue, motionDirection) {
+                if (generation == rollGeneration) {
+                    value = targetValue
+                    isRolling = false
+                    onFinished()
+                }
+            }
+            return
+        }
         fallbackView.rollTo(targetValue, motionDirection) {}
         val target = DiceOrientation.forValue(targetValue)
         val startX = rotationX
@@ -181,7 +205,13 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
      * Dialog transitions must hide the surface itself, not just this container.
      */
     fun setGameplayVisible(visible: Boolean) {
+        if (softwareRenderingOnly) {
+            glSurfaceView.visibility = INVISIBLE
+            fallbackView.visibility = if (visible) VISIBLE else INVISIBLE
+            return
+        }
         glSurfaceView.visibility = if (visible) VISIBLE else INVISIBLE
+        fallbackView.visibility = if (visible && (!glFrameReady || isRolling)) VISIBLE else INVISIBLE
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
