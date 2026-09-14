@@ -160,22 +160,13 @@ class SnakesLaddersActivity : AppCompatActivity() {
         hideBoardWhileDialogIsOpen()
         val menu = ChessMenuView(this, false, gameLabel = "S N A K E S & L A D D E R S")
         menu.onVsAi = {
-            StyledDialogs.dismiss()
-            vsAI = true
-            playerCount = 2
-            startGame()
+            beginMatch(cpuEnabled = true, players = 2)
         }
         menu.onTwoPlayers = {
-            StyledDialogs.dismiss()
-            vsAI = false
-            playerCount = 2
-            startGame()
+            beginMatch(cpuEnabled = false, players = 2)
         }
         menu.onFourPlayers = {
-            StyledDialogs.dismiss()
-            vsAI = false
-            playerCount = 4
-            startGame()
+            beginMatch(cpuEnabled = false, players = 4)
         }
         menu.onHowToPlay = {
             StyledDialogs.dismiss()
@@ -184,6 +175,17 @@ class SnakesLaddersActivity : AppCompatActivity() {
         StyledDialogs.showFullScreenView(this, menu) {
             if (matchStarted) showBoardAfterDialog() else finish()
         }
+    }
+
+    private fun beginMatch(cpuEnabled: Boolean, players: Int) {
+        vsAI = cpuEnabled
+        playerCount = players
+        // Mark the match before removing the selection overlay. This keeps
+        // the overlay's exit callback from treating a valid mode selection
+        // as an attempt to leave the activity.
+        matchStarted = true
+        StyledDialogs.dismiss()
+        startGame()
     }
 
     private fun showRules(showModeAfter: Boolean) {
