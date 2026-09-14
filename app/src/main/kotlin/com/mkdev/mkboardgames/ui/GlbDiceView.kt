@@ -61,7 +61,7 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
     private var rotationY = -28f
     private var rotationZ = 0f
     private var glFrameReady = false
-    private var softwareRenderingOnly = false
+    private var fallbackEnabled = true
     private val glRenderer = DiceRenderer(context.applicationContext)
 
     init {
@@ -77,7 +77,7 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         glRenderer.onFrameRendered = {
             post {
                 glFrameReady = true
-                if (!softwareRenderingOnly && !isRolling) fallbackView.visibility = GONE
+                if (fallbackEnabled && !isRolling) fallbackView.visibility = GONE
             }
         }
         glSurfaceView.setEGLContextClientVersion(2)
@@ -105,14 +105,16 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
     }
 
     /**
-     * Use the software die as the only renderer for screens where a separate
-     * GL surface cannot reliably remain composited during animation.
+     * Keep the software renderer out of the composition when the 3D model is
+     * required. This leaves the GL surface as the only visible die.
      */
-    fun setSoftwareRenderingOnly(enabled: Boolean) {
-        softwareRenderingOnly = enabled
-        glSurfaceView.visibility = if (enabled) INVISIBLE else VISIBLE
-        fallbackView.visibility = if (enabled) VISIBLE else {
-            if (glFrameReady && !isRolling) GONE else VISIBLE
+    fun setFallbackEnabled(enabled: Boolean) {
+        fallbackEnabled = enabled
+        if (!enabled) {
+            fallbackView.cancelRoll()
+            fallbackView.visibility = GONE
+        } else {
+            fallbackView.visibility = if (glFrameReady && !isRolling) GONE else VISIBLE
         }
     }
 
@@ -124,23 +126,13 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         val generation = ++rollGeneration
         animator?.cancel()
         isRolling = true
-        // Keep the software die available while the GL surface is rotating or
-        // taking a frame. It remains underneath the GL model when rendering is
-        // healthy, but prevents a blank control during the transition.
-        fallbackView.visibility = VISIBLE
         val targetValue = nextValue.coerceIn(1, 6)
-        if (softwareRenderingOnly) {
-            animator = null
+        if (fallbackEnabled) {
+            fallbackView.visibility = VISIBLE
             fallbackView.rollTo(targetValue, motionDirection) {
-                if (generation == rollGeneration) {
-                    value = targetValue
-                    isRolling = false
-                    onFinished()
-                }
+                // The GL renderer owns the authoritative animation callback.
             }
-            return
         }
-        fallbackView.rollTo(targetValue, motionDirection) {}
         val target = DiceOrientation.forValue(targetValue)
         val startX = rotationX
         val startY = rotationY
@@ -184,7 +176,7 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
                     rotationY = target.y
                     rotationZ = target.z
                     glRenderer.setRotation(rotationX, rotationY, rotationZ)
-                    if (glFrameReady) fallbackView.visibility = GONE
+                    if (fallbackEnabled && glFrameReady) fallbackView.visibility = GONE
                     onFinished()
                 }
             })
@@ -205,13 +197,14 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
      * Dialog transitions must hide the surface itself, not just this container.
      */
     fun setGameplayVisible(visible: Boolean) {
-        if (softwareRenderingOnly) {
-            glSurfaceView.visibility = INVISIBLE
-            fallbackView.visibility = if (visible) VISIBLE else INVISIBLE
-            return
-        }
         glSurfaceView.visibility = if (visible) VISIBLE else INVISIBLE
-        fallbackView.visibility = if (visible && (!glFrameReady || isRolling)) VISIBLE else INVISIBLE
+        fallbackView.visibility = if (
+            fallbackEnabled && visible && (!glFrameReady || isRolling)
+        ) {
+            VISIBLE
+        } else {
+            GONE
+        }
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {

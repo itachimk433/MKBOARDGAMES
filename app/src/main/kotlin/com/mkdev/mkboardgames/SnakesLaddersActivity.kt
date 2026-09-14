@@ -461,7 +461,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
     private fun createPlayerControls(count: Int) {
         playerDiceViews = Array(count) { player ->
             GlbDiceView(this).apply {
-                setSoftwareRenderingOnly(true)
+                setFallbackEnabled(false)
                 contentDescription = "Player ${player + 1} dice"
                 onRoll = {
                     if (player == currentPlayer &&
