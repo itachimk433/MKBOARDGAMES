@@ -60,6 +60,7 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
     private var rotationX = -18f
     private var rotationY = -28f
     private var rotationZ = 0f
+    private var glFrameReady = false
     private val glRenderer = DiceRenderer(context.applicationContext)
 
     init {
@@ -74,7 +75,8 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
 
         glRenderer.onFrameRendered = {
             post {
-                fallbackView.visibility = GONE
+                glFrameReady = true
+                if (!isRolling) fallbackView.visibility = GONE
             }
         }
         glSurfaceView.setEGLContextClientVersion(2)
@@ -109,6 +111,10 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         val generation = ++rollGeneration
         animator?.cancel()
         isRolling = true
+        // Keep the software die available while the GL surface is rotating or
+        // taking a frame. It remains underneath the GL model when rendering is
+        // healthy, but prevents a blank control during the transition.
+        fallbackView.visibility = VISIBLE
         val targetValue = nextValue.coerceIn(1, 6)
         fallbackView.rollTo(targetValue, motionDirection) {}
         val target = DiceOrientation.forValue(targetValue)
@@ -154,6 +160,7 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
                     rotationY = target.y
                     rotationZ = target.z
                     glRenderer.setRotation(rotationX, rotationY, rotationZ)
+                    if (glFrameReady) fallbackView.visibility = GONE
                     onFinished()
                 }
             })

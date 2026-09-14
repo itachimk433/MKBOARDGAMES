@@ -425,7 +425,7 @@ class MenuView(
             GameType.MORABARABA  -> "Morabaraba"   to "vs CPU  •  2 Players"
             GameType.TICTACTOE   -> "Tic-Tac-Toe"  to "vs CPU  •  2 Players"
             GameType.CONNECT_FOUR -> "Connect Four" to "vs CPU  •  2 Players"
-            GameType.FOX_AND_GEESE -> "Fox and Geese" to "vs CPU  •  2 Players"
+            GameType.FOX_AND_GEESE -> "Fox & Geese" to "vs CPU  •  2 Players"
             GameType.LUDO         -> "Ludo"         to "vs CPU  •  4 Players"
             GameType.SNAKES_LADDERS -> "Snakes & Ladders" to "vs CPU  •  2 Players"
             GameType.XIANGQI      -> "Xiangqi 象棋"  to "vs CPU  •  2 Players"
@@ -436,10 +436,10 @@ class MenuView(
             GameType.ONITAMA      -> "Onitama"       to "vs CPU  •  2 Players"
         }
 
-        val titleLines = if (title == "International Draughts") {
-            listOf("International", "Draughts")
-        } else {
-            listOf(title)
+        val titleLines = when (title) {
+            "International Draughts" -> listOf("International", "Draughts")
+            "Snakes & Ladders" -> listOf("Snakes &", "Ladders")
+            else -> listOf(title)
         }
         val titleStartY = previewTop + previewSz + cardTitlePaint.textSize + 5f * dp
         titleLines.forEachIndexed { index, line ->
