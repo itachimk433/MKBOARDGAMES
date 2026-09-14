@@ -16,6 +16,7 @@ import com.mkdev.mkboardgames.ui.LudoPlayerBadgeView
 import com.mkdev.mkboardgames.ui.LudoPlayerControlView
 import com.mkdev.mkboardgames.ui.MotionDiceDirection
 import com.mkdev.mkboardgames.ui.SnakesLaddersBoardView
+import com.mkdev.mkboardgames.ui.SnakesLaddersBoardSelectionView
 import com.mkdev.mkboardgames.ui.StyledDialogs
 import kotlin.random.Random
 
@@ -25,6 +26,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
     private lateinit var boardStage: FrameLayout
     private lateinit var screenRoot: FrameLayout
     private var modeMenuView: ChessMenuView? = null
+    private var boardSelectionView: SnakesLaddersBoardSelectionView? = null
     private lateinit var playerDiceViews: Array<GlbDiceView>
     private lateinit var playerBadgeViews: Array<LudoPlayerBadgeView>
     private lateinit var playerControlViews: Array<LudoPlayerControlView>
@@ -155,7 +157,11 @@ class SnakesLaddersActivity : AppCompatActivity() {
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         if (StyledDialogs.handleBackPressed()) return
-        if (gameOver) {
+        if (boardSelectionView != null) {
+            boardSelectionView?.let { (it.parent as? ViewGroup)?.removeView(it) }
+            boardSelectionView = null
+            showModeDialog()
+        } else if (gameOver) {
             showResultDialog()
         } else if (matchStarted) {
             showLeaveMatchDialog()
@@ -173,16 +179,20 @@ class SnakesLaddersActivity : AppCompatActivity() {
         modeMenuView?.let { existing ->
             (existing.parent as? ViewGroup)?.removeView(existing)
         }
+        boardSelectionView?.let { existing ->
+            (existing.parent as? ViewGroup)?.removeView(existing)
+        }
+        boardSelectionView = null
         val menu = ChessMenuView(this, false, gameLabel = "S N A K E S & L A D D E R S")
         modeMenuView = menu
         menu.onVsAi = {
-            beginMatch(cpuEnabled = true, players = 2)
+            showBoardSelection(cpuEnabled = true, players = 2)
         }
         menu.onTwoPlayers = {
-            beginMatch(cpuEnabled = false, players = 2)
+            showBoardSelection(cpuEnabled = false, players = 2)
         }
         menu.onFourPlayers = {
-            beginMatch(cpuEnabled = false, players = 4)
+            showBoardSelection(cpuEnabled = false, players = 4)
         }
         menu.onHowToPlay = {
             modeMenuView?.let { current ->
@@ -192,6 +202,30 @@ class SnakesLaddersActivity : AppCompatActivity() {
             showRules(showModeAfter = !matchStarted)
         }
         screenRoot.addView(menu, FrameLayout.LayoutParams(-1, -1))
+    }
+
+    private fun showBoardSelection(cpuEnabled: Boolean, players: Int) {
+        modeMenuView?.let { menu ->
+            (menu.parent as? ViewGroup)?.removeView(menu)
+        }
+        modeMenuView = null
+        hideBoardWhileDialogIsOpen(hideGameRoot = false)
+
+        val label = if (cpuEnabled) "vs CPU" else "$players Players"
+        val picker = SnakesLaddersBoardSelectionView(this, label)
+        boardSelectionView = picker
+        picker.onBoardSelected = { board ->
+            boardView.setBoard(board)
+            boardSelectionView?.let { (it.parent as? ViewGroup)?.removeView(it) }
+            boardSelectionView = null
+            beginMatch(cpuEnabled, players)
+        }
+        picker.onBackClicked = {
+            boardSelectionView?.let { (it.parent as? ViewGroup)?.removeView(it) }
+            boardSelectionView = null
+            showModeDialog()
+        }
+        screenRoot.addView(picker, FrameLayout.LayoutParams(-1, -1))
     }
 
     private fun beginMatch(cpuEnabled: Boolean, players: Int) {

@@ -25,14 +25,35 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
         // The board artwork is 740x740, while its numbered grid is the
         // measured 710x710 area from (15, 15) through (725, 725).
         private const val ARTWORK_SIZE = 740f
-        private const val GRID_INSET = 15f / ARTWORK_SIZE
-        private const val GRID_SIZE = 710f / ARTWORK_SIZE
         val PLAYER_COLORS = intArrayOf(
             Color.rgb(226, 67, 76),
             Color.rgb(54, 126, 218),
             Color.rgb(66, 167, 120),
             Color.rgb(232, 184, 74),
         )
+    }
+
+    enum class Board(
+        val displayName: String,
+        val assetName: String,
+        val gridInset: Float,
+        val gridSize: Float,
+        val accentColor: Int,
+    ) {
+        ONE(
+            displayName = "Board One",
+            assetName = "snakes_ladders_board.jpg",
+            gridInset = 15f / 740f,
+            gridSize = 710f / 740f,
+            accentColor = Color.parseColor("#E3B86A"),
+        ),
+        TWO(
+            displayName = "Board Two",
+            assetName = "snakes_ladders_board_two.jpg",
+            gridInset = 0f,
+            gridSize = 1f,
+            accentColor = Color.parseColor("#8EC7B9"),
+        ),
     }
 
     enum class MovePath {
@@ -48,11 +69,8 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
             invalidate()
         }
 
-    private val boardBitmap: Bitmap? = runCatching {
-        context.assets.open("snakes_ladders_board.jpg").use {
-            BitmapFactory.decodeStream(it)
-        }
-    }.getOrNull()
+    private var selectedBoard = Board.ONE
+    private var boardBitmap: Bitmap? = loadBoardBitmap(selectedBoard)
     private val positions = IntArray(4)
     private val animatedPoints = arrayOfNulls<PointF>(4)
     private val startAnchors = arrayOfNulls<PointF>(4)
@@ -92,6 +110,19 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
         contentDescription = "Snakes and Ladders board"
     }
 
+    fun setBoard(board: Board) {
+        if (selectedBoard == board) return
+        selectedBoard = board
+        boardBitmap = loadBoardBitmap(board)
+        gridLeft = left + artworkSize * board.gridInset
+        gridTop = top + artworkSize * board.gridInset
+        cell = artworkSize * board.gridSize / BOARD_SIZE
+        tokenTextPaint.textSize = cell * 0.27f
+        tokenEdgePaint.strokeWidth = cell * 0.045f
+        contentDescription = "Snakes and Ladders ${board.displayName}"
+        invalidate()
+    }
+
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val width = MeasureSpec.getSize(widthMeasureSpec)
         val height = MeasureSpec.getSize(heightMeasureSpec)
@@ -103,11 +134,11 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
 
     override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
         artworkSize = min(width, height).toFloat() * 0.97f
-        cell = artworkSize * GRID_SIZE / BOARD_SIZE
+        cell = artworkSize * selectedBoard.gridSize / BOARD_SIZE
         left = (width - artworkSize) / 2f
         top = (height - artworkSize) / 2f
-        gridLeft = left + artworkSize * GRID_INSET
-        gridTop = top + artworkSize * GRID_INSET
+        gridLeft = left + artworkSize * selectedBoard.gridInset
+        gridTop = top + artworkSize * selectedBoard.gridInset
         tokenTextPaint.textSize = cell * 0.27f
         tokenEdgePaint.strokeWidth = cell * 0.045f
     }
@@ -353,4 +384,8 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
             from.y + (to.y - from.y) * segmentProgress - jump,
         )
     }
+
+    private fun loadBoardBitmap(board: Board): Bitmap? = runCatching {
+        context.assets.open(board.assetName).use { BitmapFactory.decodeStream(it) }
+    }.getOrNull()
 }
