@@ -258,7 +258,8 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        if (event.actionMasked == MotionEvent.ACTION_UP && gameOver) {
+        if (!gameOver) return false
+        if (event.actionMasked == MotionEvent.ACTION_UP) {
             performClick()
             onGameOverTapped?.invoke()
         }
