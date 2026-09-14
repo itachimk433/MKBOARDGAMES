@@ -84,16 +84,6 @@ class SnakesLaddersActivity : AppCompatActivity() {
                 },
             )
         }
-        createPlayerControls()
-        playerControlViews.forEach { control ->
-            boardStage.addView(
-                control,
-                FrameLayout.LayoutParams(
-                    dp(LudoPlayerControlView.PAIR_WIDTH),
-                    dp(LudoPlayerControlView.CONTROL_HEIGHT),
-                ),
-            )
-        }
         gameRoot = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(android.graphics.Color.parseColor("#10151A"))
@@ -109,6 +99,18 @@ class SnakesLaddersActivity : AppCompatActivity() {
         }
         setContentView(screenRoot)
         showModeDialog()
+    }
+
+    private fun mountPlayerControls() {
+        playerControlViews.forEach { control ->
+            boardStage.addView(
+                control,
+                FrameLayout.LayoutParams(
+                    dp(LudoPlayerControlView.PAIR_WIDTH),
+                    dp(LudoPlayerControlView.CONTROL_HEIGHT),
+                ),
+            )
+        }
     }
 
     override fun onResume() {
@@ -195,6 +197,14 @@ class SnakesLaddersActivity : AppCompatActivity() {
         // the overlay's exit callback from treating a valid mode selection
         // as an attempt to leave the activity.
         matchStarted = true
+        if (!::playerControlViews.isInitialized || players > playerControlViews.size) {
+            if (::playerControlViews.isInitialized) {
+                cancelPlayerDiceRolls()
+                playerControlViews.forEach { boardStage.removeView(it) }
+            }
+            createPlayerControls(players)
+            mountPlayerControls()
+        }
         modeMenuView?.let { menu ->
             (menu.parent as? ViewGroup)?.removeView(menu)
         }
@@ -434,8 +444,8 @@ class SnakesLaddersActivity : AppCompatActivity() {
             if (vsAI) "CPU" else "Player ${player + 1}"
         }
 
-    private fun createPlayerControls() {
-        playerDiceViews = Array(4) { player ->
+    private fun createPlayerControls(count: Int) {
+        playerDiceViews = Array(count) { player ->
             GlbDiceView(this).apply {
                 contentDescription = "Player ${player + 1} dice"
                 onRoll = {
@@ -450,24 +460,23 @@ class SnakesLaddersActivity : AppCompatActivity() {
                 }
             }
         }
-        playerBadgeViews = Array(4) { player ->
+        playerBadgeViews = Array(count) { player ->
             LudoPlayerBadgeView(this).apply {
                 accentColor = SnakesLaddersBoardView.PLAYER_COLORS[player]
                 label = playerName(player)
             }
         }
-        playerControlViews = Array(4) { player ->
+        playerControlViews = Array(count) { player ->
             LudoPlayerControlView(this).apply {
                 accentColor = SnakesLaddersBoardView.PLAYER_COLORS[player]
                 label = playerName(player)
-                labelBelow = player == 0
-                labelUpsideDown = player != 0
+                labelBelow = if (count == 2) player == 0 else player < 2
+                labelUpsideDown = if (count == 2) player != 0 else player >= 2
                 bind(
                     playerBadgeViews[player],
                     playerDiceViews[player],
                     profileOnEnd = player % 2 == 1,
                 )
-                visibility = if (player < playerCount) View.VISIBLE else View.GONE
             }
         }
         boardStage.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
