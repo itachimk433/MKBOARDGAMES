@@ -146,8 +146,9 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         val boardRect = RectF(left, top, left + artworkSize, top + artworkSize)
-        if (boardBitmap != null) {
-            canvas.drawBitmap(boardBitmap, null, boardRect, bitmapPaint)
+        val bitmap = boardBitmap
+        if (bitmap != null) {
+            canvas.drawBitmap(bitmap, null, boardRect, bitmapPaint)
         } else {
             tokenPaint.color = Color.rgb(185, 217, 182)
             canvas.drawRect(boardRect, tokenPaint)
