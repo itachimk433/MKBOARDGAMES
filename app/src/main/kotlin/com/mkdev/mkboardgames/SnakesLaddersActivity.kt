@@ -553,6 +553,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
         playerControlViews = Array(count) { player ->
             LudoPlayerControlView(this).apply {
                 accentColor = SnakesLaddersBoardView.PLAYER_COLORS[player]
+                winterFrameEnabled = selectedBoard == SnakesLaddersBoardView.Board.TWO
                 label = playerName(player)
                 labelBelow = if (count == 2) player == 0 else player < 2
                 labelUpsideDown = false
@@ -574,6 +575,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
             val isBottomPlayer = if (playerCount == 2) player == 0 else player < 2
             control.labelBelow = isBottomPlayer
             control.labelUpsideDown = false
+            control.winterFrameEnabled = selectedBoard == SnakesLaddersBoardView.Board.TWO
             playerBadgeViews[player].facesOppositeSide = false
             control.bind(
                 playerBadgeViews[player],

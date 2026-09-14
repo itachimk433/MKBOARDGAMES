@@ -2,6 +2,8 @@ package com.mkdev.mkboardgames.ui
 
 import android.animation.ValueAnimator
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -54,10 +56,22 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
             invalidate()
         }
 
+    var winterFrameEnabled: Boolean = false
+        set(value) {
+            if (field == value) return
+            field = value
+            if (value && winterFrameBitmap == null) {
+                winterFrameBitmap = loadWinterFrameBitmap()
+            }
+            invalidate()
+        }
+
     private var glowAnimator: ValueAnimator? = null
     private var glowPulse = 0f
+    private var winterFrameBitmap: Bitmap? = null
 
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val winterFramePaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
     }
@@ -154,7 +168,12 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
         )
         val radius = dp(13).toFloat()
 
-        fillPaint.color = Color.argb(238, 10, 18, 27)
+        val usesWinterFrame = winterFrameEnabled && winterFrameBitmap != null
+        fillPaint.color = if (usesWinterFrame) {
+            Color.TRANSPARENT
+        } else {
+            Color.argb(238, 10, 18, 27)
+        }
         if (isActive) {
             val glowAlpha = (110 + (125 * glowPulse)).roundToInt()
             fillPaint.setShadowLayer(
@@ -172,6 +191,9 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
             fillPaint.clearShadowLayer()
         }
         canvas.drawRoundRect(frameRect, radius, radius, fillPaint)
+        if (usesWinterFrame) {
+            canvas.drawBitmap(winterFrameBitmap!!, null, frameRect, winterFramePaint)
+        }
 
         borderPaint.color = if (isActive) {
             Color.argb(
@@ -218,6 +240,12 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
 
     private fun dp(value: Float): Float =
         value * resources.displayMetrics.density
+
+    private fun loadWinterFrameBitmap(): Bitmap? = runCatching {
+        context.assets.open("snakes_ladders_board_two_profile_dice.webp").use {
+            BitmapFactory.decodeStream(it)
+        }
+    }.getOrNull()
 
     private fun startGlowAnimation() {
         if (!isAttachedToWindow || glowAnimator?.isRunning == true) return
