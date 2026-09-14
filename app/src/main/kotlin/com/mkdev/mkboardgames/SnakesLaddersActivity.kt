@@ -219,7 +219,9 @@ class SnakesLaddersActivity : AppCompatActivity() {
         resultDialogVisible = false
         matchStarted = true
         boardView.gameOver = false
-        configurePlayerControls()
+        if (playerCount == 4) {
+            configurePlayerControls()
+        }
         for (player in 0 until playerCount) {
             boardView.setPlayerPosition(player, 0)
         }
