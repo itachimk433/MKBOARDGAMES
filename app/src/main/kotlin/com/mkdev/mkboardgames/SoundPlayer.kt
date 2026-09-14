@@ -74,9 +74,16 @@ object SoundPlayer {
     /** Set to false to silence movement/game sounds while keeping UI click sounds audible. */
     var movementSoundsEnabled: Boolean = true
 
-    fun play(key: String, volume: Float = 1f) {
+    fun play(key: String, volume: Float = 1f, rate: Float = 1f) {
         ids[key]?.let { soundId ->
-            val streamId = pool?.play(soundId, volume, volume, 0, 0, 1f) ?: 0
+            val streamId = pool?.play(
+                soundId,
+                volume,
+                volume,
+                0,
+                0,
+                rate.coerceIn(0.5f, 2f),
+            ) ?: 0
             if (streamId != 0) {
                 val streams = activeStreams.getOrPut(key) { LinkedHashSet() }
                 streams.add(streamId)
@@ -90,8 +97,8 @@ object SoundPlayer {
     }
 
     /** Play a movement/game sound only when movement sounds are enabled. */
-    fun playMovement(key: String, volume: Float = 1f) {
-        if (movementSoundsEnabled) play(key, volume)
+    fun playMovement(key: String, volume: Float = 1f, rate: Float = 1f) {
+        if (movementSoundsEnabled) play(key, volume, rate)
     }
 
     fun stop(vararg keys: String) {

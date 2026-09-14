@@ -107,6 +107,12 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
         )
     }
 
+    fun setDieVisible(visible: Boolean) {
+        val die = getChildAt(1) ?: return
+        die.visibility = if (visible) View.VISIBLE else View.INVISIBLE
+        (die as? GlbDiceView)?.setGameplayVisible(visible)
+    }
+
     fun profileCenterInParent(): PointF {
         val profile = getChildAt(0) ?: return PointF()
         val params = profile.layoutParams as? MarginLayoutParams

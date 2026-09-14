@@ -111,6 +111,9 @@ class SnakesLaddersActivity : AppCompatActivity() {
                 ),
             )
         }
+        // The board is transparent outside its artwork, so placing it above
+        // the controls lets a start token cover the matching profile icon.
+        boardView.bringToFront()
     }
 
     override fun onResume() {
@@ -311,7 +314,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
             from = from,
             to = stepped,
             path = path,
-            onStep = { SoundPlayer.playMovement("ludo_move") },
+            onStep = { SoundPlayer.playMovement("ludo_move", rate = 0.5f) },
         ) {
             positions[player] = stepped
             if (destination != stepped) {
@@ -322,7 +325,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
                         from = stepped,
                         to = destination,
                         path = SnakesLaddersBoardView.MovePath.DIRECT_TRANSITION,
-                        onStep = { SoundPlayer.playMovement("ludo_move", 0.8f) },
+                         onStep = { SoundPlayer.playMovement("ludo_move", rate = 0.5f) },
                     ) {
                         positions[player] = destination
                         finishTurn(player, roll, destination)
@@ -339,6 +342,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
             winner = player
             gameOver = true
             boardView.gameOver = true
+            updateHud()
             handler.postDelayed({ if (lifecycleActive) showResultDialog() }, 300L)
             return
         }
@@ -357,6 +361,15 @@ class SnakesLaddersActivity : AppCompatActivity() {
             control.isActive = active
             playerBadgeViews[player].label = playerName(player)
             playerBadgeViews[player].isActive = active
+        }
+        syncPlayerDiceVisibility()
+    }
+
+    private fun syncPlayerDiceVisibility() {
+        if (!::playerControlViews.isInitialized) return
+        val gameplayVisible = matchStarted && !dialogOpen && !gameOver
+        playerControlViews.forEachIndexed { player, control ->
+            control.setDieVisible(gameplayVisible && player == currentPlayer)
         }
     }
 
@@ -472,13 +485,13 @@ class SnakesLaddersActivity : AppCompatActivity() {
                 accentColor = SnakesLaddersBoardView.PLAYER_COLORS[player]
                 label = playerName(player)
                 labelBelow = if (count == 2) player == 0 else player < 2
-                labelUpsideDown = !vsAI && if (count == 2) player != 0 else player >= 2
+                labelUpsideDown = false
                 bind(
                     playerBadgeViews[player],
                     playerDiceViews[player],
                     profileOnEnd = player % 2 == 1,
                 )
-                playerBadgeViews[player].facesOppositeSide = labelUpsideDown
+                playerBadgeViews[player].facesOppositeSide = false
             }
         }
         boardStage.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
@@ -490,9 +503,8 @@ class SnakesLaddersActivity : AppCompatActivity() {
         playerControlViews.forEachIndexed { player, control ->
             val isBottomPlayer = if (playerCount == 2) player == 0 else player < 2
             control.labelBelow = isBottomPlayer
-            val facesOppositeSide = !vsAI && !isBottomPlayer
-            control.labelUpsideDown = facesOppositeSide
-            playerBadgeViews[player].facesOppositeSide = facesOppositeSide
+            control.labelUpsideDown = false
+            playerBadgeViews[player].facesOppositeSide = false
             control.bind(
                 playerBadgeViews[player],
                 playerDiceViews[player],
@@ -548,8 +560,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
         playerControlViews.forEachIndexed { player, control ->
             val shown = visible && player < playerCount
             control.visibility = if (shown) View.VISIBLE else View.INVISIBLE
-            playerDiceViews[player].visibility = if (shown) View.VISIBLE else View.INVISIBLE
-            playerDiceViews[player].setGameplayVisible(shown)
+            control.setDieVisible(shown && player == currentPlayer && matchStarted && !gameOver)
             playerBadgeViews[player].visibility = if (shown) View.VISIBLE else View.INVISIBLE
         }
     }

@@ -1203,9 +1203,11 @@ class LudoActivity : AppCompatActivity() {
     private fun syncPlayerOrientations() {
         if (!::playerDiceViews.isInitialized || !::playerBadgeViews.isInitialized) return
         playerDiceViews.forEachIndexed { player, die ->
-            val rotateTopPlayerIdentity = !vsAI && LudoSetup.facesOppositeSide(player)
-            // Keep dice readable, while turning only the top players' identity
-            // elements toward those players.
+            // Keep every identity element readable from the same orientation.
+            // The controls are shared across the board, so rotating the top
+            // players makes their profile initials and CPU labels appear
+            // upside down in four-player matches.
+            val rotateTopPlayerIdentity = false
             die.facesOppositeSide = false
             playerBadgeViews[player].facesOppositeSide = rotateTopPlayerIdentity
             playerControlViews[player].labelUpsideDown = rotateTopPlayerIdentity
@@ -1214,9 +1216,18 @@ class LudoActivity : AppCompatActivity() {
 
     private fun setPlayerDiceVisible(visible: Boolean) {
         if (!::playerDiceViews.isInitialized) return
-        playerDiceViews.forEach {
-            it.visibility = if (visible) View.VISIBLE else View.INVISIBLE
-            it.setGameplayVisible(visible)
+        val activePlayer = LudoSetup.playerFromState(state)
+        val gameplayVisible = visible &&
+            matchStarted &&
+            !dialogOpen &&
+            state.status == GameStatus.IN_PROGRESS
+        playerDiceViews.forEachIndexed { player, die ->
+            val shown = gameplayVisible && player == activePlayer
+            die.visibility = if (shown) View.VISIBLE else View.INVISIBLE
+            die.setGameplayVisible(shown)
+            if (::playerControlViews.isInitialized) {
+                playerControlViews[player].setDieVisible(shown)
+            }
         }
         if (::playerBadgeViews.isInitialized) {
             playerBadgeViews.forEach {
@@ -1227,6 +1238,17 @@ class LudoActivity : AppCompatActivity() {
             playerControlViews.forEach {
                 it.visibility = if (visible) View.VISIBLE else View.INVISIBLE
             }
+        }
+    }
+
+    private fun syncPlayerDiceVisibility() {
+        if (!::playerControlViews.isInitialized) return
+        val activePlayer = LudoSetup.playerFromState(state)
+        val gameplayVisible = matchStarted &&
+            !dialogOpen &&
+            state.status == GameStatus.IN_PROGRESS
+        playerControlViews.forEachIndexed { player, control ->
+            control.setDieVisible(gameplayVisible && player == activePlayer)
         }
     }
 
@@ -1915,6 +1937,7 @@ class LudoActivity : AppCompatActivity() {
 
     private fun updateHud() {
         restoreHumanLegalMovesIfNeeded()
+        syncPlayerDiceVisibility()
         val player = LudoSetup.playerFromState(state)
         val playerPieces = LudoSetup.allPieces(state).filter { it.player == player }
         val allTokensInYard = playerPieces.all { it.progress < 0 }
