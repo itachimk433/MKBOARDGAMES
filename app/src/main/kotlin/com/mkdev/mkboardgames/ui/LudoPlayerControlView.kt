@@ -222,6 +222,20 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
     private fun drawLabel(canvas: Canvas) {
         textPaint.color = if (isActive) Color.WHITE else Color.rgb(224, 232, 240)
         textPaint.textSize = dp(16).toFloat()
+        textPaint.clearShadowLayer()
+        if (winterFrameEnabled) {
+            textPaint.setShadowLayer(
+                dp(7f),
+                0f,
+                0f,
+                Color.argb(
+                    220,
+                    Color.red(accentColor),
+                    Color.green(accentColor),
+                    Color.blue(accentColor),
+                ),
+            )
+        }
         val baseline = if (labelBelow) {
             dp(FRAME_HEIGHT + 15).toFloat()
         } else {
