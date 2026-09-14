@@ -128,6 +128,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
         handler.removeCallbacksAndMessages(null)
         diceView.cancelRoll()
         boardView.cancelAnimations()
+        SoundPlayer.stopAll()
         super.onPause()
     }
 
@@ -136,6 +137,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
         handler.removeCallbacksAndMessages(null)
         diceView.cancelRoll()
         boardView.cancelAnimations()
+        SoundPlayer.stopAll()
         super.onDestroy()
     }
 
@@ -238,17 +240,47 @@ class SnakesLaddersActivity : AppCompatActivity() {
     private fun applyRoll(player: Int, value: Int) {
         if (player != currentPlayer || gameOver) return
         val from = positions[player]
-        val stepped = if (from + value <= 100) from + value else from
+        if (from == 0 && value != 6) {
+            turnView.text = "${playerName(player)} needs a 6 to enter the board"
+            finishTurn(player, value, 0)
+            return
+        }
+
+        val stepped = if (from == 0) {
+            1
+        } else if (from + value <= 100) {
+            from + value
+        } else {
+            from
+        }
         val destination = ladders[stepped] ?: snakes[stepped] ?: stepped
-        animateMove(player, from, stepped, destination, value)
+        animateMove(
+            player = player,
+            from = from,
+            stepped = stepped,
+            destination = destination,
+            roll = value,
+            path = if (from == 0) {
+                SnakesLaddersBoardView.MovePath.ENTER_BOARD
+            } else {
+                SnakesLaddersBoardView.MovePath.NUMBERED_SQUARES
+            },
+        )
     }
 
-    private fun animateMove(player: Int, from: Int, stepped: Int, destination: Int, roll: Int) {
+    private fun animateMove(
+        player: Int,
+        from: Int,
+        stepped: Int,
+        destination: Int,
+        roll: Int,
+        path: SnakesLaddersBoardView.MovePath,
+    ) {
         boardView.animateMove(
             player = player,
             from = from,
             to = stepped,
-            path = SnakesLaddersBoardView.MovePath.NUMBERED_SQUARES,
+            path = path,
             onStep = { SoundPlayer.playMovement("ludo_move") },
         ) {
             positions[player] = stepped
@@ -371,6 +403,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
         diceView.cancelRoll()
         diceView.setGameplayVisible(false)
         boardView.cancelAnimations()
+        SoundPlayer.stopAll()
         gameRoot.visibility = View.GONE
     }
 

@@ -13,6 +13,7 @@ import android.view.View
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
+import android.view.animation.LinearInterpolator
 import kotlin.math.PI
 import kotlin.math.min
 import kotlin.math.sin
@@ -33,6 +34,7 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
 
     enum class MovePath {
         NUMBERED_SQUARES,
+        ENTER_BOARD,
         DIRECT_TRANSITION,
     }
 
@@ -60,7 +62,7 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
     private var gridTop = 0f
     private var animatedPath: List<PointF> = emptyList()
     private var animatedProgress = 0f
-    private var animatedStep = -1
+    private var animatedSoundStep = -1
 
     private val bitmapPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private val tokenPaint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -120,7 +122,7 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
     }
 
     private fun drawToken(canvas: Canvas, player: Int, animatedPoint: PointF?) {
-        val point = animatedPoint ?: pointForNumber(positions[player].toFloat())
+        val point = animatedPoint ?: pointForPosition(player, positions[player])
         val offset = if (player == 0) {
             PointF(-cell * 0.18f, cell * 0.12f)
         } else {
@@ -162,23 +164,25 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
         val index = player.coerceIn(0, 1)
         val generation = ++animationGeneration
         moveAnimator?.cancel()
-        animatedPath = routeFor(from, to, path)
+        animatedPath = routeFor(index, from, to, path)
         animatedProgress = 0f
-        animatedStep = 0
+        animatedSoundStep = -1
         animatedPoints[index] = animatedPath.firstOrNull()
         val segmentCount = (animatedPath.size - 1).coerceAtLeast(1)
         moveAnimator = ValueAnimator.ofFloat(0f, segmentCount.toFloat()).apply {
             duration = when (path) {
                 MovePath.NUMBERED_SQUARES ->
-                    (segmentCount * 105L + 90L).coerceIn(180L, 1250L)
+                    (segmentCount * 145L) + 70L
+                MovePath.ENTER_BOARD -> 215L
                 MovePath.DIRECT_TRANSITION -> 520L
             }
+            interpolator = LinearInterpolator()
             addUpdateListener {
                 animatedProgress = it.animatedValue as Float
-                val completedStep = animatedProgress.toInt().coerceAtMost(segmentCount)
-                if (completedStep > animatedStep) {
-                    repeat(completedStep - animatedStep) { onStep() }
-                    animatedStep = completedStep
+                val step = animatedProgress.toInt().coerceAtMost(segmentCount)
+                if (step < segmentCount && step != animatedSoundStep) {
+                    animatedSoundStep = step
+                    onStep()
                 }
                 animatedPoints[index] = pointAlongPath(animatedProgress)
                 invalidate()
@@ -190,7 +194,7 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
                     animatedPoints[index] = null
                     animatedPath = emptyList()
                     animatedProgress = 0f
-                    animatedStep = -1
+                    animatedSoundStep = -1
                     moveAnimator = null
                     invalidate()
                     onEnd()
@@ -207,7 +211,7 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
         animatedPoints.fill(null)
         animatedPath = emptyList()
         animatedProgress = 0f
-        animatedStep = -1
+        animatedSoundStep = -1
         invalidate()
     }
 
@@ -237,7 +241,10 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
         )
     }
 
-    private fun routeFor(from: Int, to: Int, path: MovePath): List<PointF> {
+    private fun routeFor(player: Int, from: Int, to: Int, path: MovePath): List<PointF> {
+        if (path == MovePath.ENTER_BOARD) {
+            return listOf(startPointForPlayer(player), pointForNumber(1f))
+        }
         if (path == MovePath.DIRECT_TRANSITION) {
             // A ladder or snake is a single visual transition between its two
             // measured square anchors. It must not traverse the numbered path.
@@ -256,6 +263,27 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
         val route = numbers.map { pointForNumber(it.toFloat()) }.toMutableList()
         if (route.size == 1) route += route.first()
         return route
+    }
+
+    private fun pointForPosition(player: Int, number: Int): PointF =
+        if (number == 0) startPointForPlayer(player) else pointForNumber(number.toFloat())
+
+    private fun startPointForPlayer(player: Int): PointF {
+        if (cell == 0f) return PointF()
+        val x = gridLeft + cell * if (player == 0) 1.5f else 8.5f
+        val belowBoard = PointF(x, gridTop + BOARD_SIZE * cell + cell * 0.38f)
+        val radius = cell * 0.25f
+        if (belowBoard.y + radius <= height) return belowBoard
+
+        val aboveBoard = PointF(x, gridTop - cell * 0.38f)
+        if (aboveBoard.y - radius >= 0f) return aboveBoard
+
+        // On a very short landscape board, keep the start tokens in the
+        // artwork's outer margin rather than clipping them at the view edge.
+        PointF(
+            x,
+            (gridTop + BOARD_SIZE * cell - cell * 0.08f).coerceAtMost(height - radius),
+        )
     }
 
     private fun pointAlongPath(progress: Float): PointF {
