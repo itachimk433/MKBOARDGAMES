@@ -40,6 +40,18 @@ class LudoPlayerBadgeView(context: Context) : View(context) {
             invalidate()
         }
 
+    var avatarScale: Float = 1f
+        set(value) {
+            field = value.coerceIn(0.5f, 1f)
+            invalidate()
+        }
+
+    var ringAndGlowEnabled: Boolean = true
+        set(value) {
+            field = value
+            invalidate()
+        }
+
     private val avatarPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
@@ -61,12 +73,12 @@ class LudoPlayerBadgeView(context: Context) : View(context) {
 
         val centerX = width / 2f
         val centerY = height / 2f
-        val radius = (height * 0.31f).coerceAtLeast(dp(12).toFloat())
+        val radius = (height * 0.31f * avatarScale).coerceAtLeast(dp(12).toFloat())
 
         avatarPaint.color = accentColor
         avatarPaint.style = Paint.Style.FILL
         avatarPaint.clearShadowLayer()
-        if (isActive) {
+        if (isActive && ringAndGlowEnabled) {
             avatarPaint.setShadowLayer(
                 dp(7).toFloat(),
                 0f,
@@ -81,12 +93,14 @@ class LudoPlayerBadgeView(context: Context) : View(context) {
         }
         canvas.drawCircle(centerX, centerY, radius, avatarPaint)
 
-        ringPaint.color = Color.argb(245, 255, 255, 255)
-        ringPaint.strokeWidth = dp(1).toFloat()
-        canvas.drawCircle(centerX, centerY, radius, ringPaint)
+        if (ringAndGlowEnabled) {
+            ringPaint.color = Color.argb(245, 255, 255, 255)
+            ringPaint.strokeWidth = dp(1).toFloat()
+            canvas.drawCircle(centerX, centerY, radius, ringPaint)
+        }
 
         textPaint.color = Color.WHITE
-        textPaint.textSize = (height * 0.34f).coerceAtLeast(dp(12).toFloat())
+        textPaint.textSize = (height * 0.34f * avatarScale).coerceAtLeast(dp(12).toFloat())
         val initial = label.firstOrNull()?.uppercaseChar()?.toString() ?: "•"
         val baseline = centerY - (textPaint.ascent() + textPaint.descent()) / 2f
         canvas.drawText(initial, centerX, baseline, textPaint)
@@ -94,7 +108,7 @@ class LudoPlayerBadgeView(context: Context) : View(context) {
     }
 
     fun avatarRadius(): Float =
-        (height * 0.31f).coerceAtLeast(dp(12).toFloat())
+        (height * 0.31f * avatarScale).coerceAtLeast(dp(12).toFloat())
 
     private fun dp(value: Int): Int =
         (value * resources.displayMetrics.density).roundToInt()

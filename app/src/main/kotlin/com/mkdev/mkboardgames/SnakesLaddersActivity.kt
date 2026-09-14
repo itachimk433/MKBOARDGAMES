@@ -547,6 +547,8 @@ class SnakesLaddersActivity : AppCompatActivity() {
         playerBadgeViews = Array(count) { player ->
             LudoPlayerBadgeView(this).apply {
                 accentColor = SnakesLaddersBoardView.PLAYER_COLORS[player]
+                avatarScale = if (selectedBoard == SnakesLaddersBoardView.Board.TWO) 0.9f else 1f
+                ringAndGlowEnabled = selectedBoard != SnakesLaddersBoardView.Board.TWO
                 label = playerName(player)
             }
         }
@@ -576,6 +578,10 @@ class SnakesLaddersActivity : AppCompatActivity() {
             control.labelBelow = isBottomPlayer
             control.labelUpsideDown = false
             control.winterFrameEnabled = selectedBoard == SnakesLaddersBoardView.Board.TWO
+            playerBadgeViews[player].avatarScale =
+                if (selectedBoard == SnakesLaddersBoardView.Board.TWO) 0.9f else 1f
+            playerBadgeViews[player].ringAndGlowEnabled =
+                selectedBoard != SnakesLaddersBoardView.Board.TWO
             playerBadgeViews[player].facesOppositeSide = false
             control.bind(
                 playerBadgeViews[player],

@@ -52,7 +52,7 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
     var isActive: Boolean = false
         set(value) {
             field = value
-            if (value) startGlowAnimation() else stopGlowAnimation()
+            if (value && !winterFrameEnabled) startGlowAnimation() else stopGlowAnimation()
             invalidate()
         }
 
@@ -63,6 +63,7 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
             if (value && winterFrameBitmap == null) {
                 winterFrameBitmap = loadWinterFrameBitmap()
             }
+            if (value) stopGlowAnimation() else if (isActive) startGlowAnimation()
             invalidate()
         }
 
@@ -92,7 +93,7 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
         val frameTop = if (labelBelow) 0 else dp(LABEL_HEIGHT)
         val frameHeight = dp(FRAME_HEIGHT)
         val avatarWidth = dp(AVATAR_SIZE)
-        val dieSize = dp(DIE_SIZE)
+        val dieSize = dp(renderedDieSizeDp())
         val overlap = dp(2)
         val profileLeft = if (profileOnEnd) {
             dp(PAIR_WIDTH) - avatarWidth
@@ -114,9 +115,9 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
         )
         addView(
             die,
-            LayoutParams(dieSize, frameHeight).apply {
+            LayoutParams(dieSize, dieSize).apply {
                 leftMargin = dieLeft
-                topMargin = frameTop
+                topMargin = frameTop + (frameHeight - dieSize) / 2
             },
         )
     }
@@ -144,10 +145,12 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
         val width = resolveSize(dp(PAIR_WIDTH), widthMeasureSpec)
         val height = resolveSize(dp(CONTROL_HEIGHT), heightMeasureSpec)
         setMeasuredDimension(width, height)
-        val childHeightSpec = MeasureSpec.makeMeasureSpec(dp(FRAME_HEIGHT), MeasureSpec.EXACTLY)
         for (index in 0 until childCount) {
-            val childWidth = if (index == 0) AVATAR_SIZE else DIE_SIZE
+            val isProfile = index == 0
+            val childWidth = if (isProfile) AVATAR_SIZE else renderedDieSizeDp()
+            val childHeight = if (isProfile) FRAME_HEIGHT else renderedDieSizeDp()
             val childWidthSpec = MeasureSpec.makeMeasureSpec(dp(childWidth), MeasureSpec.EXACTLY)
+            val childHeightSpec = MeasureSpec.makeMeasureSpec(dp(childHeight), MeasureSpec.EXACTLY)
             getChildAt(index).measure(childWidthSpec, childHeightSpec)
         }
     }
@@ -169,53 +172,51 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
         val radius = dp(13).toFloat()
 
         val usesWinterFrame = winterFrameEnabled && winterFrameBitmap != null
-        fillPaint.color = if (usesWinterFrame) {
-            Color.TRANSPARENT
+        if (usesWinterFrame) {
+            fillPaint.clearShadowLayer()
+            canvas.drawBitmap(winterFrameBitmap!!, null, frameRect, winterFramePaint)
         } else {
-            Color.argb(238, 10, 18, 27)
-        }
-        if (isActive) {
-            val glowAlpha = (110 + (125 * glowPulse)).roundToInt()
-            fillPaint.setShadowLayer(
-                dp((7f + (13f * glowPulse)) * GLOW_THICKNESS_SCALE),
-                0f,
-                0f,
+            fillPaint.color = Color.argb(238, 10, 18, 27)
+            if (isActive) {
+                val glowAlpha = (110 + (125 * glowPulse)).roundToInt()
+                fillPaint.setShadowLayer(
+                    dp((7f + (13f * glowPulse)) * GLOW_THICKNESS_SCALE),
+                    0f,
+                    0f,
+                    Color.argb(
+                        glowAlpha,
+                        Color.red(accentColor),
+                        Color.green(accentColor),
+                        Color.blue(accentColor),
+                    ),
+                )
+            } else {
+                fillPaint.clearShadowLayer()
+            }
+            canvas.drawRoundRect(frameRect, radius, radius, fillPaint)
+
+            borderPaint.color = if (isActive) {
                 Color.argb(
-                    glowAlpha,
+                    (190 + (65 * glowPulse)).roundToInt(),
                     Color.red(accentColor),
                     Color.green(accentColor),
                     Color.blue(accentColor),
-                ),
-            )
-        } else {
-            fillPaint.clearShadowLayer()
+                )
+            } else {
+                Color.argb(
+                    210,
+                    Color.red(accentColor),
+                    Color.green(accentColor),
+                    Color.blue(accentColor),
+                )
+            }
+            borderPaint.strokeWidth = if (isActive) {
+                dp(2f * GLOW_THICKNESS_SCALE)
+            } else {
+                dp(1).toFloat()
+            }
+            canvas.drawRoundRect(frameRect, radius, radius, borderPaint)
         }
-        canvas.drawRoundRect(frameRect, radius, radius, fillPaint)
-        if (usesWinterFrame) {
-            canvas.drawBitmap(winterFrameBitmap!!, null, frameRect, winterFramePaint)
-        }
-
-        borderPaint.color = if (isActive) {
-            Color.argb(
-                (190 + (65 * glowPulse)).roundToInt(),
-                Color.red(accentColor),
-                Color.green(accentColor),
-                Color.blue(accentColor),
-            )
-        } else {
-            Color.argb(
-                210,
-                Color.red(accentColor),
-                Color.green(accentColor),
-                Color.blue(accentColor),
-            )
-        }
-        borderPaint.strokeWidth = if (isActive) {
-            dp(2f * GLOW_THICKNESS_SCALE)
-        } else {
-            dp(1).toFloat()
-        }
-        canvas.drawRoundRect(frameRect, radius, radius, borderPaint)
     }
 
     private fun drawLabel(canvas: Canvas) {
@@ -240,6 +241,9 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
 
     private fun dp(value: Float): Float =
         value * resources.displayMetrics.density
+
+    private fun renderedDieSizeDp(): Int =
+        if (winterFrameEnabled) (DIE_SIZE / 1.2f).roundToInt() else DIE_SIZE
 
     private fun loadWinterFrameBitmap(): Bitmap? = runCatching {
         context.assets.open("snakes_ladders_board_two_profile_dice.webp").use {
@@ -270,7 +274,7 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
-        if (isActive) startGlowAnimation()
+        if (isActive && !winterFrameEnabled) startGlowAnimation()
     }
 
     override fun onDetachedFromWindow() {
