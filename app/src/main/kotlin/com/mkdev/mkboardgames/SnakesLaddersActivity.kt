@@ -243,6 +243,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
         resultDialogVisible = false
         matchStarted = true
         boardView.gameOver = false
+        boardView.setActivePlayerCount(playerCount)
         if (playerCount == 4) {
             configurePlayerControls()
         }
@@ -471,12 +472,13 @@ class SnakesLaddersActivity : AppCompatActivity() {
                 accentColor = SnakesLaddersBoardView.PLAYER_COLORS[player]
                 label = playerName(player)
                 labelBelow = if (count == 2) player == 0 else player < 2
-                labelUpsideDown = if (count == 2) player != 0 else player >= 2
+                labelUpsideDown = !vsAI && if (count == 2) player != 0 else player >= 2
                 bind(
                     playerBadgeViews[player],
                     playerDiceViews[player],
                     profileOnEnd = player % 2 == 1,
                 )
+                playerBadgeViews[player].facesOppositeSide = labelUpsideDown
             }
         }
         boardStage.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
@@ -488,8 +490,9 @@ class SnakesLaddersActivity : AppCompatActivity() {
         playerControlViews.forEachIndexed { player, control ->
             val isBottomPlayer = if (playerCount == 2) player == 0 else player < 2
             control.labelBelow = isBottomPlayer
-            control.labelUpsideDown = !isBottomPlayer
-            playerBadgeViews[player].facesOppositeSide = !isBottomPlayer
+            val facesOppositeSide = !vsAI && !isBottomPlayer
+            control.labelUpsideDown = facesOppositeSide
+            playerBadgeViews[player].facesOppositeSide = facesOppositeSide
             control.bind(
                 playerBadgeViews[player],
                 playerDiceViews[player],
@@ -529,6 +532,13 @@ class SnakesLaddersActivity : AppCompatActivity() {
                 leftMargin = left
                 topMargin = top
             }
+            val profileCenter = control.profileCenterInParent()
+            boardView.setPlayerStartAnchor(
+                player = player,
+                centerX = left + profileCenter.x - boardView.left,
+                centerY = top + profileCenter.y - boardView.top,
+                radius = control.profileRadius(),
+            )
             control.visibility = if (player < playerCount && !dialogOpen) View.VISIBLE else View.GONE
         }
     }

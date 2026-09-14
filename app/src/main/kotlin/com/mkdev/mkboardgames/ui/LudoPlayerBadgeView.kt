@@ -93,6 +93,9 @@ class LudoPlayerBadgeView(context: Context) : View(context) {
 
     }
 
+    fun avatarRadius(): Float =
+        (height * 0.31f).coerceAtLeast(dp(12).toFloat())
+
     private fun dp(value: Int): Int =
         (value * resources.displayMetrics.density).roundToInt()
 }

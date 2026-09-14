@@ -55,6 +55,9 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
     }.getOrNull()
     private val positions = IntArray(4)
     private val animatedPoints = arrayOfNulls<PointF>(4)
+    private val startAnchors = arrayOfNulls<PointF>(4)
+    private val startRadii = FloatArray(4)
+    private var activePlayerCount = 2
     private var moveAnimator: ValueAnimator? = null
     private var animationGeneration = 0
     private var artworkSize = 0f
@@ -119,20 +122,33 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
             canvas.drawRect(boardRect, tokenPaint)
         }
 
-        positions.indices.forEach { player ->
+        for (player in 0 until activePlayerCount) {
             drawToken(canvas, player, animatedPoints[player])
         }
     }
 
     private fun drawToken(canvas: Canvas, player: Int, animatedPoint: PointF?) {
         val point = animatedPoint ?: pointForPosition(player, positions[player])
-        val offset = when (player) {
-            0 -> PointF(-cell * 0.2f, cell * 0.18f)
-            1 -> PointF(cell * 0.2f, -cell * 0.18f)
-            2 -> PointF(-cell * 0.2f, -cell * 0.18f)
-            else -> PointF(cell * 0.2f, cell * 0.18f)
+        val offset = if (positions[player] == 0) {
+            PointF()
+        } else {
+            when (player) {
+                0 -> PointF(-cell * 0.2f, cell * 0.18f)
+                1 -> PointF(cell * 0.2f, -cell * 0.18f)
+                2 -> PointF(-cell * 0.2f, -cell * 0.18f)
+                else -> PointF(cell * 0.2f, cell * 0.18f)
+            }
         }
-        val radius = cell * 0.25f
+        val radius = if (positions[player] == 0) {
+            startRadii[player].takeIf { it > 0f } ?: cell * 0.25f
+        } else {
+            cell * 0.25f
+        }
+        tokenTextPaint.textSize = if (positions[player] == 0) {
+            radius * 1.08f
+        } else {
+            cell * 0.27f
+        }
         canvas.drawCircle(
             point.x + offset.x + cell * 0.04f,
             point.y + offset.y + cell * 0.06f,
@@ -152,6 +168,18 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
 
     fun setPlayerPosition(player: Int, number: Int) {
         positions[player.coerceIn(0, positions.lastIndex)] = number.coerceIn(0, 100)
+        invalidate()
+    }
+
+    fun setActivePlayerCount(count: Int) {
+        activePlayerCount = count.coerceIn(1, positions.size)
+        invalidate()
+    }
+
+    fun setPlayerStartAnchor(player: Int, centerX: Float, centerY: Float, radius: Float) {
+        val index = player.coerceIn(0, startAnchors.lastIndex)
+        startAnchors[index] = PointF(centerX, centerY)
+        startRadii[index] = radius.coerceAtLeast(0f)
         invalidate()
     }
 
@@ -284,6 +312,7 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
 
     private fun startPointForPlayer(player: Int): PointF {
         if (cell == 0f) return PointF()
+        startAnchors[player]?.let { return PointF(it.x, it.y) }
         val x = gridLeft + cell * if (player % 2 == 0) 1.5f else 8.5f
         val radius = cell * 0.25f
         val y = if (player < 2) {

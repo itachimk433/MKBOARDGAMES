@@ -5,6 +5,7 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.PointF
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.view.View
@@ -105,6 +106,19 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
             },
         )
     }
+
+    fun profileCenterInParent(): PointF {
+        val profile = getChildAt(0) ?: return PointF()
+        val params = profile.layoutParams as? MarginLayoutParams
+        return PointF(
+            (params?.leftMargin ?: profile.left).toFloat() + profile.measuredWidth / 2f,
+            (params?.topMargin ?: profile.top).toFloat() + profile.measuredHeight / 2f,
+        )
+    }
+
+    fun profileRadius(): Float =
+        (getChildAt(0) as? LudoPlayerBadgeView)?.avatarRadius()
+            ?: minOf(measuredWidth, measuredHeight) * 0.25f
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val width = resolveSize(dp(PAIR_WIDTH), widthMeasureSpec)
