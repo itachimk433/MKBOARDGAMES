@@ -604,6 +604,6 @@ class SnakesLaddersActivity : AppCompatActivity() {
         (value * resources.displayMetrics.density).toInt()
 
     private companion object {
-        const val TURN_RESOLUTION_DELAY_MS = 700L
+        const val TURN_RESOLUTION_DELAY_MS = 500L
     }
 }
