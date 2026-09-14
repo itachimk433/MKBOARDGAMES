@@ -280,7 +280,7 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
 
         // On a very short landscape board, keep the start tokens in the
         // artwork's outer margin rather than clipping them at the view edge.
-        PointF(
+        return PointF(
             x,
             (gridTop + BOARD_SIZE * cell - cell * 0.08f).coerceAtMost(height - radius),
         )
