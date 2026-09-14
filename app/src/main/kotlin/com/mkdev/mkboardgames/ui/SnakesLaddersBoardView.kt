@@ -16,6 +16,7 @@ import android.animation.ValueAnimator
 import android.view.animation.LinearInterpolator
 import kotlin.math.PI
 import kotlin.math.min
+import kotlin.math.roundToInt
 import kotlin.math.sin
 
 class SnakesLaddersBoardView(context: Context) : View(context) {
@@ -29,6 +30,8 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
         val PLAYER_COLORS = intArrayOf(
             Color.rgb(226, 67, 76),
             Color.rgb(54, 126, 218),
+            Color.rgb(66, 167, 120),
+            Color.rgb(232, 184, 74),
         )
     }
 
@@ -50,8 +53,8 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
             BitmapFactory.decodeStream(it)
         }
     }.getOrNull()
-    private val positions = intArrayOf(0, 0)
-    private val animatedPoints = arrayOfNulls<PointF>(2)
+    private val positions = IntArray(4)
+    private val animatedPoints = arrayOfNulls<PointF>(4)
     private var moveAnimator: ValueAnimator? = null
     private var animationGeneration = 0
     private var artworkSize = 0f
@@ -123,10 +126,11 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
 
     private fun drawToken(canvas: Canvas, player: Int, animatedPoint: PointF?) {
         val point = animatedPoint ?: pointForPosition(player, positions[player])
-        val offset = if (player == 0) {
-            PointF(-cell * 0.18f, cell * 0.12f)
-        } else {
-            PointF(cell * 0.18f, -cell * 0.12f)
+        val offset = when (player) {
+            0 -> PointF(-cell * 0.2f, cell * 0.18f)
+            1 -> PointF(cell * 0.2f, -cell * 0.18f)
+            2 -> PointF(-cell * 0.2f, -cell * 0.18f)
+            else -> PointF(cell * 0.2f, cell * 0.18f)
         }
         val radius = cell * 0.25f
         canvas.drawCircle(
@@ -139,7 +143,7 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
         canvas.drawCircle(point.x + offset.x, point.y + offset.y, radius, tokenPaint)
         canvas.drawCircle(point.x + offset.x, point.y + offset.y, radius, tokenEdgePaint)
         canvas.drawText(
-            if (player == 0) "1" else "2",
+            (player + 1).toString(),
             point.x + offset.x,
             point.y + offset.y - (tokenTextPaint.ascent() + tokenTextPaint.descent()) / 2f,
             tokenTextPaint,
@@ -147,11 +151,16 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
     }
 
     fun setPlayerPosition(player: Int, number: Int) {
-        positions[player.coerceIn(0, 1)] = number.coerceIn(0, 100)
+        positions[player.coerceIn(0, positions.lastIndex)] = number.coerceIn(0, 100)
         invalidate()
     }
 
-    fun playerPosition(player: Int): Int = positions[player.coerceIn(0, 1)]
+    fun playerPosition(player: Int): Int =
+        positions[player.coerceIn(0, positions.lastIndex)]
+
+    fun boardArtworkTopPixels(): Int = top.roundToInt()
+
+    fun boardArtworkBottomPixels(): Int = (top + artworkSize).roundToInt()
 
     fun animateMove(
         player: Int,
@@ -161,7 +170,7 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
         onStep: () -> Unit = {},
         onEnd: () -> Unit,
     ) {
-        val index = player.coerceIn(0, 1)
+        val index = player.coerceIn(0, positions.lastIndex)
         val generation = ++animationGeneration
         moveAnimator?.cancel()
         animatedPath = routeFor(index, from, to, path)
@@ -171,8 +180,13 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
         val segmentCount = (animatedPath.size - 1).coerceAtLeast(1)
         moveAnimator = ValueAnimator.ofFloat(0f, segmentCount.toFloat()).apply {
             duration = when (path) {
-                MovePath.NUMBERED_SQUARES ->
-                    (segmentCount * 145L) + 70L
+                MovePath.NUMBERED_SQUARES -> {
+                    // Multi-square moves should read as deliberate board
+                    // movement rather than a fast teleport. A one-square
+                    // move keeps the snappy timing used for entering play.
+                    val stepDuration = if (segmentCount >= 2) 290L else 145L
+                    (segmentCount * stepDuration) + 70L
+                }
                 MovePath.ENTER_BOARD -> 215L
                 MovePath.DIRECT_TRANSITION -> 520L
             }
@@ -270,19 +284,27 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
 
     private fun startPointForPlayer(player: Int): PointF {
         if (cell == 0f) return PointF()
-        val x = gridLeft + cell * if (player == 0) 1.5f else 8.5f
-        val belowBoard = PointF(x, gridTop + BOARD_SIZE * cell + cell * 0.38f)
+        val x = gridLeft + cell * if (player % 2 == 0) 1.5f else 8.5f
         val radius = cell * 0.25f
-        if (belowBoard.y + radius <= height) return belowBoard
-
-        val aboveBoard = PointF(x, gridTop - cell * 0.38f)
-        if (aboveBoard.y - radius >= 0f) return aboveBoard
+        val y = if (player < 2) {
+            gridTop + BOARD_SIZE * cell + cell * 0.38f
+        } else {
+            gridTop - cell * 0.38f
+        }
+        val outsideBoard = PointF(x, y)
+        if (outsideBoard.y - radius >= 0f && outsideBoard.y + radius <= height) {
+            return outsideBoard
+        }
 
         // On a very short landscape board, keep the start tokens in the
         // artwork's outer margin rather than clipping them at the view edge.
         return PointF(
             x,
-            (gridTop + BOARD_SIZE * cell - cell * 0.08f).coerceAtMost(height - radius),
+            if (player < 2) {
+                (gridTop + BOARD_SIZE * cell - cell * 0.08f).coerceAtMost(height - radius)
+            } else {
+                (gridTop + cell * 0.08f).coerceAtLeast(radius)
+            },
         )
     }
 

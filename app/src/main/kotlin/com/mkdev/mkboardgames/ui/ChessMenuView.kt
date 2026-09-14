@@ -29,6 +29,7 @@ class ChessMenuView(
 
     var onVsAi: (() -> Unit)? = null
     var onTwoPlayers: (() -> Unit)? = null
+    var onFourPlayers: (() -> Unit)? = null
     var onHowToPlay: (() -> Unit)? = null
     var onResumeMatch: (() -> Unit)? = null
 
@@ -69,6 +70,7 @@ class ChessMenuView(
     private val isInternationalDraughts =
         gameLabel.replace(" ", "").equals("INTLDRAUGHTS", ignoreCase = true)
     private val contentHeightDp = when {
+        isSnakesLadders -> 590f
         (isChessFamily || isMorabaraba) && hasResumeMatch -> 548f
         isChessFamily || isMorabaraba -> 500f
         hasResumeMatch -> 462f
@@ -271,44 +273,62 @@ class ChessMenuView(
             (if (isChessFamily || isMorabaraba) 244f else 164f) * unit
         val actionHeight = 82f * unit
 
-        actions = listOf(
-            MenuAction(
-                label = "vs CPU",
-                detail = "Challenge the board",
-                symbol = when {
-                    isChess -> "♞"
-                    isChessFamily || isMorabaraba -> "●"
-                    else -> ""
-                },
-                accent = Color.parseColor("#E3B86A"),
-                action = { onVsAi?.invoke() },
-            ),
-            MenuAction(
-                label = if (isLudo) "4 Players" else "2 Players",
-                detail = "Play on one board",
-                symbol = when {
-                    isChess -> "♙"
-                    isChessFamily || isMorabaraba -> "○"
-                    else -> ""
-                },
-                accent = Color.parseColor("#8EC7B9"),
-                action = { onTwoPlayers?.invoke() },
-            ),
-            MenuAction(
-                label = "How To Play",
-                detail = "Learn the essentials",
-                symbol = "?",
-                accent = Color.parseColor("#A9B6E8"),
-                action = { onHowToPlay?.invoke() },
-            ),
-        )
+        actions = buildList {
+            add(
+                MenuAction(
+                    label = "vs CPU",
+                    detail = "Challenge the board",
+                    symbol = when {
+                        isChess -> "♞"
+                        isChessFamily || isMorabaraba -> "●"
+                        else -> ""
+                    },
+                    accent = Color.parseColor("#E3B86A"),
+                    action = { onVsAi?.invoke() },
+                ),
+            )
+            add(
+                MenuAction(
+                    label = if (isLudo) "4 Players" else "2 Players",
+                    detail = "Play on one board",
+                    symbol = when {
+                        isChess -> "♙"
+                        isChessFamily || isMorabaraba -> "○"
+                        else -> ""
+                    },
+                    accent = Color.parseColor("#8EC7B9"),
+                    action = { onTwoPlayers?.invoke() },
+                ),
+            )
+            if (isSnakesLadders) {
+                add(
+                    MenuAction(
+                        label = "4 Players",
+                        detail = "Four players, one board",
+                        symbol = "◇",
+                        accent = Color.parseColor("#D88EAD"),
+                        action = { onFourPlayers?.invoke() },
+                    ),
+                )
+            }
+            add(
+                MenuAction(
+                    label = "How To Play",
+                    detail = "Learn the essentials",
+                    symbol = "?",
+                    accent = Color.parseColor("#A9B6E8"),
+                    action = { onHowToPlay?.invoke() },
+                ),
+            )
+        }
 
         actions.forEachIndexed { index, action ->
             if (index < 2) {
                 val left = sidePadding + index * (actionWidth + gap)
                 action.rect = RectF(left, actionTop, left + actionWidth, actionTop + actionHeight)
             } else {
-                val top = actionTop + actionHeight + gap
+                val row = index - 1
+                val top = actionTop + row * (actionHeight + gap)
                 action.rect = RectF(sidePadding, top, width - sidePadding, top + actionHeight)
             }
             actionScale[action.label] = 1f

@@ -1,21 +1,19 @@
 package com.mkdev.mkboardgames
 
-import android.graphics.Color
-import android.graphics.Typeface
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.LinearLayout
-import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.mkdev.mkboardgames.ui.ChessMenuView
 import com.mkdev.mkboardgames.ui.GlbDiceView
+import com.mkdev.mkboardgames.ui.LudoPlayerBadgeView
+import com.mkdev.mkboardgames.ui.LudoPlayerControlView
 import com.mkdev.mkboardgames.ui.MotionDiceDirection
 import com.mkdev.mkboardgames.ui.SnakesLaddersBoardView
 import com.mkdev.mkboardgames.ui.StyledDialogs
@@ -24,15 +22,18 @@ import kotlin.random.Random
 class SnakesLaddersActivity : AppCompatActivity() {
     private lateinit var gameRoot: LinearLayout
     private lateinit var boardView: SnakesLaddersBoardView
-    private lateinit var diceView: GlbDiceView
-    private lateinit var turnView: TextView
+    private lateinit var boardStage: FrameLayout
+    private lateinit var playerDiceViews: Array<GlbDiceView>
+    private lateinit var playerBadgeViews: Array<LudoPlayerBadgeView>
+    private lateinit var playerControlViews: Array<LudoPlayerControlView>
     private val handler = Handler(Looper.getMainLooper())
 
     private var vsAI = true
+    private var playerCount = 2
     private var matchStarted = false
     private var dialogOpen = false
     private var currentPlayer = 0
-    private var positions = intArrayOf(0, 0)
+    private var positions = IntArray(2)
     private var gameOver = false
     private var winner = -1
     private var resultDialogVisible = false
@@ -64,46 +65,37 @@ class SnakesLaddersActivity : AppCompatActivity() {
         SoundPlayer.movementSoundsEnabled = SettingsManager.isMovementSoundsEnabled(this)
         makeFullscreen()
 
-        val content = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(8), dp(8), dp(8), dp(6))
-            setBackgroundColor(Color.parseColor("#10151A"))
-        }
-        turnView = TextView(this).apply {
-            setTextColor(Color.WHITE)
-            setTextSize(17f)
-            setTypeface(typeface, Typeface.BOLD)
-            gravity = Gravity.CENTER
-            setPadding(dp(12), dp(6), dp(12), dp(6))
-        }
         boardView = SnakesLaddersBoardView(this).apply {
             onGameOverTapped = { showResultDialog() }
         }
-        val boardStage = FrameLayout(this).apply {
+        boardStage = FrameLayout(this).apply {
             clipChildren = false
             addView(
                 boardView,
                 FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT,
-                ),
+                ).apply {
+                    val railHeight = dp(LudoPlayerControlView.RAIL_HEIGHT)
+                    topMargin = railHeight
+                    bottomMargin = railHeight
+                },
             )
         }
-        diceView = GlbDiceView(this).apply {
-            contentDescription = "Dice"
-            onRoll = { rollDice() }
-        }
-        val diceRail = FrameLayout(this).apply {
-            addView(
-                diceView,
-                FrameLayout.LayoutParams(dp(96), dp(96), Gravity.CENTER),
+        createPlayerControls()
+        playerControlViews.forEach { control ->
+            boardStage.addView(
+                control,
+                FrameLayout.LayoutParams(
+                    dp(LudoPlayerControlView.PAIR_WIDTH),
+                    dp(LudoPlayerControlView.CONTROL_HEIGHT),
+                ),
             )
         }
         gameRoot = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            addView(turnView, LinearLayout.LayoutParams(-1, dp(48)))
+            setBackgroundColor(android.graphics.Color.parseColor("#10151A"))
             addView(boardStage, LinearLayout.LayoutParams(-1, 0, 1f))
-            addView(diceRail, LinearLayout.LayoutParams(-1, dp(96)))
         }
         gameRoot.visibility = View.GONE
 
@@ -126,7 +118,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
     override fun onPause() {
         lifecycleActive = false
         handler.removeCallbacksAndMessages(null)
-        diceView.cancelRoll()
+        cancelPlayerDiceRolls()
         boardView.cancelAnimations()
         SoundPlayer.stopAll()
         super.onPause()
@@ -135,7 +127,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
     override fun onDestroy() {
         lifecycleActive = false
         handler.removeCallbacksAndMessages(null)
-        diceView.cancelRoll()
+        cancelPlayerDiceRolls()
         boardView.cancelAnimations()
         SoundPlayer.stopAll()
         super.onDestroy()
@@ -170,11 +162,19 @@ class SnakesLaddersActivity : AppCompatActivity() {
         menu.onVsAi = {
             StyledDialogs.dismiss()
             vsAI = true
+            playerCount = 2
             startGame()
         }
         menu.onTwoPlayers = {
             StyledDialogs.dismiss()
             vsAI = false
+            playerCount = 2
+            startGame()
+        }
+        menu.onFourPlayers = {
+            StyledDialogs.dismiss()
+            vsAI = false
+            playerCount = 4
             startGame()
         }
         menu.onHowToPlay = {
@@ -195,7 +195,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
 
             Reach square 100 first to win. A roll that would pass 100 leaves your counter where it is. Rolling a six grants another turn.
 
-            Play against the CPU or choose two players to take turns on the same board.
+            Play against the CPU, choose two players, or start a four-player match on the same board.
         """.trimIndent()
         StyledDialogs.showRules(
             this,
@@ -208,30 +208,32 @@ class SnakesLaddersActivity : AppCompatActivity() {
 
     private fun startGame() {
         handler.removeCallbacksAndMessages(null)
-        diceView.cancelRoll()
+        cancelPlayerDiceRolls()
         boardView.cancelAnimations()
-        positions = intArrayOf(0, 0)
+        positions = IntArray(playerCount)
         currentPlayer = 0
         gameOver = false
         winner = -1
         resultDialogVisible = false
         matchStarted = true
         boardView.gameOver = false
-        boardView.setPlayerPosition(0, 0)
-        boardView.setPlayerPosition(1, 0)
+        configurePlayerControls()
+        for (player in 0 until playerCount) {
+            boardView.setPlayerPosition(player, 0)
+        }
         showBoardAfterDialog()
         updateHud()
         SoundPlayer.playMovement("ludo_start")
     }
 
     private fun rollDice(automated: Boolean = false) {
-        if (!gameplayActive() || !matchStarted || gameOver || diceView.isRolling) return
+        if (!gameplayActive() || !matchStarted || gameOver || playerDiceViews.any { it.isRolling }) return
         // A die tap is always a human action. CPU turns call this method with
         // automated=true so they are not blocked by the human-turn guard.
         if (!automated && vsAI && currentPlayer == 1) return
         val player = currentPlayer
         val value = Random.nextInt(1, 7)
-        diceView.rollTo(value, MotionDiceDirection.UP) {
+        playerDiceViews[player].rollTo(value, MotionDiceDirection.UP) {
             if (gameplayActive()) applyRoll(player, value)
         }
         SoundPlayer.playMovement("ludo_dice")
@@ -241,7 +243,6 @@ class SnakesLaddersActivity : AppCompatActivity() {
         if (player != currentPlayer || gameOver) return
         val from = positions[player]
         if (from == 0 && value != 6) {
-            turnView.text = "${playerName(player)} needs a 6 to enter the board"
             finishTurn(player, value, 0)
             return
         }
@@ -285,12 +286,6 @@ class SnakesLaddersActivity : AppCompatActivity() {
         ) {
             positions[player] = stepped
             if (destination != stepped) {
-                val isLadder = destination > stepped
-                turnView.text = if (isLadder) {
-                    "Ladder! $stepped → $destination"
-                } else {
-                    "Snake! $stepped → $destination"
-                }
                 handler.postDelayed({
                     if (!gameplayActive() || gameOver) return@postDelayed
                     boardView.animateMove(
@@ -315,11 +310,10 @@ class SnakesLaddersActivity : AppCompatActivity() {
             winner = player
             gameOver = true
             boardView.gameOver = true
-            turnView.text = "${playerName(player)} wins"
             handler.postDelayed({ if (lifecycleActive) showResultDialog() }, 300L)
             return
         }
-        if (roll != 6) currentPlayer = 1 - player
+        if (roll != 6) currentPlayer = (player + 1) % playerCount
         updateHud()
         if (vsAI && currentPlayer == 1) {
             handler.postDelayed({ if (gameplayActive()) rollDice(automated = true) }, 700L)
@@ -327,24 +321,18 @@ class SnakesLaddersActivity : AppCompatActivity() {
     }
 
     private fun updateHud() {
-        if (!::turnView.isInitialized) return
-        val label = if (currentPlayer == 0) {
-            if (vsAI) "Your turn · tap the die to roll" else "Player 1 · tap the die to roll"
-        } else {
-            if (vsAI) "CPU is thinking" else "Player 2 · tap the die to roll"
-        }
-        turnView.text = label
-        val accent = SnakesLaddersBoardView.PLAYER_COLORS[currentPlayer]
-        turnView.setTextColor(accent)
-        turnView.background = android.graphics.drawable.GradientDrawable().apply {
-            cornerRadius = dp(14).toFloat()
-            setColor(Color.argb(235, 13, 18, 24))
-            setStroke(dp(2), Color.argb(220, Color.red(accent), Color.green(accent), Color.blue(accent)))
+        if (!::playerControlViews.isInitialized) return
+        playerControlViews.forEachIndexed { player, control ->
+            val active = matchStarted && !gameOver && player == currentPlayer
+            control.label = playerName(player)
+            control.isActive = active
+            playerBadgeViews[player].label = playerName(player)
+            playerBadgeViews[player].isActive = active
         }
     }
 
     private fun showLeaveMatchDialog() {
-        if (diceView.isRolling) {
+        if (playerDiceViews.any { it.isRolling }) {
             Toast.makeText(this, "Wait for the dice to stop rolling", Toast.LENGTH_SHORT).show()
             return
         }
@@ -370,10 +358,12 @@ class SnakesLaddersActivity : AppCompatActivity() {
         if (!gameOver || resultDialogVisible) return
         resultDialogVisible = true
         hideBoardWhileDialogIsOpen()
-        val message = if (winner == 0) {
-            if (vsAI) "You win!" else "Player 1 wins!"
+        val message = if (vsAI && winner == 0) {
+            "You win!"
+        } else if (vsAI && winner == 1) {
+            "The CPU wins!"
         } else {
-            if (vsAI) "The CPU wins!" else "Player 2 wins!"
+            "${playerName(winner)} wins!"
         }
         StyledDialogs.showChoices(
             this,
@@ -400,8 +390,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
     private fun hideBoardWhileDialogIsOpen() {
         dialogOpen = true
         handler.removeCallbacksAndMessages(null)
-        diceView.cancelRoll()
-        diceView.setGameplayVisible(false)
+        setPlayerControlsVisible(false)
         boardView.cancelAnimations()
         SoundPlayer.stopAll()
         gameRoot.visibility = View.GONE
@@ -410,7 +399,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
     private fun showBoardAfterDialog() {
         dialogOpen = false
         gameRoot.visibility = View.VISIBLE
-        diceView.setGameplayVisible(true)
+        setPlayerControlsVisible(true)
         updateHud()
         if (vsAI && currentPlayer == 1 && !gameOver) {
             handler.postDelayed({ if (gameplayActive()) rollDice(automated = true) }, 500L)
@@ -424,8 +413,114 @@ class SnakesLaddersActivity : AppCompatActivity() {
         if (player == 0) {
             if (vsAI) "You" else "Player 1"
         } else {
-            if (vsAI) "CPU" else "Player 2"
+            if (vsAI) "CPU" else "Player ${player + 1}"
         }
+
+    private fun createPlayerControls() {
+        playerDiceViews = Array(4) { player ->
+            GlbDiceView(this).apply {
+                contentDescription = "Player ${player + 1} dice"
+                onRoll = {
+                    if (player == currentPlayer &&
+                        gameplayActive() &&
+                        matchStarted &&
+                        !gameOver &&
+                        (!vsAI || player == 0)
+                    ) {
+                        rollDice()
+                    }
+                }
+            }
+        }
+        playerBadgeViews = Array(4) { player ->
+            LudoPlayerBadgeView(this).apply {
+                accentColor = SnakesLaddersBoardView.PLAYER_COLORS[player]
+                label = playerName(player)
+            }
+        }
+        playerControlViews = Array(4) { player ->
+            LudoPlayerControlView(this).apply {
+                accentColor = SnakesLaddersBoardView.PLAYER_COLORS[player]
+                label = playerName(player)
+                labelBelow = player == 0
+                labelUpsideDown = player != 0
+                bind(
+                    playerBadgeViews[player],
+                    playerDiceViews[player],
+                    profileOnEnd = player % 2 == 1,
+                )
+                visibility = if (player < playerCount) View.VISIBLE else View.GONE
+            }
+        }
+        boardStage.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+            positionPlayerControls()
+        }
+    }
+
+    private fun configurePlayerControls() {
+        playerControlViews.forEachIndexed { player, control ->
+            val isBottomPlayer = if (playerCount == 2) player == 0 else player < 2
+            control.labelBelow = isBottomPlayer
+            control.labelUpsideDown = !isBottomPlayer
+            playerBadgeViews[player].facesOppositeSide = !isBottomPlayer
+            control.bind(
+                playerBadgeViews[player],
+                playerDiceViews[player],
+                profileOnEnd = player % 2 == 1,
+            )
+        }
+    }
+
+    private fun positionPlayerControls() {
+        if (!::boardStage.isInitialized || boardStage.width <= 0 || boardStage.height <= 0) return
+        val boardLeft = boardView.left
+        val boardTop = boardView.top + boardView.boardArtworkTopPixels()
+        val boardWidth = boardView.width
+        val boardBottom = boardView.top + boardView.boardArtworkBottomPixels()
+        val controlWidth = dp(LudoPlayerControlView.PAIR_WIDTH)
+        val controlHeight = dp(LudoPlayerControlView.CONTROL_HEIGHT)
+        val gap = dp(LudoPlayerControlView.CONTROL_GAP)
+        val leftX = boardLeft + dp(4)
+        val rightX = boardLeft + boardWidth - controlWidth - dp(4)
+        val topY = boardTop - controlHeight - gap
+        val bottomY = boardBottom + gap
+        val positions = if (playerCount == 2) {
+            arrayOf(leftX to bottomY, rightX to topY)
+        } else {
+            arrayOf(
+                leftX to bottomY,
+                rightX to bottomY,
+                leftX to topY,
+                rightX to topY,
+            )
+        }
+        playerControlViews.forEachIndexed { player, control ->
+            val (left, top) = positions[player]
+            control.layoutParams = (control.layoutParams as FrameLayout.LayoutParams).apply {
+                width = controlWidth
+                height = controlHeight
+                leftMargin = left
+                topMargin = top
+            }
+            control.visibility = if (player < playerCount && !dialogOpen) View.VISIBLE else View.GONE
+        }
+    }
+
+    private fun setPlayerControlsVisible(visible: Boolean) {
+        if (!::playerControlViews.isInitialized) return
+        playerControlViews.forEachIndexed { player, control ->
+            val shown = visible && player < playerCount
+            control.visibility = if (shown) View.VISIBLE else View.INVISIBLE
+            playerDiceViews[player].visibility = if (shown) View.VISIBLE else View.INVISIBLE
+            playerDiceViews[player].setGameplayVisible(shown)
+            playerBadgeViews[player].visibility = if (shown) View.VISIBLE else View.INVISIBLE
+        }
+    }
+
+    private fun cancelPlayerDiceRolls() {
+        if (!::playerDiceViews.isInitialized) return
+        playerDiceViews.forEach { it.cancelRoll() }
+    }
 
     private fun makeFullscreen() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
