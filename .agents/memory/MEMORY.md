@@ -4,3 +4,4 @@
 - [GitHub repository auth](github-auth.md) — Git operations use GitHub’s standard basic-auth token header; never put the token in a remote URL or output.
 - [Fox & Geese rendering](fox-geese-rendering.md) — initialize the game state before dialogs, and route custom board colors through the shared theme palette.
 - [Chess challenge catalogue](chess-challenge-validation.md) — validate the effective 1–100 list after any filtered seed data and appended authored levels.
+- [Snakes & Ladders movement](snakes-ladders-animation.md) — pieces start off-board, enter on six, and use Ludo-synchronized hop timing and sounds.
