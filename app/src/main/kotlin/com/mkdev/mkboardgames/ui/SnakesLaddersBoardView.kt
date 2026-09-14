@@ -75,9 +75,9 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
             assetName = "snakes_ladders_board_two.jpg",
             gridInset = 0f,
             gridSize = 1f,
-            artworkAspectRatio = 640f / 1132f,
+            artworkAspectRatio = 1f,
             artworkScale = 1f,
-            fullBleedBackground = true,
+            fullBleedBackground = false,
             ladders = mapOf(
                 7 to 30,
                 16 to 33,
@@ -261,7 +261,6 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
             canvas.drawRect(boardRect, tokenPaint)
         }
 
-        drawBoardOverlay(canvas)
         for (player in 0 until activePlayerCount) {
             drawToken(canvas, player, animatedPoints[player])
         }
