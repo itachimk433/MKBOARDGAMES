@@ -14,6 +14,7 @@ import android.widget.LinearLayout
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.mkdev.mkboardgames.ui.ChessMenuView
+import com.mkdev.mkboardgames.ui.FireworksView
 import com.mkdev.mkboardgames.ui.GlbDiceView
 import com.mkdev.mkboardgames.ui.LudoPlayerBadgeView
 import com.mkdev.mkboardgames.ui.LudoPlayerControlView
@@ -29,6 +30,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
     private lateinit var boardStage: FrameLayout
     private lateinit var screenRoot: FrameLayout
     private lateinit var boardBackdropView: ImageView
+    private lateinit var fireworksView: FireworksView
     private var modeMenuView: ChessMenuView? = null
     private var boardSelectionView: SnakesLaddersBoardSelectionView? = null
     private lateinit var playerDiceViews: Array<GlbDiceView>
@@ -101,6 +103,11 @@ class SnakesLaddersActivity : AppCompatActivity() {
                 gameRoot,
                 FrameLayout.LayoutParams(-1, -1),
             )
+            fireworksView = FireworksView(this@SnakesLaddersActivity)
+            addView(
+                fireworksView,
+                FrameLayout.LayoutParams(-1, -1),
+            )
         }
         setContentView(screenRoot)
         showModeDialog()
@@ -125,12 +132,27 @@ class SnakesLaddersActivity : AppCompatActivity() {
         super.onResume()
         lifecycleActive = true
         makeFullscreen()
+        if (::playerDiceViews.isInitialized) {
+            playerDiceViews.forEach { it.onHostResume() }
+            if (matchStarted && !dialogOpen && !gameOver) {
+                updateHud()
+                if (vsAI && currentPlayer == 1) {
+                    handler.postDelayed(
+                        { if (gameplayActive() && currentPlayer == 1) rollDice(automated = true) },
+                        350L,
+                    )
+                }
+            }
+        }
     }
 
     override fun onPause() {
         lifecycleActive = false
         handler.removeCallbacksAndMessages(null)
-        cancelPlayerDiceRolls()
+        if (::playerDiceViews.isInitialized) {
+            playerDiceViews.forEach { it.onHostPause() }
+        }
+        turnResolutionPending = false
         boardView.cancelAnimations()
         SoundPlayer.stopAll()
         super.onPause()
@@ -139,9 +161,13 @@ class SnakesLaddersActivity : AppCompatActivity() {
     override fun onDestroy() {
         lifecycleActive = false
         handler.removeCallbacksAndMessages(null)
-        cancelPlayerDiceRolls()
+        if (::playerDiceViews.isInitialized) {
+            playerDiceViews.forEach { it.onHostPause() }
+        }
+        turnResolutionPending = false
         boardView.cancelAnimations()
         SoundPlayer.stopAll()
+        if (::fireworksView.isInitialized) fireworksView.cancel()
         super.onDestroy()
     }
 
@@ -296,6 +322,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
         resultDialogVisible = false
         turnResolutionPending = false
         matchStarted = true
+        fireworksView.cancel()
         boardView.gameOver = false
         boardView.setActivePlayerCount(playerCount)
         if (playerCount == 4) {
@@ -417,6 +444,8 @@ class SnakesLaddersActivity : AppCompatActivity() {
             winner = player
             gameOver = true
             boardView.gameOver = true
+            SoundPlayer.playMovement("snakes_ladders_victory")
+            fireworksView.playOnce()
             updateHud()
             handler.postDelayed({ if (lifecycleActive) showResultDialog() }, 300L)
             return

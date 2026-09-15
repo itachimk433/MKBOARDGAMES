@@ -152,6 +152,22 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
     }
 
     /**
+     * GLSurfaceView does not receive Activity lifecycle callbacks through its
+     * FrameLayout parent. Forward them explicitly so returning to the app
+     * cannot leave the renderer paused on a partially rolled frame.
+     */
+    fun onHostPause() {
+        cancelRoll()
+        glSurfaceView.onPause()
+    }
+
+    fun onHostResume() {
+        glSurfaceView.onResume()
+        glRenderer.setAnimationScale(1f)
+        glRenderer.setRotation(rotationX, rotationY, rotationZ)
+    }
+
+    /**
      * GLSurfaceView can remain above its parent when it uses z-order-on-top.
      * Dialog transitions must hide the surface itself, not just this container.
      */

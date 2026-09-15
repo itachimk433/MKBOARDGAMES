@@ -68,6 +68,7 @@ object SoundPlayer {
         // Snakes & Ladders transitions
         ids["snakes_ladders_ladder"] = p.load(ctx, R.raw.snakes_ladders_ladder_climb, 1)
         ids["snakes_ladders_snake"] = p.load(ctx, R.raw.snakes_ladders_snake_slide, 1)
+        ids["snakes_ladders_victory"] = p.load(ctx, R.raw.snakes_ladders_victory, 1)
 
         // UI navigation click (reuses mora_place — short, clicky)
         ids["ui_click"]         = p.load(ctx, R.raw.mora_place,       1)
