@@ -196,6 +196,7 @@ class FireworksView(context: Context) : View(context) {
             launchAt: Float,
             color: Int,
             count: Int,
+            launchDuration: Float = 0.13f,
         ): Burst {
             val sparks = List(count) {
                 Spark(
@@ -211,7 +212,7 @@ class FireworksView(context: Context) : View(context) {
                 targetX = targetX,
                 targetY = targetY,
                 launchAt = launchAt,
-                launchDuration = 0.13f,
+                launchDuration = launchDuration,
                 lifetime = 0.67f + random.nextFloat() * 0.16f,
                 color = color,
                 sparks = sparks,
@@ -219,7 +220,7 @@ class FireworksView(context: Context) : View(context) {
         }
 
         return listOf(
-            burst(0.18f, 0.27f, 0.31f, 0.04f, Color.rgb(255, 211, 72), 62),
+            burst(0.18f, 0.27f, 0.31f, 0f, Color.rgb(255, 211, 72), 62, 0.08f),
             burst(0.74f, 0.69f, 0.25f, 0.18f, Color.rgb(109, 194, 255), 70),
             burst(0.47f, 0.48f, 0.18f, 0.38f, Color.rgb(255, 107, 145), 78),
             burst(0.88f, 0.81f, 0.43f, 0.56f, Color.rgb(182, 132, 255), 56),

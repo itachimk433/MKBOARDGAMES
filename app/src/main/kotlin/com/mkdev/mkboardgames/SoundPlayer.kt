@@ -9,10 +9,17 @@ import android.media.SoundPool
  * Call [init] once in Activity.onCreate and [play] to fire a sound.
  */
 object SoundPlayer {
+    private data class PendingPlay(
+        val key: String,
+        val volume: Float,
+        val rate: Float,
+    )
 
     private var pool: SoundPool? = null
     private val ids = mutableMapOf<String, Int>()
     private val activeStreams = mutableMapOf<String, MutableSet<Int>>()
+    private val loadedSampleIds = mutableSetOf<Int>()
+    private val pendingPlays = mutableMapOf<Int, MutableList<PendingPlay>>()
     private var ready = false
 
     fun init(ctx: Context) {
@@ -23,6 +30,16 @@ object SoundPlayer {
             .build()
         pool = SoundPool.Builder().setMaxStreams(4).setAudioAttributes(attrs).build()
         val p = pool ?: return
+        p.setOnLoadCompleteListener { _, sampleId, status ->
+            if (status != 0) {
+                pendingPlays.remove(sampleId)
+                return@setOnLoadCompleteListener
+            }
+            loadedSampleIds.add(sampleId)
+            pendingPlays.remove(sampleId)?.forEach { pending ->
+                playLoaded(pending.key, pending.volume, pending.rate)
+            }
+        }
 
         // Chess sounds (unchanged)
         ids["game_start"]       = p.load(ctx, R.raw.game_start,       1)
@@ -80,6 +97,25 @@ object SoundPlayer {
     var movementSoundsEnabled: Boolean = true
 
     fun play(key: String, volume: Float = 1f, rate: Float = 1f) {
+        playLoaded(key, volume, rate)
+    }
+
+    /**
+     * Plays a one-shot celebration even if SoundPool is still decoding the
+     * sample. Unlike movement cues, it intentionally ignores the movement
+     * sound preference.
+     */
+    fun playWhenReady(key: String, volume: Float = 1f, rate: Float = 1f) {
+        val soundId = ids[key] ?: return
+        if (loadedSampleIds.contains(soundId)) {
+            playLoaded(key, volume, rate)
+        } else {
+            pendingPlays.getOrPut(soundId) { mutableListOf() }
+                .add(PendingPlay(key, volume, rate))
+        }
+    }
+
+    private fun playLoaded(key: String, volume: Float, rate: Float) {
         ids[key]?.let { soundId ->
             val streamId = pool?.play(
                 soundId,
@@ -122,5 +158,6 @@ object SoundPlayer {
             }
         }
         activeStreams.clear()
+        pendingPlays.clear()
     }
 }

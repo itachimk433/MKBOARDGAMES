@@ -22,6 +22,7 @@ import com.mkdev.mkboardgames.ui.MotionDiceDirection
 import com.mkdev.mkboardgames.ui.SnakesLaddersBoardView
 import com.mkdev.mkboardgames.ui.SnakesLaddersBoardSelectionView
 import com.mkdev.mkboardgames.ui.StyledDialogs
+import com.mkdev.mkboardgames.ui.SnakesLaddersGameOverView
 import kotlin.random.Random
 
 class SnakesLaddersActivity : AppCompatActivity() {
@@ -31,6 +32,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
     private lateinit var screenRoot: FrameLayout
     private lateinit var boardBackdropView: ImageView
     private lateinit var fireworksView: FireworksView
+    private lateinit var gameOverView: SnakesLaddersGameOverView
     private var modeMenuView: ChessMenuView? = null
     private var boardSelectionView: SnakesLaddersBoardSelectionView? = null
     private lateinit var playerDiceViews: Array<GlbDiceView>
@@ -64,7 +66,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
         makeFullscreen()
 
         boardView = SnakesLaddersBoardView(this).apply {
-            onGameOverTapped = { showResultDialog() }
+            onGameOverTapped = { showGameOverOverlay() }
         }
         boardStage = FrameLayout(this).apply {
             clipChildren = false
@@ -106,6 +108,20 @@ class SnakesLaddersActivity : AppCompatActivity() {
             fireworksView = FireworksView(this@SnakesLaddersActivity)
             addView(
                 fireworksView,
+                FrameLayout.LayoutParams(-1, -1),
+            )
+            gameOverView = SnakesLaddersGameOverView(this@SnakesLaddersActivity).apply {
+                onReplay = {
+                    hideGameOverOverlay()
+                    startGame()
+                }
+                onHome = {
+                    hideGameOverOverlay()
+                    finish()
+                }
+            }
+            addView(
+                gameOverView,
                 FrameLayout.LayoutParams(-1, -1),
             )
         }
@@ -191,7 +207,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
             boardSelectionView = null
             showModeDialog()
         } else if (gameOver) {
-            showResultDialog()
+            showGameOverOverlay()
         } else if (matchStarted) {
             showLeaveMatchDialog()
         } else {
@@ -323,6 +339,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
         turnResolutionPending = false
         matchStarted = true
         fireworksView.cancel()
+        hideGameOverOverlay()
         boardView.gameOver = false
         boardView.setActivePlayerCount(playerCount)
         if (playerCount == 4) {
@@ -419,12 +436,20 @@ class SnakesLaddersActivity : AppCompatActivity() {
                         onStep = {},
                     ) {
                         positions[player] = destination
-                        finishTurn(player, roll, destination)
+                        finishAnimatedMove(player, roll, destination)
                     }
                 }, 120L)
             } else {
-                finishTurn(player, roll, destination)
+                finishAnimatedMove(player, roll, destination)
             }
+        }
+    }
+
+    private fun finishAnimatedMove(player: Int, roll: Int, destination: Int) {
+        if (destination >= 100) {
+            completeWin(player)
+        } else {
+            finishTurn(player, roll, destination)
         }
     }
 
@@ -441,13 +466,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
     private fun completeTurn(player: Int, roll: Int, destination: Int) {
         turnResolutionPending = false
         if (destination >= 100) {
-            winner = player
-            gameOver = true
-            boardView.gameOver = true
-            SoundPlayer.playMovement("snakes_ladders_victory")
-            fireworksView.playOnce()
-            updateHud()
-            handler.postDelayed({ if (lifecycleActive) showResultDialog() }, 300L)
+            completeWin(player)
             return
         }
         if (roll != 6) currentPlayer = (player + 1) % playerCount
@@ -455,6 +474,19 @@ class SnakesLaddersActivity : AppCompatActivity() {
         if (vsAI && currentPlayer == 1) {
             handler.postDelayed({ if (gameplayActive()) rollDice(automated = true) }, 700L)
         }
+    }
+
+    private fun completeWin(player: Int) {
+        if (gameOver) return
+        turnResolutionPending = false
+        winner = player
+        gameOver = true
+        boardView.gameOver = true
+        SoundPlayer.stop("ludo_move")
+        SoundPlayer.playWhenReady("snakes_ladders_victory")
+        fireworksView.playOnce()
+        updateHud()
+        showGameOverOverlay()
     }
 
     private fun updateHud() {
@@ -500,36 +532,17 @@ class SnakesLaddersActivity : AppCompatActivity() {
         }
     }
 
-    private fun showResultDialog() {
+    private fun showGameOverOverlay() {
         if (!gameOver || resultDialogVisible) return
         resultDialogVisible = true
-        hideBoardWhileDialogIsOpen()
-        val message = if (vsAI && winner == 0) {
-            "You win!"
-        } else if (vsAI && winner == 1) {
-            "The CPU wins!"
-        } else {
-            "${playerName(winner)} wins!"
-        }
-        StyledDialogs.showChoices(
-            this,
-            "Game Over",
-            message,
-            listOf(
-                StyledDialogs.choice("Play Again", "Start a fresh game", "↻", "#E3B86A"),
-                StyledDialogs.choice("Main Menu", "Choose another match", "⌂", "#E58A7A"),
-            ),
-            420f,
-            "S N A K E S & L A D D E R S",
-            onCancel = {
-                resultDialogVisible = false
-                showBoardAfterDialog()
-            },
-            fullScreen = false,
-        ) { which, dialog ->
-            dialog.dismiss()
-            resultDialogVisible = false
-            if (which == 0) startGame() else finish()
+        gameOverView.visibility = View.VISIBLE
+        gameOverView.bringToFront()
+    }
+
+    private fun hideGameOverOverlay() {
+        resultDialogVisible = false
+        if (::gameOverView.isInitialized) {
+            gameOverView.visibility = View.GONE
         }
     }
 
@@ -539,6 +552,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
         setPlayerControlsVisible(false)
         boardView.cancelAnimations()
         SoundPlayer.stopAll()
+        hideGameOverOverlay()
         gameRoot.visibility = if (hideGameRoot) View.GONE else View.VISIBLE
     }
 
