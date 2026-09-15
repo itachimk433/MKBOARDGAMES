@@ -213,6 +213,7 @@ class SnakesLaddersBoardSelectionView(
                 SnakesLaddersBoardView.Board.ONE -> "Classic board"
                 SnakesLaddersBoardView.Board.TWO -> "Winter board"
                 SnakesLaddersBoardView.Board.THREE -> "Haunted board"
+                SnakesLaddersBoardView.Board.FOUR -> "Forest board"
             },
             drawnCard.centerX(),
             drawnCard.bottom - dp(14f),
