@@ -430,7 +430,8 @@ class MenuView(
         }
 
         val contentCardH = if (homeStyle == SettingsManager.HomeStyle.SNOW) baseCardH else r.height()
-        val previewSz   = minOf(contentCardH * 0.46f, r.width() * 0.64f)
+        val contentScale = if (homeStyle == SettingsManager.HomeStyle.SNOW) 0.95f else 1f
+        val previewSz   = minOf(contentCardH * 0.46f, r.width() * 0.64f) * contentScale
         val previewLeft = r.centerX() - previewSz / 2f
         val previewTop  = r.top + 10f * dp
         drawMiniBoard(canvas, previewLeft, previewTop, previewSz, card.type)
@@ -460,17 +461,27 @@ class MenuView(
             "Snakes & Ladders" -> listOf("Snakes &", "Ladders")
             else -> listOf(title)
         }
-        val titleStartY = previewTop + previewSz + cardTitlePaint.textSize + 5f * dp
+        val titlePaint = if (homeStyle == SettingsManager.HomeStyle.SNOW) {
+            Paint(cardTitlePaint).apply { textSize *= 0.95f }
+        } else {
+            cardTitlePaint
+        }
+        val descPaint = if (homeStyle == SettingsManager.HomeStyle.SNOW) {
+            Paint(cardDescPaint).apply { textSize *= 0.95f }
+        } else {
+            cardDescPaint
+        }
+        val titleStartY = previewTop + previewSz + titlePaint.textSize + 5f * dp
         titleLines.forEachIndexed { index, line ->
             canvas.drawText(
                 line,
                 r.centerX(),
-                titleStartY + index * (cardTitlePaint.textSize + 1f * dp),
-                cardTitlePaint
+                titleStartY + index * (titlePaint.textSize + 1f * dp),
+                titlePaint
             )
         }
-        val descY = titleStartY + titleLines.size * (cardTitlePaint.textSize + 1f * dp) + 2f * dp
-        canvas.drawText(desc, r.centerX(), descY, cardDescPaint)
+        val descY = titleStartY + titleLines.size * (titlePaint.textSize + 1f * dp) + 2f * dp
+        canvas.drawText(desc, r.centerX(), descY, descPaint)
         if (isChallengeLocked(card.type)) {
             drawChallengeLockOverlay(canvas, r)
         }
@@ -525,46 +536,27 @@ class MenuView(
     }
 
     private fun drawSnowCardShell(canvas: Canvas, r: RectF, pressed: Boolean) {
-        val shellWidth = r.width() * 1.5f
-        val shellHeight = r.height() * 1.5f
-        val shellOffsetY = -r.height() * 0.2f
-        val shellRect = RectF(
-            r.centerX() - shellWidth / 2f,
-            r.centerY() - shellHeight / 2f + shellOffsetY,
-            r.centerX() + shellWidth / 2f,
-            r.centerY() + shellHeight / 2f + shellOffsetY,
-        )
         val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.argb(60, 34, 78, 117)
             maskFilter = BlurMaskFilter(5f * dp, BlurMaskFilter.Blur.NORMAL)
         }
         canvas.drawRoundRect(
-            RectF(
-                shellRect.left + 2f * dp,
-                shellRect.top + 3f * dp,
-                shellRect.right + 2f * dp,
-                shellRect.bottom + 3f * dp,
-            ),
+            RectF(r.left + 2f * dp, r.top + 3f * dp, r.right + 2f * dp, r.bottom + 3f * dp),
             14f * dp,
             14f * dp,
             shadowPaint,
         )
         val bitmap = snowCardBitmap
         if (bitmap == null) {
-            canvas.drawRoundRect(
-                shellRect,
-                14f * dp,
-                14f * dp,
-                if (pressed) cardHiPaint else cardPaint,
-            )
+            canvas.drawRoundRect(r, 14f * dp, 14f * dp, if (pressed) cardHiPaint else cardPaint)
             return
         }
-        canvas.drawBitmap(bitmap, null, shellRect, snowCardPaint)
+        canvas.drawBitmap(bitmap, null, r, snowCardPaint)
         if (pressed) {
             val pressedPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.argb(35, 33, 77, 126)
             }
-            canvas.drawRoundRect(shellRect, 14f * dp, 14f * dp, pressedPaint)
+            canvas.drawRoundRect(r, 14f * dp, 14f * dp, pressedPaint)
         }
     }
 
