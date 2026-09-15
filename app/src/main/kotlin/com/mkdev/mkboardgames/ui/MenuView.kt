@@ -210,6 +210,9 @@ class MenuView(
     private val homeBackgroundScrimPaint = Paint().apply {
         color = Color.argb(105, 0, 0, 0)
     }
+    private val snowBackButtonBitmap: Bitmap? = try {
+        context.assets.open("snow_back_button.webp").use { BitmapFactory.decodeStream(it) }
+    } catch (e: Exception) { null }
     private val snowCardBitmap: Bitmap? = try {
         context.assets.open("snow_game_card.webp").use { BitmapFactory.decodeStream(it) }
     } catch (e: Exception) { null }
@@ -370,6 +373,10 @@ class MenuView(
     }
 
     private fun drawBackArrow(canvas: Canvas) {
+        snowBackButtonBitmap?.let {
+            canvas.drawBitmap(it, null, backRect, bitmapPaint)
+            return
+        }
         canvas.drawRoundRect(backRect, 10f * dp, 10f * dp, backButtonPaint)
         canvas.drawRoundRect(backRect, 10f * dp, 10f * dp, backButtonEdgePaint)
         val cy = backRect.centerY()
