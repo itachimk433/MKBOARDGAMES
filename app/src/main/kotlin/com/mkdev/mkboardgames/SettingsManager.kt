@@ -294,6 +294,7 @@ object SettingsManager {
 
     // ── Home background ──────────────────────────────────────────────────────
     private const val KEY_HOME_BACKGROUND = "home_background"
+    private const val KEY_HOME_STYLE = "home_style"
     fun isHomeBackgroundEnabled(ctx: Context) =
         prefs(ctx).getBoolean(KEY_HOME_BACKGROUND, true)
     fun setHomeBackgroundEnabled(ctx: Context, v: Boolean) =
@@ -301,6 +302,29 @@ object SettingsManager {
 
     // ── Home game card style ─────────────────────────────────────────────────
     private const val KEY_WOOD_GAME_CARDS = "wood_game_cards"
+    enum class HomeStyle(val label: String) {
+        CLASSIC("Classic"),
+        BROWN("Brown"),
+        SNOW("Snow"),
+    }
+
+    fun getHomeStyle(ctx: Context): HomeStyle {
+        return when (prefs(ctx).getString(KEY_HOME_STYLE, null)) {
+            HomeStyle.BROWN.name -> HomeStyle.BROWN
+            HomeStyle.SNOW.name -> HomeStyle.SNOW
+            HomeStyle.CLASSIC.name -> HomeStyle.CLASSIC
+            else -> if (isBrownHomeStyleEnabled(ctx)) HomeStyle.BROWN else HomeStyle.CLASSIC
+        }
+    }
+
+    fun setHomeStyle(ctx: Context, style: HomeStyle) {
+        prefs(ctx).edit()
+            .putString(KEY_HOME_STYLE, style.name)
+            .putBoolean(KEY_HOME_BACKGROUND, style == HomeStyle.BROWN)
+            .putBoolean(KEY_WOOD_GAME_CARDS, style == HomeStyle.BROWN)
+            .apply()
+    }
+
     fun isWoodGameCardStyleEnabled(ctx: Context) =
         prefs(ctx).getBoolean(KEY_WOOD_GAME_CARDS, true)
     fun setWoodGameCardStyleEnabled(ctx: Context, v: Boolean) =
@@ -310,6 +334,7 @@ object SettingsManager {
             prefs(ctx).getBoolean(KEY_WOOD_GAME_CARDS, true)
     fun setBrownHomeStyleEnabled(ctx: Context, v: Boolean) =
         prefs(ctx).edit()
+            .putString(KEY_HOME_STYLE, if (v) HomeStyle.BROWN.name else HomeStyle.CLASSIC.name)
             .putBoolean(KEY_HOME_BACKGROUND, v)
             .putBoolean(KEY_WOOD_GAME_CARDS, v)
             .apply()

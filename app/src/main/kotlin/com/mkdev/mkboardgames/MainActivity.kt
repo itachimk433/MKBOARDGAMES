@@ -907,15 +907,18 @@ class MainActivity : AppCompatActivity() {
         }
         root.addView(movSoundRow)
 
-        var brownHomeStyle = SettingsManager.isBrownHomeStyleEnabled(ctx)
+        var homeStyle = SettingsManager.getHomeStyle(ctx)
         val (homeStyleRow, homeStyleVal) =
-            settingRow("🖌️", "Home Style", if (brownHomeStyle) "Brown" else "Classic")
+            settingRow("🖌️", "Home Style", homeStyle.label)
         homeStyleRow.setOnClickListener {
-            brownHomeStyle = !brownHomeStyle
-            SettingsManager.setBrownHomeStyleEnabled(ctx, brownHomeStyle)
-            menuView?.isHomeBackgroundEnabled = brownHomeStyle
-            menuView?.isWoodGameCardStyleEnabled = brownHomeStyle
-            homeStyleVal.text = if (brownHomeStyle) "Brown" else "Classic"
+            homeStyle = when (homeStyle) {
+                SettingsManager.HomeStyle.CLASSIC -> SettingsManager.HomeStyle.BROWN
+                SettingsManager.HomeStyle.BROWN -> SettingsManager.HomeStyle.SNOW
+                SettingsManager.HomeStyle.SNOW -> SettingsManager.HomeStyle.CLASSIC
+            }
+            SettingsManager.setHomeStyle(ctx, homeStyle)
+            menuView?.homeStyle = homeStyle
+            homeStyleVal.text = homeStyle.label
         }
         root.addView(homeStyleRow)
 

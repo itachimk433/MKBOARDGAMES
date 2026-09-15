@@ -6,6 +6,7 @@ import android.graphics.*
 import android.view.MotionEvent
 import android.view.View
 import com.mkdev.mkboardgames.GameMode
+import com.mkdev.mkboardgames.SettingsManager
 import com.mkdev.mkboardgames.engine.Position
 import com.mkdev.mkboardgames.games.foxandgeese.FoxAndGeeseSetup
 import com.mkdev.mkboardgames.games.go.GoSetup
@@ -21,13 +22,19 @@ class MenuView(
 
     /** Applied at attach-time from saved preferences; controls colour scheme. */
     var isLightMode: Boolean = false
-        set(v) { field = v; applyLightTheme(); invalidate() }
+        set(v) {
+            field = v
+            applyLightTheme()
+            applyHomeStyleColors()
+            invalidate()
+        }
 
-    var isHomeBackgroundEnabled: Boolean = false
-        set(v) { field = v; invalidate() }
-
-    var isWoodGameCardStyleEnabled: Boolean = true
-        set(v) { field = v; invalidate() }
+    var homeStyle: SettingsManager.HomeStyle = SettingsManager.HomeStyle.CLASSIC
+        set(v) {
+            field = v
+            applyHomeStyleColors()
+            invalidate()
+        }
 
     private var currentGameMode = com.mkdev.mkboardgames.SettingsManager.currentMode(context)
 
@@ -39,10 +46,7 @@ class MenuView(
         } else {
             com.mkdev.mkboardgames.SettingsManager.currentMode(context)
         }
-        val brownHomeStyle =
-            com.mkdev.mkboardgames.SettingsManager.isBrownHomeStyleEnabled(context)
-        isHomeBackgroundEnabled = brownHomeStyle
-        isWoodGameCardStyleEnabled = brownHomeStyle
+        homeStyle = SettingsManager.getHomeStyle(context)
         com.mkdev.mkboardgames.SoundPlayer.init(context)
     }
 
@@ -205,6 +209,10 @@ class MenuView(
     private val homeBackgroundScrimPaint = Paint().apply {
         color = Color.argb(105, 0, 0, 0)
     }
+    private val snowCardBitmap: Bitmap? = try {
+        context.assets.open("snow_game_card.webp").use { BitmapFactory.decodeStream(it) }
+    } catch (e: Exception) { null }
+    private val snowCardPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
 
     private val gridColumns = 3
     private val cardH = 136f * dp
@@ -336,7 +344,7 @@ class MenuView(
     // ── Draw ──────────────────────────────────────────────────────────────────
     override fun onDraw(canvas: Canvas) {
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
-        if (isHomeBackgroundEnabled) drawHomeBackground(canvas)
+        if (homeStyle == SettingsManager.HomeStyle.BROWN) drawHomeBackground(canvas)
         // The header, game cards, and footer are one continuous scrollable
         // surface. This keeps the home screen predictable on short displays
         // and makes the version/settings area move with the game catalogue.
@@ -392,7 +400,11 @@ class MenuView(
         val scale = cardScales[card.type] ?: 1f
         val r = card.rect; val pressed = pressedCard == card.type
         if (scale != 1f) { canvas.save(); canvas.scale(scale, scale, r.centerX(), r.centerY()) }
-        if (isLightMode || !isWoodGameCardStyleEnabled) {
+        if (homeStyle == SettingsManager.HomeStyle.SNOW) {
+            drawSnowCardShell(canvas, r, pressed)
+        } else if (homeStyle == SettingsManager.HomeStyle.BROWN && !isLightMode) {
+            drawWoodCardShell(canvas, r, pressed)
+        } else {
             val shadowP = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.argb(50, 0, 0, 0)
                 maskFilter = BlurMaskFilter(10f, BlurMaskFilter.Blur.NORMAL)
@@ -407,8 +419,6 @@ class MenuView(
                 RectF(r.left + 0.5f * dp, r.top + 0.5f * dp, r.right - 0.5f * dp, r.bottom - 0.5f * dp),
                 cardRadius, cardRadius, cardBorderPaint
             )
-        } else {
-            drawWoodCardShell(canvas, r, pressed)
         }
 
         val previewSz   = minOf(r.height() * 0.46f, r.width() * 0.64f)
@@ -503,6 +513,31 @@ class MenuView(
 
     private fun drawWoodCardShell(canvas: Canvas, r: RectF, pressed: Boolean) {
         brownWoodCardRenderer.draw(canvas, r, pressed)
+    }
+
+    private fun drawSnowCardShell(canvas: Canvas, r: RectF, pressed: Boolean) {
+        val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(60, 34, 78, 117)
+            maskFilter = BlurMaskFilter(5f * dp, BlurMaskFilter.Blur.NORMAL)
+        }
+        canvas.drawRoundRect(
+            RectF(r.left + 2f * dp, r.top + 3f * dp, r.right + 2f * dp, r.bottom + 3f * dp),
+            14f * dp,
+            14f * dp,
+            shadowPaint,
+        )
+        val bitmap = snowCardBitmap
+        if (bitmap == null) {
+            canvas.drawRoundRect(r, 14f * dp, 14f * dp, if (pressed) cardHiPaint else cardPaint)
+            return
+        }
+        canvas.drawBitmap(bitmap, null, r, snowCardPaint)
+        if (pressed) {
+            val pressedPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.argb(35, 33, 77, 126)
+            }
+            canvas.drawRoundRect(r, 14f * dp, 14f * dp, pressedPaint)
+        }
     }
 
     private fun drawMiniBoard(canvas: Canvas, left: Float, top: Float, size: Float, type: GameType) {
@@ -1278,6 +1313,34 @@ class MenuView(
             backButtonPaint.color = Color.argb(210, 34, 18, 13)
             backButtonEdgePaint.color = Color.parseColor("#D3A05F")
             backArrowPaint.color = Color.parseColor("#F7D99B")
+        }
+    }
+
+    private fun applyHomeStyleColors() {
+        if (homeStyle == SettingsManager.HomeStyle.SNOW) {
+            bgPaint.color = Color.parseColor("#DDEEFF")
+            cardPaint.color = Color.parseColor("#F4FAFF")
+            cardHiPaint.color = Color.parseColor("#E5F2FF")
+            cardBorderPaint.color = Color.parseColor("#A6C8E7")
+        } else {
+            applyLightTheme()
+        }
+        applyHomeCardTextTheme()
+    }
+
+    private fun applyHomeCardTextTheme() {
+        if (homeStyle == SettingsManager.HomeStyle.SNOW) {
+            cardTitlePaint.color = Color.parseColor("#173A61")
+            cardDescPaint.color = Color.parseColor("#456887")
+            copyrightPaint.color = Color.parseColor("#55738D")
+        } else if (isLightMode) {
+            cardTitlePaint.color = Color.parseColor("#1A1A1A")
+            cardDescPaint.color = Color.parseColor("#555555")
+            copyrightPaint.color = Color.parseColor("#999999")
+        } else {
+            cardTitlePaint.color = Color.WHITE
+            cardDescPaint.color = Color.parseColor("#BDBDBD")
+            copyrightPaint.color = Color.parseColor("#555555")
         }
     }
 
