@@ -378,12 +378,18 @@ class SnakesLaddersActivity : AppCompatActivity() {
             if (destination != stepped) {
                 handler.postDelayed({
                     if (!gameplayActive() || gameOver) return@postDelayed
+                    val transitionSound = if (destination > stepped) {
+                        "snakes_ladders_ladder"
+                    } else {
+                        "snakes_ladders_snake"
+                    }
+                    SoundPlayer.playMovement(transitionSound)
                     boardView.animateMove(
                         player = player,
                         from = stepped,
                         to = destination,
                         path = SnakesLaddersBoardView.MovePath.DIRECT_TRANSITION,
-                         onStep = { SoundPlayer.playMovement("ludo_move", rate = 0.5f) },
+                        onStep = {},
                     ) {
                         positions[player] = destination
                         finishTurn(player, roll, destination)

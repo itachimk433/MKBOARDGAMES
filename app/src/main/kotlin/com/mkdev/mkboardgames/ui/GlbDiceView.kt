@@ -106,11 +106,12 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         }
 
         animator = ValueAnimator.ofFloat(0f, 1f).apply {
-            duration = 273L
+            duration = 420L
             interpolator = AccelerateDecelerateInterpolator()
             addUpdateListener {
                 val progress = it.animatedFraction
                 val tumble = sin(progress * Math.PI).toFloat()
+                val sizePulse = 1f + 0.12f * tumble
                 rotationX = startX +
                     (target.x - startX + spin.x) * progress +
                     (tiltX + spin.wobbleX) * tumble
@@ -120,6 +121,7 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
                 rotationZ = startZ +
                     (target.z - startZ + spin.z) * progress +
                     spin.wobbleZ * tumble
+                glRenderer.setAnimationScale(sizePulse)
                 glRenderer.setRotation(rotationX, rotationY, rotationZ)
             }
             addListener(object : AnimatorListenerAdapter() {
@@ -131,6 +133,7 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
                     rotationX = target.x
                     rotationY = target.y
                     rotationZ = target.z
+                    glRenderer.setAnimationScale(1f)
                     glRenderer.setRotation(rotationX, rotationY, rotationZ)
                     onFinished()
                 }
@@ -144,6 +147,8 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         animator?.cancel()
         animator = null
         isRolling = false
+        glRenderer.setAnimationScale(1f)
+        glRenderer.setRotation(rotationX, rotationY, rotationZ)
     }
 
     /**
@@ -193,6 +198,7 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         @Volatile private var rotationY = -28f
         @Volatile private var rotationZ = 0f
         @Volatile private var facingRotation = 0f
+        @Volatile private var animationScale = 1f
 
         fun setRotation(x: Float, y: Float, z: Float) {
             rotationX = x
@@ -202,6 +208,10 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
 
         fun setFacingRotation(rotation: Float) {
             facingRotation = rotation
+        }
+
+        fun setAnimationScale(scale: Float) {
+            animationScale = scale.coerceIn(1f, 1.2f)
         }
 
         override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
@@ -262,9 +272,9 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
             Matrix.scaleM(
                 modelMatrix,
                 0,
-                currentModel.renderScale,
-                currentModel.renderScale,
-                currentModel.renderScale,
+                currentModel.renderScale * animationScale,
+                currentModel.renderScale * animationScale,
+                currentModel.renderScale * animationScale,
             )
             Matrix.translateM(
                 modelMatrix,

@@ -65,6 +65,10 @@ object SoundPlayer {
         ids["ludo_star"]        = p.load(ctx, R.raw.ludo_start,       1)
         ids["ludo_win"]         = p.load(ctx, R.raw.ludo_win,         1)
 
+        // Snakes & Ladders transitions
+        ids["snakes_ladders_ladder"] = p.load(ctx, R.raw.snakes_ladders_ladder_climb, 1)
+        ids["snakes_ladders_snake"] = p.load(ctx, R.raw.snakes_ladders_snake_slide, 1)
+
         // UI navigation click (reuses mora_place — short, clicky)
         ids["ui_click"]         = p.load(ctx, R.raw.mora_place,       1)
 

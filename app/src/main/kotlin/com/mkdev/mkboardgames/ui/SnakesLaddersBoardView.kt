@@ -109,8 +109,9 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
         THREE(
             displayName = "Board Three",
             assetName = "snakes_ladders_board_three.webp",
-            gridInset = 0f,
-            gridSize = 1f,
+            // The Halloween artwork has a 10px frame around its 700px play grid.
+            gridInset = 10f / 720f,
+            gridSize = 700f / 720f,
             artworkAspectRatio = 1f,
             artworkScale = 1f,
             fullBleedBackground = false,
@@ -143,8 +144,9 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
         FOUR(
             displayName = "Board Four",
             assetName = "snakes_ladders_board_four.webp",
-            gridInset = 0f,
-            gridSize = 1f,
+            // The forest artwork also reserves a 10px frame outside the 700px grid.
+            gridInset = 10f / 720f,
+            gridSize = 700f / 720f,
             artworkAspectRatio = 1f,
             artworkScale = 1f,
             fullBleedBackground = false,
@@ -528,16 +530,6 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
 
     private fun drawToken(canvas: Canvas, player: Int, animatedPoint: PointF?) {
         val point = animatedPoint ?: pointForPosition(player, positions[player])
-        val offset = if (positions[player] == 0) {
-            PointF()
-        } else {
-            when (player) {
-                0 -> PointF(-cell * 0.2f, cell * 0.18f)
-                1 -> PointF(cell * 0.2f, -cell * 0.18f)
-                2 -> PointF(-cell * 0.2f, -cell * 0.18f)
-                else -> PointF(cell * 0.2f, cell * 0.18f)
-            }
-        }
         val radius = if (positions[player] == 0) {
             startRadii[player].takeIf { it > 0f } ?: cell * 0.25f
         } else {
@@ -549,18 +541,21 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
             cell * 0.27f
         }
         canvas.drawCircle(
-            point.x + offset.x + cell * 0.04f,
-            point.y + offset.y + cell * 0.06f,
+            point.x + cell * 0.04f,
+            point.y + cell * 0.06f,
             radius,
             shadowPaint,
         )
         tokenPaint.color = PLAYER_COLORS[player]
-        canvas.drawCircle(point.x + offset.x, point.y + offset.y, radius, tokenPaint)
-        canvas.drawCircle(point.x + offset.x, point.y + offset.y, radius, tokenEdgePaint)
+        // Every numbered token is anchored to the measured centre of its square.
+        // Do not offset by player here: that made tokens visibly drift into
+        // neighbouring squares, especially on the framed artwork.
+        canvas.drawCircle(point.x, point.y, radius, tokenPaint)
+        canvas.drawCircle(point.x, point.y, radius, tokenEdgePaint)
         canvas.drawText(
             (player + 1).toString(),
-            point.x + offset.x,
-            point.y + offset.y - (tokenTextPaint.ascent() + tokenTextPaint.descent()) / 2f,
+            point.x,
+            point.y - (tokenTextPaint.ascent() + tokenTextPaint.descent()) / 2f,
             tokenTextPaint,
         )
     }
