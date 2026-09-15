@@ -65,6 +65,13 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
             invalidate()
         }
 
+    var dieScale: Float = 1f
+        set(value) {
+            field = value.coerceIn(0.5f, 1f)
+            requestLayout()
+            invalidate()
+        }
+
     private var glowAnimator: ValueAnimator? = null
     private var glowPulse = 0f
     private var themedFrameBitmap: Bitmap? = null
@@ -255,7 +262,7 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
         value * resources.displayMetrics.density
 
     private fun renderedDieSizeDp(): Int =
-        if (frameAssetName != null) (DIE_SIZE / 1.2f).roundToInt() else DIE_SIZE
+        ((if (frameAssetName != null) DIE_SIZE / 1.2f else DIE_SIZE) * dieScale).roundToInt()
 
     private fun loadFrameBitmap(assetName: String): Bitmap? = runCatching {
         context.assets.open(assetName).use {

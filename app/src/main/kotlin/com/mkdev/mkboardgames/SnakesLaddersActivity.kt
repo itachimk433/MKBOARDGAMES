@@ -548,7 +548,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
         playerBadgeViews = Array(count) { player ->
             LudoPlayerBadgeView(this).apply {
                 accentColor = SnakesLaddersBoardView.PLAYER_COLORS[player]
-                avatarScale = if (selectedBoard == SnakesLaddersBoardView.Board.TWO) 0.9f else 1f
+                avatarScale = selectedBoard.profileScale
                 ringAndGlowEnabled = selectedBoard != SnakesLaddersBoardView.Board.TWO
                 label = playerName(player)
             }
@@ -557,6 +557,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
             LudoPlayerControlView(this).apply {
                 accentColor = SnakesLaddersBoardView.PLAYER_COLORS[player]
                 frameAssetName = selectedBoard.playerFrameAssetName
+                dieScale = selectedBoard.dieScale
                 label = playerName(player)
                 labelBelow = if (count == 2) player == 0 else player < 2
                 labelUpsideDown = false
@@ -579,8 +580,8 @@ class SnakesLaddersActivity : AppCompatActivity() {
             control.labelBelow = isBottomPlayer
             control.labelUpsideDown = false
             control.frameAssetName = selectedBoard.playerFrameAssetName
-            playerBadgeViews[player].avatarScale =
-                if (selectedBoard == SnakesLaddersBoardView.Board.TWO) 0.9f else 1f
+            control.dieScale = selectedBoard.dieScale
+            playerBadgeViews[player].avatarScale = selectedBoard.profileScale
             playerBadgeViews[player].ringAndGlowEnabled =
                 selectedBoard != SnakesLaddersBoardView.Board.TWO
             playerBadgeViews[player].facesOppositeSide = false
