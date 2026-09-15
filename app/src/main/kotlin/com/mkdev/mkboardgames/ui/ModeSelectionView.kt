@@ -58,6 +58,12 @@ class ModeSelectionView(context: Context) : View(context) {
     private val backgroundScrimPaint = Paint().apply {
         color = Color.argb(58, 0, 0, 0)
     }
+    private val snowModeButtonBitmap: Bitmap? = try {
+        context.assets.open("snow_mode_button.webp").use { BitmapFactory.decodeStream(it) }
+    } catch (_: Exception) {
+        null
+    }
+    private val snowModeButtonPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private val modeIconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
         textAlign = Paint.Align.CENTER
@@ -136,7 +142,7 @@ class ModeSelectionView(context: Context) : View(context) {
         val originalButtonWidth = min(width - 48f * unit, 360f * unit)
         val buttonWidth = originalButtonWidth / 1.5f * 1.1f
         val left = (width - buttonWidth) / 2f
-        val buttonHeight = 136f / 3f * 1.1f * unit
+        val buttonHeight = buttonWidth / 3f
         val gap = 10f * unit
         val totalHeight = buttonHeight * 3f + gap * 2f
         val firstTop = (height * 0.16f).coerceAtMost(
@@ -247,12 +253,47 @@ class ModeSelectionView(context: Context) : View(context) {
         }
         canvas.save()
         canvas.scale(scale, scale, rect.centerX(), rect.centerY())
-        brownWoodCardRenderer.draw(canvas, rect, pressedMode == mode)
+        val pressed = pressedMode == mode
+        if (snowModeButtonBitmap == null) {
+            brownWoodCardRenderer.draw(canvas, rect, pressed)
+        } else {
+            canvas.drawBitmap(snowModeButtonBitmap, null, rect, snowModeButtonPaint)
+            if (pressed) {
+                val pressedPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = Color.argb(35, 33, 77, 126)
+                }
+                canvas.drawRoundRect(rect, 14f * unit, 14f * unit, pressedPaint)
+            }
+        }
+        val iconPaint = if (snowModeButtonBitmap == null) {
+            modeIconPaint
+        } else {
+            Paint(modeIconPaint).apply {
+                color = Color.BLACK
+                clearShadowLayer()
+            }
+        }
+        val titlePaint = if (snowModeButtonBitmap == null) {
+            modeTitlePaint
+        } else {
+            Paint(modeTitlePaint).apply {
+                color = Color.BLACK
+                clearShadowLayer()
+            }
+        }
+        val descriptionPaint = if (snowModeButtonBitmap == null) {
+            modeDescriptionPaint
+        } else {
+            Paint(modeDescriptionPaint).apply {
+                color = Color.parseColor("#243C50")
+                clearShadowLayer()
+            }
+        }
         val iconCenterX = rect.left + 32f * unit
         val textCenterX = rect.left + 32f * unit + (rect.width() - 32f * unit) / 2f
-        canvas.drawText(symbol, iconCenterX, rect.centerY() + 8f * unit, modeIconPaint)
-        canvas.drawText(label, textCenterX, rect.centerY() + 1f * unit, modeTitlePaint)
-        canvas.drawText(description, textCenterX, rect.centerY() + 14f * unit, modeDescriptionPaint)
+        canvas.drawText(symbol, iconCenterX, rect.centerY() + 8f * unit, iconPaint)
+        canvas.drawText(label, textCenterX, rect.centerY() + 1f * unit, titlePaint)
+        canvas.drawText(description, textCenterX, rect.centerY() + 14f * unit, descriptionPaint)
         if (loadingMode == mode) drawLoadingRing(canvas, rect)
         canvas.restore()
     }
