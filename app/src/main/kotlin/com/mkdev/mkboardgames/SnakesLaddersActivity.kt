@@ -338,6 +338,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
         resultDialogVisible = false
         turnResolutionPending = false
         matchStarted = true
+        gameOverView.winnerLabel = ""
         fireworksView.cancel()
         SoundPlayer.stop("snakes_ladders_fireworks", "snakes_ladders_victory")
         hideGameOverOverlay()
@@ -483,6 +484,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
         winner = player
         gameOver = true
         boardView.gameOver = true
+        gameOverView.winnerLabel = "WINNER: ${playerName(player)}"
         SoundPlayer.stop("ludo_move")
         SoundPlayer.playWhenReady("snakes_ladders_victory")
         SoundPlayer.playWhenReady("snakes_ladders_fireworks", volume = 0.82f)

@@ -16,8 +16,18 @@ import android.view.View
 class SnakesLaddersGameOverView(context: Context) : View(context) {
     var onReplay: (() -> Unit)? = null
     var onHome: (() -> Unit)? = null
+    var winnerLabel: String = ""
+        set(value) {
+            field = value
+            invalidate()
+        }
 
     private val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
+        textAlign = Paint.Align.CENTER
+        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+    }
+    private val winnerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
         textAlign = Paint.Align.CENTER
         typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
@@ -56,6 +66,16 @@ class SnakesLaddersGameOverView(context: Context) : View(context) {
             titlePaint,
         )
         titlePaint.clearShadowLayer()
+
+        winnerPaint.textSize = dp(18f)
+        winnerPaint.setShadowLayer(dp(5f), 0f, dp(2f), Color.argb(220, 0, 0, 0))
+        canvas.drawText(
+            winnerLabel,
+            width / 2f,
+            dp(69f),
+            winnerPaint,
+        )
+        winnerPaint.clearShadowLayer()
 
         val horizontalMargin = dp(22f)
         val gap = dp(18f)
