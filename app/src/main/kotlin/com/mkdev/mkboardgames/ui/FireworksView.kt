@@ -65,6 +65,8 @@ class FireworksView(context: Context) : View(context) {
         isFocusable = false
         importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
         animator.duration = 3_650L
+        animator.repeatCount = FIREWORKS_PASS_COUNT - 1
+        animator.repeatMode = ValueAnimator.RESTART
         animator.interpolator = LinearInterpolator()
         animator.addUpdateListener {
             progress = it.animatedFraction
@@ -226,5 +228,9 @@ class FireworksView(context: Context) : View(context) {
             burst(0.88f, 0.81f, 0.43f, 0.56f, Color.rgb(182, 132, 255), 56),
             burst(0.08f, 0.16f, 0.52f, 0.71f, Color.rgb(96, 235, 171), 60),
         )
+    }
+
+    private companion object {
+        const val FIREWORKS_PASS_COUNT = 3
     }
 }

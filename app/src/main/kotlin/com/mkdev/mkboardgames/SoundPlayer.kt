@@ -86,6 +86,7 @@ object SoundPlayer {
         ids["snakes_ladders_ladder"] = p.load(ctx, R.raw.snakes_ladders_ladder_climb, 1)
         ids["snakes_ladders_snake"] = p.load(ctx, R.raw.snakes_ladders_snake_slide, 1)
         ids["snakes_ladders_victory"] = p.load(ctx, R.raw.snakes_ladders_victory, 1)
+        ids["snakes_ladders_fireworks"] = p.load(ctx, R.raw.snakes_ladders_fireworks, 1)
 
         // UI navigation click (reuses mora_place — short, clicky)
         ids["ui_click"]         = p.load(ctx, R.raw.mora_place,       1)
@@ -146,6 +147,7 @@ object SoundPlayer {
         val soundPool = pool ?: return
         keys.forEach { key ->
             activeStreams.remove(key)?.forEach(soundPool::stop)
+            ids[key]?.let { pendingPlays.remove(it) }
         }
     }
 

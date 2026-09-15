@@ -339,6 +339,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
         turnResolutionPending = false
         matchStarted = true
         fireworksView.cancel()
+        SoundPlayer.stop("snakes_ladders_fireworks", "snakes_ladders_victory")
         hideGameOverOverlay()
         boardView.gameOver = false
         boardView.setActivePlayerCount(playerCount)
@@ -484,6 +485,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
         boardView.gameOver = true
         SoundPlayer.stop("ludo_move")
         SoundPlayer.playWhenReady("snakes_ladders_victory")
+        SoundPlayer.playWhenReady("snakes_ladders_fireworks", volume = 0.82f)
         fireworksView.playOnce()
         updateHud()
         showGameOverOverlay()
