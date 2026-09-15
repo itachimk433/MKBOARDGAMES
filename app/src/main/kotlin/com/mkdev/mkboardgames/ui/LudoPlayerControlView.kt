@@ -72,6 +72,17 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
             invalidate()
         }
 
+    /**
+     * Moves only the die horizontally by a fraction of the device width.
+     * The profile badge and control frame remain anchored in their corner.
+     */
+    var dieHorizontalShiftFraction: Float = 0f
+        set(value) {
+            field = value
+            requestLayout()
+            invalidate()
+        }
+
     private var glowAnimator: ValueAnimator? = null
     private var glowPulse = 0f
     private var themedFrameBitmap: Bitmap? = null
@@ -100,15 +111,17 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
         val avatarWidth = dp(AVATAR_SIZE)
         val dieSize = dp(renderedDieSizeDp())
         val overlap = dp(2)
+        val dieShift = (resources.displayMetrics.widthPixels * dieHorizontalShiftFraction)
+            .roundToInt()
         val profileLeft = if (profileOnEnd) {
             dp(PAIR_WIDTH) - avatarWidth
         } else {
             0
         }
         val dieLeft = if (profileOnEnd) {
-            ((profileLeft - dieSize) / 2).coerceAtLeast(0)
+            ((profileLeft - dieSize) / 2 + dieShift).coerceAtLeast(0)
         } else {
-            avatarWidth - overlap
+            avatarWidth - overlap + dieShift
         }
 
         addView(

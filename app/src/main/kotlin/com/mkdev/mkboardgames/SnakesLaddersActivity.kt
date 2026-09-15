@@ -561,6 +561,11 @@ class SnakesLaddersActivity : AppCompatActivity() {
                 label = playerName(player)
                 labelBelow = if (count == 2) player == 0 else player < 2
                 labelUpsideDown = false
+                dieHorizontalShiftFraction = if (player == 0 || player == 2) {
+                    PLAYER_ONE_THREE_DIE_SHIFT_FRACTION
+                } else {
+                    0f
+                }
                 bind(
                     playerBadgeViews[player],
                     playerDiceViews[player],
@@ -581,6 +586,11 @@ class SnakesLaddersActivity : AppCompatActivity() {
             control.labelUpsideDown = false
             control.frameAssetName = selectedBoard.playerFrameAssetName
             control.dieScale = selectedBoard.dieScale
+            control.dieHorizontalShiftFraction = if (player == 0 || player == 2) {
+                PLAYER_ONE_THREE_DIE_SHIFT_FRACTION
+            } else {
+                0f
+            }
             playerBadgeViews[player].avatarScale = selectedBoard.profileScale
             playerBadgeViews[player].ringAndGlowEnabled =
                 selectedBoard != SnakesLaddersBoardView.Board.TWO
@@ -669,5 +679,6 @@ class SnakesLaddersActivity : AppCompatActivity() {
 
     private companion object {
         const val TURN_RESOLUTION_DELAY_MS = 500L
+        const val PLAYER_ONE_THREE_DIE_SHIFT_FRACTION = 0.015f
     }
 }
