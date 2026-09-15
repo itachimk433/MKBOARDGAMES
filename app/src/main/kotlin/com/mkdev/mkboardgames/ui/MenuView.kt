@@ -429,7 +429,8 @@ class MenuView(
             )
         }
 
-        val previewSz   = minOf(r.height() * 0.46f, r.width() * 0.64f)
+        val contentCardH = if (homeStyle == SettingsManager.HomeStyle.SNOW) baseCardH else r.height()
+        val previewSz   = minOf(contentCardH * 0.46f, r.width() * 0.64f)
         val previewLeft = r.centerX() - previewSz / 2f
         val previewTop  = r.top + 10f * dp
         drawMiniBoard(canvas, previewLeft, previewTop, previewSz, card.type)
@@ -524,27 +525,46 @@ class MenuView(
     }
 
     private fun drawSnowCardShell(canvas: Canvas, r: RectF, pressed: Boolean) {
+        val shellWidth = r.width() * 1.5f
+        val shellHeight = r.height() * 1.5f
+        val shellOffsetY = -r.height() * 0.2f
+        val shellRect = RectF(
+            r.centerX() - shellWidth / 2f,
+            r.centerY() - shellHeight / 2f + shellOffsetY,
+            r.centerX() + shellWidth / 2f,
+            r.centerY() + shellHeight / 2f + shellOffsetY,
+        )
         val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.argb(60, 34, 78, 117)
             maskFilter = BlurMaskFilter(5f * dp, BlurMaskFilter.Blur.NORMAL)
         }
         canvas.drawRoundRect(
-            RectF(r.left + 2f * dp, r.top + 3f * dp, r.right + 2f * dp, r.bottom + 3f * dp),
+            RectF(
+                shellRect.left + 2f * dp,
+                shellRect.top + 3f * dp,
+                shellRect.right + 2f * dp,
+                shellRect.bottom + 3f * dp,
+            ),
             14f * dp,
             14f * dp,
             shadowPaint,
         )
         val bitmap = snowCardBitmap
         if (bitmap == null) {
-            canvas.drawRoundRect(r, 14f * dp, 14f * dp, if (pressed) cardHiPaint else cardPaint)
+            canvas.drawRoundRect(
+                shellRect,
+                14f * dp,
+                14f * dp,
+                if (pressed) cardHiPaint else cardPaint,
+            )
             return
         }
-        canvas.drawBitmap(bitmap, null, r, snowCardPaint)
+        canvas.drawBitmap(bitmap, null, shellRect, snowCardPaint)
         if (pressed) {
             val pressedPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.argb(35, 33, 77, 126)
             }
-            canvas.drawRoundRect(r, 14f * dp, 14f * dp, pressedPaint)
+            canvas.drawRoundRect(shellRect, 14f * dp, 14f * dp, pressedPaint)
         }
     }
 
