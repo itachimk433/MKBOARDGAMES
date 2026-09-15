@@ -33,6 +33,7 @@ class MenuView(
         set(v) {
             field = v
             applyHomeStyleColors()
+            updateCardLayout()
             invalidate()
         }
 
@@ -215,7 +216,10 @@ class MenuView(
     private val snowCardPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
 
     private val gridColumns = 3
-    private val cardH = 136f * dp
+    private val baseCardH = 136f * dp
+    private val snowCardHeightScale = 1.15f
+    private val cardH get() =
+        baseCardH * if (homeStyle == SettingsManager.HomeStyle.SNOW) snowCardHeightScale else 1f
     private val gridPadding = 12f * dp
     private val gridSpacing = 8f * dp
     private val cardW get() =
@@ -250,15 +254,7 @@ class MenuView(
 
     override fun onSizeChanged(w: Int, h: Int, ow: Int, oh: Int) {
         headerH = if (currentGameMode == GameMode.IRREGULAR) 82f * dp else 64f * dp
-        for (i in cards.indices) {
-            val column = i % gridColumns
-            val row = i / gridColumns
-            val left = gridPadding + column * (cardW + gridSpacing)
-            val top = headerH + row * (cardH + gridSpacing)
-            cards[i].rect = RectF(left, top, left + cardW, top + cardH)
-        }
-        val contentBottom = cards.last().rect.bottom + 56f * dp   // room for two-line footer
-        maxScrollY = maxOf(0f, contentBottom - h)
+        updateCardLayout()
 
         val backSize = 34f * dp
         val backLeft = 14f * dp
@@ -273,7 +269,19 @@ class MenuView(
         val gs = 34f * dp; val gx = w - gs - 14f * dp; val gy = 14f * dp
         gearRect.set(gx, gy, gx + gs, gy + gs)
         gearTouch.set(gx - 4f * dp, gy - 4f * dp, gx + gs + 4f * dp, gy + gs + 18f * dp)
+    }
 
+    private fun updateCardLayout() {
+        for (i in cards.indices) {
+            val column = i % gridColumns
+            val row = i / gridColumns
+            val left = gridPadding + column * (cardW + gridSpacing)
+            val top = headerH + row * (cardH + gridSpacing)
+            cards[i].rect = RectF(left, top, left + cardW, top + cardH)
+        }
+        val contentBottom = cards.last().rect.bottom + 56f * dp   // room for two-line footer
+        maxScrollY = maxOf(0f, contentBottom - height)
+        scrollY = scrollY.coerceIn(0f, maxScrollY)
     }
 
     // ── Touch ─────────────────────────────────────────────────────────────────
@@ -1330,16 +1338,22 @@ class MenuView(
 
     private fun applyHomeCardTextTheme() {
         if (homeStyle == SettingsManager.HomeStyle.SNOW) {
-            cardTitlePaint.color = Color.parseColor("#173A61")
-            cardDescPaint.color = Color.parseColor("#456887")
+            cardTitlePaint.color = Color.BLACK
+            cardDescPaint.color = Color.BLACK
+            cardTitlePaint.clearShadowLayer()
+            cardDescPaint.clearShadowLayer()
             copyrightPaint.color = Color.parseColor("#55738D")
         } else if (isLightMode) {
             cardTitlePaint.color = Color.parseColor("#1A1A1A")
             cardDescPaint.color = Color.parseColor("#555555")
+            cardTitlePaint.setShadowLayer(2f * dp, 0f, 1f * dp, Color.argb(230, 0, 0, 0))
+            cardDescPaint.setShadowLayer(1.5f * dp, 0f, 1f * dp, Color.argb(210, 0, 0, 0))
             copyrightPaint.color = Color.parseColor("#999999")
         } else {
             cardTitlePaint.color = Color.WHITE
             cardDescPaint.color = Color.parseColor("#BDBDBD")
+            cardTitlePaint.setShadowLayer(2f * dp, 0f, 1f * dp, Color.argb(230, 0, 0, 0))
+            cardDescPaint.setShadowLayer(1.5f * dp, 0f, 1f * dp, Color.argb(210, 0, 0, 0))
             copyrightPaint.color = Color.parseColor("#555555")
         }
     }
