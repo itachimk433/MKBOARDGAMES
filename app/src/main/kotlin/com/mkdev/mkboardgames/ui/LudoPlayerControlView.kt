@@ -262,7 +262,8 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
         value * resources.displayMetrics.density
 
     private fun renderedDieSizeDp(): Int =
-        ((if (frameAssetName != null) DIE_SIZE / 1.2f else DIE_SIZE) * dieScale).roundToInt()
+        ((if (frameAssetName != null) DIE_SIZE / 1.2f else DIE_SIZE.toFloat()) * dieScale)
+            .roundToInt()
 
     private fun loadFrameBitmap(assetName: String): Bitmap? = runCatching {
         context.assets.open(assetName).use {
