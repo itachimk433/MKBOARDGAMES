@@ -116,7 +116,7 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
             fullBleedBackground = false,
             ladders = mapOf(
                 9 to 27,
-                18 to 27,
+                18 to 37,
                 25 to 54,
                 28 to 51,
                 56 to 64,
@@ -130,6 +130,7 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
                 63 to 19,
                 87 to 24,
                 67 to 30,
+                93 to 69,
                 95 to 75,
                 99 to 77,
             ),
