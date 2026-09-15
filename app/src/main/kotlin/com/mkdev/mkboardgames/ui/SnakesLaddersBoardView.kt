@@ -115,7 +115,7 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
             artworkScale = 1f,
             fullBleedBackground = false,
             ladders = mapOf(
-                9 to 21,
+                9 to 27,
                 18 to 27,
                 25 to 54,
                 28 to 51,
