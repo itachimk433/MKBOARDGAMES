@@ -433,7 +433,8 @@ class MenuView(
         val contentScale = if (homeStyle == SettingsManager.HomeStyle.SNOW) 0.95f else 1f
         val previewSz   = minOf(contentCardH * 0.46f, r.width() * 0.64f) * contentScale
         val previewLeft = r.centerX() - previewSz / 2f
-        val previewTop  = r.top + 10f * dp
+        val contentOffsetY = if (homeStyle == SettingsManager.HomeStyle.SNOW) baseCardH * 0.1f else 0f
+        val previewTop  = r.top + 10f * dp + contentOffsetY
         drawMiniBoard(canvas, previewLeft, previewTop, previewSz, card.type)
 
         val (title, desc) = when (card.type) {
