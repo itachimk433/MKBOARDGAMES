@@ -15,34 +15,42 @@ import android.view.View
  */
 class SnakesLaddersGameOverView(context: Context) : View(context) {
     var onReplay: (() -> Unit)? = null
+    var onWatchReplay: (() -> Unit)? = null
+        set(value) {
+            field = value
+            invalidate()
+        }
     var onHome: (() -> Unit)? = null
     var winnerLabel: String = ""
         set(value) {
             field = value
             invalidate()
         }
-
-    private val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.WHITE
-        textAlign = Paint.Align.CENTER
-        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-    }
+    var winnerBaselineDp: Float = 69f
+        set(value) {
+            field = value
+            invalidate()
+        }
     private val winnerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
         textAlign = Paint.Align.CENTER
         typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
     }
-    private val buttonPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val buttonPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#34261B")
+    }
     private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#D3A05F")
         style = Paint.Style.STROKE
-        strokeWidth = dp(2f)
+        strokeWidth = dp(1f)
     }
     private val buttonTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.WHITE
+        color = Color.parseColor("#F7D99B")
         textAlign = Paint.Align.CENTER
-        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        textSize = 11f * resources.displayMetrics.scaledDensity.coerceAtMost(3f)
     }
     private val replayRect = RectF()
+    private val watchReplayRect = RectF()
     private val homeRect = RectF()
     private var pressedButton = 0
 
@@ -50,83 +58,75 @@ class SnakesLaddersGameOverView(context: Context) : View(context) {
         setLayerType(View.LAYER_TYPE_SOFTWARE, null)
         visibility = GONE
         isClickable = true
-        contentDescription = "Game over. Replay or return home."
+        contentDescription = "Game result. Play again, watch replay, or return home."
     }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         if (visibility != VISIBLE || width <= 0 || height <= 0) return
 
-        titlePaint.textSize = dp(28f)
-        titlePaint.setShadowLayer(dp(7f), 0f, dp(2f), Color.argb(220, 0, 0, 0))
-        canvas.drawText(
-            "GAME OVER",
-            width / 2f,
-            dp(38f),
-            titlePaint,
-        )
-        titlePaint.clearShadowLayer()
-
         winnerPaint.textSize = dp(18f)
-        winnerPaint.setShadowLayer(dp(5f), 0f, dp(2f), Color.argb(220, 0, 0, 0))
         canvas.drawText(
             winnerLabel,
             width / 2f,
-            dp(69f),
+            dp(winnerBaselineDp),
             winnerPaint,
         )
-        winnerPaint.clearShadowLayer()
 
+        // Keep the same compact proportions as the HUD actions, reduced from
+        // the original game-over buttons and arranged in one row.
+        val showWatchReplay = onWatchReplay != null
         val horizontalMargin = dp(22f)
-        val gap = dp(18f)
-        val buttonHeight = dp(62f)
-        val buttonWidth = ((width - horizontalMargin * 2f - gap) / 2f)
-            .coerceAtLeast(dp(112f))
-        val top = height - dp(22f) - buttonHeight
-        replayRect.set(horizontalMargin, top, horizontalMargin + buttonWidth, top + buttonHeight)
+        val gap = dp(10f)
+        val buttonCount = if (showWatchReplay) 3 else 2
+        val oldGap = dp(18f)
+        val oldButtonWidth = ((width - horizontalMargin * 2f - oldGap) / 2f)
+        val buttonWidth = if (showWatchReplay) {
+            (oldButtonWidth * 0.6f).coerceAtLeast(dp(72f))
+        } else {
+            oldButtonWidth
+        }
+        val buttonHeight = dp(37f)
+        val totalWidth = buttonWidth * buttonCount + gap * (buttonCount - 1)
+        val left = ((width - totalWidth) / 2f).coerceAtLeast(dp(8f))
+        val top = height - dp(28f) - buttonHeight
+        replayRect.set(left, top, left + buttonWidth, top + buttonHeight)
+        if (showWatchReplay) {
+            watchReplayRect.set(
+                replayRect.right + gap,
+                top,
+                replayRect.right + gap + buttonWidth,
+                top + buttonHeight,
+            )
+        } else {
+            watchReplayRect.setEmpty()
+        }
+        val homeLeft = if (showWatchReplay) watchReplayRect.right + gap else replayRect.right + gap
         homeRect.set(
-            width - horizontalMargin - buttonWidth,
+            homeLeft,
             top,
-            width - horizontalMargin,
+            homeLeft + buttonWidth,
             top + buttonHeight,
         )
 
-        drawButton(
-            canvas,
-            replayRect,
-            Color.rgb(203, 149, 59),
-            "REPLAY",
-            pressedButton == 1,
-        )
-        drawButton(
-            canvas,
-            homeRect,
-            Color.rgb(181, 78, 79),
-            "HOME",
-            pressedButton == 2,
-        )
+        drawButton(canvas, replayRect, "PLAY AGAIN", pressedButton == 1)
+        if (showWatchReplay) {
+            drawButton(canvas, watchReplayRect, "WATCH REPLAY", pressedButton == 2)
+        }
+        drawButton(canvas, homeRect, "HOME", pressedButton == 3)
     }
 
     private fun drawButton(
         canvas: Canvas,
         rect: RectF,
-        color: Int,
         label: String,
         pressed: Boolean,
     ) {
-        buttonPaint.color = Color.argb(if (pressed) 245 else 220, Color.red(color), Color.green(color), Color.blue(color))
-        buttonPaint.setShadowLayer(dp(if (pressed) 2f else 6f), 0f, dp(2f), Color.argb(160, 0, 0, 0))
-        canvas.drawRoundRect(rect, dp(18f), dp(18f), buttonPaint)
-        buttonPaint.clearShadowLayer()
-
-        borderPaint.color = Color.argb(235, 255, 255, 255)
-        canvas.drawRoundRect(rect, dp(18f), dp(18f), borderPaint)
-
-        buttonTextPaint.textSize = dp(17f)
-        buttonTextPaint.setShadowLayer(dp(3f), 0f, dp(1f), Color.argb(190, 0, 0, 0))
+        buttonPaint.color = Color.parseColor(if (pressed) "#45321F" else "#34261B")
+        canvas.drawRoundRect(rect, dp(5f), dp(5f), buttonPaint)
+        canvas.drawRoundRect(rect, dp(5f), dp(5f), borderPaint)
         val baseline = rect.centerY() - (buttonTextPaint.ascent() + buttonTextPaint.descent()) / 2f
         canvas.drawText(label, rect.centerX(), baseline, buttonTextPaint)
-        buttonTextPaint.clearShadowLayer()
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
@@ -134,7 +134,8 @@ class SnakesLaddersGameOverView(context: Context) : View(context) {
             MotionEvent.ACTION_DOWN -> {
                 pressedButton = when {
                     replayRect.contains(event.x, event.y) -> 1
-                    homeRect.contains(event.x, event.y) -> 2
+                    watchReplayRect.contains(event.x, event.y) -> 2
+                    homeRect.contains(event.x, event.y) -> 3
                     else -> 0
                 }
                 invalidate()
@@ -144,7 +145,8 @@ class SnakesLaddersGameOverView(context: Context) : View(context) {
             MotionEvent.ACTION_UP -> {
                 val selected = when {
                     replayRect.contains(event.x, event.y) -> pressedButton == 1
-                    homeRect.contains(event.x, event.y) -> pressedButton == 2
+                    watchReplayRect.contains(event.x, event.y) -> pressedButton == 2
+                    homeRect.contains(event.x, event.y) -> pressedButton == 3
                     else -> false
                 }
                 val action = pressedButton
@@ -152,7 +154,11 @@ class SnakesLaddersGameOverView(context: Context) : View(context) {
                 invalidate()
                 if (selected) {
                     performClick()
-                    if (action == 1) onReplay?.invoke() else onHome?.invoke()
+                    when (action) {
+                        1 -> onReplay?.invoke()
+                        2 -> onWatchReplay?.invoke()
+                        3 -> onHome?.invoke()
+                    }
                 }
                 return true
             }

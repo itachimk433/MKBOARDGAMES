@@ -147,9 +147,14 @@ class GameActivity : AppCompatActivity() {
         autoplayButton   = AutoplayButtonView(this)
         bottomCaptureView = CaptureStripView(this).also { it.dividerOnTop = true }
         chessGameOverView = SnakesLaddersGameOverView(this).apply {
+            winnerBaselineDp = 112f
             onReplay = {
                 visibility = View.GONE
                 startGame()
+            }
+            onWatchReplay = {
+                visibility = View.GONE
+                launchReplay(currentResultLabel())
             }
             onHome = {
                 visibility = View.GONE
@@ -2079,6 +2084,13 @@ Checkmate your opponent's King.
             else -> "Black"
         }
         return "Winner: $label"
+    }
+
+    private fun currentResultLabel(): String = when (gameState.status) {
+        GameStatus.WHITE_WINS -> "White wins"
+        GameStatus.BLACK_WINS -> "Black wins"
+        GameStatus.DRAW -> "Draw"
+        else -> ""
     }
 
     private fun showStyledResultDialog(message: String, resultLabel: String) {
