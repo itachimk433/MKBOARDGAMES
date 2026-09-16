@@ -2009,6 +2009,11 @@ Checkmate your opponent's King.
 
     private fun showChessResultDialog(message: String, resultLabel: String) {
         chessGameOverView.resultMessage = message
+        // ChessGameOverView starts hidden because it is only mounted after a
+        // match ends. Make it visible before adding it to the result overlay;
+        // otherwise the overlay intercepts input while the board underneath
+        // remains visible with the stale turn label.
+        chessGameOverView.visibility = View.VISIBLE
         showStyledOverlay(
             view = chessGameOverView,
             fullScreen = true,
