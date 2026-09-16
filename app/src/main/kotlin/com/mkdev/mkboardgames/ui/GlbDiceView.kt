@@ -13,7 +13,6 @@ import android.opengl.Matrix
 import android.util.Log
 import android.view.MotionEvent
 import android.view.ViewGroup
-import android.view.animation.AccelerateDecelerateInterpolator
 import android.view.animation.DecelerateInterpolator
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
