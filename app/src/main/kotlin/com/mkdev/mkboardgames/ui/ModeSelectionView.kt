@@ -7,7 +7,6 @@ import android.view.MotionEvent
 import android.view.View
 import com.mkdev.mkboardgames.GameMode
 import com.mkdev.mkboardgames.R
-import com.mkdev.mkboardgames.SettingsManager
 import com.mkdev.mkboardgames.SoundPlayer
 import kotlin.math.min
 
@@ -52,11 +51,6 @@ class ModeSelectionView(context: Context) : View(context) {
 
     private val backgroundBitmap: Bitmap? = try {
         context.assets.open("mode_selection_background.webp").use { BitmapFactory.decodeStream(it) }
-    } catch (_: Exception) {
-        null
-    }
-    private val snowBackgroundBitmap: Bitmap? = try {
-        context.assets.open("snow_mode_selection_background.webp").use { BitmapFactory.decodeStream(it) }
     } catch (_: Exception) {
         null
     }
@@ -190,11 +184,7 @@ class ModeSelectionView(context: Context) : View(context) {
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        val bitmap = if (SettingsManager.getHomeStyle(context) == SettingsManager.HomeStyle.SNOW) {
-            snowBackgroundBitmap ?: backgroundBitmap
-        } else {
-            backgroundBitmap
-        }
+        val bitmap = backgroundBitmap
         if (bitmap == null) {
             canvas.drawColor(Color.parseColor("#121212"))
         } else {

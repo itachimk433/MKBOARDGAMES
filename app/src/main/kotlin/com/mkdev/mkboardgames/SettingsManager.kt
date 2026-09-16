@@ -305,13 +305,11 @@ object SettingsManager {
     enum class HomeStyle(val label: String) {
         CLASSIC("Classic"),
         BROWN("Brown"),
-        SNOW("Snow"),
     }
 
     fun getHomeStyle(ctx: Context): HomeStyle {
         return when (prefs(ctx).getString(KEY_HOME_STYLE, null)) {
             HomeStyle.BROWN.name -> HomeStyle.BROWN
-            HomeStyle.SNOW.name -> HomeStyle.SNOW
             HomeStyle.CLASSIC.name -> HomeStyle.CLASSIC
             else -> if (isBrownHomeStyleEnabled(ctx)) HomeStyle.BROWN else HomeStyle.CLASSIC
         }

@@ -210,19 +210,9 @@ class MenuView(
     private val homeBackgroundScrimPaint = Paint().apply {
         color = Color.argb(105, 0, 0, 0)
     }
-    private val snowBackButtonBitmap: Bitmap? = try {
-        context.assets.open("snow_back_button.webp").use { BitmapFactory.decodeStream(it) }
-    } catch (e: Exception) { null }
-    private val snowCardBitmap: Bitmap? = try {
-        context.assets.open("snow_game_card.webp").use { BitmapFactory.decodeStream(it) }
-    } catch (e: Exception) { null }
-    private val snowCardPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-
     private val gridColumns = 3
     private val baseCardH = 136f * dp
-    private val snowCardHeightScale = 1.15f
-    private val cardH get() =
-        baseCardH * if (homeStyle == SettingsManager.HomeStyle.SNOW) snowCardHeightScale else 1f
+    private val cardH get() = baseCardH
     private val gridPadding = 12f * dp
     private val gridSpacing = 8f * dp
     private val cardW get() =
@@ -373,12 +363,6 @@ class MenuView(
     }
 
     private fun drawBackArrow(canvas: Canvas) {
-        if (homeStyle == SettingsManager.HomeStyle.SNOW) {
-            snowBackButtonBitmap?.let {
-                canvas.drawBitmap(it, null, backRect, bitmapPaint)
-                return
-            }
-        }
         canvas.drawRoundRect(backRect, 10f * dp, 10f * dp, backButtonPaint)
         canvas.drawRoundRect(backRect, 10f * dp, 10f * dp, backButtonEdgePaint)
         val cy = backRect.centerY()
@@ -417,9 +401,7 @@ class MenuView(
         val scale = cardScales[card.type] ?: 1f
         val r = card.rect; val pressed = pressedCard == card.type
         if (scale != 1f) { canvas.save(); canvas.scale(scale, scale, r.centerX(), r.centerY()) }
-        if (homeStyle == SettingsManager.HomeStyle.SNOW) {
-            drawSnowCardShell(canvas, r, pressed)
-        } else if (homeStyle == SettingsManager.HomeStyle.BROWN && !isLightMode) {
+        if (homeStyle == SettingsManager.HomeStyle.BROWN && !isLightMode) {
             drawWoodCardShell(canvas, r, pressed)
         } else {
             val shadowP = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -438,12 +420,10 @@ class MenuView(
             )
         }
 
-        val contentCardH = if (homeStyle == SettingsManager.HomeStyle.SNOW) baseCardH else r.height()
-        val contentScale = if (homeStyle == SettingsManager.HomeStyle.SNOW) 0.95f else 1f
-        val previewSz   = minOf(contentCardH * 0.46f, r.width() * 0.64f) * contentScale
+        val contentCardH = r.height()
+        val previewSz   = minOf(contentCardH * 0.46f, r.width() * 0.64f)
         val previewLeft = r.centerX() - previewSz / 2f
-        val contentOffsetY = if (homeStyle == SettingsManager.HomeStyle.SNOW) baseCardH * 0.1f else 0f
-        val previewTop  = r.top + 10f * dp + contentOffsetY
+        val previewTop  = r.top + 10f * dp
         drawMiniBoard(canvas, previewLeft, previewTop, previewSz, card.type)
 
         val (title, desc) = when (card.type) {
@@ -471,16 +451,8 @@ class MenuView(
             "Snakes & Ladders" -> listOf("Snakes &", "Ladders")
             else -> listOf(title)
         }
-        val titlePaint = if (homeStyle == SettingsManager.HomeStyle.SNOW) {
-            Paint(cardTitlePaint).apply { textSize *= 0.95f }
-        } else {
-            cardTitlePaint
-        }
-        val descPaint = if (homeStyle == SettingsManager.HomeStyle.SNOW) {
-            Paint(cardDescPaint).apply { textSize *= 0.95f }
-        } else {
-            cardDescPaint
-        }
+        val titlePaint = cardTitlePaint
+        val descPaint = cardDescPaint
         val titleStartY = previewTop + previewSz + titlePaint.textSize + 5f * dp
         titleLines.forEachIndexed { index, line ->
             canvas.drawText(
@@ -543,31 +515,6 @@ class MenuView(
 
     private fun drawWoodCardShell(canvas: Canvas, r: RectF, pressed: Boolean) {
         brownWoodCardRenderer.draw(canvas, r, pressed)
-    }
-
-    private fun drawSnowCardShell(canvas: Canvas, r: RectF, pressed: Boolean) {
-        val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(60, 34, 78, 117)
-            maskFilter = BlurMaskFilter(5f * dp, BlurMaskFilter.Blur.NORMAL)
-        }
-        canvas.drawRoundRect(
-            RectF(r.left + 2f * dp, r.top + 3f * dp, r.right + 2f * dp, r.bottom + 3f * dp),
-            14f * dp,
-            14f * dp,
-            shadowPaint,
-        )
-        val bitmap = snowCardBitmap
-        if (bitmap == null) {
-            canvas.drawRoundRect(r, 14f * dp, 14f * dp, if (pressed) cardHiPaint else cardPaint)
-            return
-        }
-        canvas.drawBitmap(bitmap, null, r, snowCardPaint)
-        if (pressed) {
-            val pressedPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.argb(35, 33, 77, 126)
-            }
-            canvas.drawRoundRect(r, 14f * dp, 14f * dp, pressedPaint)
-        }
     }
 
     private fun drawMiniBoard(canvas: Canvas, left: Float, top: Float, size: Float, type: GameType) {
@@ -1347,25 +1294,12 @@ class MenuView(
     }
 
     private fun applyHomeStyleColors() {
-        if (homeStyle == SettingsManager.HomeStyle.SNOW) {
-            bgPaint.color = Color.parseColor("#DDEEFF")
-            cardPaint.color = Color.parseColor("#F4FAFF")
-            cardHiPaint.color = Color.parseColor("#E5F2FF")
-            cardBorderPaint.color = Color.parseColor("#A6C8E7")
-        } else {
-            applyLightTheme()
-        }
+        applyLightTheme()
         applyHomeCardTextTheme()
     }
 
     private fun applyHomeCardTextTheme() {
-        if (homeStyle == SettingsManager.HomeStyle.SNOW) {
-            cardTitlePaint.color = Color.BLACK
-            cardDescPaint.color = Color.BLACK
-            cardTitlePaint.clearShadowLayer()
-            cardDescPaint.clearShadowLayer()
-            copyrightPaint.color = Color.parseColor("#55738D")
-        } else if (isLightMode) {
+        if (isLightMode) {
             cardTitlePaint.color = Color.parseColor("#1A1A1A")
             cardDescPaint.color = Color.parseColor("#555555")
             cardTitlePaint.setShadowLayer(2f * dp, 0f, 1f * dp, Color.argb(230, 0, 0, 0))

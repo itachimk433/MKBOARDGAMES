@@ -913,8 +913,7 @@ class MainActivity : AppCompatActivity() {
         homeStyleRow.setOnClickListener {
             homeStyle = when (homeStyle) {
                 SettingsManager.HomeStyle.CLASSIC -> SettingsManager.HomeStyle.BROWN
-                SettingsManager.HomeStyle.BROWN -> SettingsManager.HomeStyle.SNOW
-                SettingsManager.HomeStyle.SNOW -> SettingsManager.HomeStyle.CLASSIC
+                SettingsManager.HomeStyle.BROWN -> SettingsManager.HomeStyle.CLASSIC
             }
             SettingsManager.setHomeStyle(ctx, homeStyle)
             menuView?.homeStyle = homeStyle
