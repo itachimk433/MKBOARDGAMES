@@ -31,13 +31,13 @@ import com.mkdev.mkboardgames.ui.CaptureStripView
 import com.mkdev.mkboardgames.ui.ChessBoardSelectionView
 import com.mkdev.mkboardgames.ui.ChessChoiceView
 import com.mkdev.mkboardgames.ui.ChessMenuView
-import com.mkdev.mkboardgames.ui.ChessResultActionsView
 import com.mkdev.mkboardgames.ui.ChessRulesView
 import com.mkdev.mkboardgames.ui.ChessBoardStyle
 import com.mkdev.mkboardgames.ui.DraughtsBoardStyle
 import com.mkdev.mkboardgames.ui.FoxAndGeeseBoardStyle
 import com.mkdev.mkboardgames.ui.OthelloBoardStyle
 import com.mkdev.mkboardgames.ui.ShogiBoardStyle
+import com.mkdev.mkboardgames.ui.SnakesLaddersGameOverView
 import com.mkdev.mkboardgames.ui.XiangqiBoardStyle
 import kotlinx.coroutines.*
 
@@ -53,8 +53,7 @@ class GameActivity : AppCompatActivity() {
     private lateinit var topCaptureView:   CaptureStripView
     private lateinit var goNoticeView:    android.widget.TextView
     private lateinit var bottomCaptureView: CaptureStripView
-    private lateinit var chessWinnerView: android.widget.TextView
-    private lateinit var chessResultActionsView: ChessResultActionsView
+    private lateinit var chessGameOverView: SnakesLaddersGameOverView
     private lateinit var engine:           RuleEngine
     private lateinit var gameType:         String
     private lateinit var gameContainer:    View
@@ -144,23 +143,19 @@ class GameActivity : AppCompatActivity() {
             setBackgroundColor(Color.parseColor("#1A1A1A"))
             visibility = View.GONE
         }
-        chessWinnerView = android.widget.TextView(this).apply {
-            setTextColor(Color.parseColor("#FFE7B0"))
-            textSize = 14f
-            typeface = Typeface.DEFAULT_BOLD
-            gravity = Gravity.CENTER
-            setPadding((14 * dp).toInt(), (5 * dp).toInt(), (14 * dp).toInt(), (5 * dp).toInt())
-            setBackgroundColor(Color.parseColor("#102C32"))
-            visibility = View.GONE
-            contentDescription = "Chess game winner"
-        }
         boardView        = BoardView(this)
         autoplayButton   = AutoplayButtonView(this)
         bottomCaptureView = CaptureStripView(this).also { it.dividerOnTop = true }
-        chessResultActionsView = ChessResultActionsView(this).apply {
-            onPlayAgain = { startGame() }
-            onMainMenu = { confirmChessMainMenu() }
-            onWatchReplay = { launchReplay(resultLabel = currentResultLabel()) }
+        chessGameOverView = SnakesLaddersGameOverView(this).apply {
+            onReplay = {
+                visibility = View.GONE
+                startGame()
+            }
+            onHome = {
+                visibility = View.GONE
+                clearPausedMatch()
+                finish()
+            }
         }
         boardView.onEmptySpaceTapped = null
         autoplayButton.onAutoplayChanged = { enabled ->
@@ -203,11 +198,6 @@ class GameActivity : AppCompatActivity() {
             android.widget.LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, hudH))
         container.addView(topCaptureView,
             android.widget.LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, capH))
-        container.addView(chessWinnerView,
-            android.widget.LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                (36 * dp).toInt(),
-            ))
         container.addView(goNoticeView,
             android.widget.LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -227,14 +217,6 @@ class GameActivity : AppCompatActivity() {
             })
         container.addView(bottomCaptureView,
             android.widget.LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, capH))
-        container.addView(
-            chessResultActionsView,
-            android.widget.LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ),
-        )
-
         val showCaptures = gameType != "OTHELLO"
         topCaptureView.visibility    = if (showCaptures) View.VISIBLE else View.GONE
         bottomCaptureView.visibility = if (showCaptures) View.VISIBLE else View.GONE
@@ -258,6 +240,13 @@ class GameActivity : AppCompatActivity() {
         )
         screenRoot.addView(
             styledOverlayHost,
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+            ),
+        )
+        screenRoot.addView(
+            chessGameOverView,
             FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -712,11 +701,15 @@ class GameActivity : AppCompatActivity() {
             this,
             matchLabel = if (vsAI) "vs CPU" else "2 Players",
         )
-        view.onSelectionConfirmed = { style, color ->
+        view.onSelectionConfirmed = { style ->
             boardView.chessBoardStyle = style
-            playerColor = color
             dismissStyledOverlay()
-            startGame()
+            if (vsAI) {
+                showChessSidePicker()
+            } else {
+                playerColor = PieceColor.WHITE
+                startGame()
+            }
         }
         view.onBackClicked = {
             showChessMenu()
@@ -1171,14 +1164,7 @@ Checkmate your opponent's King.
         hudView.setGoMode(gameType == "GO")
         hudView.setGameOver(false)
         hideGoNotice()
-        if (::chessWinnerView.isInitialized) {
-            chessWinnerView.visibility = View.GONE
-            chessWinnerView.text = ""
-        }
-        if (::chessResultActionsView.isInitialized) {
-            chessResultActionsView.visibility = View.GONE
-        }
-        setGameOverCaptureSpacing(false)
+        chessGameOverView.visibility = View.GONE
 
         topCaptureView.setLabel(
             when {
@@ -2070,43 +2056,13 @@ Checkmate your opponent's King.
         builder.show()
     }
 
-    private var mainMenuConfirmation: AlertDialog? = null
-
     private fun showChessResultDialog() {
         hudView.setInfo("Game Over", canUndo = false, canRedo = false)
         hudView.setGameOver(true)
-        setGameOverCaptureSpacing(true)
-        chessWinnerView.text = chessWinnerLabel()
-        chessWinnerView.visibility = View.VISIBLE
-        chessResultActionsView.visibility = View.VISIBLE
+        chessGameOverView.winnerLabel = chessWinnerLabel()
         gameContainer.visibility = View.VISIBLE
         styledOverlayHost.visibility = View.GONE
-    }
-
-    private fun setGameOverCaptureSpacing(gameOver: Boolean) {
-        if (!::bottomCaptureView.isInitialized || gameType != "CHESS") return
-        val params = bottomCaptureView.layoutParams as? android.widget.LinearLayout.LayoutParams
-            ?: return
-        val density = resources.displayMetrics.density
-        params.topMargin = if (gameOver) -(28 * density).toInt() else 0
-        bottomCaptureView.layoutParams = params
-    }
-
-    private fun confirmChessMainMenu() {
-        if (mainMenuConfirmation?.isShowing == true) return
-        mainMenuConfirmation = AlertDialog.Builder(this)
-            .setTitle("Leave game?")
-            .setMessage("Return to the mode selection screen?")
-            .setNegativeButton("Stay", null)
-            .setPositiveButton("Main Menu") { _, _ ->
-                clearPausedMatch()
-                finish()
-            }
-            .create()
-            .also { dialog ->
-                dialog.setOnDismissListener { mainMenuConfirmation = null }
-                dialog.show()
-            }
+        chessGameOverView.visibility = View.VISIBLE
     }
 
     private fun chessWinnerLabel(): String {
@@ -2170,13 +2126,6 @@ Checkmate your opponent's King.
             dimBackground = true,
             onCancel = { showChessBoardAfterDialog() },
         )
-    }
-
-    private fun currentResultLabel(): String = when (gameState.status) {
-        GameStatus.WHITE_WINS -> "White wins"
-        GameStatus.BLACK_WINS -> "Black wins"
-        GameStatus.DRAW -> "Draw"
-        else -> ""
     }
 
     private fun buildGoResultMessage(outcome: String): String {

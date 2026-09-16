@@ -18,24 +18,19 @@ import android.view.View
 import android.animation.ValueAnimator
 import android.view.animation.LinearInterpolator
 import com.mkdev.mkboardgames.SoundPlayer
-import com.mkdev.mkboardgames.engine.PieceColor
 import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.sin
 
 /**
- * Chess setup surface shown after choosing a match type.
- *
- * Board presentation and player colour are chosen together so the match starts
- * with the intended look and side, rather than hiding the board choice behind
- * an in-game switch.
+ * Chess board setup surface shown after choosing a match type.
  */
 class ChessBoardSelectionView(
     context: Context,
     private val matchLabel: String,
 ) : View(context) {
 
-    var onSelectionConfirmed: ((ChessBoardStyle, PieceColor) -> Unit)? = null
+    var onSelectionConfirmed: ((ChessBoardStyle) -> Unit)? = null
     var onBackClicked: (() -> Unit)? = null
 
     private val density = resources.displayMetrics.density
@@ -57,7 +52,6 @@ class ChessBoardSelectionView(
     private val realisticBitmap = createRealisticPreview()
     private val cardRects = styles.map { RectF() }
     private val imageRects = styles.map { RectF() }
-    private val sideRects = arrayOf(RectF(), RectF())
     private val continueRect = RectF()
     private val backRect = RectF()
     private val backTouchRect = RectF()
@@ -86,23 +80,6 @@ class ChessBoardSelectionView(
         textSize = sp(14f)
     }
     private val boardDetailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#6A2D1B")
-        textAlign = Paint.Align.CENTER
-        textSize = sp(9f)
-    }
-    private val sectionTitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.WHITE
-        textAlign = Paint.Align.CENTER
-        isFakeBoldText = true
-        textSize = sp(13f)
-    }
-    private val sideLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#4A1714")
-        textAlign = Paint.Align.CENTER
-        isFakeBoldText = true
-        textSize = sp(13f)
-    }
-    private val sideDetailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#6A2D1B")
         textAlign = Paint.Align.CENTER
         textSize = sp(9f)
@@ -137,9 +114,7 @@ class ChessBoardSelectionView(
     }
 
     private var selectedStyle: Int? = null
-    private var selectedSide: Int? = PieceColor.WHITE.ordinal
     private var pressedStyle: Int? = null
-    private var pressedSide: Int? = null
     private var pressedContinue = false
     private var pressedBack = false
     private var backgroundPhase = 0f
@@ -155,7 +130,7 @@ class ChessBoardSelectionView(
 
     init {
         isClickable = true
-        contentDescription = "Choose a Chess board and side"
+        contentDescription = "Choose a Chess board"
     }
 
     override fun onAttachedToWindow() {
@@ -181,7 +156,7 @@ class ChessBoardSelectionView(
         val gap = dp(9f)
         val cardWidth = ((width - horizontalPadding * 2f - gap) / 2f).coerceAtLeast(1f)
         val rowCount = (styles.size + 1) / 2
-        val controlsHeight = dp(154f)
+        val controlsHeight = dp(98f)
         val availableHeight =
             (height - top - controlsHeight - dp(16f)).coerceAtLeast(dp(90f))
         val rowGap = if (rowCount > 1) gap else 0f
@@ -218,18 +193,10 @@ class ChessBoardSelectionView(
             backTop + backSize + dp(6f),
         )
 
-        val sideTop = height - dp(91f)
         val continueSize = dp(50f)
         val continueLeft = width - dp(16f) - continueSize
-        continueRect.set(continueLeft, sideTop, continueLeft + continueSize, sideTop + continueSize)
-        val sideGap = dp(8f)
-        val sideLeft = dp(18f)
-        val sideRight = continueLeft - dp(12f)
-        val sideWidth = ((sideRight - sideLeft - sideGap) / 2f).coerceAtLeast(dp(80f))
-        sideRects.forEachIndexed { index, rect ->
-            val left = sideLeft + index * (sideWidth + sideGap)
-            rect.set(left, sideTop, left + sideWidth, sideTop + continueSize)
-        }
+        val continueTop = height - dp(78f)
+        continueRect.set(continueLeft, continueTop, continueLeft + continueSize, continueTop + continueSize)
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -274,16 +241,16 @@ class ChessBoardSelectionView(
         drawBackButton(canvas)
         canvas.drawText("Choose your board", width / 2f, dp(68f), titlePaint)
         canvas.drawText(
-            "Playing $matchLabel · Select a board and side",
+            "Playing $matchLabel · Select a board",
             width / 2f,
             dp(101f),
             subtitlePaint,
         )
 
         styles.forEachIndexed { index, style -> drawBoardCard(canvas, index, style) }
-        drawSideChoices(canvas)
+        drawContinueButton(canvas)
         canvas.drawText(
-            "Choose both options, then tap the arrow to begin.",
+            "Choose a board, then tap the arrow to continue.",
             width / 2f,
             height - dp(12f),
             footerPaint,
@@ -378,32 +345,8 @@ class ChessBoardSelectionView(
         canvas.drawRect(destination, dark)
     }
 
-    private fun drawSideChoices(canvas: Canvas) {
-        val left = sideRects.first().left
-        val right = sideRects.last().right
-        canvas.drawText("Play as", (left + right) / 2f, sideRects.first().top - dp(9f), sectionTitlePaint)
-        val labels = arrayOf("White", "Black")
-        val details = arrayOf("Moves first", "Moves second")
-        val symbols = arrayOf("♔", "♚")
-        sideRects.forEachIndexed { index, rect ->
-            val selected = selectedSide == index
-            val pressed = pressedSide == index
-            drawChessWoodButton(canvas, rect, pressed)
-            if (selected) {
-                selectionBorderPaint.color = Color.parseColor("#F6D78F")
-                selectionBorderPaint.strokeWidth = dp(3f)
-                canvas.drawRoundRect(rect, dp(10f), dp(10f), selectionBorderPaint)
-            } else if (selectedSide != null) {
-                canvas.drawRoundRect(rect, dp(10f), dp(10f), dimPaint)
-            }
-            sideLabelPaint.color = Color.parseColor("#4A1714")
-            canvas.drawText(symbols[index], rect.centerX(), rect.centerY() - dp(4f), sideLabelPaint)
-            canvas.drawText(labels[index], rect.centerX(), rect.centerY() + dp(14f), sideLabelPaint)
-            sideDetailPaint.color = Color.parseColor("#6A2D1B")
-            canvas.drawText(details[index], rect.centerX(), rect.bottom - dp(8f), sideDetailPaint)
-        }
-
-        val enabled = selectedStyle != null && selectedSide != null
+    private fun drawContinueButton(canvas: Canvas) {
+        val enabled = selectedStyle != null
         val buttonPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = if (enabled) Color.parseColor("#E3B86A") else Color.argb(80, 180, 197, 201)
         }
@@ -482,22 +425,17 @@ class ChessBoardSelectionView(
             MotionEvent.ACTION_DOWN -> {
                 pressedBack = backTouchRect.contains(event.x, event.y)
                 pressedStyle = null
-                pressedSide = null
                 pressedContinue = false
                 if (!pressedBack) {
                     pressedStyle = cardRects.indexOfFirst { it.contains(event.x, event.y) }
                         .takeIf { it >= 0 }
-                    if (pressedStyle == null) {
-                        pressedSide = sideRects.indexOfFirst { it.contains(event.x, event.y) }
-                            .takeIf { it >= 0 }
-                    }
-                    if (pressedStyle == null && pressedSide == null &&
+                    if (pressedStyle == null &&
                         continueRect.contains(event.x, event.y)
                     ) {
                         pressedContinue = true
                     }
                 }
-                if (pressedBack || pressedStyle != null || pressedSide != null || pressedContinue) {
+                if (pressedBack || pressedStyle != null || pressedContinue) {
                     performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
                 }
                 invalidate()
@@ -509,9 +447,6 @@ class ChessBoardSelectionView(
                 if (pressedStyle != null && !cardRects[pressedStyle!!].contains(event.x, event.y)) {
                     pressedStyle = null
                 }
-                if (pressedSide != null && !sideRects[pressedSide!!].contains(event.x, event.y)) {
-                    pressedSide = null
-                }
                 if (pressedContinue && !continueRect.contains(event.x, event.y)) {
                     pressedContinue = false
                 }
@@ -521,11 +456,9 @@ class ChessBoardSelectionView(
 
             MotionEvent.ACTION_UP -> {
                 val tappedStyle = pressedStyle?.takeIf { cardRects[it].contains(event.x, event.y) }
-                val tappedSide = pressedSide?.takeIf { sideRects[it].contains(event.x, event.y) }
                 val tappedContinue = pressedContinue && continueRect.contains(event.x, event.y)
                 val tappedBack = pressedBack && backTouchRect.contains(event.x, event.y)
                 pressedStyle = null
-                pressedSide = null
                 pressedContinue = false
                 pressedBack = false
                 when {
@@ -537,18 +470,9 @@ class ChessBoardSelectionView(
                         SoundPlayer.play("ui_click")
                         selectedStyle = if (selectedStyle == tappedStyle) null else tappedStyle
                     }
-                    tappedSide != null -> {
+                    tappedContinue && selectedStyle != null -> {
                         SoundPlayer.play("ui_click")
-                        selectedSide = if (selectedSide == tappedSide) null else tappedSide
-                    }
-                    tappedContinue && selectedStyle != null && selectedSide != null -> {
-                        SoundPlayer.play("ui_click")
-                        val color = if (selectedSide == PieceColor.BLACK.ordinal) {
-                            PieceColor.BLACK
-                        } else {
-                            PieceColor.WHITE
-                        }
-                        onSelectionConfirmed?.invoke(styles[selectedStyle!!], color)
+                        onSelectionConfirmed?.invoke(styles[selectedStyle!!])
                     }
                 }
                 invalidate()
@@ -557,7 +481,6 @@ class ChessBoardSelectionView(
 
             MotionEvent.ACTION_CANCEL -> {
                 pressedStyle = null
-                pressedSide = null
                 pressedContinue = false
                 pressedBack = false
                 invalidate()
