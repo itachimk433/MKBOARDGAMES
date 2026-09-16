@@ -373,9 +373,11 @@ class MenuView(
     }
 
     private fun drawBackArrow(canvas: Canvas) {
-        snowBackButtonBitmap?.let {
-            canvas.drawBitmap(it, null, backRect, bitmapPaint)
-            return
+        if (homeStyle == SettingsManager.HomeStyle.SNOW) {
+            snowBackButtonBitmap?.let {
+                canvas.drawBitmap(it, null, backRect, bitmapPaint)
+                return
+            }
         }
         canvas.drawRoundRect(backRect, 10f * dp, 10f * dp, backButtonPaint)
         canvas.drawRoundRect(backRect, 10f * dp, 10f * dp, backButtonEdgePaint)
