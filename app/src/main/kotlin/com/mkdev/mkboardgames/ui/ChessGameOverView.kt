@@ -11,6 +11,7 @@ import android.graphics.Typeface
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
+import com.mkdev.mkboardgames.SoundPlayer
 
 /**
  * Board-visible Chess result screen.
