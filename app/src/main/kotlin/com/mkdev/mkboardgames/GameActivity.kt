@@ -617,7 +617,7 @@ class GameActivity : AppCompatActivity() {
             gameType == "XIANGQI"
 
     private fun showModeDialog() {
-        if (isStyledBoardGame()) {
+        if (gameType == "CHESS") {
             showChessMenu()
             return
         }
@@ -684,7 +684,7 @@ class GameActivity : AppCompatActivity() {
     }
 
     private fun showColorPickerDialog() {
-        if (isStyledBoardGame()) {
+        if (gameType != "CHESS" && isStyledBoardGame()) {
             showChessSidePicker()
             return
         }
@@ -716,34 +716,66 @@ class GameActivity : AppCompatActivity() {
     }
 
     private fun showChessSidePicker() {
-        val isFoxAndGeese = gameType == "FOX_AND_GEESE"
+        val firstChoice = when (gameType) {
+            "FOX_AND_GEESE" -> "Fox"
+            "XIANGQI" -> "Red"
+            "SHOGI" -> "Sente / Black"
+            "GO" -> "Black"
+            else -> "White"
+        }
+        val secondChoice = when (gameType) {
+            "FOX_AND_GEESE" -> "Geese"
+            "XIANGQI" -> "Black"
+            "SHOGI" -> "Gote / White"
+            "GO" -> "White"
+            else -> "Black"
+        }
+        val firstDetail = if (gameType == "FOX_AND_GEESE") {
+            "Moves second"
+        } else {
+            "Moves first"
+        }
+        val secondDetail = if (gameType == "FOX_AND_GEESE") {
+            "Moves first"
+        } else {
+            "Moves second"
+        }
+        val firstSymbol = when (gameType) {
+            "CHESS" -> "♔"
+            "SHOGI" -> "▲"
+            "XIANGQI" -> "红"
+            "GO" -> "●"
+            "FOX_AND_GEESE" -> "F"
+            else -> "●"
+        }
+        val secondSymbol = when (gameType) {
+            "CHESS" -> "♚"
+            "SHOGI" -> "▽"
+            "XIANGQI" -> "黑"
+            "GO" -> "○"
+            "FOX_AND_GEESE" -> "G"
+            else -> "○"
+        }
+        val firstColor = if (gameType == "SHOGI" || gameType == "GO") {
+            PieceColor.BLACK
+        } else {
+            PieceColor.WHITE
+        }
         val view = ChessChoiceView(
             this,
             title = "Play As",
             subtitle = "Choose your colour before the first move.",
             choices = listOf(
                 ChessChoiceView.Choice(
-                    if (isFoxAndGeese) "Fox" else "White",
-                    if (isFoxAndGeese) "Moves second" else "Moves first",
-                    when {
-                        gameType == "CHESS" -> "♔"
-                        gameType == "CHECKERS" -> "●"
-                        gameType == "INTERNATIONAL_DRAUGHTS" -> "●"
-                        gameType == "OTHELLO" -> "●"
-                        else -> ""
-                    },
+                    firstChoice,
+                    firstDetail,
+                    firstSymbol,
                     Color.parseColor("#E3B86A"),
                 ),
                 ChessChoiceView.Choice(
-                    if (isFoxAndGeese) "Geese" else "Black",
-                    if (isFoxAndGeese) "Moves first" else "Moves second",
-                    when {
-                        gameType == "CHESS" -> "♚"
-                        gameType == "CHECKERS" -> "◉"
-                        gameType == "INTERNATIONAL_DRAUGHTS" -> "◉"
-                        gameType == "OTHELLO" -> "○"
-                        else -> ""
-                    },
+                    secondChoice,
+                    secondDetail,
+                    secondSymbol,
                     Color.parseColor("#A9B6E8"),
                 ),
             ),
@@ -751,7 +783,7 @@ class GameActivity : AppCompatActivity() {
             headerSymbol = "●",
         )
         view.onChoiceSelected = { which ->
-            playerColor = if (which == 0) PieceColor.WHITE else PieceColor.BLACK
+            playerColor = if (which == 0) firstColor else firstColor.opponent()
             dismissStyledOverlay()
             startGame()
         }
