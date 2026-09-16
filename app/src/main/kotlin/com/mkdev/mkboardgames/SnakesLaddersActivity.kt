@@ -21,6 +21,7 @@ import com.mkdev.mkboardgames.ui.LudoPlayerControlView
 import com.mkdev.mkboardgames.ui.MotionDiceDirection
 import com.mkdev.mkboardgames.ui.SnakesLaddersBoardView
 import com.mkdev.mkboardgames.ui.SnakesLaddersBoardSelectionView
+import com.mkdev.mkboardgames.ui.SnakesLaddersEntryRule
 import com.mkdev.mkboardgames.ui.StyledDialogs
 import com.mkdev.mkboardgames.ui.SnakesLaddersGameOverView
 import kotlin.random.Random
@@ -56,6 +57,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
     private var ladders = SnakesLaddersBoardView.Board.ONE.ladders
     private var snakes = SnakesLaddersBoardView.Board.ONE.snakes
     private var selectedBoard = SnakesLaddersBoardView.Board.ONE
+    private var selectedEntryRule = SnakesLaddersEntryRule.REQUIRE_SIX
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -261,8 +263,9 @@ class SnakesLaddersActivity : AppCompatActivity() {
         val label = if (cpuEnabled) "vs CPU" else "$players Players"
         val picker = SnakesLaddersBoardSelectionView(this, label)
         boardSelectionView = picker
-        picker.onBoardSelected = { board ->
+        picker.onSelectionConfirmed = { board, entryRule ->
             setBoardRules(board)
+            selectedEntryRule = entryRule
             boardView.setBoard(board)
             boardSelectionView?.let { (it.parent as? ViewGroup)?.removeView(it) }
             boardSelectionView = null
@@ -312,7 +315,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
         val rules = """
             SNAKES & LADDERS — Rules
 
-            Roll the die and move your counter along the numbered board. Land on the bottom of a ladder to climb upward. Land on a snake's head and slide back down.
+            Roll the die and move your counter along the numbered board. ${selectedEntryRule.title}. Land on the bottom of a ladder to climb upward. Land on a snake's head and slide back down.
 
             Reach square 100 first to win. A roll that would pass 100 leaves your counter where it is. Rolling a six grants another turn.
 
@@ -378,12 +381,17 @@ class SnakesLaddersActivity : AppCompatActivity() {
     private fun applyRoll(player: Int, value: Int) {
         if (player != currentPlayer || gameOver) return
         val from = positions[player]
+        if (from == 0 &&
+            selectedEntryRule == SnakesLaddersEntryRule.REQUIRE_SIX &&
+            value != 6
+        ) {
+            turnView.text = "${playerName(player)} needs a 6 to enter the board"
+            finishTurn(player, value, 0)
+            return
+        }
+
         val stepped = if (from == 0) {
-            // Snakes & Ladders starts off the board, but the first roll still
-            // counts normally: a roll of 4 lands on square 4, not square 1.
-            // Requiring a six here is a separate house-rule variant and
-            // contradicted the rules shown in this activity.
-            value
+            if (selectedEntryRule == SnakesLaddersEntryRule.REQUIRE_SIX) 1 else value
         } else if (from + value <= 100) {
             from + value
         } else {

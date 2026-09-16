@@ -105,10 +105,18 @@ private fun drawChessGlow(canvas: Canvas, x: Float, y: Float, radius: Float, uni
     canvas.drawCircle(x, y, radius, glow)
 }
 
-internal fun drawChessWoodButton(canvas: Canvas, rect: RectF, pressed: Boolean, unit: Float) {
+internal fun drawChessWoodButton(
+    canvas: Canvas,
+    rect: RectF,
+    pressed: Boolean,
+    unit: Float,
+    maxCornerRadius: Float? = null,
+) {
     val offset = if (pressed) 2f * unit else 0f
     val drawn = RectF(rect.left, rect.top + offset, rect.right, rect.bottom + offset)
-    val radius = drawn.height() * 0.2f
+    val radius = (drawn.height() * 0.2f).let { defaultRadius ->
+        maxCornerRadius?.let { min(defaultRadius, it) } ?: defaultRadius
+    }
     val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         shader = LinearGradient(
             0f,

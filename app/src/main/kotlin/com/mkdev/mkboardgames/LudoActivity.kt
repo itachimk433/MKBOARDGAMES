@@ -209,6 +209,7 @@ class LudoActivity : AppCompatActivity() {
         playerBadgeViews = Array(LudoSetup.PLAYER_COUNT) { player ->
             LudoPlayerBadgeView(this).apply {
                 accentColor = LudoSetup.PLAYER_COLORS[player]
+                avatarScale = 0.7f
                 label = playerDisplayName(player)
                 setOnClickListener {
                     if (profilesEnabled() && matchStarted) showPlayerProfile(player)
@@ -218,6 +219,7 @@ class LudoActivity : AppCompatActivity() {
         playerControlViews = Array(LudoSetup.PLAYER_COUNT) { player ->
             LudoPlayerControlView(this).apply {
                 accentColor = LudoSetup.PLAYER_COLORS[player]
+                dieScale = 0.7f
                 label = playerDisplayName(player)
                 labelBelow = player == 0 || player == 1
                 bind(

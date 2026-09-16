@@ -73,6 +73,8 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
                 97 to 56,
             ),
             accentColor = Color.parseColor("#E3B86A"),
+            profileScale = 0.7f,
+            dieScale = 0.7f,
         ),
         TWO(
             displayName = "Board Two",
