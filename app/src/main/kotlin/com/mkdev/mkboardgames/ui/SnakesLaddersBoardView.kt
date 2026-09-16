@@ -613,7 +613,10 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
                     val stepDuration = if (segmentCount >= 2) 290L else 145L
                     (segmentCount * stepDuration) + 70L
                 }
-                MovePath.ENTER_BOARD -> 215L
+                // Include the off-board start point and every square reached
+                // by the opening roll. This keeps a first roll of 4 visually
+                // consistent with a later four-square move.
+                MovePath.ENTER_BOARD -> (segmentCount * 190L) + 80L
                 MovePath.DIRECT_TRANSITION -> 520L
             }
             interpolator = LinearInterpolator()
@@ -684,7 +687,11 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
 
     private fun routeFor(player: Int, from: Int, to: Int, path: MovePath): List<PointF> {
         if (path == MovePath.ENTER_BOARD) {
-            return listOf(startPointForPlayer(player), pointForNumber(1f))
+            val end = to.coerceIn(1, 100)
+            return buildList {
+                add(startPointForPlayer(player))
+                addAll((1..end).map { pointForNumber(it.toFloat()) })
+            }
         }
         if (path == MovePath.DIRECT_TRANSITION) {
             // A ladder or snake is a single visual transition between its two

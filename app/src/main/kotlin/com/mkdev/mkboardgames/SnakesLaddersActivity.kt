@@ -378,13 +378,12 @@ class SnakesLaddersActivity : AppCompatActivity() {
     private fun applyRoll(player: Int, value: Int) {
         if (player != currentPlayer || gameOver) return
         val from = positions[player]
-        if (from == 0 && value != 6) {
-            finishTurn(player, value, 0)
-            return
-        }
-
         val stepped = if (from == 0) {
-            1
+            // Snakes & Ladders starts off the board, but the first roll still
+            // counts normally: a roll of 4 lands on square 4, not square 1.
+            // Requiring a six here is a separate house-rule variant and
+            // contradicted the rules shown in this activity.
+            value
         } else if (from + value <= 100) {
             from + value
         } else {

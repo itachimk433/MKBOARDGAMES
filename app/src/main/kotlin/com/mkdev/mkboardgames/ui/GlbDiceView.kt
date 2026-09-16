@@ -14,6 +14,7 @@ import android.util.Log
 import android.view.MotionEvent
 import android.view.ViewGroup
 import android.view.animation.AccelerateDecelerateInterpolator
+import android.view.animation.DecelerateInterpolator
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
@@ -106,8 +107,11 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         }
 
         animator = ValueAnimator.ofFloat(0f, 1f).apply {
-            duration = 420L
-            interpolator = AccelerateDecelerateInterpolator()
+            // Give the tumble enough time to read as a physical throw. The
+            // die still accelerates into the roll, then settles cleanly on
+            // the predetermined face instead of snapping there too quickly.
+            duration = 680L
+            interpolator = DecelerateInterpolator(1.6f)
             addUpdateListener {
                 val progress = it.animatedFraction
                 val tumble = sin(progress * Math.PI).toFloat()
