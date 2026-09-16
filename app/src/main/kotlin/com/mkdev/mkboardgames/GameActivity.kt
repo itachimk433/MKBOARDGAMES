@@ -59,7 +59,6 @@ class GameActivity : AppCompatActivity() {
     private lateinit var gameContainer:    View
     private lateinit var screenRoot:       FrameLayout
     private lateinit var styledOverlayHost: FrameLayout
-    private val dp = resources.displayMetrics.density
     private val internationalDraughtsStyles = arrayOf(
         DraughtsBoardStyle.CANVAS,
         DraughtsBoardStyle.INTERNATIONAL_DARK_WOOD,
@@ -2078,7 +2077,8 @@ Checkmate your opponent's King.
         if (!::bottomCaptureView.isInitialized || gameType != "CHESS") return
         val params = bottomCaptureView.layoutParams as? android.widget.LinearLayout.LayoutParams
             ?: return
-        params.topMargin = if (gameOver) -(28 * dp).toInt() else 0
+        val density = resources.displayMetrics.density
+        params.topMargin = if (gameOver) -(28 * density).toInt() else 0
         bottomCaptureView.layoutParams = params
     }
 
