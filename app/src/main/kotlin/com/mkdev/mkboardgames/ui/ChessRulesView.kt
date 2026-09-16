@@ -202,17 +202,17 @@ private class ChessMancalaRulesView(
             isXiangqi || isTicTacToe || isConnectFour || isLudo || isSnakesLadders || isOnitama
     private val gameIconBitmap = run {
         val assetName = when {
-            isChess -> "chess_home_icon.png"
+            isChess -> "chess_home_icon.webp"
             isDraughts && gameLabel.replace(" ", "").equals("INTLDRAUGHTS", ignoreCase = true) ->
-                "international_draughts_home_icon.png"
-            isDraughts -> "draughts_home_icon.png"
-            isOthello -> "othello_home_icon.png"
-            isFoxAndGeese -> "fox_and_geese_home_icon.png"
-            isGo -> "go_home_icon.png"
-            isShogi -> "shogi_home_icon.png"
-            isXiangqi -> "xiangqi_home_icon.png"
-            isConnectFour -> "connect_four_home_icon.png"
-            isLudo -> "ludo_home_icon.png"
+                "international_draughts_home_icon.webp"
+            isDraughts -> "draughts_home_icon.webp"
+            isOthello -> "othello_home_icon.webp"
+            isFoxAndGeese -> "fox_and_geese_home_icon.webp"
+            isGo -> "go_home_icon.webp"
+            isShogi -> "shogi_home_icon.webp"
+            isXiangqi -> "xiangqi_home_icon.webp"
+            isConnectFour -> "connect_four_home_icon.webp"
+            isLudo -> "ludo_home_icon.webp"
             isOnitama -> "onitama_home_icon.webp"
             else -> null
         }

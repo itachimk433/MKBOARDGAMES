@@ -91,40 +91,40 @@ class MenuView(
     } catch (e: Exception) { null }
 
     private val ludoHomeIconBitmap: Bitmap? = try {
-        context.assets.open("ludo_home_icon.png").use { BitmapFactory.decodeStream(it) }
+        context.assets.open("ludo_home_icon.webp").use { BitmapFactory.decodeStream(it) }
     } catch (e: Exception) { null }
     private val othelloHomeIconBitmap: Bitmap? = try {
-        context.assets.open("othello_home_icon.png").use { BitmapFactory.decodeStream(it) }
+        context.assets.open("othello_home_icon.webp").use { BitmapFactory.decodeStream(it) }
     } catch (e: Exception) { null }
     private val chessHomeIconBitmap: Bitmap? = try {
-        context.assets.open("chess_home_icon.png").use { BitmapFactory.decodeStream(it) }
+        context.assets.open("chess_home_icon.webp").use { BitmapFactory.decodeStream(it) }
     } catch (e: Exception) { null }
     private val internationalDraughtsHomeIconBitmap: Bitmap? = try {
-        context.assets.open("international_draughts_home_icon.png").use { BitmapFactory.decodeStream(it) }
+        context.assets.open("international_draughts_home_icon.webp").use { BitmapFactory.decodeStream(it) }
     } catch (e: Exception) { null }
     private val draughtsHomeIconBitmap: Bitmap? = try {
-        context.assets.open("draughts_home_icon.png").use { BitmapFactory.decodeStream(it) }
+        context.assets.open("draughts_home_icon.webp").use { BitmapFactory.decodeStream(it) }
     } catch (e: Exception) { null }
     private val morabarabaHomeIconBitmap: Bitmap? = try {
-        context.assets.open("morabaraba_home_icon.png").use { BitmapFactory.decodeStream(it) }
+        context.assets.open("morabaraba_home_icon.webp").use { BitmapFactory.decodeStream(it) }
     } catch (e: Exception) { null }
     private val ticTacToeHomeIconBitmap: Bitmap? = try {
-        context.assets.open("tictactoe_home_icon.png").use { BitmapFactory.decodeStream(it) }
+        context.assets.open("tictactoe_home_icon.webp").use { BitmapFactory.decodeStream(it) }
     } catch (e: Exception) { null }
     private val connectFourHomeIconBitmap: Bitmap? = try {
-        context.assets.open("connect_four_home_icon.png").use { BitmapFactory.decodeStream(it) }
+        context.assets.open("connect_four_home_icon.webp").use { BitmapFactory.decodeStream(it) }
     } catch (e: Exception) { null }
     private val shogiHomeIconBitmap: Bitmap? = try {
-        context.assets.open("shogi_home_icon.png").use { BitmapFactory.decodeStream(it) }
+        context.assets.open("shogi_home_icon.webp").use { BitmapFactory.decodeStream(it) }
     } catch (e: Exception) { null }
     private val xiangqiHomeIconBitmap: Bitmap? = try {
-        context.assets.open("xiangqi_home_icon.png").use { BitmapFactory.decodeStream(it) }
+        context.assets.open("xiangqi_home_icon.webp").use { BitmapFactory.decodeStream(it) }
     } catch (e: Exception) { null }
     private val goHomeIconBitmap: Bitmap? = try {
-        context.assets.open("go_home_icon.png").use { BitmapFactory.decodeStream(it) }
+        context.assets.open("go_home_icon.webp").use { BitmapFactory.decodeStream(it) }
     } catch (e: Exception) { null }
     private val foxAndGeeseHomeIconBitmap: Bitmap? = try {
-        context.assets.open("fox_and_geese_home_icon.png").use { BitmapFactory.decodeStream(it) }
+        context.assets.open("fox_and_geese_home_icon.webp").use { BitmapFactory.decodeStream(it) }
     } catch (e: Exception) { null }
     private val mancalaHomeIconBitmap: Bitmap? = try {
         context.assets.open("mancala_home_icon.webp").use { BitmapFactory.decodeStream(it) }
