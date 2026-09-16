@@ -918,6 +918,7 @@ class MainActivity : AppCompatActivity() {
             }
             SettingsManager.setHomeStyle(ctx, homeStyle)
             menuView?.homeStyle = homeStyle
+            screenRoot.invalidate()
             homeStyleVal.text = homeStyle.label
         }
         root.addView(homeStyleRow)
