@@ -24,7 +24,9 @@ import com.mkdev.mkboardgames.games.shogi.ShogiRuleEngine
 import com.mkdev.mkboardgames.games.xiangqi.XiangqiRuleEngine
 import com.mkdev.mkboardgames.ui.AutoplayButtonView
 import com.mkdev.mkboardgames.ui.BoardView
-import com.mkdev.mkboardgames.ui.BoardStyleSwitchView
+import com.mkdev.mkboardgames.ui.BoardSelectionOption
+import com.mkdev.mkboardgames.ui.BoardSelectionPreview
+import com.mkdev.mkboardgames.ui.BoardSelectionView
 import com.mkdev.mkboardgames.ui.CaptureStripView
 import com.mkdev.mkboardgames.ui.ChessBoardSelectionView
 import com.mkdev.mkboardgames.ui.ChessChoiceView
@@ -46,7 +48,6 @@ class GameActivity : AppCompatActivity() {
     }
 
     private lateinit var boardView:        BoardView
-    private lateinit var boardStyleSwitch: BoardStyleSwitchView
     private lateinit var autoplayButton:   AutoplayButtonView
     private lateinit var hudView:          HudView
     private lateinit var topCaptureView:   CaptureStripView
@@ -90,20 +91,7 @@ class GameActivity : AppCompatActivity() {
     // Result guard: stats recorded exactly once per game
     private var resultRecorded = false
     private var interstitialAd: Any? = null
-    private var boardStyleSwitchEnabled = false
     private var exitPosted = false
-    private val boardStyleSwitchFadeRunnable = Runnable {
-        if (!boardStyleSwitchEnabled || !::boardStyleSwitch.isInitialized) return@Runnable
-        boardStyleSwitch.animate()
-            .alpha(0f)
-            .setDuration(900L)
-            .withEndAction {
-                if (boardStyleSwitch.alpha <= 0.01f) {
-                    boardStyleSwitch.visibility = View.INVISIBLE
-                }
-            }
-            .start()
-    }
     private val redoGameStates = ArrayDeque<GameState>()
     private val redoCaptures   = ArrayDeque<Pair<List<Piece>, List<Piece>>>()
     private val redoMoves      = ArrayDeque<List<GameState>>()
@@ -138,7 +126,6 @@ class GameActivity : AppCompatActivity() {
         val dp    = resources.displayMetrics.density
         val hudH  = (56 * dp).toInt()
         val capH  = if (gameType == "GO") (58 * dp).toInt() else (36 * dp).toInt()
-        val boardStyleSwitchH = (44 * dp).toInt()
         val autoplayButtonH = (76 * dp).toInt()
 
         val container = android.widget.LinearLayout(this).apply {
@@ -168,7 +155,6 @@ class GameActivity : AppCompatActivity() {
             contentDescription = "Chess game winner"
         }
         boardView        = BoardView(this)
-        boardStyleSwitch = BoardStyleSwitchView(this)
         autoplayButton   = AutoplayButtonView(this)
         bottomCaptureView = CaptureStripView(this).also { it.dividerOnTop = true }
         chessResultActionsView = ChessResultActionsView(this).apply {
@@ -176,23 +162,7 @@ class GameActivity : AppCompatActivity() {
             onMainMenu = { confirmChessMainMenu() }
             onWatchReplay = { launchReplay(resultLabel = currentResultLabel()) }
         }
-        val boardStyleRow = android.widget.LinearLayout(this).apply {
-            orientation = android.widget.LinearLayout.HORIZONTAL
-            gravity = Gravity.START
-            setPadding((10 * dp).toInt(), 0, 0, 0)
-            isClickable = true
-        }
-        boardStyleRow.setOnTouchListener { _, event ->
-            if (event.action == android.view.MotionEvent.ACTION_UP) {
-                revealBoardStyleSwitch()
-            }
-            true
-        }
-        boardStyleSwitch.onStyleChanged = { styleIndex ->
-            applyBoardStyleIndex(styleIndex)
-        }
-        boardView.onEmptySpaceTapped =
-            if (gameType == "CHESS") null else ::revealBoardStyleSwitch
+        boardView.onEmptySpaceTapped = null
         autoplayButton.onAutoplayChanged = { enabled ->
             if (autoplayAllowed && gameType != "LUDO" && vsAI) {
                 autoplayEnabled = enabled
@@ -227,41 +197,6 @@ class GameActivity : AppCompatActivity() {
         if (isInternationalDraughts) {
             boardView.draughtsBoardStyle = internationalDraughtsStyles.first()
         }
-        boardStyleSwitchEnabled =
-            isDraughtsGame ||
-                gameType == "OTHELLO" || gameType == "FOX_AND_GEESE" ||
-                gameType == "XIANGQI" || gameType == "SHOGI"
-        boardStyleSwitch.setStyleCount(
-            when {
-                gameType == "CHESS" -> ChessBoardStyle.entries.size
-                isInternationalDraughts -> internationalDraughtsStyles.size
-                isDraughtsGame ->
-                    DraughtsBoardStyle.entries.size -
-                        internationalDraughtsStyles.count { it != DraughtsBoardStyle.CANVAS }
-                gameType == "OTHELLO" -> OthelloBoardStyle.entries.size
-                gameType == "FOX_AND_GEESE" -> foxAndGeeseStyles.size
-                gameType == "XIANGQI" -> xiangqiStyles.size
-                gameType == "SHOGI" -> ShogiBoardStyle.entries.size
-                else -> ChessBoardStyle.entries.size
-            },
-        )
-        val selectedBoardStyleIndex = when {
-            isInternationalDraughts ->
-                internationalDraughtsStyles.indexOf(boardView.draughtsBoardStyle)
-                    .coerceAtLeast(0)
-            isDraughtsGame -> boardView.draughtsBoardStyle.ordinal
-            gameType == "OTHELLO" -> boardView.othelloBoardStyle.ordinal
-            gameType == "FOX_AND_GEESE" ->
-                foxAndGeeseStyles.indexOf(boardView.foxAndGeeseBoardStyle).coerceAtLeast(0)
-            gameType == "XIANGQI" ->
-                xiangqiStyles.indexOf(boardView.xiangqiBoardStyle).coerceAtLeast(0)
-            gameType == "SHOGI" -> boardView.shogiBoardStyle.ordinal
-            else -> boardView.chessBoardStyle.ordinal
-        }
-        boardStyleSwitch.setSelectedIndex(
-            selectedBoardStyleIndex,
-            animate = false,
-        )
         autoplayButton.setAutoplayEnabled(false, animate = false)
 
         container.addView(hudView,
@@ -278,16 +213,6 @@ class GameActivity : AppCompatActivity() {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 (58 * dp).toInt(),
             ))
-        if (boardStyleSwitchEnabled) {
-            boardStyleRow.addView(boardStyleSwitch,
-                android.widget.LinearLayout.LayoutParams((118 * dp).toInt(), boardStyleSwitchH))
-            boardStyleSwitch.visibility = View.VISIBLE
-            container.addView(boardStyleRow,
-                android.widget.LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    boardStyleSwitchH,
-                ))
-        }
         container.addView(boardView,
             android.widget.LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0)
                 .apply { weight = 1f })
@@ -410,32 +335,6 @@ class GameActivity : AppCompatActivity() {
             @Suppress("DEPRECATION")
             overridePendingTransition(0, 0)
         }, 16L)
-    }
-
-    private fun scheduleBoardStyleSwitchFade() {
-        if (boardStyleSwitchEnabled && ::boardStyleSwitch.isInitialized) {
-            boardStyleSwitch.removeCallbacks(boardStyleSwitchFadeRunnable)
-            boardStyleSwitch.animate().cancel()
-            boardStyleSwitch.alpha = 1f
-            boardStyleSwitch.visibility = View.VISIBLE
-            boardStyleSwitch.postDelayed(boardStyleSwitchFadeRunnable, 5_000L)
-        }
-    }
-
-    private fun revealBoardStyleSwitch() {
-        if (boardStyleSwitchEnabled && ::boardStyleSwitch.isInitialized) {
-            boardStyleSwitch.removeCallbacks(boardStyleSwitchFadeRunnable)
-            boardStyleSwitch.animate().cancel()
-            if (boardStyleSwitch.visibility != View.VISIBLE) {
-                boardStyleSwitch.visibility = View.VISIBLE
-                boardStyleSwitch.alpha = 0f
-            }
-            boardStyleSwitch.animate()
-                .alpha(1f)
-                .setDuration(220L)
-                .start()
-            boardStyleSwitch.postDelayed(boardStyleSwitchFadeRunnable, 5_000L)
-        }
     }
 
     private fun applyBoardStyleIndex(styleIndex: Int) {
@@ -665,6 +564,8 @@ class GameActivity : AppCompatActivity() {
             vsAI = true
             if (gameType == "CHESS") {
                 showChessBoardSelection()
+            } else if (boardSelectionOptions() != null) {
+                showBoardSelection()
             } else {
                 showChessSidePicker()
             }
@@ -673,6 +574,8 @@ class GameActivity : AppCompatActivity() {
             vsAI = false
             if (gameType == "CHESS") {
                 showChessBoardSelection()
+            } else if (boardSelectionOptions() != null) {
+                showBoardSelection()
             } else {
                 playerColor = PieceColor.WHITE
                 dismissStyledOverlay()
@@ -818,6 +721,75 @@ class GameActivity : AppCompatActivity() {
         view.onBackClicked = {
             showChessMenu()
         }
+        showStyledOverlay(
+            view = view,
+            fullScreen = true,
+            onCancel = { showChessMenu() },
+        )
+    }
+
+    private fun boardSelectionOptions(): List<BoardSelectionOption>? = when (gameType) {
+        "CHECKERS" -> listOf(
+            BoardSelectionOption("Canvas board", "Clean and modern", preview = BoardSelectionPreview.CHECKERS),
+            BoardSelectionOption("Red & black", "Bold contrast", "draughts_board_red_black.png", BoardSelectionPreview.CHECKERS),
+            BoardSelectionOption("Classic wood", "Warm tournament feel", "chess_board.jpg", BoardSelectionPreview.CHECKERS),
+            BoardSelectionOption("Supplied wood", "Rich natural grain", "chess_board_wood.jpg", BoardSelectionPreview.CHECKERS),
+            BoardSelectionOption("Realistic dark", "High-contrast frame", preview = BoardSelectionPreview.CHECKERS),
+            BoardSelectionOption("Black & white", "Bold monochrome", "chess_board_black_white.png", BoardSelectionPreview.CHECKERS),
+        )
+        "INTERNATIONAL_DRAUGHTS" -> listOf(
+            BoardSelectionOption("Canvas board", "Clean and modern", preview = BoardSelectionPreview.CHECKERS),
+            BoardSelectionOption("Dark wood", "Deep natural grain", "international_draughts_board_dark.jpg", BoardSelectionPreview.CHECKERS),
+            BoardSelectionOption("Light wood", "Bright natural grain", "international_draughts_board_light.jpg", BoardSelectionPreview.CHECKERS),
+        )
+        "OTHELLO" -> listOf(
+            BoardSelectionOption("Canvas board", "Clean and modern", preview = BoardSelectionPreview.OTHELLO),
+            BoardSelectionOption("Green felt", "Classic table feel", "othello_board_green.webp", BoardSelectionPreview.OTHELLO),
+        )
+        "FOX_AND_GEESE" -> listOf(
+            BoardSelectionOption("Canvas board", "Clean and modern", preview = BoardSelectionPreview.FOX_AND_GEESE),
+            BoardSelectionOption("Light wood", "Warm natural grain", "fox_and_geese_board_light.webp", BoardSelectionPreview.FOX_AND_GEESE),
+            BoardSelectionOption("Cross wood", "Rich crafted frame", "fox_and_geese_board_cross.webp", BoardSelectionPreview.FOX_AND_GEESE),
+        )
+        "XIANGQI" -> listOf(
+            BoardSelectionOption("Classic", "Traditional lines", "xiangqi_board.webp", BoardSelectionPreview.XIANGQI),
+            BoardSelectionOption("Chinese", "Chinese labels", "xiangqi_board_chinese.webp", BoardSelectionPreview.XIANGQI),
+            BoardSelectionOption("English", "English labels", "xiangqi_board_english.webp", BoardSelectionPreview.XIANGQI),
+        )
+        "SHOGI" -> listOf(
+            BoardSelectionOption("Classic", "Traditional board", "shogi_board.webp", BoardSelectionPreview.SHOGI),
+            BoardSelectionOption("Wood", "Warm natural grain", "shogi_board_wood.webp", BoardSelectionPreview.SHOGI),
+        )
+        else -> null
+    }
+
+    private fun showBoardSelection() {
+        val options = boardSelectionOptions() ?: run {
+            if (vsAI) {
+                showChessSidePicker()
+            } else {
+                playerColor = PieceColor.WHITE
+                dismissStyledOverlay()
+                startGame()
+            }
+            return
+        }
+        val view = BoardSelectionView(
+            this,
+            matchLabel = if (vsAI) "vs CPU" else "2 Players",
+            options = options,
+        )
+        view.onSelectionConfirmed = { styleIndex ->
+            applyBoardStyleIndex(styleIndex)
+            dismissStyledOverlay()
+            if (vsAI) {
+                showChessSidePicker()
+            } else {
+                playerColor = PieceColor.WHITE
+                startGame()
+            }
+        }
+        view.onBackClicked = { showChessMenu() }
         showStyledOverlay(
             view = view,
             fullScreen = true,
@@ -1180,9 +1152,6 @@ Checkmate your opponent's King.
         if (vsAI) SettingsManager.setActiveGame(this, gameType.lowercase())
         restoring?.boardStyle?.let {
             applyBoardStyleIndex(it)
-            if (::boardStyleSwitch.isInitialized) {
-                boardStyleSwitch.setSelectedIndex(currentBoardStyleIndex(), animate = false)
-            }
         }
 
         gameState = engine.initialState()
@@ -1245,7 +1214,6 @@ Checkmate your opponent's King.
         ) {
             triggerAI()
         }
-        scheduleBoardStyleSwitchFade()
     }
 
     private fun resumePausedMatch() {
@@ -2335,7 +2303,7 @@ Checkmate your opponent's King.
                     undoRect.contains(e.x, e.y) -> { SoundPlayer.play("ui_click"); onUndoClicked() }
                     redoRect.contains(e.x, e.y) -> { SoundPlayer.play("ui_click"); onRedoClicked() }
                     menuRect.contains(e.x, e.y) -> { SoundPlayer.play("ui_click"); onMenuClicked() }
-                    else -> revealBoardStyleSwitch()
+                    else -> Unit
                 }
             }
             return true

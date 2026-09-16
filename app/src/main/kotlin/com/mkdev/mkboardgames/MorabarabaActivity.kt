@@ -11,10 +11,12 @@ import com.mkdev.mkboardgames.engine.*
 import com.mkdev.mkboardgames.games.morabaraba.MorabarabaBoard
 import com.mkdev.mkboardgames.games.morabaraba.MorabarabaRuleEngine
 import com.mkdev.mkboardgames.ui.AutoplayButtonView
+import com.mkdev.mkboardgames.ui.BoardSelectionOption
+import com.mkdev.mkboardgames.ui.BoardSelectionPreview
+import com.mkdev.mkboardgames.ui.BoardSelectionView
 import com.mkdev.mkboardgames.ui.CaptureStripView
 import com.mkdev.mkboardgames.ui.ChessChoiceView
 import com.mkdev.mkboardgames.ui.ChessMenuView
-import com.mkdev.mkboardgames.ui.BoardStyleSwitchView
 import com.mkdev.mkboardgames.ui.MorabaraBoardView
 import com.mkdev.mkboardgames.ui.MorabarabaBoardStyle
 import com.mkdev.mkboardgames.ui.StyledDialogs
@@ -30,7 +32,6 @@ class MorabarabaActivity : AppCompatActivity() {
     private lateinit var hudView:           MorabarabaHudView
     private lateinit var topCaptureView:    CaptureStripView
     private lateinit var bottomCaptureView: CaptureStripView
-    private lateinit var boardStyleSwitch:  BoardStyleSwitchView
     private lateinit var autoplayButton:    AutoplayButtonView
     private lateinit var gameRoot: View
     private var engine:                     MorabarabaRuleEngine = MorabarabaRuleEngine()
@@ -45,7 +46,7 @@ class MorabarabaActivity : AppCompatActivity() {
     private var exitPosted                  = false
     private var autoplayMoveInProgress      = false
     private var pieceCount                  = 12
-    private var boardStyleSwitchEnabled    = false
+    private var selectedBoardStyle          = MorabarabaBoardStyle.CANVAS
     private val scope                       = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private val moveHistory                 = ArrayDeque<GameState>()
     private var aiJob: Job?                 = null
@@ -79,19 +80,13 @@ class MorabarabaActivity : AppCompatActivity() {
         hudView          = MorabarabaHudView(this)
         topCaptureView   = CaptureStripView(this).also { it.dividerOnTop = false }
         boardView        = MorabaraBoardView(this)
-        boardStyleSwitch = BoardStyleSwitchView(this)
         autoplayButton   = AutoplayButtonView(this)
         bottomCaptureView = CaptureStripView(this).also { it.dividerOnTop = true }
 
         val hudH = (82 * dp).toInt()
         val capH = (36 * dp).toInt()
-        val boardStyleSwitchH = (44 * dp).toInt()
         val autoplayButtonH = (76 * dp).toInt()
 
-        boardStyleSwitch.onStyleChanged = { styleIndex ->
-            boardView.boardStyle = MorabarabaBoardStyle.entries
-                .getOrElse(styleIndex) { MorabarabaBoardStyle.CANVAS }
-        }
         autoplayButton.onAutoplayChanged = { enabled ->
             if (autoplayAllowed && vsAI) {
                 autoplayEnabled = enabled
@@ -113,15 +108,12 @@ class MorabarabaActivity : AppCompatActivity() {
 
         root.addView(hudView,          LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, hudH))
         root.addView(topCaptureView,   LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, capH))
-        root.addView(boardStyleSwitch, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, boardStyleSwitchH))
         root.addView(boardView,        LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0).apply { weight = 1f })
         root.addView(autoplayButton,   LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, autoplayButtonH).apply {
             gravity = Gravity.CENTER_HORIZONTAL
         })
         autoplayButton.visibility = View.GONE
         root.addView(bottomCaptureView, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, capH))
-        boardStyleSwitch.visibility = View.GONE
-
         AdManager.attachBanner(root)
         gameRoot = root
         setContentView(root)
@@ -203,6 +195,7 @@ class MorabarabaActivity : AppCompatActivity() {
             vsAI = vsAI,
             playerColor = playerColor.name,
             pieceCount = pieceCount,
+            boardStyle = boardView.boardStyle.ordinal,
             moves = gameState.moveHistory,
         )
     }
@@ -248,12 +241,49 @@ class MorabarabaActivity : AppCompatActivity() {
             {
                 pieceCount = when (index) { 0 -> 6; 1 -> 9; else -> 12 }
                 vsAI = isVsAI
-                if (isVsAI) showColorPickerDialog() else {
+                if (pieceCount == 6) selectedBoardStyle = MorabarabaBoardStyle.CANVAS
+                if (pieceCount != 6) {
+                    showBoardSelection()
+                } else if (isVsAI) {
+                    showColorPickerDialog()
+                } else {
                     playerColor = PieceColor.WHITE
                     startGame()
                 }
             }
         }, 520f) { showModeDialog() }
+    }
+
+    private fun showBoardSelection() {
+        val picker = BoardSelectionView(
+            this,
+            matchLabel = if (vsAI) "vs CPU" else "2 Players",
+            options = listOf(
+                BoardSelectionOption(
+                    "Canvas board",
+                    "Clean and modern",
+                    preview = BoardSelectionPreview.MORABARABA,
+                ),
+                BoardSelectionOption(
+                    "Realistic wood",
+                    "Warm natural grain",
+                    "morabaraba_board_wood.webp",
+                    BoardSelectionPreview.MORABARABA,
+                ),
+            ),
+        )
+        picker.onSelectionConfirmed = { styleIndex ->
+            selectedBoardStyle = MorabarabaBoardStyle.entries[styleIndex]
+            StyledDialogs.dismiss()
+            if (vsAI) showColorPickerDialog() else startGame()
+        }
+        picker.onBackClicked = {
+            StyledDialogs.dismiss()
+            showModeDialog()
+        }
+        StyledDialogs.showFullScreenView(this, picker) {
+            showModeDialog()
+        }
     }
 
     private fun showColorPickerDialog() {
@@ -339,11 +369,9 @@ class MorabarabaActivity : AppCompatActivity() {
         engine                 = MorabarabaRuleEngine(pieceCount)
         gameState              = engine.initialState()
         boardView.ruleEngine   = engine
-        boardStyleSwitchEnabled = pieceCount != 6
-        boardView.boardStyle = MorabarabaBoardStyle.CANVAS
-        boardStyleSwitch.visibility = if (boardStyleSwitchEnabled) View.VISIBLE else View.GONE
-        boardStyleSwitch.setStyleCount(MorabarabaBoardStyle.entries.size)
-        boardStyleSwitch.setSelectedIndex(boardView.boardStyle.ordinal, animate = false)
+        boardView.boardStyle = restoring?.boardStyle
+            ?.let { MorabarabaBoardStyle.entries.getOrElse(it) { MorabarabaBoardStyle.CANVAS } }
+            ?: selectedBoardStyle
         boardView.gameState    = gameState
         boardView.playerColor  = playerColor
         boardView.vsAI         = vsAI
@@ -379,6 +407,9 @@ class MorabarabaActivity : AppCompatActivity() {
             return
         }
         pieceCount = paused.pieceCount ?: 12
+        selectedBoardStyle = paused.boardStyle
+            ?.let { MorabarabaBoardStyle.entries.getOrElse(it) { MorabarabaBoardStyle.CANVAS } }
+            ?: MorabarabaBoardStyle.CANVAS
         vsAI = paused.vsAI
         playerColor = runCatching { PieceColor.valueOf(paused.playerColor) }
             .getOrDefault(PieceColor.WHITE)

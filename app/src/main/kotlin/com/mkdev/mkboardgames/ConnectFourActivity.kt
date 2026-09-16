@@ -15,7 +15,9 @@ import com.mkdev.mkboardgames.engine.*
 import com.mkdev.mkboardgames.games.connectfour.ConnectFourPiece
 import com.mkdev.mkboardgames.games.connectfour.ConnectFourRuleEngine
 import com.mkdev.mkboardgames.ui.AutoplayButtonView
-import com.mkdev.mkboardgames.ui.BoardStyleSwitchView
+import com.mkdev.mkboardgames.ui.BoardSelectionOption
+import com.mkdev.mkboardgames.ui.BoardSelectionPreview
+import com.mkdev.mkboardgames.ui.BoardSelectionView
 import com.mkdev.mkboardgames.ui.ChessMenuView
 import com.mkdev.mkboardgames.ui.ConnectFourBoardStyle
 import com.mkdev.mkboardgames.ui.StyledDialogs
@@ -38,31 +40,16 @@ class ConnectFourActivity : AppCompatActivity() {
     private var scoreDraws = 0
     private var resultRecorded = false
     private var interstitialAd: Any? = null
-    private var boardStyleSwitchEnabled = true
     private var autoplayEnabled = false
     private val autoplayAllowed: Boolean
         get() = SettingsManager.currentMode(this) == GameMode.IRREGULAR
     private var exitPosted = false
 
     private lateinit var hudView: HudView
-    private lateinit var boardStyleSwitch: BoardStyleSwitchView
     private lateinit var boardView: ConnectBoardView
     private lateinit var scoreView: ScoreView
     private lateinit var autoplayButton: AutoplayButtonView
     private lateinit var gameRoot: View
-    private val boardStyleSwitchFadeRunnable = Runnable {
-        if (!boardStyleSwitchEnabled || !::boardStyleSwitch.isInitialized) return@Runnable
-        boardStyleSwitch.animate()
-            .alpha(0f)
-            .setDuration(900L)
-            .withEndAction {
-                if (boardStyleSwitch.alpha <= 0.01f) {
-                    boardStyleSwitch.visibility = View.INVISIBLE
-                }
-            }
-            .start()
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         SettingsManager.setCurrentModeFromIntent(this, intent)
@@ -73,7 +60,6 @@ class ConnectFourActivity : AppCompatActivity() {
             setBackgroundColor(Color.parseColor("#121212"))
         }
         hudView = HudView(this)
-        boardStyleSwitch = BoardStyleSwitchView(this)
         boardView = ConnectBoardView(this)
         scoreView = ScoreView(this)
         autoplayButton = AutoplayButtonView(this)
@@ -91,31 +77,7 @@ class ConnectFourActivity : AppCompatActivity() {
             }
         }
 
-        val boardStyleRow = LinearLayout(this).apply {
-            gravity = Gravity.START
-            setPadding((10 * dp).toInt(), 0, 0, 0)
-            setBackgroundColor(Color.parseColor("#121212"))
-            isClickable = true
-        }
-        boardStyleRow.setOnTouchListener { _, event ->
-            if (event.action == MotionEvent.ACTION_UP) revealBoardStyleSwitch()
-            true
-        }
-        boardStyleSwitch.setStyleCount(ConnectFourBoardStyle.entries.size)
-        boardStyleSwitch.setSelectedIndex(
-            ConnectFourBoardStyle.CANVAS.ordinal,
-            animate = false,
-        )
-        boardStyleSwitch.onStyleChanged = { styleIndex ->
-            boardView.boardStyle = ConnectFourBoardStyle.entries[styleIndex]
-        }
-        boardStyleRow.addView(
-            boardStyleSwitch,
-            LinearLayout.LayoutParams((118 * dp).toInt(), (44 * dp).toInt()),
-        )
-
         root.addView(hudView, LinearLayout.LayoutParams(-1, (60 * dp).toInt()))
-        root.addView(boardStyleRow, LinearLayout.LayoutParams(-1, (44 * dp).toInt()))
         root.addView(boardView, LinearLayout.LayoutParams(-1, 0).apply { weight = 1f })
         root.addView(autoplayButton, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -244,6 +206,7 @@ class ConnectFourActivity : AppCompatActivity() {
             vsAI = vsAI,
             playerColor = playerColor.name,
             moves = gameState.moveHistory,
+            boardStyle = boardView.boardStyle.ordinal,
         )
     }
 
@@ -270,13 +233,13 @@ class ConnectFourActivity : AppCompatActivity() {
         menuView.onVsAi = {
             StyledDialogs.dismiss()
             vsAI = true
-            showColorPickerDialog()
+            showBoardSelection()
         }
         menuView.onTwoPlayers = {
             StyledDialogs.dismiss()
             vsAI = false
             playerColor = PieceColor.WHITE
-            startGame()
+            showBoardSelection()
         }
         menuView.onHowToPlay = {
             StyledDialogs.dismiss()
@@ -288,6 +251,39 @@ class ConnectFourActivity : AppCompatActivity() {
         }
         StyledDialogs.showFullScreenView(this, menuView) {
                 if (!matchStarted) finish() else showBoardAfterDialog()
+        }
+    }
+
+    private fun showBoardSelection() {
+        hideBoardWhileDialogIsOpen()
+        val picker = BoardSelectionView(
+            this,
+            matchLabel = if (vsAI) "vs CPU" else "2 Players",
+            options = listOf(
+                BoardSelectionOption(
+                    "Canvas board",
+                    "Clean and modern",
+                    preview = BoardSelectionPreview.CONNECT_FOUR,
+                ),
+                BoardSelectionOption(
+                    "Blue board",
+                    "Bright arcade feel",
+                    "connect_four_blue.webp",
+                    BoardSelectionPreview.CONNECT_FOUR,
+                ),
+            ),
+        )
+        picker.onSelectionConfirmed = { styleIndex ->
+            boardView.boardStyle = ConnectFourBoardStyle.entries[styleIndex]
+            StyledDialogs.dismiss()
+            if (vsAI) showColorPickerDialog() else startGame()
+        }
+        picker.onBackClicked = {
+            StyledDialogs.dismiss()
+            showModeDialog()
+        }
+        StyledDialogs.showFullScreenView(this, picker) {
+            showModeDialog()
         }
     }
 
@@ -354,6 +350,10 @@ Control the centre columns, build threats in more than one direction, and block 
         if (vsAI) SettingsManager.setActiveGame(this, "connect_four")
         SoundPlayer.init(this)
         gameState = engine.initialState()
+        restoring?.boardStyle?.let { index ->
+            boardView.boardStyle = ConnectFourBoardStyle.entries
+                .getOrElse(index) { ConnectFourBoardStyle.CANVAS }
+        }
         moveHistory.clear()
         boardView.reset(gameState)
         autoplayEnabled = false
@@ -362,7 +362,6 @@ Control the centre columns, build threats in more than one direction, and block 
         boardView.onGameOverTapped = { showResultDialog() }
         scoreView.update(scoreRed, scoreDraws, scoreYellow)
         updateHud()
-        scheduleBoardStyleSwitchFade()
         if (restoring != null) {
             restoreMoves(restoring.moves)
             clearPausedMatch()
@@ -661,8 +660,6 @@ Control the centre columns, build threats in more than one direction, and block 
     }
 
     private fun hideBoardWhileDialogIsOpen() {
-        boardStyleSwitch.removeCallbacks(boardStyleSwitchFadeRunnable)
-        boardStyleSwitch.animate().cancel()
         // Keep the game surface mounted under the in-activity overlay.
         gameRoot.visibility = View.VISIBLE
     }
@@ -676,32 +673,7 @@ Control the centre columns, build threats in more than one direction, and block 
             MusicPlayer.resumeMatch(this)
         }
         gameRoot.visibility = View.VISIBLE
-        scheduleBoardStyleSwitchFade()
         if (resumeAi) resumeComputerTurnIfNeeded()
-    }
-
-    private fun scheduleBoardStyleSwitchFade() {
-        if (!boardStyleSwitchEnabled || !::boardStyleSwitch.isInitialized) return
-        boardStyleSwitch.removeCallbacks(boardStyleSwitchFadeRunnable)
-        boardStyleSwitch.animate().cancel()
-        boardStyleSwitch.alpha = 1f
-        boardStyleSwitch.visibility = View.VISIBLE
-        boardStyleSwitch.postDelayed(boardStyleSwitchFadeRunnable, 5_000L)
-    }
-
-    private fun revealBoardStyleSwitch() {
-        if (!boardStyleSwitchEnabled || !::boardStyleSwitch.isInitialized) return
-        boardStyleSwitch.removeCallbacks(boardStyleSwitchFadeRunnable)
-        boardStyleSwitch.animate().cancel()
-        if (boardStyleSwitch.visibility != View.VISIBLE) {
-            boardStyleSwitch.visibility = View.VISIBLE
-            boardStyleSwitch.alpha = 0f
-        }
-        boardStyleSwitch.animate()
-            .alpha(1f)
-            .setDuration(220L)
-            .start()
-        boardStyleSwitch.postDelayed(boardStyleSwitchFadeRunnable, 5_000L)
     }
 
     inner class ConnectBoardView(ctx: Context) : View(ctx) {
