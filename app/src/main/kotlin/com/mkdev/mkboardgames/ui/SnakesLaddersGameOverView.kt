@@ -10,8 +10,8 @@ import android.view.MotionEvent
 import android.view.View
 
 /**
- * In-board game-over controls. The board remains visible while the title and
- * actions sit in the open top and bottom areas of the themed artwork.
+ * In-board game-over controls. The board remains visible while the winner and
+ * actions sit in the open areas of the themed artwork.
  */
 class SnakesLaddersGameOverView(context: Context) : View(context) {
     var onReplay: (() -> Unit)? = null
@@ -31,6 +31,7 @@ class SnakesLaddersGameOverView(context: Context) : View(context) {
             field = value
             invalidate()
         }
+    var bottomCaptureTopPxProvider: (() -> Float)? = null
     private val winnerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
         textAlign = Paint.Align.CENTER
@@ -89,7 +90,9 @@ class SnakesLaddersGameOverView(context: Context) : View(context) {
         val buttonHeight = dp(37f)
         val totalWidth = buttonWidth * buttonCount + gap * (buttonCount - 1)
         val left = ((width - totalWidth) / 2f).coerceAtLeast(dp(8f))
-        val top = height - dp(28f) - buttonHeight
+        val defaultTop = height - dp(28f) - buttonHeight
+        val captureTop = bottomCaptureTopPxProvider?.invoke()?.takeIf { it > 0f }
+        val top = captureTop?.minus(buttonHeight + dp(10f)) ?: defaultTop
         replayRect.set(left, top, left + buttonWidth, top + buttonHeight)
         if (showWatchReplay) {
             watchReplayRect.set(

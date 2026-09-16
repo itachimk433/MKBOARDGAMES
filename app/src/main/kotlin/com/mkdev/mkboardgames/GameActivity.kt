@@ -148,13 +148,14 @@ class GameActivity : AppCompatActivity() {
         bottomCaptureView = CaptureStripView(this).also { it.dividerOnTop = true }
         chessGameOverView = SnakesLaddersGameOverView(this).apply {
             winnerBaselineDp = 112f
+            bottomCaptureTopPxProvider = { bottomCaptureView.top.toFloat() }
             onReplay = {
                 visibility = View.GONE
                 startGame()
             }
             onWatchReplay = {
                 visibility = View.GONE
-                launchReplay(currentResultLabel())
+                launchReplay(currentResultLabel(), lockBoardStyle = true)
             }
             onHome = {
                 visibility = View.GONE
@@ -374,8 +375,11 @@ class GameActivity : AppCompatActivity() {
             dismissStyledOverlay(invokeCancel = true)
             return
         }
-        if (matchStarted && gameType == "CHESS" && gameState.status != GameStatus.IN_PROGRESS) {
-            // A finished Chess match already has its actions on the board.
+        if (matchStarted &&
+            (gameType == "CHESS" || gameType == "CHECKERS" || gameType == "INTERNATIONAL_DRAUGHTS") &&
+            gameState.status != GameStatus.IN_PROGRESS
+        ) {
+            // A finished Chess or Draughts match already has its actions on the board.
             // Keep repeated system-back presses from falling through to the
             // activity finish path and returning to mode selection.
             return
@@ -2041,8 +2045,10 @@ Checkmate your opponent's King.
             GameStatus.DRAW       -> "Draw"
             else -> ""
         }
-        if (gameType == "CHESS") {
-            showChessResultDialog()
+        if (gameType == "CHESS" || gameType == "CHECKERS" ||
+            gameType == "INTERNATIONAL_DRAUGHTS"
+        ) {
+            showBoardGameResultDialog()
             return
         }
         if (isStyledBoardGame()) {
@@ -2061,16 +2067,16 @@ Checkmate your opponent's King.
         builder.show()
     }
 
-    private fun showChessResultDialog() {
+    private fun showBoardGameResultDialog() {
         hudView.setInfo("Game Over", canUndo = false, canRedo = false)
         hudView.setGameOver(true)
-        chessGameOverView.winnerLabel = chessWinnerLabel()
+        chessGameOverView.winnerLabel = boardGameWinnerLabel()
         gameContainer.visibility = View.VISIBLE
         styledOverlayHost.visibility = View.GONE
         chessGameOverView.visibility = View.VISIBLE
     }
 
-    private fun chessWinnerLabel(): String {
+    private fun boardGameWinnerLabel(): String {
         val winner = when (gameState.status) {
             GameStatus.WHITE_WINS -> PieceColor.WHITE
             GameStatus.BLACK_WINS -> PieceColor.BLACK
@@ -2157,13 +2163,17 @@ Checkmate your opponent's King.
         return "$outcome\n\n${playerDetails("Black", scores.black)}\n\n${playerDetails("White", scores.white)}"
     }
 
-    private fun launchReplay(resultLabel: String) {
+    private fun launchReplay(resultLabel: String, lockBoardStyle: Boolean = false) {
         showChessBoardAfterDialog()
         val movesJson = ReplayActivity.buildMovesJson(gameState.moveHistory)
         startActivity(Intent(this, ReplayActivity::class.java).apply {
             putExtra(ReplayActivity.EXTRA_GAME_TYPE,  gameType)
             putExtra(ReplayActivity.EXTRA_MOVES_JSON, movesJson)
             putExtra(ReplayActivity.EXTRA_RESULT,     resultLabel)
+            if (lockBoardStyle) {
+                putExtra(ReplayActivity.EXTRA_BOARD_STYLE_INDEX, currentBoardStyleIndex())
+                putExtra(ReplayActivity.EXTRA_LOCK_BOARD_STYLE, true)
+            }
         })
     }
 

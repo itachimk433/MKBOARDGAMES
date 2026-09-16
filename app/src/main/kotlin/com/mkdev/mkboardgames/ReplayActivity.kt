@@ -58,6 +58,8 @@ class ReplayActivity : AppCompatActivity() {
         const val EXTRA_MOVES_JSON = "moves_json"
         const val EXTRA_GAME_TYPE  = "game_type"
         const val EXTRA_RESULT     = "game_result"
+        const val EXTRA_BOARD_STYLE_INDEX = "board_style_index"
+        const val EXTRA_LOCK_BOARD_STYLE = "lock_board_style"
         const val EXTRA_ONITAMA_SETUP_SEED = "onitama_setup_seed"
         const val EXTRA_BOARD_SIZE = "board_size"   // for TicTacToe
         const val EXTRA_MORABARABA_PIECE_COUNT = "morabaraba_piece_count"
@@ -185,6 +187,7 @@ class ReplayActivity : AppCompatActivity() {
     private val handler    = Handler(Looper.getMainLooper())
     private var resultText = ""
     private var gameType   = "CHESS"
+    private var lockedBoardStyleIndex: Int? = null
 
 
     // ─── Vibration ────────────────────────────────────────────────────────────
@@ -238,6 +241,9 @@ class ReplayActivity : AppCompatActivity() {
         gameType          = intent.getStringExtra(EXTRA_GAME_TYPE)  ?: "CHESS"
         val movesJson     = intent.getStringExtra(EXTRA_MOVES_JSON) ?: "[]"
         resultText        = intent.getStringExtra(EXTRA_RESULT)     ?: ""
+        if (intent.getBooleanExtra(EXTRA_LOCK_BOARD_STYLE, false)) {
+            lockedBoardStyleIndex = intent.getIntExtra(EXTRA_BOARD_STYLE_INDEX, 0)
+        }
         val ticBoardSize  = intent.getIntExtra(EXTRA_BOARD_SIZE, 3)
         val morabarabaPieceCount = intent.getIntExtra(EXTRA_MORABARABA_PIECE_COUNT, 12)
         val onitamaSetupSeed = intent.getLongExtra(EXTRA_ONITAMA_SETUP_SEED, Long.MIN_VALUE)
@@ -360,7 +366,7 @@ class ReplayActivity : AppCompatActivity() {
         controlsView = ReplayControlsView(this)
 
         root.addView(infoView, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (60 * dp).toInt()))
-        if (supportsBoardStyleSwitch()) {
+        if (supportsBoardStyleSwitch() && lockedBoardStyleIndex == null) {
             root.addView(boardStyleRow, LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 (44 * dp).toInt(),
@@ -459,6 +465,10 @@ class ReplayActivity : AppCompatActivity() {
 
     private fun configureBoardStyleSwitch() {
         if (!supportsBoardStyleSwitch()) return
+        lockedBoardStyleIndex?.let {
+            applyBoardStyle(it)
+            return
+        }
 
         val styleCount = when (gameType) {
             "CHESS" -> ChessBoardStyle.entries.size
