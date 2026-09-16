@@ -135,8 +135,8 @@ class MenuView(
     private val onitamaHomeIconBitmap: Bitmap? = try {
         context.assets.open("onitama_home_icon.webp").use { BitmapFactory.decodeStream(it) }
     } catch (e: Exception) { null }
-    private val snakesLaddersBoardBitmap: Bitmap? = try {
-        context.assets.open("snakes_ladders_board.jpg").use { BitmapFactory.decodeStream(it) }
+    private val snakesLaddersIconBitmap: Bitmap? = try {
+        context.assets.open("snakes_ladders_icon.webp").use { BitmapFactory.decodeStream(it) }
     } catch (e: Exception) { null }
 
     private val bgPaint        = Paint().apply { color = Color.parseColor("#121212") }
@@ -836,7 +836,7 @@ class MenuView(
     }
 
     private fun drawSnakesLaddersMini(canvas: Canvas, left: Float, top: Float, size: Float) {
-        snakesLaddersBoardBitmap?.let {
+        snakesLaddersIconBitmap?.let {
             canvas.drawBitmap(it, null, RectF(left, top, left + size, top + size), bitmapPaint)
             return
         }

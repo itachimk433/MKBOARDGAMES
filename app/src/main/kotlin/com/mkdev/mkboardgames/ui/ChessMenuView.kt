@@ -90,7 +90,7 @@ class ChessMenuView(
             isTicTacToe -> "tictactoe_home_icon.png"
             isConnectFour -> "connect_four_home_icon.png"
             isLudo -> "ludo_home_icon.png"
-            isSnakesLadders -> "snakes_ladders_board.jpg"
+            isSnakesLadders -> "snakes_ladders_icon.webp"
             isMancala -> "mancala_home_icon.webp"
             isYote -> "yote_home_icon.webp"
             isOnitama -> "onitama_home_icon.webp"

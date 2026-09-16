@@ -32,6 +32,9 @@ class SnakesLaddersBoardSelectionView(
     private val scaledDensity = resources.displayMetrics.scaledDensity
     private val textScale = scaledDensity.coerceAtMost(2f)
     private val boards = SnakesLaddersBoardView.Board.values()
+    private val snakesLaddersIconBitmap: Bitmap? = runCatching {
+        context.assets.open("snakes_ladders_icon.webp").use { BitmapFactory.decodeStream(it) }
+    }.getOrNull()
     private val bitmaps = boards.map { board ->
         runCatching {
             context.assets.open(board.assetName).use { BitmapFactory.decodeStream(it) }
@@ -83,11 +86,13 @@ class SnakesLaddersBoardSelectionView(
         strokeJoin = Paint.Join.ROUND
     }
     private val backgroundPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private val scrimPaint = Paint().apply {
         color = Color.argb(55, 0, 0, 0)
     }
     private val backRect = RectF()
     private val backTouchRect = RectF()
+    private val iconRect = RectF()
     private var pressedBoard: Int? = null
     private var pressedBack = false
 
@@ -142,6 +147,9 @@ class SnakesLaddersBoardSelectionView(
             backLeft + backSize + dp(6f),
             backTop + backSize + dp(6f),
         )
+        val iconSize = dp(54f)
+        val iconRight = width - dp(14f)
+        iconRect.set(iconRight - iconSize, dp(8f), iconRight, dp(8f) + iconSize)
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -159,6 +167,7 @@ class SnakesLaddersBoardSelectionView(
         backgroundPaint.shader = null
 
         drawBackButton(canvas)
+        snakesLaddersIconBitmap?.let { canvas.drawBitmap(it, null, iconRect, iconPaint) }
         canvas.drawText("S N A K E S & L A D D E R S", width / 2f, dp(58f), eyebrowPaint)
         canvas.drawText("Choose your board", width / 2f, dp(98f), titlePaint)
         canvas.drawText(
