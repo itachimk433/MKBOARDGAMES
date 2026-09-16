@@ -26,7 +26,9 @@ import com.mkdev.mkboardgames.ui.AutoplayButtonView
 import com.mkdev.mkboardgames.ui.BoardView
 import com.mkdev.mkboardgames.ui.BoardStyleSwitchView
 import com.mkdev.mkboardgames.ui.CaptureStripView
+import com.mkdev.mkboardgames.ui.ChessBoardSelectionView
 import com.mkdev.mkboardgames.ui.ChessChoiceView
+import com.mkdev.mkboardgames.ui.ChessGameOverView
 import com.mkdev.mkboardgames.ui.ChessMenuView
 import com.mkdev.mkboardgames.ui.ChessRulesView
 import com.mkdev.mkboardgames.ui.ChessBoardStyle
@@ -50,6 +52,7 @@ class GameActivity : AppCompatActivity() {
     private lateinit var topCaptureView:   CaptureStripView
     private lateinit var goNoticeView:    android.widget.TextView
     private lateinit var bottomCaptureView: CaptureStripView
+    private lateinit var chessGameOverView: ChessGameOverView
     private lateinit var engine:           RuleEngine
     private lateinit var gameType:         String
     private lateinit var gameContainer:    View
@@ -192,7 +195,8 @@ class GameActivity : AppCompatActivity() {
                     boardView.shogiBoardStyle = ShogiBoardStyle.entries[styleIndex]
             }
         }
-        boardView.onEmptySpaceTapped = ::revealBoardStyleSwitch
+        boardView.onEmptySpaceTapped =
+            if (gameType == "CHESS") null else ::revealBoardStyleSwitch
         autoplayButton.onAutoplayChanged = { enabled ->
             if (autoplayAllowed && gameType != "LUDO" && vsAI) {
                 autoplayEnabled = enabled
@@ -228,7 +232,7 @@ class GameActivity : AppCompatActivity() {
             boardView.draughtsBoardStyle = internationalDraughtsStyles.first()
         }
         boardStyleSwitchEnabled =
-            gameType == "CHESS" || isDraughtsGame ||
+            isDraughtsGame ||
                 gameType == "OTHELLO" || gameType == "FOX_AND_GEESE" ||
                 gameType == "XIANGQI" || gameType == "SHOGI"
         boardStyleSwitch.setStyleCount(
@@ -273,14 +277,16 @@ class GameActivity : AppCompatActivity() {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 (58 * dp).toInt(),
             ))
-        boardStyleRow.addView(boardStyleSwitch,
-            android.widget.LinearLayout.LayoutParams((118 * dp).toInt(), boardStyleSwitchH))
-        boardStyleSwitch.visibility = if (boardStyleSwitchEnabled) View.VISIBLE else View.GONE
-        container.addView(boardStyleRow,
-            android.widget.LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                boardStyleSwitchH,
-            ))
+        if (boardStyleSwitchEnabled) {
+            boardStyleRow.addView(boardStyleSwitch,
+                android.widget.LinearLayout.LayoutParams((118 * dp).toInt(), boardStyleSwitchH))
+            boardStyleSwitch.visibility = View.VISIBLE
+            container.addView(boardStyleRow,
+                android.widget.LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    boardStyleSwitchH,
+                ))
+        }
         container.addView(boardView,
             android.widget.LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0)
                 .apply { weight = 1f })
@@ -309,6 +315,20 @@ class GameActivity : AppCompatActivity() {
             isClickable = true
             isFocusable = true
             visibility = View.GONE
+        }
+        chessGameOverView = ChessGameOverView(this).apply {
+            onPlayAgain = {
+                dismissStyledOverlay()
+                startGame()
+            }
+            onMainMenu = {
+                dismissStyledOverlay()
+                finish()
+            }
+            onWatchReplay = {
+                dismissStyledOverlay()
+                launchReplay(resultLabel = currentResultLabel())
+            }
         }
         screenRoot.addView(
             gameContainer,
@@ -605,12 +625,11 @@ class GameActivity : AppCompatActivity() {
         )
         menuView.onVsAi = {
             vsAI = true
-            showColorPickerDialog()
+            showChessBoardSelection()
         }
         menuView.onTwoPlayers = {
             vsAI = false
-            playerColor = PieceColor.WHITE
-            startGame()
+            showChessBoardSelection()
         }
         menuView.onHowToPlay = {
             showRules(showModeAfter = !matchStarted)
@@ -702,6 +721,27 @@ class GameActivity : AppCompatActivity() {
             view = view,
             fullScreen = true,
             onCancel = { showModeDialog() },
+        )
+    }
+
+    private fun showChessBoardSelection() {
+        val view = ChessBoardSelectionView(
+            this,
+            matchLabel = if (vsAI) "vs CPU" else "2 Players",
+        )
+        view.onSelectionConfirmed = { style, color ->
+            boardView.chessBoardStyle = style
+            playerColor = color
+            dismissStyledOverlay()
+            startGame()
+        }
+        view.onBackClicked = {
+            showChessMenu()
+        }
+        showStyledOverlay(
+            view = view,
+            fullScreen = true,
+            onCancel = { showChessMenu() },
         )
     }
 
@@ -1947,8 +1987,12 @@ Checkmate your opponent's King.
             GameStatus.DRAW       -> "Draw"
             else -> ""
         }
-        if (isStyledBoardGame()) {
+        if (gameType == "CHESS") {
             showChessResultDialog(msg, resultLabel)
+            return
+        }
+        if (isStyledBoardGame()) {
+            showStyledResultDialog(msg, resultLabel)
             return
         }
 
@@ -1964,6 +2008,16 @@ Checkmate your opponent's King.
     }
 
     private fun showChessResultDialog(message: String, resultLabel: String) {
+        chessGameOverView.resultMessage = message
+        showStyledOverlay(
+            view = chessGameOverView,
+            fullScreen = true,
+            dimBackground = false,
+            onCancel = { showChessBoardAfterDialog() },
+        )
+    }
+
+    private fun showStyledResultDialog(message: String, resultLabel: String) {
         val choices = mutableListOf(
             ChessChoiceView.Choice(
                 "Play Again",
@@ -2008,6 +2062,13 @@ Checkmate your opponent's King.
             dimBackground = true,
             onCancel = { showChessBoardAfterDialog() },
         )
+    }
+
+    private fun currentResultLabel(): String = when (gameState.status) {
+        GameStatus.WHITE_WINS -> "White wins"
+        GameStatus.BLACK_WINS -> "Black wins"
+        GameStatus.DRAW -> "Draw"
+        else -> ""
     }
 
     private fun buildGoResultMessage(outcome: String): String {
