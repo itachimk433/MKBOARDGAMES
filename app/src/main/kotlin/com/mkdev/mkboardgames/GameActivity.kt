@@ -28,7 +28,6 @@ import com.mkdev.mkboardgames.ui.BoardStyleSwitchView
 import com.mkdev.mkboardgames.ui.CaptureStripView
 import com.mkdev.mkboardgames.ui.ChessBoardSelectionView
 import com.mkdev.mkboardgames.ui.ChessChoiceView
-import com.mkdev.mkboardgames.ui.ChessGameOverView
 import com.mkdev.mkboardgames.ui.ChessMenuView
 import com.mkdev.mkboardgames.ui.ChessRulesView
 import com.mkdev.mkboardgames.ui.ChessBoardStyle
@@ -52,7 +51,8 @@ class GameActivity : AppCompatActivity() {
     private lateinit var topCaptureView:   CaptureStripView
     private lateinit var goNoticeView:    android.widget.TextView
     private lateinit var bottomCaptureView: CaptureStripView
-    private lateinit var chessGameOverView: ChessGameOverView
+    private lateinit var chessWinnerView: android.widget.TextView
+    private lateinit var chessResultActionsView: android.widget.LinearLayout
     private lateinit var engine:           RuleEngine
     private lateinit var gameType:         String
     private lateinit var gameContainer:    View
@@ -156,10 +156,21 @@ class GameActivity : AppCompatActivity() {
             setBackgroundColor(Color.parseColor("#1A1A1A"))
             visibility = View.GONE
         }
+        chessWinnerView = android.widget.TextView(this).apply {
+            setTextColor(Color.parseColor("#FFE7B0"))
+            textSize = 14f
+            typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            setPadding((14 * dp).toInt(), (5 * dp).toInt(), (14 * dp).toInt(), (5 * dp).toInt())
+            setBackgroundColor(Color.parseColor("#102C32"))
+            visibility = View.GONE
+            contentDescription = "Chess game winner"
+        }
         boardView        = BoardView(this)
         boardStyleSwitch = BoardStyleSwitchView(this)
         autoplayButton   = AutoplayButtonView(this)
         bottomCaptureView = CaptureStripView(this).also { it.dividerOnTop = true }
+        chessResultActionsView = createChessResultActions()
         val boardStyleRow = android.widget.LinearLayout(this).apply {
             orientation = android.widget.LinearLayout.HORIZONTAL
             gravity = Gravity.START
@@ -272,6 +283,11 @@ class GameActivity : AppCompatActivity() {
             android.widget.LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, hudH))
         container.addView(topCaptureView,
             android.widget.LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, capH))
+        container.addView(chessWinnerView,
+            android.widget.LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                (36 * dp).toInt(),
+            ))
         container.addView(goNoticeView,
             android.widget.LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -301,6 +317,13 @@ class GameActivity : AppCompatActivity() {
             })
         container.addView(bottomCaptureView,
             android.widget.LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, capH))
+        container.addView(
+            chessResultActionsView,
+            android.widget.LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ),
+        )
 
         val showCaptures = gameType != "OTHELLO"
         topCaptureView.visibility    = if (showCaptures) View.VISIBLE else View.GONE
@@ -315,20 +338,6 @@ class GameActivity : AppCompatActivity() {
             isClickable = true
             isFocusable = true
             visibility = View.GONE
-        }
-        chessGameOverView = ChessGameOverView(this).apply {
-            onPlayAgain = {
-                dismissStyledOverlay()
-                startGame()
-            }
-            onMainMenu = {
-                dismissStyledOverlay()
-                finish()
-            }
-            onWatchReplay = {
-                dismissStyledOverlay()
-                launchReplay(resultLabel = currentResultLabel())
-            }
         }
         screenRoot.addView(
             gameContainer,
@@ -1115,6 +1124,13 @@ Checkmate your opponent's King.
         boardView.refreshTheme()
         hudView.setGoMode(gameType == "GO")
         hideGoNotice()
+        if (::chessWinnerView.isInitialized) {
+            chessWinnerView.visibility = View.GONE
+            chessWinnerView.text = ""
+        }
+        if (::chessResultActionsView.isInitialized) {
+            chessResultActionsView.visibility = View.GONE
+        }
 
         topCaptureView.setLabel(
             when {
@@ -2008,18 +2024,100 @@ Checkmate your opponent's King.
     }
 
     private fun showChessResultDialog(message: String, resultLabel: String) {
-        chessGameOverView.resultMessage = message
-        // ChessGameOverView starts hidden because it is only mounted after a
-        // match ends. Make it visible before adding it to the result overlay;
-        // otherwise the overlay intercepts input while the board underneath
-        // remains visible with the stale turn label.
-        chessGameOverView.visibility = View.VISIBLE
-        showStyledOverlay(
-            view = chessGameOverView,
-            fullScreen = true,
-            dimBackground = false,
-            onCancel = { showChessBoardAfterDialog() },
+        hudView.setInfo("Game Over", canUndo = false, canRedo = false)
+        chessWinnerView.text = chessWinnerLabel()
+        chessWinnerView.visibility = View.VISIBLE
+        chessResultActionsView.visibility = View.VISIBLE
+        gameContainer.visibility = View.VISIBLE
+        styledOverlayHost.visibility = View.GONE
+    }
+
+    private fun chessWinnerLabel(): String {
+        val winner = when (gameState.status) {
+            GameStatus.WHITE_WINS -> PieceColor.WHITE
+            GameStatus.BLACK_WINS -> PieceColor.BLACK
+            else -> null
+        }
+        val label = when {
+            winner == null -> "Draw"
+            vsAI && winner == playerColor -> "You"
+            vsAI -> "CPU"
+            winner == PieceColor.WHITE -> "White"
+            else -> "Black"
+        }
+        return "Winner: $label"
+    }
+
+    private fun createChessResultActions(): android.widget.LinearLayout {
+        val density = resources.displayMetrics.density
+        val rowGap = (8 * density).toInt()
+        val buttonHeight = (52 * density).toInt()
+        val horizontalPadding = (12 * density).toInt()
+        val verticalPadding = (4 * density).toInt()
+
+        val row = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+        }
+        row.addView(
+            chessResultButton("Replay") { startGame() },
+            android.widget.LinearLayout.LayoutParams(0, buttonHeight, 1f).apply {
+                marginEnd = rowGap / 2
+            },
         )
+        row.addView(
+            chessResultButton("Main Menu") { finish() },
+            android.widget.LinearLayout.LayoutParams(0, buttonHeight, 1f).apply {
+                marginStart = rowGap / 2
+            },
+        )
+
+        return android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setPadding(horizontalPadding, verticalPadding, horizontalPadding, verticalPadding)
+            addView(
+                row,
+                android.widget.LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    buttonHeight,
+                ),
+            )
+            addView(
+                chessResultButton("Watch Replay") {
+                    launchReplay(resultLabel = currentResultLabel())
+                },
+                android.widget.LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    buttonHeight,
+                ).apply {
+                    topMargin = rowGap
+                },
+            )
+            visibility = View.GONE
+        }
+    }
+
+    private fun chessResultButton(
+        label: String,
+        action: () -> Unit,
+    ): android.widget.TextView {
+        val density = resources.displayMetrics.density
+        return android.widget.TextView(this).apply {
+            text = label
+            gravity = Gravity.CENTER
+            setTextColor(Color.parseColor("#4A1714"))
+            textSize = 14f
+            typeface = Typeface.DEFAULT_BOLD
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(Color.parseColor("#EBCB92"))
+                setStroke((1 * density).toInt(), Color.parseColor("#FFEFC2"))
+                cornerRadius = 12 * density
+            }
+            setOnClickListener {
+                SoundPlayer.play("ui_click")
+                action()
+            }
+        }
     }
 
     private fun showStyledResultDialog(message: String, resultLabel: String) {
