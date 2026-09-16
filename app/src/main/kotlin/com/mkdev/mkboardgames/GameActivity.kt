@@ -59,6 +59,7 @@ class GameActivity : AppCompatActivity() {
     private lateinit var gameContainer:    View
     private lateinit var screenRoot:       FrameLayout
     private lateinit var styledOverlayHost: FrameLayout
+    private val dp = resources.displayMetrics.density
     private val internationalDraughtsStyles = arrayOf(
         DraughtsBoardStyle.CANVAS,
         DraughtsBoardStyle.INTERNATIONAL_DARK_WOOD,
@@ -189,27 +190,7 @@ class GameActivity : AppCompatActivity() {
             true
         }
         boardStyleSwitch.onStyleChanged = { styleIndex ->
-            when (gameType) {
-                "CHESS" -> boardView.chessBoardStyle = ChessBoardStyle.entries[styleIndex]
-                "CHECKERS" ->
-                    boardView.draughtsBoardStyle = DraughtsBoardStyle.entries[styleIndex]
-                "INTERNATIONAL_DRAUGHTS" ->
-                    boardView.draughtsBoardStyle =
-                        internationalDraughtsStyles.getOrElse(styleIndex) {
-                            internationalDraughtsStyles.first()
-                        }
-                "OTHELLO" ->
-                    boardView.othelloBoardStyle =
-                        OthelloBoardStyle.entries[styleIndex]
-                "FOX_AND_GEESE" ->
-                    boardView.foxAndGeeseBoardStyle =
-                        foxAndGeeseStyles.getOrElse(styleIndex) { foxAndGeeseStyles.first() }
-                "XIANGQI" ->
-                    boardView.xiangqiBoardStyle =
-                        xiangqiStyles.getOrElse(styleIndex) { xiangqiStyles.first() }
-                "SHOGI" ->
-                    boardView.shogiBoardStyle = ShogiBoardStyle.entries[styleIndex]
-            }
+            applyBoardStyleIndex(styleIndex)
         }
         boardView.onEmptySpaceTapped =
             if (gameType == "CHESS") null else ::revealBoardStyleSwitch
@@ -458,6 +439,43 @@ class GameActivity : AppCompatActivity() {
         }
     }
 
+    private fun applyBoardStyleIndex(styleIndex: Int) {
+        when (gameType) {
+            "CHESS" -> boardView.chessBoardStyle =
+                ChessBoardStyle.entries.getOrElse(styleIndex) { ChessBoardStyle.CANVAS }
+            "CHECKERS" -> boardView.draughtsBoardStyle =
+                DraughtsBoardStyle.entries.getOrElse(styleIndex) { DraughtsBoardStyle.CANVAS }
+            "INTERNATIONAL_DRAUGHTS" ->
+                boardView.draughtsBoardStyle =
+                    internationalDraughtsStyles.getOrElse(styleIndex) {
+                        internationalDraughtsStyles.first()
+                    }
+            "OTHELLO" -> boardView.othelloBoardStyle =
+                OthelloBoardStyle.entries.getOrElse(styleIndex) { OthelloBoardStyle.CANVAS }
+            "FOX_AND_GEESE" ->
+                boardView.foxAndGeeseBoardStyle =
+                    foxAndGeeseStyles.getOrElse(styleIndex) { foxAndGeeseStyles.first() }
+            "XIANGQI" -> boardView.xiangqiBoardStyle =
+                xiangqiStyles.getOrElse(styleIndex) { XiangqiBoardStyle.CLASSIC }
+            "SHOGI" -> boardView.shogiBoardStyle =
+                ShogiBoardStyle.entries.getOrElse(styleIndex) { ShogiBoardStyle.CLASSIC }
+        }
+    }
+
+    private fun currentBoardStyleIndex(): Int = when {
+        gameType == "CHESS" -> boardView.chessBoardStyle.ordinal
+        gameType == "CHECKERS" -> boardView.draughtsBoardStyle.ordinal
+        gameType == "INTERNATIONAL_DRAUGHTS" ->
+            internationalDraughtsStyles.indexOf(boardView.draughtsBoardStyle).coerceAtLeast(0)
+        gameType == "OTHELLO" -> boardView.othelloBoardStyle.ordinal
+        gameType == "FOX_AND_GEESE" ->
+            foxAndGeeseStyles.indexOf(boardView.foxAndGeeseBoardStyle).coerceAtLeast(0)
+        gameType == "XIANGQI" ->
+            xiangqiStyles.indexOf(boardView.xiangqiBoardStyle).coerceAtLeast(0)
+        gameType == "SHOGI" -> boardView.shogiBoardStyle.ordinal
+        else -> 0
+    }
+
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         if (activeStyledOverlay != null) {
@@ -571,6 +589,7 @@ class GameActivity : AppCompatActivity() {
             vsAI = vsAI,
             playerColor = playerColor.name,
             moves = gameState.moveHistory,
+            boardStyle = currentBoardStyleIndex(),
         )
     }
 
@@ -1118,6 +1137,12 @@ Checkmate your opponent's King.
         if (restoring == null) clearPausedMatch()
         SettingsManager.activateGameTheme(this, gameType.lowercase())
         if (vsAI) SettingsManager.setActiveGame(this, gameType.lowercase())
+        restoring?.boardStyle?.let {
+            applyBoardStyleIndex(it)
+            if (::boardStyleSwitch.isInitialized) {
+                boardStyleSwitch.setSelectedIndex(currentBoardStyleIndex(), animate = false)
+            }
+        }
 
         gameState = engine.initialState()
         boardView.ruleEngine           = engine
@@ -1143,6 +1168,7 @@ Checkmate your opponent's King.
         if (::chessResultActionsView.isInitialized) {
             chessResultActionsView.visibility = View.GONE
         }
+        setGameOverCaptureSpacing(false)
 
         topCaptureView.setLabel(
             when {
@@ -2040,11 +2066,20 @@ Checkmate your opponent's King.
     private fun showChessResultDialog() {
         hudView.setInfo("Game Over", canUndo = false, canRedo = false)
         hudView.setGameOver(true)
+        setGameOverCaptureSpacing(true)
         chessWinnerView.text = chessWinnerLabel()
         chessWinnerView.visibility = View.VISIBLE
         chessResultActionsView.visibility = View.VISIBLE
         gameContainer.visibility = View.VISIBLE
         styledOverlayHost.visibility = View.GONE
+    }
+
+    private fun setGameOverCaptureSpacing(gameOver: Boolean) {
+        if (!::bottomCaptureView.isInitialized || gameType != "CHESS") return
+        val params = bottomCaptureView.layoutParams as? android.widget.LinearLayout.LayoutParams
+            ?: return
+        params.topMargin = if (gameOver) -(28 * dp).toInt() else 0
+        bottomCaptureView.layoutParams = params
     }
 
     private fun confirmChessMainMenu() {
