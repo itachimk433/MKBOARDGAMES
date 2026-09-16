@@ -617,7 +617,7 @@ class GameActivity : AppCompatActivity() {
             gameType == "XIANGQI"
 
     private fun showModeDialog() {
-        if (gameType == "CHESS") {
+        if (isStyledBoardGame()) {
             showChessMenu()
             return
         }
@@ -663,11 +663,21 @@ class GameActivity : AppCompatActivity() {
         )
         menuView.onVsAi = {
             vsAI = true
-            showChessBoardSelection()
+            if (gameType == "CHESS") {
+                showChessBoardSelection()
+            } else {
+                showChessSidePicker()
+            }
         }
         menuView.onTwoPlayers = {
             vsAI = false
-            showChessBoardSelection()
+            if (gameType == "CHESS") {
+                showChessBoardSelection()
+            } else {
+                playerColor = PieceColor.WHITE
+                dismissStyledOverlay()
+                startGame()
+            }
         }
         menuView.onHowToPlay = {
             showRules(showModeAfter = !matchStarted)
