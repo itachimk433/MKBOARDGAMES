@@ -385,7 +385,11 @@ class SnakesLaddersActivity : AppCompatActivity() {
             selectedEntryRule == SnakesLaddersEntryRule.REQUIRE_SIX &&
             value != 6
         ) {
-            turnView.text = "${playerName(player)} needs a 6 to enter the board"
+            Toast.makeText(
+                this,
+                "${playerName(player)} needs a 6 to enter the board",
+                Toast.LENGTH_SHORT,
+            ).show()
             finishTurn(player, value, 0)
             return
         }
