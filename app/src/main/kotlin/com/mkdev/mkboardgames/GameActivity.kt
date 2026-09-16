@@ -29,6 +29,7 @@ import com.mkdev.mkboardgames.ui.CaptureStripView
 import com.mkdev.mkboardgames.ui.ChessBoardSelectionView
 import com.mkdev.mkboardgames.ui.ChessChoiceView
 import com.mkdev.mkboardgames.ui.ChessMenuView
+import com.mkdev.mkboardgames.ui.ChessResultActionsView
 import com.mkdev.mkboardgames.ui.ChessRulesView
 import com.mkdev.mkboardgames.ui.ChessBoardStyle
 import com.mkdev.mkboardgames.ui.DraughtsBoardStyle
@@ -52,7 +53,7 @@ class GameActivity : AppCompatActivity() {
     private lateinit var goNoticeView:    android.widget.TextView
     private lateinit var bottomCaptureView: CaptureStripView
     private lateinit var chessWinnerView: android.widget.TextView
-    private lateinit var chessResultActionsView: android.widget.LinearLayout
+    private lateinit var chessResultActionsView: ChessResultActionsView
     private lateinit var engine:           RuleEngine
     private lateinit var gameType:         String
     private lateinit var gameContainer:    View
@@ -170,7 +171,11 @@ class GameActivity : AppCompatActivity() {
         boardStyleSwitch = BoardStyleSwitchView(this)
         autoplayButton   = AutoplayButtonView(this)
         bottomCaptureView = CaptureStripView(this).also { it.dividerOnTop = true }
-        chessResultActionsView = createChessResultActions()
+        chessResultActionsView = ChessResultActionsView(this).apply {
+            onPlayAgain = { startGame() }
+            onMainMenu = { confirmChessMainMenu() }
+            onWatchReplay = { launchReplay(resultLabel = currentResultLabel()) }
+        }
         val boardStyleRow = android.widget.LinearLayout(this).apply {
             orientation = android.widget.LinearLayout.HORIZONTAL
             gravity = Gravity.START
@@ -457,6 +462,12 @@ class GameActivity : AppCompatActivity() {
     override fun onBackPressed() {
         if (activeStyledOverlay != null) {
             dismissStyledOverlay(invokeCancel = true)
+            return
+        }
+        if (matchStarted && gameType == "CHESS" && gameState.status != GameStatus.IN_PROGRESS) {
+            // A finished Chess match already has its actions on the board.
+            // Keep repeated system-back presses from falling through to the
+            // activity finish path and returning to mode selection.
             return
         }
         if (matchStarted && gameState.status != GameStatus.IN_PROGRESS) {
@@ -1123,6 +1134,7 @@ Checkmate your opponent's King.
         boardView.onGameOverTapped     = { showResultDialog() }
         boardView.refreshTheme()
         hudView.setGoMode(gameType == "GO")
+        hudView.setGameOver(false)
         hideGoNotice()
         if (::chessWinnerView.isInitialized) {
             chessWinnerView.visibility = View.GONE
@@ -2004,7 +2016,7 @@ Checkmate your opponent's King.
             else -> ""
         }
         if (gameType == "CHESS") {
-            showChessResultDialog(msg, resultLabel)
+            showChessResultDialog()
             return
         }
         if (isStyledBoardGame()) {
@@ -2023,13 +2035,33 @@ Checkmate your opponent's King.
         builder.show()
     }
 
-    private fun showChessResultDialog(message: String, resultLabel: String) {
+    private var mainMenuConfirmation: AlertDialog? = null
+
+    private fun showChessResultDialog() {
         hudView.setInfo("Game Over", canUndo = false, canRedo = false)
+        hudView.setGameOver(true)
         chessWinnerView.text = chessWinnerLabel()
         chessWinnerView.visibility = View.VISIBLE
         chessResultActionsView.visibility = View.VISIBLE
         gameContainer.visibility = View.VISIBLE
         styledOverlayHost.visibility = View.GONE
+    }
+
+    private fun confirmChessMainMenu() {
+        if (mainMenuConfirmation?.isShowing == true) return
+        mainMenuConfirmation = AlertDialog.Builder(this)
+            .setTitle("Leave game?")
+            .setMessage("Return to the mode selection screen?")
+            .setNegativeButton("Stay", null)
+            .setPositiveButton("Main Menu") { _, _ ->
+                clearPausedMatch()
+                finish()
+            }
+            .create()
+            .also { dialog ->
+                dialog.setOnDismissListener { mainMenuConfirmation = null }
+                dialog.show()
+            }
     }
 
     private fun chessWinnerLabel(): String {
@@ -2046,78 +2078,6 @@ Checkmate your opponent's King.
             else -> "Black"
         }
         return "Winner: $label"
-    }
-
-    private fun createChessResultActions(): android.widget.LinearLayout {
-        val density = resources.displayMetrics.density
-        val rowGap = (8 * density).toInt()
-        val buttonHeight = (52 * density).toInt()
-        val horizontalPadding = (12 * density).toInt()
-        val verticalPadding = (4 * density).toInt()
-
-        val row = android.widget.LinearLayout(this).apply {
-            orientation = android.widget.LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-        }
-        row.addView(
-            chessResultButton("Replay") { startGame() },
-            android.widget.LinearLayout.LayoutParams(0, buttonHeight, 1f).apply {
-                marginEnd = rowGap / 2
-            },
-        )
-        row.addView(
-            chessResultButton("Main Menu") { finish() },
-            android.widget.LinearLayout.LayoutParams(0, buttonHeight, 1f).apply {
-                marginStart = rowGap / 2
-            },
-        )
-
-        return android.widget.LinearLayout(this).apply {
-            orientation = android.widget.LinearLayout.VERTICAL
-            setPadding(horizontalPadding, verticalPadding, horizontalPadding, verticalPadding)
-            addView(
-                row,
-                android.widget.LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    buttonHeight,
-                ),
-            )
-            addView(
-                chessResultButton("Watch Replay") {
-                    launchReplay(resultLabel = currentResultLabel())
-                },
-                android.widget.LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    buttonHeight,
-                ).apply {
-                    topMargin = rowGap
-                },
-            )
-            visibility = View.GONE
-        }
-    }
-
-    private fun chessResultButton(
-        label: String,
-        action: () -> Unit,
-    ): android.widget.TextView {
-        val density = resources.displayMetrics.density
-        return android.widget.TextView(this).apply {
-            text = label
-            gravity = Gravity.CENTER
-            setTextColor(Color.parseColor("#4A1714"))
-            textSize = 14f
-            typeface = Typeface.DEFAULT_BOLD
-            background = android.graphics.drawable.GradientDrawable().apply {
-                setColor(Color.parseColor("#EBCB92"))
-                setStroke((1 * density).toInt(), Color.parseColor("#FFEFC2"))
-                cornerRadius = 12 * density
-            }
-            setOnClickListener {
-                SoundPlayer.play("ui_click")
-                action()
-            }
-        }
     }
 
     private fun showStyledResultDialog(message: String, resultLabel: String) {
@@ -2230,6 +2190,14 @@ Checkmate your opponent's King.
             style = Paint.Style.STROKE
             strokeWidth = dp
         }
+        private val disabledBtnBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#211F1B")
+        }
+        private val disabledBtnEdgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#665A4A")
+            style = Paint.Style.STROKE
+            strokeWidth = dp
+        }
         private val btnPaint   = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.parseColor("#F7D99B"); textAlign = Paint.Align.CENTER
             textSize = 11f * sp.coerceAtMost(3f)
@@ -2244,12 +2212,17 @@ Checkmate your opponent's King.
         private val undoRect = RectF()
         private val redoRect = RectF()
         private val menuRect = RectF()
+        private var gameOver = false
 
         fun setInfo(label: String, canUndo: Boolean, canRedo: Boolean, detail: String = "") {
             title = label
             this.canUndo = canUndo
             this.canRedo = canRedo
             this.detail = detail
+            invalidate()
+        }
+        fun setGameOver(value: Boolean) {
+            gameOver = value
             invalidate()
         }
         fun setThinking(t: Boolean) {
@@ -2277,6 +2250,7 @@ Checkmate your opponent's King.
 
         @Suppress("DEPRECATION")
         override fun onTouchEvent(e: MotionEvent): Boolean {
+            if (gameOver) return true
             if (e.action == MotionEvent.ACTION_UP) {
                 when {
                     backRect.contains(e.x, e.y) -> { SoundPlayer.play("ui_click"); this@GameActivity.onBackPressed() }
@@ -2296,23 +2270,26 @@ Checkmate your opponent's King.
             canvas.drawRect(0f, h - dp, w, h, divPaint)
 
             val rr = 5f * dp
-            canvas.drawRoundRect(backRect, rr, rr, btnBgPaint)
-            if (goMode) canvas.drawRoundRect(passRect, rr, rr, btnBgPaint)
-            canvas.drawRoundRect(undoRect, rr, rr, btnBgPaint)
-            canvas.drawRoundRect(redoRect, rr, rr, btnBgPaint)
-            canvas.drawRoundRect(menuRect, rr, rr, btnBgPaint)
-            canvas.drawRoundRect(backRect, rr, rr, btnEdgePaint)
-            if (goMode) canvas.drawRoundRect(passRect, rr, rr, btnEdgePaint)
-            canvas.drawRoundRect(undoRect, rr, rr, btnEdgePaint)
-            canvas.drawRoundRect(redoRect, rr, rr, btnEdgePaint)
-            canvas.drawRoundRect(menuRect, rr, rr, btnEdgePaint)
-            canvas.drawText("← Back", backRect.centerX(), backRect.centerY() + btnPaint.textSize * 0.36f, btnPaint)
-            if (goMode) canvas.drawText("Pass", passRect.centerX(), passRect.centerY() + btnPaint.textSize * 0.36f, btnPaint)
+            val backgroundPaint = if (gameOver) disabledBtnBgPaint else btnBgPaint
+            val edgePaint = if (gameOver) disabledBtnEdgePaint else btnEdgePaint
+            val actionPaint = if (gameOver) dimPaint else btnPaint
+            canvas.drawRoundRect(backRect, rr, rr, backgroundPaint)
+            if (goMode) canvas.drawRoundRect(passRect, rr, rr, backgroundPaint)
+            canvas.drawRoundRect(undoRect, rr, rr, backgroundPaint)
+            canvas.drawRoundRect(redoRect, rr, rr, backgroundPaint)
+            canvas.drawRoundRect(menuRect, rr, rr, backgroundPaint)
+            canvas.drawRoundRect(backRect, rr, rr, edgePaint)
+            if (goMode) canvas.drawRoundRect(passRect, rr, rr, edgePaint)
+            canvas.drawRoundRect(undoRect, rr, rr, edgePaint)
+            canvas.drawRoundRect(redoRect, rr, rr, edgePaint)
+            canvas.drawRoundRect(menuRect, rr, rr, edgePaint)
+            canvas.drawText("← Back", backRect.centerX(), backRect.centerY() + btnPaint.textSize * 0.36f, actionPaint)
+            if (goMode) canvas.drawText("Pass", passRect.centerX(), passRect.centerY() + btnPaint.textSize * 0.36f, actionPaint)
             canvas.drawText("Undo", undoRect.centerX(), undoRect.centerY() + btnPaint.textSize * 0.36f,
-                if (canUndo) btnPaint else dimPaint)
+                if (gameOver) dimPaint else if (canUndo) btnPaint else dimPaint)
             canvas.drawText("Redo", redoRect.centerX(), redoRect.centerY() + btnPaint.textSize * 0.36f,
-                if (canRedo) btnPaint else dimPaint)
-            canvas.drawText("Menu", menuRect.centerX(), menuRect.centerY() + btnPaint.textSize * 0.36f, btnPaint)
+                if (gameOver) dimPaint else if (canRedo) btnPaint else dimPaint)
+            canvas.drawText("Menu", menuRect.centerX(), menuRect.centerY() + btnPaint.textSize * 0.36f, actionPaint)
 
             val cx = (backRect.right + if (goMode) passRect.left else undoRect.left) / 2f
             val sub = if (thinking) "Thinking…" else detail
