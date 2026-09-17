@@ -231,6 +231,6 @@ class FireworksView(context: Context) : View(context) {
     }
 
     private companion object {
-        const val FIREWORKS_PASS_COUNT = 3
+        const val FIREWORKS_PASS_COUNT = 1
     }
 }

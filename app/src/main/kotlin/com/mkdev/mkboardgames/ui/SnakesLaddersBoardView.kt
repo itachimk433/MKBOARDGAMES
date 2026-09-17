@@ -217,6 +217,11 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
     private var animatedProgress = 0f
     private var animatedSoundStep = -1
 
+    private data class TokenPlacement(
+        val point: PointF,
+        val radius: Float,
+    )
+
     private val bitmapPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private val tokenPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val tokenEdgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -531,17 +536,10 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
     }
 
     private fun drawToken(canvas: Canvas, player: Int, animatedPoint: PointF?) {
-        val point = animatedPoint ?: pointForPosition(player, positions[player])
-        val radius = if (positions[player] == 0) {
-            startRadii[player].takeIf { it > 0f } ?: cell * 0.25f
-        } else {
-            cell * 0.25f
-        }
-        tokenTextPaint.textSize = if (positions[player] == 0) {
-            radius * 1.08f
-        } else {
-            cell * 0.27f
-        }
+        val placement = tokenPlacement(player, animatedPoint)
+        val point = placement.point
+        val radius = placement.radius
+        tokenTextPaint.textSize = radius * 1.08f
         canvas.drawCircle(
             point.x + cell * 0.04f,
             point.y + cell * 0.06f,
@@ -560,6 +558,63 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
             point.y - (tokenTextPaint.ascent() + tokenTextPaint.descent()) / 2f,
             tokenTextPaint,
         )
+    }
+
+    private fun tokenPlacement(player: Int, animatedPoint: PointF?): TokenPlacement {
+        // A moving token follows its animation path without trying to snap to
+        // a multi-token layout. It is laid out with the other occupants as
+        // soon as the move completes.
+        if (animatedPoint != null) {
+            return TokenPlacement(animatedPoint, cell * 0.25f)
+        }
+
+        val number = positions[player]
+        if (number == 0) {
+            return TokenPlacement(
+                point = pointForPosition(player, number),
+                radius = startRadii[player].takeIf { it > 0f } ?: cell * 0.25f,
+            )
+        }
+
+        val occupants = (0 until activePlayerCount)
+            .filter { positions[it] == number }
+        val occupantCount = occupants.size
+        val occupantIndex = occupants.indexOf(player)
+        val radius = when (occupantCount) {
+            2 -> cell * 0.19f
+            3 -> cell * 0.17f
+            4 -> cell * 0.15f
+            else -> cell * 0.25f
+        }
+        val offset = tokenOffset(occupantIndex, occupantCount)
+        val center = pointForPosition(player, number)
+        return TokenPlacement(
+            point = PointF(center.x + offset.x, center.y + offset.y),
+            radius = radius,
+        )
+    }
+
+    private fun tokenOffset(index: Int, count: Int): PointF {
+        if (count < 2 || index < 0) return PointF()
+        val spacing = cell
+        val offsets = when (count) {
+            2 -> arrayOf(
+                PointF(-spacing * 0.20f, 0f),
+                PointF(spacing * 0.20f, 0f),
+            )
+            3 -> arrayOf(
+                PointF(-spacing * 0.18f, spacing * 0.12f),
+                PointF(spacing * 0.18f, spacing * 0.12f),
+                PointF(0f, -spacing * 0.18f),
+            )
+            else -> arrayOf(
+                PointF(-spacing * 0.16f, -spacing * 0.16f),
+                PointF(spacing * 0.16f, -spacing * 0.16f),
+                PointF(-spacing * 0.16f, spacing * 0.16f),
+                PointF(spacing * 0.16f, spacing * 0.16f),
+            )
+        }
+        return offsets[index.coerceIn(0, offsets.lastIndex)]
     }
 
     fun setPlayerPosition(player: Int, number: Int) {
