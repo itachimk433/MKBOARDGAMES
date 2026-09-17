@@ -37,6 +37,7 @@ import com.mkdev.mkboardgames.games.ludo.LudoPlayerEconomy
 import com.mkdev.mkboardgames.games.ludo.LudoSetup
 import com.mkdev.mkboardgames.ui.LudoBoardView
 import com.mkdev.mkboardgames.ui.GlbDiceView
+import com.mkdev.mkboardgames.ui.LudoGameOverView
 import com.mkdev.mkboardgames.ui.LudoPlayerBadgeView
 import com.mkdev.mkboardgames.ui.LudoPlayerControlView
 import com.mkdev.mkboardgames.ui.MotionDiceDirection
@@ -2025,41 +2026,77 @@ class LudoActivity : AppCompatActivity() {
             SettingsManager.recordLudoResult(this, winner == humanPlayer)
         }
         val standings = LudoEconomy.standings(state)
-        val result = buildString {
-            append("${LudoSetup.PLAYER_NAMES[winner]} wins\n\n")
-            standings.forEachIndexed { index, standing ->
-                val economy = LudoEconomy.player(state, standing.player)
-                val ordinal = when (standing.place) {
-                    1 -> "1st"
-                    2 -> "2nd"
-                    3 -> "3rd"
-                    else -> "${standing.place}th"
-                }
-                append("$ordinal  ${LudoSetup.PLAYER_NAMES[standing.player]}")
-                if (standing.player == humanPlayer && vsAI) append(" (You)")
-                append("\n")
-                append("  ${standing.completedTokens}/4 home · ")
-                append("Placement reward +${standing.placementReward}\n")
-                if (economyEnabled) {
-                    append("  Earned +${standing.totalEarned} total · Balance ${standing.balance}")
-                } else {
-                    append("  Classic match · coins disabled")
-                }
-                if (index < standings.lastIndex) append("\n\n")
-            }
+        val winnerStanding = standings.firstOrNull { it.player == winner }
+            ?: standings.firstOrNull()
+        val winnerName = LudoSetup.PLAYER_NAMES.getOrElse(winner) { "Player" }
+        val winnerLabel = if (winner == humanPlayer && vsAI) {
+            "$winnerName (You)"
+        } else {
+            winnerName
         }
-        StyledDialogs.showChoices(this, "Ludo Standings", result,
-            listOf(
-                StyledDialogs.choice("New Match", "Roll into another game", "↻", "#E3B86A"),
-                StyledDialogs.choice("Main Menu", "Choose another game", "⌂", "#E58A7A"),
-            ), 620f, "L U D O", onCancel = { showBoardAfterDialog() }, fullScreen = false) { which, dialog ->
-                dialog.dismiss()
-                resultDialogVisible = false
-                when (which) {
-                    0 -> startGame()
-                    1 -> finish()
+
+        val winnerSummary = winnerStanding?.let { standing ->
+            val reward = if (economyEnabled) {
+                "Placement reward +${standing.placementReward}"
+            } else {
+                "Classic match · coins disabled"
+            }
+            "${standing.completedTokens}/4 tokens home · $reward"
+        } ?: "Final standings"
+
+        val resultView = LudoGameOverView(
+            this,
+            winnerTitle = "$winnerLabel wins",
+            winnerSummary = winnerSummary,
+            rows = standings.map { standing ->
+                val economy = LudoEconomy.player(state, standing.player)
+                val playerName = LudoSetup.PLAYER_NAMES.getOrElse(standing.player) {
+                    "Player ${standing.player + 1}"
                 }
-            }.setOnDismissListener { resultDialogVisible = false }
+                val displayName = if (standing.player == humanPlayer && vsAI) {
+                    "$playerName (You)"
+                } else {
+                    playerName
+                }
+                val economyDetail = if (economyEnabled) {
+                    "Earned +${standing.totalEarned} · Balance ${standing.balance}"
+                } else {
+                    "Classic match · coins disabled"
+                }
+                LudoGameOverView.Row(
+                    place = standing.place,
+                    playerName = displayName,
+                    detail = "${standing.completedTokens}/4 home · " +
+                        "Placement reward +${standing.placementReward}",
+                    economyDetail = economyDetail,
+                    accentColor = LudoSetup.PLAYER_COLORS[standing.player],
+                    isWinner = standing.player == winner,
+                )
+            },
+        )
+        resultView.onNewMatch = {
+            StyledDialogs.dismiss()
+            resultDialogVisible = false
+            startGame()
+        }
+        resultView.onMainMenu = {
+            StyledDialogs.dismiss()
+            resultDialogVisible = false
+            finish()
+        }
+        resultView.onDismiss = {
+            StyledDialogs.dismiss()
+            resultDialogVisible = false
+            showBoardAfterDialog()
+        }
+        StyledDialogs.showFullScreenView(
+            this,
+            resultView,
+            onBack = {
+                resultDialogVisible = false
+                showBoardAfterDialog()
+            },
+        )
     }
 
     private fun hideBoardWhileDialogIsOpen() {
