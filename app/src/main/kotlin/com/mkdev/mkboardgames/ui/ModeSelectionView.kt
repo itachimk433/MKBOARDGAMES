@@ -96,16 +96,11 @@ class ModeSelectionView(context: Context) : View(context) {
     private val comingSoonStampFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(226, 42, 25, 20)
     }
-    private val comingSoonStampEdgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#E3B86A")
-        style = Paint.Style.STROKE
-        strokeWidth = 1.4f * unit
-    }
     private val comingSoonStampTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#F7D99B")
         textAlign = Paint.Align.CENTER
         isFakeBoldText = true
-        textSize = 9f * textScale
+        textSize = 7.2f * textScale
         letterSpacing = 0.08f
     }
     private val brownWoodCardRenderer = BrownWoodCardRenderer(unit)
@@ -287,8 +282,8 @@ class ModeSelectionView(context: Context) : View(context) {
     }
 
     private fun drawComingSoonStamp(canvas: Canvas, rect: RectF) {
-        val stampWidth = min(rect.width() - 18f * unit, 144f * unit)
-        val stampHeight = 27f * unit
+        val stampWidth = min(rect.width() - 18f * unit, 144f * unit) * 0.8f
+        val stampHeight = 27f * unit * 0.8f
         val stamp = RectF(
             rect.centerX() - stampWidth / 2f,
             rect.centerY() - stampHeight / 2f,
@@ -298,7 +293,6 @@ class ModeSelectionView(context: Context) : View(context) {
         canvas.save()
         canvas.rotate(-7f, rect.centerX(), rect.centerY())
         canvas.drawRoundRect(stamp, 5f * unit, 5f * unit, comingSoonStampFillPaint)
-        canvas.drawRoundRect(stamp, 5f * unit, 5f * unit, comingSoonStampEdgePaint)
         val baseline = stamp.centerY() - (comingSoonStampTextPaint.ascent() + comingSoonStampTextPaint.descent()) / 2f
         canvas.drawText("COMING SOON", stamp.centerX(), baseline, comingSoonStampTextPaint)
         canvas.restore()

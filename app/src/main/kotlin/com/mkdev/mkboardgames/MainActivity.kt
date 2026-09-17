@@ -1164,7 +1164,9 @@ class MainActivity : AppCompatActivity() {
         )
 
         var currentPage = 0
-        var statsMode = SettingsManager.currentMode(ctx)
+        var statsMode = SettingsManager.currentMode(ctx).let { mode ->
+            if (mode == GameMode.IRREGULAR) GameMode.NORMAL else mode
+        }
 
         val wrapper = android.widget.LinearLayout(ctx).apply {
             orientation = android.widget.LinearLayout.VERTICAL
@@ -1201,17 +1203,7 @@ class MainActivity : AppCompatActivity() {
                 0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f,
             ).also { it.setMargins((4 * dp).toInt(), 0, (4 * dp).toInt(), 0) }
         }
-        val irregularModeChip = android.widget.TextView(ctx).apply {
-            text = "Irregular Mode"
-            setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 13f)
-            gravity = android.view.Gravity.CENTER
-            setPadding((12 * dp).toInt(), (8 * dp).toInt(), (12 * dp).toInt(), (8 * dp).toInt())
-            layoutParams = android.widget.LinearLayout.LayoutParams(
-                0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f,
-            ).also { it.setMargins((4 * dp).toInt(), 0, (4 * dp).toInt(), 0) }
-        }
         modeRow.addView(normalModeChip)
-        modeRow.addView(irregularModeChip)
 
         val navRow = android.widget.LinearLayout(ctx).apply {
             orientation = android.widget.LinearLayout.HORIZONTAL
@@ -1303,10 +1295,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         fun refreshModeChips() {
-            listOf(
-                normalModeChip to GameMode.NORMAL,
-                irregularModeChip to GameMode.IRREGULAR,
-            ).forEach { (chip, mode) ->
+            listOf(normalModeChip to GameMode.NORMAL).forEach { (chip, mode) ->
                 chip.setTextColor(
                     Color.parseColor(if (statsMode == mode) "#102C32" else "#E3B86A"),
                 )
@@ -1320,11 +1309,6 @@ class MainActivity : AppCompatActivity() {
 
         normalModeChip.setOnClickListener {
             statsMode = GameMode.NORMAL
-            refreshModeChips()
-            buildStatCard(pages[currentPage].gameTag)
-        }
-        irregularModeChip.setOnClickListener {
-            statsMode = GameMode.IRREGULAR
             refreshModeChips()
             buildStatCard(pages[currentPage].gameTag)
         }
