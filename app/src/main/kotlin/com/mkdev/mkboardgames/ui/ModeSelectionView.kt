@@ -90,6 +90,24 @@ class ModeSelectionView(context: Context) : View(context) {
         textSize = 8f * textScale
         setShadowLayer(1.5f * unit, 0f, 1f * unit, Color.argb(210, 0, 0, 0))
     }
+    private val comingSoonOverlayPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(145, 0, 0, 0)
+    }
+    private val comingSoonStampFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(226, 42, 25, 20)
+    }
+    private val comingSoonStampEdgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#E3B86A")
+        style = Paint.Style.STROKE
+        strokeWidth = 1.4f * unit
+    }
+    private val comingSoonStampTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#F7D99B")
+        textAlign = Paint.Align.CENTER
+        isFakeBoldText = true
+        textSize = 9f * textScale
+        letterSpacing = 0.08f
+    }
     private val brownWoodCardRenderer = BrownWoodCardRenderer(unit)
     private val loadingRingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#63301F")
@@ -219,7 +237,7 @@ class ModeSelectionView(context: Context) : View(context) {
             GameMode.IRREGULAR,
             "♟️♟️",
             "Play (IRREGULAR MODE)",
-            "Irregular rules",
+            "",
         )
         drawModeCard(
             canvas,
@@ -227,7 +245,7 @@ class ModeSelectionView(context: Context) : View(context) {
             GameMode.CHALLENGES,
             "♞",
             "Challenges",
-            "10 chess challenges",
+            "",
         )
         drawSettings(canvas)
     }
@@ -252,8 +270,37 @@ class ModeSelectionView(context: Context) : View(context) {
         val textCenterX = rect.left + 32f * unit + (rect.width() - 32f * unit) / 2f
         canvas.drawText(symbol, iconCenterX, rect.centerY() + 8f * unit, modeIconPaint)
         canvas.drawText(label, textCenterX, rect.centerY() + 1f * unit, modeTitlePaint)
-        canvas.drawText(description, textCenterX, rect.centerY() + 14f * unit, modeDescriptionPaint)
+        if (description.isNotBlank()) {
+            canvas.drawText(description, textCenterX, rect.centerY() + 14f * unit, modeDescriptionPaint)
+        }
         if (loadingMode == mode) drawLoadingRing(canvas, rect)
+        if (isComingSoon(mode)) {
+            canvas.drawRoundRect(
+                rect,
+                10f * unit,
+                10f * unit,
+                comingSoonOverlayPaint,
+            )
+            drawComingSoonStamp(canvas, rect)
+        }
+        canvas.restore()
+    }
+
+    private fun drawComingSoonStamp(canvas: Canvas, rect: RectF) {
+        val stampWidth = min(rect.width() - 18f * unit, 144f * unit)
+        val stampHeight = 27f * unit
+        val stamp = RectF(
+            rect.centerX() - stampWidth / 2f,
+            rect.centerY() - stampHeight / 2f,
+            rect.centerX() + stampWidth / 2f,
+            rect.centerY() + stampHeight / 2f,
+        )
+        canvas.save()
+        canvas.rotate(-7f, rect.centerX(), rect.centerY())
+        canvas.drawRoundRect(stamp, 5f * unit, 5f * unit, comingSoonStampFillPaint)
+        canvas.drawRoundRect(stamp, 5f * unit, 5f * unit, comingSoonStampEdgePaint)
+        val baseline = stamp.centerY() - (comingSoonStampTextPaint.ascent() + comingSoonStampTextPaint.descent()) / 2f
+        canvas.drawText("COMING SOON", stamp.centerX(), baseline, comingSoonStampTextPaint)
         canvas.restore()
     }
 
@@ -352,8 +399,6 @@ class ModeSelectionView(context: Context) : View(context) {
                 } else {
                     when {
                         normalRect.contains(event.x, event.y) -> GameMode.NORMAL
-                        irregularRect.contains(event.x, event.y) -> GameMode.IRREGULAR
-                        challengesRect.contains(event.x, event.y) -> GameMode.CHALLENGES
                         else -> null
                     }
                 }
@@ -450,4 +495,7 @@ class ModeSelectionView(context: Context) : View(context) {
         GameMode.IRREGULAR -> irregularRect
         GameMode.CHALLENGES -> challengesRect
     }
+
+    private fun isComingSoon(mode: GameMode): Boolean =
+        mode == GameMode.IRREGULAR || mode == GameMode.CHALLENGES
 }

@@ -2036,12 +2036,7 @@ class LudoActivity : AppCompatActivity() {
         }
 
         val winnerSummary = winnerStanding?.let { standing ->
-            val reward = if (economyEnabled) {
-                "Placement reward +${standing.placementReward}"
-            } else {
-                "Classic match · coins disabled"
-            }
-            "${standing.completedTokens}/4 tokens home · $reward"
+            "${standing.completedTokens}/4 tokens home"
         } ?: "Final standings"
 
         val resultView = LudoGameOverView(
@@ -2049,7 +2044,6 @@ class LudoActivity : AppCompatActivity() {
             winnerTitle = "$winnerLabel wins",
             winnerSummary = winnerSummary,
             rows = standings.map { standing ->
-                val economy = LudoEconomy.player(state, standing.player)
                 val playerName = LudoSetup.PLAYER_NAMES.getOrElse(standing.player) {
                     "Player ${standing.player + 1}"
                 }
@@ -2061,13 +2055,12 @@ class LudoActivity : AppCompatActivity() {
                 val economyDetail = if (economyEnabled) {
                     "Earned +${standing.totalEarned} · Balance ${standing.balance}"
                 } else {
-                    "Classic match · coins disabled"
+                    null
                 }
                 LudoGameOverView.Row(
                     place = standing.place,
                     playerName = displayName,
-                    detail = "${standing.completedTokens}/4 home · " +
-                        "Placement reward +${standing.placementReward}",
+                    detail = "${standing.completedTokens}/4 home",
                     economyDetail = economyDetail,
                     accentColor = LudoSetup.PLAYER_COLORS[standing.player],
                     isWinner = standing.player == winner,

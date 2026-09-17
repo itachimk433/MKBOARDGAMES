@@ -27,7 +27,7 @@ class LudoGameOverView(
         val place: Int,
         val playerName: String,
         val detail: String,
-        val economyDetail: String,
+        val economyDetail: String?,
         val accentColor: Int,
         val isWinner: Boolean,
     )
@@ -341,20 +341,22 @@ class LudoGameOverView(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
             ),
         )
-        text.addView(
-            label(
-                text = row.economyDetail,
-                size = 11f,
-                color = Color.rgb(174, 203, 231),
-                bold = false,
-            ).apply {
-                setPadding(0, dp(2f), 0, 0)
-            },
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-            ),
-        )
+        row.economyDetail?.takeIf { it.isNotBlank() }?.let { economyDetail ->
+            text.addView(
+                label(
+                    text = economyDetail,
+                    size = 11f,
+                    color = Color.rgb(174, 203, 231),
+                    bold = false,
+                ).apply {
+                    setPadding(0, dp(2f), 0, 0)
+                },
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                ),
+            )
+        }
         container.addView(
             text,
             LinearLayout.LayoutParams(
