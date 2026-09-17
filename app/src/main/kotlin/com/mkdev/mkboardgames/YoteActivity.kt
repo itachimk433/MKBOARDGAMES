@@ -21,6 +21,7 @@ import com.mkdev.mkboardgames.games.yote.YoteRuleEngine
 import com.mkdev.mkboardgames.ui.AutoplayButtonView
 import com.mkdev.mkboardgames.ui.ChessChoiceView
 import com.mkdev.mkboardgames.ui.ChessMenuView
+import com.mkdev.mkboardgames.ui.SnakesLaddersGameOverView
 import com.mkdev.mkboardgames.ui.StandardGameHudView
 import com.mkdev.mkboardgames.ui.StyledDialogs
 import com.mkdev.mkboardgames.ui.YoteBoardView
@@ -57,6 +58,7 @@ class YoteActivity : AppCompatActivity() {
     private lateinit var topInfoView: YotePieceStripView
     private lateinit var bottomInfoView: YotePieceStripView
     private lateinit var autoplayButton: AutoplayButtonView
+    private lateinit var gameOverView: SnakesLaddersGameOverView
     private var activeOverlay: View? = null
     private val capturedByWhite = mutableListOf<Piece>()
     private val capturedByBlack = mutableListOf<Piece>()
@@ -133,6 +135,23 @@ class YoteActivity : AppCompatActivity() {
         gameLayout.visibility = View.GONE
         autoplayButton.visibility = View.GONE
         screenRoot.addView(gameLayout, FrameLayout.LayoutParams(-1, -1))
+        gameOverView = SnakesLaddersGameOverView(this).apply {
+            winnerBaselineDp = 112f
+            bottomCaptureTopPxProvider = { bottomInfoView.top.toFloat() }
+            onReplay = {
+                visibility = View.GONE
+                startGame()
+            }
+            onWatchReplay = {
+                visibility = View.GONE
+                launchReplay(currentResultLabel())
+            }
+            onHome = {
+                visibility = View.GONE
+                showHome()
+            }
+        }
+        screenRoot.addView(gameOverView, FrameLayout.LayoutParams(-1, -1))
         setContentView(screenRoot)
         SoundPlayer.init(this)
         SoundPlayer.movementSoundsEnabled = SettingsManager.isMovementSoundsEnabled(this)
@@ -406,6 +425,7 @@ class YoteActivity : AppCompatActivity() {
     }
 
     private fun startGame(restoring: PausedMatchStore.Match? = null) {
+        gameOverView.visibility = View.GONE
         matchStarted = true
         MusicPlayer.enterMatch(this)
         resultRecorded = false
@@ -727,39 +747,23 @@ class YoteActivity : AppCompatActivity() {
 
     private fun showResultDialog() {
         if (gameState.status == GameStatus.IN_PROGRESS) return
-        val message = when (gameState.status) {
-            GameStatus.WHITE_WINS -> if (vsAI && playerColor == PieceColor.WHITE) "You win!" else "White wins!"
-            GameStatus.BLACK_WINS -> if (vsAI && playerColor == PieceColor.BLACK) "You win!" else "Black wins!"
-            GameStatus.DRAW -> "It's a draw!"
-            GameStatus.IN_PROGRESS -> return
-        }
-        val resultLabel = when (gameState.status) {
-            GameStatus.WHITE_WINS -> "White wins"
-            GameStatus.BLACK_WINS -> "Black wins"
+        gameOverView.winnerLabel = when (gameState.status) {
+            GameStatus.WHITE_WINS ->
+                "Winner: ${if (vsAI && playerColor == PieceColor.WHITE) "You" else "White"}"
+            GameStatus.BLACK_WINS ->
+                "Winner: ${if (vsAI && playerColor == PieceColor.BLACK) "You" else "Black"}"
             GameStatus.DRAW -> "Draw"
             GameStatus.IN_PROGRESS -> return
         }
-        StyledDialogs.showChoices(
-            this,
-            "Game Over",
-            message,
-            listOf(
-                StyledDialogs.choice("Play Again", "Start a fresh game", "↻", "#E3B86A"),
-                StyledDialogs.choice("Main Menu", "Choose another match", "⌂", "#E58A7A"),
-                StyledDialogs.choice("Watch Replay", "Review the moves", "▶", "#A9B6E8"),
-            ),
-            520f,
-            "Y O T É",
-            onCancel = { showBoardAfterDialog() },
-            fullScreen = false,
-        ) { which, dialog ->
-            dialog.dismiss()
-            when (which) {
-                0 -> startGame()
-                1 -> showHome()
-                else -> launchReplay(resultLabel)
-            }
-        }
+        gameOverView.visibility = View.VISIBLE
+        gameOverView.bringToFront()
+    }
+
+    private fun currentResultLabel(): String = when (gameState.status) {
+        GameStatus.WHITE_WINS -> "White wins"
+        GameStatus.BLACK_WINS -> "Black wins"
+        GameStatus.DRAW -> "Draw"
+        GameStatus.IN_PROGRESS -> ""
     }
 
     private fun launchReplay(resultLabel: String) {
@@ -775,6 +779,7 @@ class YoteActivity : AppCompatActivity() {
         if (matchStarted && gameState.status == GameStatus.IN_PROGRESS) {
             MusicPlayer.resumeMatch(this)
         }
+        if (::gameOverView.isInitialized) gameOverView.visibility = View.GONE
         dismissOverlay()
         gameRoot.visibility = View.VISIBLE
         boardView.isLocked = gameState.status != GameStatus.IN_PROGRESS
@@ -784,6 +789,7 @@ class YoteActivity : AppCompatActivity() {
     private fun showHome() {
         stopAutomatedGameplay()
         PausedMatchStore.clear(this, "YOTE")
+        if (::gameOverView.isInitialized) gameOverView.visibility = View.GONE
         dismissOverlay()
         finish()
     }

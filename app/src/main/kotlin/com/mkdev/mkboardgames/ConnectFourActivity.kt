@@ -9,6 +9,7 @@ import android.graphics.*
 import android.os.Bundle
 import android.view.*
 import android.view.animation.AccelerateInterpolator
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import androidx.appcompat.app.AppCompatActivity
 import com.mkdev.mkboardgames.engine.*
@@ -20,6 +21,7 @@ import com.mkdev.mkboardgames.ui.BoardSelectionPreview
 import com.mkdev.mkboardgames.ui.BoardSelectionView
 import com.mkdev.mkboardgames.ui.ChessMenuView
 import com.mkdev.mkboardgames.ui.ConnectFourBoardStyle
+import com.mkdev.mkboardgames.ui.SnakesLaddersGameOverView
 import com.mkdev.mkboardgames.ui.StyledDialogs
 import kotlinx.coroutines.*
 
@@ -50,6 +52,7 @@ class ConnectFourActivity : AppCompatActivity() {
     private lateinit var scoreView: ScoreView
     private lateinit var autoplayButton: AutoplayButtonView
     private lateinit var gameRoot: View
+    private lateinit var gameOverView: SnakesLaddersGameOverView
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         SettingsManager.setCurrentModeFromIntent(this, intent)
@@ -89,7 +92,28 @@ class ConnectFourActivity : AppCompatActivity() {
         root.addView(scoreView, LinearLayout.LayoutParams(-1, (48 * dp).toInt()))
         AdManager.attachBanner(root)
         gameRoot = root
-        setContentView(root)
+        gameOverView = SnakesLaddersGameOverView(this).apply {
+            winnerBaselineDp = 112f
+            bottomCaptureTopPxProvider = { scoreView.top.toFloat() }
+            onReplay = {
+                visibility = View.GONE
+                startGame()
+            }
+            onWatchReplay = {
+                visibility = View.GONE
+                launchReplay(currentResultLabel())
+            }
+            onHome = {
+                visibility = View.GONE
+                clearPausedMatch()
+                finish()
+            }
+        }
+        val screenRoot = FrameLayout(this).apply {
+            addView(root, FrameLayout.LayoutParams(-1, -1))
+            addView(gameOverView, FrameLayout.LayoutParams(-1, -1))
+        }
+        setContentView(screenRoot)
         hideBoardUntilMatchStarts()
         @Suppress("DEPRECATION")
         window.decorView.setOnSystemUiVisibilityChangeListener { vis ->
@@ -625,38 +649,34 @@ Control the centre columns, build threats in more than one direction, and block 
 
     private fun showResultDialog() {
         if (gameState.status == GameStatus.IN_PROGRESS) return
-        hideBoardWhileDialogIsOpen()
-        val message = when (gameState.status) {
-            GameStatus.WHITE_WINS -> if (vsAI && playerColor == PieceColor.WHITE) "You win!" else "Red wins!"
-            GameStatus.BLACK_WINS -> if (vsAI && playerColor == PieceColor.BLACK) "You win!" else "Yellow wins!"
-            GameStatus.DRAW -> "It's a draw!"
+        gameOverView.winnerLabel = when (gameState.status) {
+            GameStatus.WHITE_WINS ->
+                "Winner: ${if (vsAI && playerColor == PieceColor.WHITE) "You" else "Red"}"
+            GameStatus.BLACK_WINS ->
+                "Winner: ${if (vsAI && playerColor == PieceColor.BLACK) "You" else "Yellow"}"
+            GameStatus.DRAW -> "Draw"
             else -> return
         }
-        val result = when (gameState.status) {
-            GameStatus.WHITE_WINS -> "Red wins"
-            GameStatus.BLACK_WINS -> "Yellow wins"
-            else -> "Draw"
-        }
-        StyledDialogs.showChoices(this, "Game Over", message,
-            listOf(
-                StyledDialogs.choice("Play Again", "Start a fresh game", "↻", "#E3B86A"),
-                StyledDialogs.choice("Main Menu", "Choose another match", "⌂", "#E58A7A"),
-                StyledDialogs.choice("Watch Replay", "Review the moves", "▶", "#A9B6E8"),
-            ), 520f, "C O N N E C T · F O U R", onCancel = { showBoardAfterDialog() }, fullScreen = false) { which, dialog ->
-                dialog.dismiss()
-                when (which) {
-                    0 -> startGame()
-                    1 -> finish()
-                    2 -> {
-                        showBoardAfterDialog()
-                        startActivity(Intent(this, ReplayActivity::class.java).apply {
-                            putExtra(ReplayActivity.EXTRA_GAME_TYPE, "CONNECTFOUR")
-                            putExtra(ReplayActivity.EXTRA_MOVES_JSON, ReplayActivity.buildMovesJson(gameState.moveHistory))
-                            putExtra(ReplayActivity.EXTRA_RESULT, result)
-                        })
-                    }
-                }
-            }
+        gameOverView.visibility = View.VISIBLE
+        gameOverView.bringToFront()
+    }
+
+    private fun currentResultLabel(): String = when (gameState.status) {
+        GameStatus.WHITE_WINS -> "Red wins"
+        GameStatus.BLACK_WINS -> "Yellow wins"
+        GameStatus.DRAW -> "Draw"
+        else -> ""
+    }
+
+    private fun launchReplay(resultLabel: String) {
+        showBoardAfterDialog()
+        startActivity(Intent(this, ReplayActivity::class.java).apply {
+            putExtra(ReplayActivity.EXTRA_GAME_TYPE, "CONNECTFOUR")
+            putExtra(ReplayActivity.EXTRA_MOVES_JSON, ReplayActivity.buildMovesJson(gameState.moveHistory))
+            putExtra(ReplayActivity.EXTRA_RESULT, resultLabel)
+            putExtra(ReplayActivity.EXTRA_BOARD_STYLE_INDEX, boardView.boardStyle.ordinal)
+            putExtra(ReplayActivity.EXTRA_LOCK_BOARD_STYLE, true)
+        })
     }
 
     private fun hideBoardWhileDialogIsOpen() {

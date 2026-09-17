@@ -19,6 +19,7 @@ import com.mkdev.mkboardgames.ui.ChessChoiceView
 import com.mkdev.mkboardgames.ui.ChessMenuView
 import com.mkdev.mkboardgames.ui.MorabaraBoardView
 import com.mkdev.mkboardgames.ui.MorabarabaBoardStyle
+import com.mkdev.mkboardgames.ui.SnakesLaddersGameOverView
 import com.mkdev.mkboardgames.ui.StyledDialogs
 import kotlinx.coroutines.*
 
@@ -34,6 +35,7 @@ class MorabarabaActivity : AppCompatActivity() {
     private lateinit var bottomCaptureView: CaptureStripView
     private lateinit var autoplayButton:    AutoplayButtonView
     private lateinit var gameRoot: View
+    private lateinit var gameOverView: SnakesLaddersGameOverView
     private var engine:                     MorabarabaRuleEngine = MorabarabaRuleEngine()
     private var gameState:                  GameState = GameState(arrayOfNulls(49), boardSize = 7)
     private var vsAI                        = true
@@ -116,7 +118,28 @@ class MorabarabaActivity : AppCompatActivity() {
         root.addView(bottomCaptureView, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, capH))
         AdManager.attachBanner(root)
         gameRoot = root
-        setContentView(root)
+        gameOverView = SnakesLaddersGameOverView(this).apply {
+            winnerBaselineDp = 112f
+            bottomCaptureTopPxProvider = { bottomCaptureView.top.toFloat() }
+            onReplay = {
+                visibility = View.GONE
+                startGame()
+            }
+            onWatchReplay = {
+                visibility = View.GONE
+                launchReplay(currentResultLabel())
+            }
+            onHome = {
+                visibility = View.GONE
+                clearPausedMatch()
+                finish()
+            }
+        }
+        val screenRoot = FrameLayout(this).apply {
+            addView(root, FrameLayout.LayoutParams(-1, -1))
+            addView(gameOverView, FrameLayout.LayoutParams(-1, -1))
+        }
+        setContentView(screenRoot)
         hideBoardUntilMatchStarts()
         showModeDialog()
     }
@@ -757,32 +780,16 @@ class MorabarabaActivity : AppCompatActivity() {
 
     private fun showResult() {
         if (gameState.status == GameStatus.IN_PROGRESS) return
-        val msg = when (gameState.status) {
-            GameStatus.WHITE_WINS -> if (vsAI && playerColor == PieceColor.WHITE) "You win! 🎉" else "White wins!"
-            GameStatus.BLACK_WINS -> if (vsAI && playerColor == PieceColor.BLACK) "You win! 🎉" else "Black wins!"
-            else -> "Draw!"
+        gameOverView.winnerLabel = when (gameState.status) {
+            GameStatus.WHITE_WINS ->
+                "Winner: ${if (vsAI && playerColor == PieceColor.WHITE) "You" else "White"}"
+            GameStatus.BLACK_WINS ->
+                "Winner: ${if (vsAI && playerColor == PieceColor.BLACK) "You" else "Black"}"
+            GameStatus.DRAW -> "Draw"
+            else -> return
         }
-        val resultLabel = when (gameState.status) {
-            GameStatus.WHITE_WINS -> "White wins"
-            GameStatus.BLACK_WINS -> "Black wins"
-            else -> "Draw"
-        }
-        showChoiceDialog(
-            "Game Over",
-            msg,
-            listOf(
-                ChessChoiceView.Choice("Play Again", "Start a fresh game", "↻", Color.parseColor("#E3B86A")),
-                ChessChoiceView.Choice("Main Menu", "Choose another match", "⌂", Color.parseColor("#E58A7A")),
-                ChessChoiceView.Choice("Watch Replay", "Review the moves", "▶", Color.parseColor("#A9B6E8")),
-            ),
-            listOf(
-                { showModeDialog() },
-                { finish() },
-                { launchReplay(resultLabel) },
-            ),
-            520f,
-            fullScreen = false,
-        )
+        gameOverView.visibility = View.VISIBLE
+        gameOverView.bringToFront()
     }
 
     // ─── Replay ───────────────────────────────────────────────────────────────
@@ -795,6 +802,8 @@ class MorabarabaActivity : AppCompatActivity() {
             putExtra(ReplayActivity.EXTRA_MOVES_JSON, movesJson)
             putExtra(ReplayActivity.EXTRA_RESULT,     resultLabel)
             putExtra(ReplayActivity.EXTRA_MORABARABA_PIECE_COUNT, pieceCount)
+            putExtra(ReplayActivity.EXTRA_BOARD_STYLE_INDEX, boardView.boardStyle.ordinal)
+            putExtra(ReplayActivity.EXTRA_LOCK_BOARD_STYLE, true)
         })
     }
 

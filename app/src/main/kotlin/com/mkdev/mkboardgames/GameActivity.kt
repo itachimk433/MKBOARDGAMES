@@ -376,12 +376,13 @@ class GameActivity : AppCompatActivity() {
             return
         }
         if (matchStarted &&
-            (gameType == "CHESS" || gameType == "CHECKERS" || gameType == "INTERNATIONAL_DRAUGHTS") &&
+            gameType != "LUDO" &&
+            gameType != "ONITAMA" &&
             gameState.status != GameStatus.IN_PROGRESS
         ) {
-            // A finished Chess or Draughts match already has its actions on the board.
-            // Keep repeated system-back presses from falling through to the
-            // activity finish path and returning to mode selection.
+            // Every board game handled here keeps its game-over actions on the
+            // board. Keep repeated system-back presses from falling through
+            // to the activity finish path and returning to mode selection.
             return
         }
         if (matchStarted && gameState.status != GameStatus.IN_PROGRESS) {
@@ -1125,6 +1126,7 @@ Checkmate your opponent's King.
     private fun showChessBoardAfterDialog(resumeAi: Boolean) {
         gameContainer.visibility = View.VISIBLE
         dismissStyledOverlay()
+        chessGameOverView.visibility = View.GONE
         if (matchStarted && gameState.status == GameStatus.IN_PROGRESS) {
             MusicPlayer.resumeMatch(this)
         }
@@ -2045,9 +2047,7 @@ Checkmate your opponent's King.
             GameStatus.DRAW       -> "Draw"
             else -> ""
         }
-        if (gameType == "CHESS" || gameType == "CHECKERS" ||
-            gameType == "INTERNATIONAL_DRAUGHTS"
-        ) {
+        if (gameType != "LUDO" && gameType != "ONITAMA") {
             showBoardGameResultDialog()
             return
         }
@@ -2073,7 +2073,9 @@ Checkmate your opponent's King.
         chessGameOverView.winnerLabel = boardGameWinnerLabel()
         gameContainer.visibility = View.VISIBLE
         styledOverlayHost.visibility = View.GONE
+        activeStyledOverlay = null
         chessGameOverView.visibility = View.VISIBLE
+        chessGameOverView.bringToFront()
     }
 
     private fun boardGameWinnerLabel(): String {

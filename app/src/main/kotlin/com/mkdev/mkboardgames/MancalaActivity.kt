@@ -23,6 +23,7 @@ import com.mkdev.mkboardgames.ui.ChessChoiceView
 import com.mkdev.mkboardgames.ui.MancalaRulesView
 import com.mkdev.mkboardgames.ui.AutoplayButtonView
 import com.mkdev.mkboardgames.ui.StandardGameHudView
+import com.mkdev.mkboardgames.ui.SnakesLaddersGameOverView
 import com.mkdev.mkboardgames.ui.StyledDialogs
 import kotlinx.coroutines.*
 import kotlin.math.*
@@ -110,6 +111,7 @@ class MancalaActivity : AppCompatActivity() {
     private lateinit var boardView: MancalaBoardView
     private lateinit var hudView: StandardGameHudView
     private lateinit var autoplayButton: AutoplayButtonView
+    private lateinit var gameOverView: SnakesLaddersGameOverView
     private var activeMancalaOverlay: View? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -170,6 +172,25 @@ class MancalaActivity : AppCompatActivity() {
         gameLayout.visibility = View.GONE
         screenRoot.addView(
             gameLayout,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT,
+            ),
+        )
+        gameOverView = SnakesLaddersGameOverView(this).apply {
+            winnerBaselineDp = 112f
+            onReplay = {
+                visibility = View.GONE
+                startGame()
+            }
+            onHome = {
+                visibility = View.GONE
+                clearPausedMatch()
+                finish()
+            }
+        }
+        screenRoot.addView(
+            gameOverView,
             FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT,
@@ -552,11 +573,13 @@ class MancalaActivity : AppCompatActivity() {
     private fun showHome() {
         stopAutomatedGameplay()
         dismissMancalaOverlay()
+        if (::gameOverView.isInitialized) gameOverView.visibility = View.GONE
         if (::gameRoot.isInitialized) gameRoot.visibility = View.GONE
         finish()
     }
 
     private fun startGame(restoring: PausedMatchStore.Match? = null) {
+        gameOverView.visibility = View.GONE
         matchStarted = true
         MusicPlayer.enterMatch(this)
         resultRecorded = false
@@ -716,33 +739,16 @@ class MancalaActivity : AppCompatActivity() {
 
     private fun showResultDialog() {
         if (gameState.status == GameStatus.IN_PROGRESS) return
-        val message = when (gameState.status) {
-            GameStatus.WHITE_WINS -> if (vsAI && playerColor == PieceColor.WHITE) "You win!" else "South wins!"
-            GameStatus.BLACK_WINS -> if (vsAI && playerColor == PieceColor.BLACK) "You win!" else "North wins!"
-            GameStatus.DRAW -> "It's a draw!"
+        gameOverView.winnerLabel = when (gameState.status) {
+            GameStatus.WHITE_WINS ->
+                "Winner: ${if (vsAI && playerColor == PieceColor.WHITE) "You" else "South"}"
+            GameStatus.BLACK_WINS ->
+                "Winner: ${if (vsAI && playerColor == PieceColor.BLACK) "You" else "North"}"
+            GameStatus.DRAW -> "Draw"
             else -> return
         }
-        StyledDialogs.showChoices(
-            this,
-            "Game Over",
-            message,
-            listOf(
-                StyledDialogs.choice("Play Again", "Start a fresh game", "↻", "#E3B86A"),
-                StyledDialogs.choice("Main Menu", "Choose another match", "⌂", "#E58A7A"),
-            ),
-            420f,
-            "M A N C A L A",
-            onCancel = { showBoardAfterDialog() },
-            fullScreen = false,
-        ) { which, dialog ->
-            dialog.dismiss()
-            if (which == 0) {
-                startGame()
-            } else {
-                clearPausedMatch()
-                finish()
-            }
-        }
+        gameOverView.visibility = View.VISIBLE
+        gameOverView.bringToFront()
     }
 
     private fun leaveCompletedGameToHome() {
@@ -784,6 +790,7 @@ class MancalaActivity : AppCompatActivity() {
 
     private fun showBoardAfterDialog(resumeAi: Boolean = true) {
         dismissMancalaOverlay()
+        if (::gameOverView.isInitialized) gameOverView.visibility = View.GONE
         if (matchStarted && gameState.status == GameStatus.IN_PROGRESS) {
             MusicPlayer.resumeMatch(this)
         }
