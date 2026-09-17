@@ -13,7 +13,7 @@ import android.opengl.Matrix
 import android.util.Log
 import android.view.MotionEvent
 import android.view.ViewGroup
-import android.view.animation.DecelerateInterpolator
+import android.view.animation.LinearInterpolator
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
@@ -24,7 +24,13 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
 import java.nio.ShortBuffer
+import kotlin.math.abs
+import kotlin.math.asin
+import kotlin.math.atan2
+import kotlin.math.acos
+import kotlin.math.cos
 import kotlin.math.sin
+import kotlin.math.sqrt
 import kotlin.random.Random
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
@@ -53,6 +59,7 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
     private var rotationX = -18f
     private var rotationY = -28f
     private var rotationZ = 0f
+    private var currentOrientation = Quat.fromEulerDegrees(-18f, -28f, 0f)
     private val glRenderer = DiceRenderer(context.applicationContext)
 
     init {
@@ -88,44 +95,43 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         val generation = ++rollGeneration
         animator?.cancel()
         isRolling = true
+
         val targetValue = nextValue.coerceIn(1, 6)
-        val target = DiceOrientation.forValue(targetValue)
-        val startX = rotationX
-        val startY = rotationY
-        val startZ = rotationZ
+        val startOrientation = currentOrientation
+        val targetOrientation = DiceOrientation.forValue(targetValue)
         val spin = RollSpin.random(motionDirection)
-        val tiltX = when (motionDirection) {
-            MotionDiceDirection.TOP_LEFT, MotionDiceDirection.TOP_RIGHT -> -22f
-            MotionDiceDirection.UP -> -12f
-            else -> 0f
-        }
-        val tiltY = when (motionDirection) {
-            MotionDiceDirection.LEFT, MotionDiceDirection.TOP_LEFT -> -28f
-            MotionDiceDirection.RIGHT, MotionDiceDirection.TOP_RIGHT -> 28f
-            else -> 0f
-        }
 
         animator = ValueAnimator.ofFloat(0f, 1f).apply {
-            // Give the tumble enough time to read as a physical throw. The
-            // die still accelerates into the roll, then settles cleanly on
-            // the predetermined face instead of snapping there too quickly.
             duration = 680L
-            interpolator = DecelerateInterpolator(1.6f)
+            interpolator = LinearInterpolator()
             addUpdateListener {
                 val progress = it.animatedFraction
-                val tumble = sin(progress * Math.PI).toFloat()
-                val sizePulse = 1f + 0.12f * tumble
-                rotationX = startX +
-                    (target.x - startX + spin.x) * progress +
-                    (tiltX + spin.wobbleX) * tumble
-                rotationY = startY +
-                    (target.y - startY + spin.y) * progress +
-                    (tiltY + spin.wobbleY) * tumble
-                rotationZ = startZ +
-                    (target.z - startZ + spin.z) * progress +
-                    spin.wobbleZ * tumble
-                glRenderer.setAnimationScale(sizePulse)
-                glRenderer.setRotation(rotationX, rotationY, rotationZ)
+                val eased = easeOutQuint(progress)
+                val baseOrientation = Quat.slerp(
+                    startOrientation,
+                    targetOrientation,
+                    eased,
+                )
+                val spinOrientation = Quat.fromEulerDegrees(
+                    spin.turnsX * eased,
+                    spin.turnsY * eased,
+                    spin.turnsZ * eased,
+                )
+                val wobble = wobbleEnvelope(progress)
+                val tiltOrientation = Quat.fromEulerDegrees(
+                    spin.tiltX * wobble,
+                    spin.tiltY * wobble,
+                    spin.tiltZ * wobble,
+                )
+                val orientation = (
+                    tiltOrientation *
+                        spinOrientation *
+                        baseOrientation
+                    ).normalized()
+
+                currentOrientation = orientation
+                applyOrientation(orientation)
+                glRenderer.setAnimationScale(1f + 0.12f * wobble)
             }
             addListener(object : AnimatorListenerAdapter() {
                 override fun onAnimationEnd(animation: Animator) {
@@ -133,16 +139,33 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
                     value = targetValue
                     isRolling = false
                     animator = null
-                    rotationX = target.x
-                    rotationY = target.y
-                    rotationZ = target.z
+                    currentOrientation = targetOrientation
                     glRenderer.setAnimationScale(1f)
-                    glRenderer.setRotation(rotationX, rotationY, rotationZ)
+                    applyOrientation(targetOrientation)
                     onFinished()
                 }
             })
             start()
         }
+    }
+
+    private fun applyOrientation(orientation: Quat) {
+        val (x, y, z) = orientation.toEulerDegrees()
+        rotationX = x
+        rotationY = y
+        rotationZ = z
+        glRenderer.setRotation(x, y, z)
+    }
+
+    private fun easeOutQuint(progress: Float): Float {
+        val remaining = 1f - progress
+        return 1f - remaining * remaining * remaining * remaining * remaining
+    }
+
+    private fun wobbleEnvelope(progress: Float): Float {
+        val raw = progress * progress *
+            (1f - progress) * (1f - progress) * (1f - progress)
+        return (raw / 0.05184f).coerceIn(0f, 1f)
     }
 
     fun cancelRoll() {
@@ -880,51 +903,197 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         }
     }
 
-    private data class DiceOrientation(
-        val x: Float,
-        val y: Float,
-        val z: Float = 0f,
-    ) {
-        companion object {
-            fun forValue(value: Int): DiceOrientation = when (value.coerceIn(1, 6)) {
-                1 -> DiceOrientation(90f, 0f)
-                2 -> DiceOrientation(0f, 0f)
-                3 -> DiceOrientation(0f, -90f)
-                4 -> DiceOrientation(0f, 90f)
-                5 -> DiceOrientation(0f, 180f)
-                else -> DiceOrientation(-90f, 0f)
-            }
+    private object DiceOrientation {
+        fun forValue(value: Int): Quat = when (value.coerceIn(1, 6)) {
+            1 -> Quat.fromEulerDegrees(90f, 0f, 0f)
+            2 -> Quat.fromEulerDegrees(0f, 0f, 0f)
+            3 -> Quat.fromEulerDegrees(0f, -90f, 0f)
+            4 -> Quat.fromEulerDegrees(0f, 90f, 0f)
+            5 -> Quat.fromEulerDegrees(0f, 180f, 0f)
+            else -> Quat.fromEulerDegrees(-90f, 0f, 0f)
         }
     }
 
     private data class RollSpin(
-        val x: Float,
-        val y: Float,
-        val z: Float,
-        val wobbleX: Float,
-        val wobbleY: Float,
-        val wobbleZ: Float,
+        val turnsX: Float,
+        val turnsY: Float,
+        val turnsZ: Float,
+        val tiltX: Float,
+        val tiltY: Float,
+        val tiltZ: Float,
     ) {
         companion object {
             fun random(direction: MotionDiceDirection): RollSpin {
-                val sign = { if (Random.nextBoolean()) 1f else -1f }
-                val xSign = sign()
-                val ySign = sign()
-                val zSign = sign()
-                val directionBoost = when (direction) {
-                    MotionDiceDirection.LEFT, MotionDiceDirection.TOP_LEFT -> -1f
-                    MotionDiceDirection.RIGHT, MotionDiceDirection.TOP_RIGHT -> 1f
-                    MotionDiceDirection.UP -> 0f
+                fun randomSign() = if (Random.nextBoolean()) 1f else -1f
+
+                val directionalTilt = when (direction) {
+                    MotionDiceDirection.TOP_LEFT -> -22f to -28f
+                    MotionDiceDirection.TOP_RIGHT -> -22f to 28f
+                    MotionDiceDirection.UP -> -12f to 0f
+                    MotionDiceDirection.LEFT -> 0f to -28f
+                    MotionDiceDirection.RIGHT -> 0f to 28f
                 }
+
                 return RollSpin(
-                    x = Random.nextInt(2, 5) * 360f * xSign,
-                    y = Random.nextInt(2, 5) * 360f * ySign,
-                    z = Random.nextInt(2, 4) * 360f * zSign,
-                    wobbleX = (8f + Random.nextFloat() * 12f) * xSign,
-                    wobbleY = (8f + Random.nextFloat() * 12f) * ySign +
-                        directionBoost * 8f,
-                    wobbleZ = (10f + Random.nextFloat() * 16f) * zSign,
+                    turnsX = Random.nextInt(2, 5) * 360f * randomSign(),
+                    turnsY = Random.nextInt(2, 5) * 360f * randomSign(),
+                    turnsZ = Random.nextInt(2, 4) * 360f * randomSign(),
+                    tiltX = directionalTilt.first,
+                    tiltY = directionalTilt.second,
+                    tiltZ = 0f,
                 )
+            }
+        }
+    }
+
+    private data class Quat(
+        val w: Float,
+        val x: Float,
+        val y: Float,
+        val z: Float,
+    ) {
+        operator fun times(other: Quat): Quat = Quat(
+            w = w * other.w -
+                x * other.x -
+                y * other.y -
+                z * other.z,
+            x = w * other.x +
+                x * other.w +
+                y * other.z -
+                z * other.y,
+            y = w * other.y -
+                x * other.z +
+                y * other.w +
+                z * other.x,
+            z = w * other.z +
+                x * other.y -
+                y * other.x +
+                z * other.w,
+        )
+
+        fun normalized(): Quat {
+            val magnitude = sqrt(w * w + x * x + y * y + z * z)
+            return if (magnitude < 1e-6f) {
+                IDENTITY
+            } else {
+                Quat(
+                    w / magnitude,
+                    x / magnitude,
+                    y / magnitude,
+                    z / magnitude,
+                )
+            }
+        }
+
+        /**
+         * Extracts Euler angles for the renderer's Rx * Ry * Rz matrix order.
+         */
+        fun toEulerDegrees(): Triple<Float, Float, Float> {
+            val m00 = 1f - 2f * (y * y + z * z)
+            val m01 = 2f * (x * y - w * z)
+            val m02 = 2f * (x * z + w * y)
+            val m12 = 2f * (y * z - w * x)
+            val m22 = 1f - 2f * (x * x + y * y)
+
+            val rotationX = atan2(-m12, m22)
+            val rotationY = asin(m02.coerceIn(-1f, 1f))
+            val rotationZ = atan2(-m01, m00)
+
+            return Triple(
+                Math.toDegrees(rotationX.toDouble()).toFloat(),
+                Math.toDegrees(rotationY.toDouble()).toFloat(),
+                Math.toDegrees(rotationZ.toDouble()).toFloat(),
+            )
+        }
+
+        companion object {
+            val IDENTITY = Quat(1f, 0f, 0f, 0f)
+
+            fun fromEulerDegrees(
+                xDegrees: Float,
+                yDegrees: Float,
+                zDegrees: Float,
+            ): Quat {
+                val xRotation = fromAxisAngleDegrees(1f, 0f, 0f, xDegrees)
+                val yRotation = fromAxisAngleDegrees(0f, 1f, 0f, yDegrees)
+                val zRotation = fromAxisAngleDegrees(0f, 0f, 1f, zDegrees)
+
+                // Matches Matrix.rotateM(X), Matrix.rotateM(Y),
+                // Matrix.rotateM(Z) in DiceRenderer.onDrawFrame().
+                return (xRotation * yRotation * zRotation).normalized()
+            }
+
+            fun fromAxisAngleDegrees(
+                axisX: Float,
+                axisY: Float,
+                axisZ: Float,
+                degrees: Float,
+            ): Quat {
+                val length = sqrt(
+                    axisX * axisX +
+                        axisY * axisY +
+                        axisZ * axisZ,
+                )
+                if (length < 1e-6f) return IDENTITY
+
+                val halfRadians =
+                    Math.toRadians(degrees.toDouble()).toFloat() / 2f
+                val sine = sin(halfRadians)
+
+                return Quat(
+                    cos(halfRadians),
+                    axisX / length * sine,
+                    axisY / length * sine,
+                    axisZ / length * sine,
+                ).normalized()
+            }
+
+            fun slerp(
+                start: Quat,
+                end: Quat,
+                amount: Float,
+            ): Quat {
+                var endW = end.w
+                var endX = end.x
+                var endY = end.y
+                var endZ = end.z
+                var dot = start.w * endW +
+                    start.x * endX +
+                    start.y * endY +
+                    start.z * endZ
+
+                if (dot < 0f) {
+                    endW = -endW
+                    endX = -endX
+                    endY = -endY
+                    endZ = -endZ
+                    dot = -dot
+                }
+
+                dot = dot.coerceIn(-1f, 1f)
+
+                if (dot > 0.9995f) {
+                    return Quat(
+                        start.w + amount * (endW - start.w),
+                        start.x + amount * (endX - start.x),
+                        start.y + amount * (endY - start.y),
+                        start.z + amount * (endZ - start.z),
+                    ).normalized()
+                }
+
+                val angle = acos(dot)
+                val scaledAngle = angle * amount
+                val sineAngle = sin(angle)
+                val startScale = cos(scaledAngle) -
+                    dot * sin(scaledAngle) / sineAngle
+                val endScale = sin(scaledAngle) / sineAngle
+
+                return Quat(
+                    startScale * start.w + endScale * endW,
+                    startScale * start.x + endScale * endX,
+                    startScale * start.y + endScale * endY,
+                    startScale * start.z + endScale * endZ,
+                ).normalized()
             }
         }
     }
