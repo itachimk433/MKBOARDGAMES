@@ -41,6 +41,8 @@ import com.mkdev.mkboardgames.ui.LudoGameOverView
 import com.mkdev.mkboardgames.ui.LudoPlayerBadgeView
 import com.mkdev.mkboardgames.ui.LudoPlayerControlView
 import com.mkdev.mkboardgames.ui.MotionDiceDirection
+import com.mkdev.mkboardgames.ui.BoardSelectionOption
+import com.mkdev.mkboardgames.ui.BoardSelectionView
 import com.mkdev.mkboardgames.ui.ChessMenuView
 import com.mkdev.mkboardgames.ui.StyledDialogs
 import kotlin.math.abs
@@ -89,6 +91,7 @@ class LudoActivity : AppCompatActivity() {
     private var usingRawAccelerometer = false
     private var lastMotionAt = 0L
     private val gravity = FloatArray(3)
+    private var selectedBoard = LudoBoardView.Board.ONE
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -442,13 +445,13 @@ class LudoActivity : AppCompatActivity() {
             StyledDialogs.dismiss()
             vsAI = true
             irregularMode = SettingsManager.currentMode(this) == GameMode.IRREGULAR
-            showPlayerPicker()
+            showBoardSelection { showPlayerPicker() }
         }
         menuView.onTwoPlayers = {
             StyledDialogs.dismiss()
             vsAI = false
             irregularMode = false
-            startGame()
+            showBoardSelection { startGame() }
         }
         menuView.onHowToPlay = {
             StyledDialogs.dismiss()
@@ -456,6 +459,39 @@ class LudoActivity : AppCompatActivity() {
         }
         StyledDialogs.showFullScreenView(this, menuView) {
             if (!matchStarted) finish() else showBoardAfterDialog()
+        }
+    }
+
+    private fun showBoardSelection(onSelected: () -> Unit) {
+        hideBoardWhileDialogIsOpen()
+        val picker = BoardSelectionView(
+            this,
+            "LUDO",
+            listOf(
+                BoardSelectionOption(
+                    title = "Classic Board",
+                    detail = "The original Ludo layout",
+                    assetName = LudoBoardView.Board.ONE.assetName,
+                ),
+                BoardSelectionOption(
+                    title = "Snow Board",
+                    detail = "A winter board with matching tokens",
+                    assetName = LudoBoardView.Board.TWO.assetName,
+                ),
+            ),
+        )
+        picker.onSelectionConfirmed = { index ->
+            selectedBoard = LudoBoardView.Board.values()[index]
+            boardView.setBoard(selectedBoard)
+            StyledDialogs.dismiss()
+            onSelected()
+        }
+        picker.onBackClicked = {
+            StyledDialogs.dismiss()
+            showModeDialog()
+        }
+        StyledDialogs.showFullScreenView(this, picker) {
+            if (!matchStarted) showModeDialog() else showBoardAfterDialog()
         }
     }
 
@@ -493,6 +529,7 @@ class LudoActivity : AppCompatActivity() {
     }
 
     private fun startGame() {
+        boardView.setBoard(selectedBoard)
         showBoardAfterDialog()
         moves.clear()
         resultDialogVisible = false

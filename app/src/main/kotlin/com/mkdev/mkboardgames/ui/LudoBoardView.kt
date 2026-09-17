@@ -35,6 +35,34 @@ class LudoBoardView(context: Context) : View(context) {
         // board cell. Reserve this much space above the square so edge tokens
         // are not clipped by this View's own canvas bounds.
         const val EDGE_OVERFLOW_DP = 30
+        private const val BOARD_ARTWORK_SIZE = 1254f
+    }
+
+    enum class Board(
+        val assetName: String,
+        val tokenAssetNames: Array<String>,
+        val tokenTipFractions: FloatArray,
+    ) {
+        ONE(
+            assetName = "ludo_board_reference.webp",
+            tokenAssetNames = arrayOf(
+                "ludo_token_red.webp",
+                "ludo_token_blue.webp",
+                "ludo_token_green.webp",
+                "ludo_token_yellow.webp",
+            ),
+            tokenTipFractions = floatArrayOf(0.961f, 0.977f, 0.977f, 0.953f),
+        ),
+        TWO(
+            assetName = "ludo_board_snow.webp",
+            tokenAssetNames = arrayOf(
+                "ludo_token_snow_red.webp",
+                "ludo_token_snow_blue.webp",
+                "ludo_token_snow_green.webp",
+                "ludo_token_snow_yellow.webp",
+            ),
+            tokenTipFractions = floatArrayOf(0.956f, 0.949f, 0.960f, 0.922f),
+        ),
     }
 
     var gameState: GameState = LudoSetup.initialState()
@@ -109,27 +137,9 @@ class LudoBoardView(context: Context) : View(context) {
         }
     }
 
-    private val boardBitmap: Bitmap? = runCatching {
-        context.assets.open("ludo_board_reference.webp").use { BitmapFactory.decodeStream(it) }
-    }.getOrNull()
-    private val tokenBitmaps: Array<Bitmap?> = arrayOf(
-        "ludo_token_red.webp",
-        "ludo_token_blue.webp",
-        "ludo_token_green.webp",
-        "ludo_token_yellow.webp",
-    ).map { assetName ->
-        runCatching {
-            context.assets.open(assetName).use { BitmapFactory.decodeStream(it) }
-        }.getOrNull()
-    }.toTypedArray()
-    // The supplied pin images have a small transparent margin below their
-    // sharp tips. These fractions locate the visible tip in the 128px asset.
-    private val tokenTipFractions = floatArrayOf(
-        0.961f, // red
-        0.977f, // blue
-        0.977f, // green
-        0.953f, // yellow
-    )
+    private var selectedBoard = Board.ONE
+    private var boardBitmap: Bitmap? = loadBitmap(selectedBoard.assetName)
+    private var tokenBitmaps: Array<Bitmap?> = loadTokenBitmaps(selectedBoard)
     private data class RenderedPiece(
         val piece: LudoPiece,
         val point: PointF,
@@ -165,6 +175,15 @@ class LudoBoardView(context: Context) : View(context) {
 
     init {
         setLayerType(View.LAYER_TYPE_SOFTWARE, null)
+    }
+
+    fun setBoard(board: Board) {
+        if (selectedBoard == board) return
+        selectedBoard = board
+        boardBitmap = loadBitmap(board.assetName)
+        tokenBitmaps = loadTokenBitmaps(board)
+        updateGeometry()
+        invalidate()
     }
 
     override fun onAttachedToWindow() {
@@ -496,7 +515,7 @@ class LudoBoardView(context: Context) : View(context) {
             // The sharp bottom tip is the board-position anchor in both the
             // yard and on the track. This places the tip and dotted indicator
             // in the measured home-circle instead of aligning by the head.
-            val anchorFraction = tokenTipFractions[piece.player]
+            val anchorFraction = selectedBoard.tokenTipFractions[piece.player]
             val tokenTop = point.y - tokenHeight!! * anchorFraction
             val tokenRect = RectF(
                 point.x - tokenWidth / 2f,
@@ -787,7 +806,7 @@ class LudoBoardView(context: Context) : View(context) {
             left + (position.col + 1) * cell, top + (position.row + 1) * cell)
 
     /**
-     * Circle centroids measured from ludo_board_reference.webp at its native
+     * Circle centroids measured from the Ludo board artwork at its native
      * 1254x1254 resolution. The model positions remain unchanged for rules;
      * these artwork coordinates are only used for rendering and hit targets.
      *
@@ -827,8 +846,7 @@ class LudoBoardView(context: Context) : View(context) {
 
     private fun yardCenter(player: Int, token: Int): PointF {
         val artworkCenter = yardArtworkCenters[player][token]
-        val boardReferenceSize = boardBitmap?.width?.toFloat() ?: 1254f
-        val boardPixelScale = LudoSetup.BOARD_SIZE * cell / boardReferenceSize
+        val boardPixelScale = LudoSetup.BOARD_SIZE * cell / BOARD_ARTWORK_SIZE
         return PointF(
             left + artworkCenter.x * boardPixelScale,
             top + artworkCenter.y * boardPixelScale,
@@ -854,6 +872,13 @@ class LudoBoardView(context: Context) : View(context) {
     private fun centerOf(position: Position): PointF =
         PointF(left + (position.col + 0.5f) * cell, top + (position.row + 0.5f) * cell)
 
+    private fun loadBitmap(assetName: String): Bitmap? = runCatching {
+        context.assets.open(assetName).use { BitmapFactory.decodeStream(it) }
+    }.getOrNull()
+
+    private fun loadTokenBitmaps(board: Board): Array<Bitmap?> =
+        board.tokenAssetNames.map(::loadBitmap).toTypedArray()
+
     private fun positionAt(x: Float, y: Float): Position? {
         val yardPiece = LudoSetup.allPieces(gameState)
             .firstOrNull { piece ->
@@ -871,4 +896,5 @@ class LudoBoardView(context: Context) : View(context) {
         return if (row in 0 until LudoSetup.BOARD_SIZE && col in 0 until LudoSetup.BOARD_SIZE)
             Position(row, col) else null
     }
+
 }
