@@ -792,6 +792,13 @@ class MorabarabaActivity : AppCompatActivity() {
         gameOverView.bringToFront()
     }
 
+    private fun currentResultLabel(): String = when (gameState.status) {
+        GameStatus.WHITE_WINS -> "White wins"
+        GameStatus.BLACK_WINS -> "Black wins"
+        GameStatus.DRAW -> "Draw"
+        else -> ""
+    }
+
     // ─── Replay ───────────────────────────────────────────────────────────────
 
     private fun launchReplay(resultLabel: String) {
