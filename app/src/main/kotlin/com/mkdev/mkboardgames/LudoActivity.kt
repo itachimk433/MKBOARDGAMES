@@ -500,7 +500,7 @@ class LudoActivity : AppCompatActivity() {
         StyledDialogs.showChoices(this, "Play As", "Choose your colour before the first roll.",
             LudoSetup.PLAYER_NAMES.mapIndexed { index, name ->
                 StyledDialogs.choice(name, if (index == 0) "Moves first" else "Joins the match", "", listOf("#E3B86A", "#E58A7A", "#8EC7B9", "#A9B6E8")[index])
-            }, 520f, "L U D O", headerSymbol = "●", onCancel = { showModeDialog() }) { which, dialog ->
+            }, 520f, "L U D O", headerSymbol = "●", onCancel = { showModeDialog() }, gridChoices = true) { which, dialog ->
                 humanPlayer = which
                 dialog.dismiss()
                 startGame()

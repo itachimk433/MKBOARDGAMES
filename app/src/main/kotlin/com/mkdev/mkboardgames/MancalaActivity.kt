@@ -82,12 +82,20 @@ class MancalaActivity : AppCompatActivity() {
         val settlementTransfers: List<SettlementTransfer>,
         val speedMultiplier: Float,
     ) {
-        // Each stone leaves its original position without a pickup-stack phase.
+        // Stones first gather in a short staging line outside the board. They
+        // then fly directly from that line to their landing pits.
         val pickupDuration = 0f
         private val normalizedSpeed = speedMultiplier.coerceIn(1f, 4f)
-        val placementDuration = 320f / normalizedSpeed
+        val stagingTravelDuration = 120f / normalizedSpeed
+        val stagingGap = 34f / normalizedSpeed
+        val stagingDuration = if (movedStones.isEmpty()) {
+            0f
+        } else {
+            stagingTravelDuration + (movedStones.size - 1) * stagingGap
+        }
+        val placementDuration = 260f / normalizedSpeed
         val settleDuration = 600f / normalizedSpeed
-        val sowingDuration = sowingRoutes.fold(0f) { total, route ->
+        val sowingDuration = stagingDuration + sowingRoutes.fold(0f) { total, route ->
             total + routeDuration(route)
         }
         val settlementDuration = settlementTransfers.fold(0f) { total, transfer ->
@@ -982,18 +990,12 @@ class MancalaActivity : AppCompatActivity() {
                 onMoveAnimationFinished = null
                 return
             }
-            val sowingRoutes = path.mapIndexed { pathIndex, destination ->
-                engine.pathBetween(
-                    from = move.from.col,
-                    destination = destination,
-                    mover = previousState.currentTurn,
-                    minimumSteps = pathIndex + 1,
-                ).ifEmpty {
-                    // This should not occur for a legal sowing path, but keep
-                    // the animation bounded if a future rules variant adds a
-                    // destination that is not on the standard ring.
-                    listOf(move.from.col, destination)
-                }
+            // The rules still calculate the normal Mancala sowing order, but
+            // the visual treatment is intentionally not a board-ring tour:
+            // after staging, each stone takes one straight flight to its
+            // respective landing pit.
+            val sowingRoutes = path.map { destination ->
+                listOf(move.from.col, destination)
             }
 
             val beforeStyles = copyStoneStyles()
@@ -1325,8 +1327,14 @@ class MancalaActivity : AppCompatActivity() {
                     val visibleStyles = animation.beforeStyles[index].toMutableList()
                     if (index == animation.from) {
                         visibleStyles.clear()
+                        val elapsed = animationElapsed(animation)
+                        val removedFromSource = if (elapsed < animation.stagingDuration) {
+                            stagingRemovedCount(animation)
+                        } else {
+                            animation.movedStones.size
+                        }
                         visibleStyles += animation.beforeStyles[index]
-                            .drop((placed + 1).coerceAtMost(animation.beforeStyles[index].size))
+                            .drop(removedFromSource.coerceAtMost(animation.beforeStyles[index].size))
                     }
                     animation.path.take(placed).forEachIndexed { pathIndex, destination ->
                         if (destination == index) {
@@ -1409,11 +1417,63 @@ class MancalaActivity : AppCompatActivity() {
         }
 
         private fun placedCount(animation: MoveAnimation): Int {
+            val placementElapsed = animationElapsed(animation) -
+                animation.pickupDuration - animation.stagingDuration
+            if (placementElapsed < 0f) return 0
             return completedRouteCount(
                 animation.sowingRoutes,
-                animationElapsed(animation) - animation.pickupDuration,
+                placementElapsed,
                 animation.placementDuration,
             )
+        }
+
+        private fun stagingElapsed(animation: MoveAnimation): Float =
+            (animationElapsed(animation) - animation.pickupDuration).coerceAtLeast(0f)
+
+        private fun stagingRemovedCount(animation: MoveAnimation): Int {
+            val elapsed = stagingElapsed(animation)
+            return animation.movedStones.indices.count { index ->
+                elapsed >= index * animation.stagingGap
+            }
+        }
+
+        private fun stagingProgress(animation: MoveAnimation, index: Int): Float =
+            ((stagingElapsed(animation) - index * animation.stagingGap) /
+                animation.stagingTravelDuration).coerceIn(0f, 1f)
+
+        private fun stagingSlotFor(animation: MoveAnimation, index: Int): PointF {
+            val radius = boardRect.width() * 0.022f * 2.25f
+            val source = centerFor(animation.from)
+            val slotOffset = (index - (animation.movedStones.size - 1) / 2f) * radius * 1.55f
+            val leftSpace = boardRect.left
+            val rightSpace = width - boardRect.right
+            val sideClearance = radius * 2.25f
+
+            val side = when {
+                source.x <= boardRect.centerX() && leftSpace >= sideClearance -> -1
+                source.x > boardRect.centerX() && rightSpace >= sideClearance -> 1
+                leftSpace >= rightSpace && leftSpace >= sideClearance -> -1
+                rightSpace >= sideClearance -> 1
+                else -> 0
+            }
+            if (side != 0) {
+                val x = if (side < 0) {
+                    boardRect.left - radius * 1.55f
+                } else {
+                    boardRect.right + radius * 1.55f
+                }
+                return PointF(x, source.y + slotOffset)
+            }
+
+            val topSpace = boardRect.top
+            val bottomSpace = height - boardRect.bottom
+            val verticalSide = if (topSpace >= bottomSpace) -1 else 1
+            val y = if (verticalSide < 0) {
+                boardRect.top - radius * 1.55f
+            } else {
+                boardRect.bottom + radius * 1.55f
+            }
+            return PointF(source.x + slotOffset, y)
         }
 
         private fun settlementPlacedCount(animation: MoveAnimation): Int {
@@ -1513,21 +1573,18 @@ class MancalaActivity : AppCompatActivity() {
             }
 
             val sowingElapsed = elapsed - animation.pickupDuration
-            if (sowingElapsed < animation.sowingDuration) {
-                val completed = placedCount(animation)
-                val active = if (activeRouteProgress(
-                        animation.sowingRoutes,
-                        sowingElapsed,
-                        animation.placementDuration,
-                    ) != null
-                ) {
-                    1
-                } else {
-                    0
-                }
-                val movedOut = (completed + active).coerceAtMost(animation.path.size)
+            if (sowingElapsed < animation.stagingDuration) {
                 counts[animation.from] =
-                    (animation.before[animation.from] - movedOut).coerceAtLeast(0)
+                    (animation.before[animation.from] - stagingRemovedCount(animation))
+                        .coerceAtLeast(0)
+                return counts
+            }
+
+            val placementElapsed = sowingElapsed - animation.stagingDuration
+            if (placementElapsed < animation.sowingDuration - animation.stagingDuration) {
+                val completed = placedCount(animation)
+                counts[animation.from] =
+                    (animation.before[animation.from] - animation.path.size).coerceAtLeast(0)
                 repeat(completed) { counts[animation.path[it]]++ }
                 return counts
             }
@@ -1568,29 +1625,63 @@ class MancalaActivity : AppCompatActivity() {
         private fun drawMoveAnimation(canvas: Canvas) {
             val animation = moveAnimation ?: return
             val elapsed = animationElapsed(animation)
-            val from = centerFor(animation.from)
             val chipRadius = boardRect.width() * 0.022f * 2.25f
+
+            if (elapsed - animation.pickupDuration < animation.stagingDuration) {
+                val source = centerFor(animation.from)
+                animation.movedStones.forEachIndexed { index, stone ->
+                    if (stagingElapsed(animation) < index * animation.stagingGap) {
+                        return@forEachIndexed
+                    }
+                    val sourceHole = holeMeasurementFor(animation.from)
+                    val sourceOffset = stableCircularOffset(
+                        stone,
+                        animation.from,
+                        (radiusFor(sourceHole) - chipRadius * 1.28f).coerceAtLeast(0f),
+                    )
+                    val start = PointF(source.x + sourceOffset.x, source.y + sourceOffset.y)
+                    val slot = stagingSlotFor(animation, index)
+                    val progress = stagingProgress(animation, index)
+                    val x = start.x + (slot.x - start.x) * progress
+                    val y = start.y + (slot.y - start.y) * progress
+                    drawStone(
+                        canvas,
+                        x,
+                        y,
+                        stoneRadius(chipRadius, stone.color, stone.variation),
+                        stone.color,
+                        stoneVariation = stone.variation,
+                    )
+                }
+                return
+            }
+
             val placed = placedCount(animation)
             if (placed < animation.path.size) {
                 val index = placed
-                val route = animation.sowingRoutes[index]
-                val sourceHole = holeMeasurementFor(animation.from)
-                val sourceOffset = stableCircularOffset(
-                    animation.movedStones[index],
-                    animation.from,
-                    (radiusFor(sourceHole) - chipRadius * 1.28f).coerceAtLeast(0f),
-                )
-                val start = PointF(from.x + sourceOffset.x, from.y + sourceOffset.y)
+                for (waitingIndex in (index + 1) until animation.movedStones.size) {
+                    val waiting = animation.movedStones[waitingIndex]
+                    val slot = stagingSlotFor(animation, waitingIndex)
+                    drawStone(
+                        canvas,
+                        slot.x,
+                        slot.y,
+                        stoneRadius(chipRadius, waiting.color, waiting.variation),
+                        waiting.color,
+                        stoneVariation = waiting.variation,
+                    )
+                }
                 val routeProgress = activeRouteProgress(
                     animation.sowingRoutes,
-                    elapsed - animation.pickupDuration,
+                    elapsed - animation.pickupDuration - animation.stagingDuration,
                     animation.placementDuration,
                 )
                 val local = routeProgress?.second ?: 0f
-                val routePoint = pointAlongRoute(route, local)
                 val stone = animation.movedStones[index]
-                val x = routePoint.x + sourceOffset.x * (1f - local)
-                val y = routePoint.y + sourceOffset.y * (1f - local)
+                val start = stagingSlotFor(animation, index)
+                val destination = centerFor(animation.path[index])
+                val x = start.x + (destination.x - start.x) * local
+                val y = start.y + (destination.y - start.y) * local
                 drawStone(
                     canvas,
                     x,
@@ -1602,7 +1693,7 @@ class MancalaActivity : AppCompatActivity() {
                 drawLandingRipple(
                     canvas,
                     start,
-                    radiusFor(holeMeasurementFor(animation.from)),
+                    chipRadius * 1.8f,
                     1f - local,
                 )
             } else if (animation.settlementTransfers.isNotEmpty() &&
@@ -1661,7 +1752,7 @@ class MancalaActivity : AppCompatActivity() {
             } else if (placed > 0) {
                 val landingIndex = animation.path[placed - 1]
                 val landing = centerFor(landingIndex)
-                val settle = ((elapsed - animation.pickupDuration -
+                val settle = ((elapsed - animation.pickupDuration - animation.stagingDuration -
                     animation.path.size * animation.placementDuration) /
                     animation.settleDuration).coerceIn(0f, 1f)
                 drawLandingRipple(

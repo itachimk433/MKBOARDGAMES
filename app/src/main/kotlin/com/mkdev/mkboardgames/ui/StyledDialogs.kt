@@ -34,6 +34,7 @@ object StyledDialogs {
         headerSymbol: String = "●",
         onCancel: (() -> Unit)? = null,
         fullScreen: Boolean = isFullScreenStyledGameLabel(gameLabel),
+        gridChoices: Boolean = false,
         onChoice: (Int, Dialog) -> Unit,
     ): Dialog {
         val view = ChessChoiceView(
@@ -44,6 +45,7 @@ object StyledDialogs {
             gameLabel,
             headerSymbol,
             fullScreenOverride = fullScreen,
+            gridChoices = gridChoices,
         )
         val dialog = Dialog(context)
         view.onChoiceSelected = { index ->

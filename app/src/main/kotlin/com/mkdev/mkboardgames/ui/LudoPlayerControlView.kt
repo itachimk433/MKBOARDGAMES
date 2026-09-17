@@ -229,9 +229,9 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
                 )
             }
             borderPaint.strokeWidth = if (isActive) {
-                dp(2f * GLOW_THICKNESS_SCALE)
+                dp(2f * GLOW_THICKNESS_SCALE * BORDER_THICKNESS_SCALE)
             } else {
-                dp(1).toFloat()
+                dp(1f * BORDER_THICKNESS_SCALE)
             }
             canvas.drawRoundRect(frameRect, radius, radius, borderPaint)
         }
@@ -317,6 +317,7 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
 
     companion object {
         private const val GLOW_THICKNESS_SCALE = 1.2f
+        private const val BORDER_THICKNESS_SCALE = 0.81f
         private const val LABEL_HEIGHT = 29
         private const val FRAME_HEIGHT = 74
         private const val AVATAR_SIZE = 70
