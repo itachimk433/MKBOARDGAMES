@@ -23,6 +23,7 @@ import com.mkdev.mkboardgames.ui.OnitamaBoardView
 import com.mkdev.mkboardgames.ui.OnitamaCardsView
 import com.mkdev.mkboardgames.ui.OnitamaCardStripView
 import com.mkdev.mkboardgames.ui.OnitamaAtmosphereView
+import com.mkdev.mkboardgames.ui.SnakesLaddersGameOverView
 import com.mkdev.mkboardgames.ui.StandardGameHudView
 import com.mkdev.mkboardgames.ui.StyledDialogs
 import kotlinx.coroutines.*
@@ -54,6 +55,7 @@ class OnitamaActivity : AppCompatActivity() {
     private lateinit var topCards: OnitamaCardStripView
     private lateinit var bottomCards: OnitamaCardStripView
     private lateinit var autoplayButton: AutoplayButtonView
+    private lateinit var gameOverView: SnakesLaddersGameOverView
     private var activeOverlay: View? = null
     private var whiteCardIndex = 0
     private var blackCardIndex = 0
@@ -122,6 +124,23 @@ class OnitamaActivity : AppCompatActivity() {
         gameRoot = gameFrame
         screenRoot = FrameLayout(this)
         screenRoot.addView(gameRoot, FrameLayout.LayoutParams(-1, -1))
+        gameOverView = SnakesLaddersGameOverView(this).apply {
+            winnerBaselineDp = 112f
+            bottomCaptureTopPxProvider = { bottomCards.top.toFloat() }
+            onReplay = {
+                visibility = View.GONE
+                startGame()
+            }
+            onWatchReplay = {
+                visibility = View.GONE
+                launchReplay(currentResultLabel())
+            }
+            onHome = {
+                visibility = View.GONE
+                showHome()
+            }
+        }
+        screenRoot.addView(gameOverView, FrameLayout.LayoutParams(-1, -1))
         setContentView(screenRoot)
         autoplayButton.visibility = View.GONE
 
@@ -179,6 +198,7 @@ class OnitamaActivity : AppCompatActivity() {
     }
 
     private fun startGame(restoring: PausedMatchStore.Match? = null) {
+        gameOverView.visibility = View.GONE
         matchStarted = true
         MusicPlayer.enterOnitamaMatch(this)
         resultRecorded = false
@@ -474,6 +494,7 @@ class OnitamaActivity : AppCompatActivity() {
 
     private fun showBoardAfterDialog(resumeAi: Boolean = true) {
         dismissOverlay()
+        if (::gameOverView.isInitialized) gameOverView.visibility = View.GONE
         gameRoot.visibility = View.VISIBLE
         if (matchStarted && gameState.status == GameStatus.IN_PROGRESS) {
             MusicPlayer.resumeMatch(this)
@@ -516,39 +537,23 @@ class OnitamaActivity : AppCompatActivity() {
 
     private fun showResultDialog() {
         if (gameState.status == GameStatus.IN_PROGRESS) return
-        val message = when (gameState.status) {
-            GameStatus.WHITE_WINS -> if (vsAI && playerColor == PieceColor.WHITE) "You win!" else "White wins!"
-            GameStatus.BLACK_WINS -> if (vsAI && playerColor == PieceColor.BLACK) "You win!" else "Black wins!"
-            GameStatus.DRAW -> "It's a draw!"
-            GameStatus.IN_PROGRESS -> return
-        }
-        val resultLabel = when (gameState.status) {
-            GameStatus.WHITE_WINS -> "White wins"
-            GameStatus.BLACK_WINS -> "Black wins"
+        gameOverView.winnerLabel = when (gameState.status) {
+            GameStatus.WHITE_WINS ->
+                "Winner: ${if (vsAI && playerColor == PieceColor.WHITE) "You" else "White"}"
+            GameStatus.BLACK_WINS ->
+                "Winner: ${if (vsAI && playerColor == PieceColor.BLACK) "You" else "Black"}"
             GameStatus.DRAW -> "Draw"
             GameStatus.IN_PROGRESS -> return
         }
-        StyledDialogs.showChoices(
-            this,
-            "Game Over",
-            message,
-            listOf(
-                StyledDialogs.choice("Play Again", "Start a fresh game", "↻", "#E3B86A"),
-                StyledDialogs.choice("Main Menu", "Choose another match", "⌂", "#E58A7A"),
-                StyledDialogs.choice("Watch Replay", "Review the moves", "▶", "#A9B6E8"),
-            ),
-            520f,
-            "O N I T A M A",
-            onCancel = { showBoardAfterDialog() },
-            fullScreen = false,
-        ) { which, dialog ->
-            dialog.dismiss()
-            when (which) {
-                0 -> startGame()
-                1 -> showHome()
-                else -> launchReplay(resultLabel)
-            }
-        }
+        gameOverView.visibility = View.VISIBLE
+        gameOverView.bringToFront()
+    }
+
+    private fun currentResultLabel(): String = when (gameState.status) {
+        GameStatus.WHITE_WINS -> "White wins"
+        GameStatus.BLACK_WINS -> "Black wins"
+        GameStatus.DRAW -> "Draw"
+        GameStatus.IN_PROGRESS -> ""
     }
 
     private fun launchReplay(resultLabel: String) {
@@ -590,6 +595,7 @@ class OnitamaActivity : AppCompatActivity() {
 
     private fun showHome() {
         stopAutomatedGameplay()
+        if (::gameOverView.isInitialized) gameOverView.visibility = View.GONE
         gameRoot.visibility = View.GONE
         PausedMatchStore.clear(this, "ONITAMA")
         finish()
@@ -629,6 +635,9 @@ class OnitamaActivity : AppCompatActivity() {
     @Suppress("DEPRECATION")
     override fun onBackPressed() {
         if (StyledDialogs.handleBackPressed()) return
+        if (matchStarted && gameState.status != GameStatus.IN_PROGRESS) {
+            return
+        }
         if (activeOverlay != null) {
             val callback = activeOverlay?.tag as? (() -> Unit)
             dismissOverlay(revealGame = false)
