@@ -93,7 +93,9 @@ class MancalaActivity : AppCompatActivity() {
         } else {
             stagingTravelDuration + (movedStones.size - 1) * stagingGap
         }
-        val placementDuration = 260f / normalizedSpeed
+        // Slow the staging-to-pit flight by 40% while preserving the selected
+        // movement-speed setting's relative differences.
+        val placementDuration = 260f / (normalizedSpeed * 0.6f)
         val settleDuration = 600f / normalizedSpeed
         val sowingDuration = stagingDuration + sowingRoutes.fold(0f) { total, route ->
             total + routeDuration(route)

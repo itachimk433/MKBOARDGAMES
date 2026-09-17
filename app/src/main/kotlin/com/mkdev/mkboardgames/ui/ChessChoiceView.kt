@@ -46,6 +46,7 @@ class ChessChoiceView(
     fullScreenOverride: Boolean? = null,
     private val gridChoices: Boolean = false,
     private val compactGrid: Boolean = false,
+    private val showChoiceInfo: Boolean = true,
     private val dismissOnEmptyTap: Boolean = false,
 ) : View(context) {
 
@@ -292,12 +293,16 @@ class ChessChoiceView(
                 val left = sidePadding + column * (cardWidth + columnGap)
                 val cardTop = top + row * (cardHeight + gap)
                 hit.rect = RectF(left, cardTop, left + cardWidth, cardTop + cardHeight)
-                hit.infoRect = RectF(
-                    hit.rect.right - 30f * unit,
-                    hit.rect.top + 6f * unit,
-                    hit.rect.right - 6f * unit,
-                    hit.rect.top + 30f * unit,
-                )
+                hit.infoRect = if (showChoiceInfo) {
+                    RectF(
+                        hit.rect.right - 30f * unit,
+                        hit.rect.top + 6f * unit,
+                        hit.rect.right - 6f * unit,
+                        hit.rect.top + 30f * unit,
+                    )
+                } else {
+                    RectF()
+                }
             }
         } else {
             hits.forEachIndexed { index, hit ->
@@ -641,18 +646,28 @@ class ChessChoiceView(
             labelPaint,
         )
 
-        canvas.drawCircle(
-            hit.infoRect.centerX(),
-            hit.infoRect.centerY(),
-            (if (compactGrid) 7f else 9f) * unit,
-            infoCirclePaint,
-        )
+        detailPaint.color = Color.parseColor("#6A2D1B")
+        detailPaint.textSize = if (compactGrid) 9f * textScale else 11f * textScale
         canvas.drawText(
-            "i",
-            hit.infoRect.centerX(),
-            hit.infoRect.centerY() - (infoTextPaint.ascent() + infoTextPaint.descent()) / 2f,
-            infoTextPaint,
+            hit.choice.detail,
+            rect.centerX(),
+            top + (if (compactGrid) 48f else 79f) * unit,
+            detailPaint,
         )
+        if (showChoiceInfo) {
+            canvas.drawCircle(
+                hit.infoRect.centerX(),
+                hit.infoRect.centerY(),
+                (if (compactGrid) 7f else 9f) * unit,
+                infoCirclePaint,
+            )
+            canvas.drawText(
+                "i",
+                hit.infoRect.centerX(),
+                hit.infoRect.centerY() - (infoTextPaint.ascent() + infoTextPaint.descent()) / 2f,
+                infoTextPaint,
+            )
+        }
     }
 
     private fun drawChoiceInfo(canvas: Canvas, hit: ChoiceHit) {
@@ -780,7 +795,9 @@ class ChessChoiceView(
                     return true
                 }
                 val hit = hits.firstOrNull { it.rect.contains(event.x, event.y) }
-                pressedInfoIndex = if (gridChoices && hit?.infoRect?.contains(event.x, event.y) == true) {
+                pressedInfoIndex = if (gridChoices && showChoiceInfo &&
+                    hit?.infoRect?.contains(event.x, event.y) == true
+                ) {
                     hit.index
                 } else {
                     null
