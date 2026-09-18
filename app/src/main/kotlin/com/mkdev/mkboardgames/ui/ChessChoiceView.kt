@@ -217,6 +217,10 @@ class ChessChoiceView(
         isFakeBoldText = true
     }
     private val choiceAssetPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+    private val playAsWhiteButtonBitmap: Bitmap? = loadAssetBitmap("play_as_white.webp")
+    private val playAsBlackButtonBitmap: Bitmap? = loadAssetBitmap("play_as_black.webp")
+    private val hasPlayAsButtonAssets =
+        !isGo && !isXiangqi && choices.any { it.label == "White" || it.label == "Black" }
     private val backButtonPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val backButtonBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
@@ -294,20 +298,26 @@ class ChessChoiceView(
 
     override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
         val rows = if (gridChoices) (hits.size + 1) / 2 else hits.size
-        val contentHeight = if (compactGrid) {
-            (84f + rows * 50f) * unit
+        val sidePadding = (if (compactGrid) 12f else 22f) * unit
+        val cardHeight = if (compactGrid) {
+            44f * unit
+        } else if (hasPlayAsButtonAssets) {
+            (width - sidePadding * 2f) * 149f / 448f
         } else {
-            (178f + rows * 104f) * unit
+            88f * unit
+        }
+        val gap = (if (compactGrid) 6f else 12f) * unit
+        val contentHeight = if (compactGrid) {
+            (84f * unit) + rows * (cardHeight + gap)
+        } else {
+            (178f * unit) + rows * (cardHeight + 16f * unit)
         }
         contentOffset = if (fullScreen && !compactGrid) {
             ((height - contentHeight) / 2f).coerceAtLeast(0f)
         } else {
             0f
         }
-        val sidePadding = (if (compactGrid) 12f else 22f) * unit
         val top = contentOffset + (if (compactGrid) 70f else 153f) * unit
-        val cardHeight = (if (compactGrid) 44f else 88f) * unit
-        val gap = (if (compactGrid) 6f else 12f) * unit
         if (gridChoices) {
             val columnGap = (if (compactGrid) 6f else 10f) * unit
             val cardWidth = (width - sidePadding * 2f - columnGap) / 2f
@@ -775,6 +785,7 @@ class ChessChoiceView(
     private fun drawDraughtsChoice(canvas: Canvas, hit: ChoiceHit) {
         val rect = hit.rect
         val pressed = pressedIndex == hit.index
+        if (drawPlayAsButtonAsset(canvas, hit)) return
         drawDraughtsButton(canvas, rect, pressed, unit)
         val top = rect.top + if (pressed) 2f * unit else 0f
 
@@ -800,6 +811,7 @@ class ChessChoiceView(
     private fun drawOthelloChoice(canvas: Canvas, hit: ChoiceHit) {
         val rect = hit.rect
         val pressed = pressedIndex == hit.index
+        if (drawPlayAsButtonAsset(canvas, hit)) return
         drawOthelloButton(canvas, rect, pressed, unit)
         val top = rect.top + if (pressed) 2f * unit else 0f
 
@@ -825,6 +837,7 @@ class ChessChoiceView(
     private fun drawChessChoice(canvas: Canvas, hit: ChoiceHit) {
         val rect = hit.rect
         val pressed = pressedIndex == hit.index
+        if (drawPlayAsButtonAsset(canvas, hit)) return
         drawChessWoodButton(canvas, rect, pressed, unit)
         val top = rect.top + if (pressed) 2f * unit else 0f
 
@@ -845,6 +858,28 @@ class ChessChoiceView(
                 hit.choice,
             )
         }
+    }
+
+    private fun drawPlayAsButtonAsset(canvas: Canvas, hit: ChoiceHit): Boolean {
+        if (!hasPlayAsButtonAssets) return false
+        val bitmap = when (hit.choice.label) {
+            "White" -> playAsWhiteButtonBitmap
+            "Black" -> playAsBlackButtonBitmap
+            else -> null
+        } ?: return false
+        val offset = if (pressedIndex == hit.index) 2f * unit else 0f
+        canvas.drawBitmap(
+            bitmap,
+            null,
+            RectF(
+                hit.rect.left,
+                hit.rect.top + offset,
+                hit.rect.right,
+                hit.rect.bottom + offset,
+            ),
+            choiceAssetPaint,
+        )
+        return true
     }
 
     private fun drawCenteredChoiceText(canvas: Canvas, rect: RectF, choice: Choice) {
