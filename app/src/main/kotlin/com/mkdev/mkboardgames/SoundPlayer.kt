@@ -28,7 +28,7 @@ object SoundPlayer {
             .setUsage(AudioAttributes.USAGE_GAME)
             .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
             .build()
-        pool = SoundPool.Builder().setMaxStreams(4).setAudioAttributes(attrs).build()
+        pool = SoundPool.Builder().setMaxStreams(12).setAudioAttributes(attrs).build()
         val p = pool ?: return
         p.setOnLoadCompleteListener { _, sampleId, status ->
             if (status != 0) {
