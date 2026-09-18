@@ -295,8 +295,6 @@ class ChessMenuView(
         val actionWidth = (width - sidePadding * 2f - gap) / 2f
         val actionTop = contentOffset +
             (if (isChessFamily || isMorabaraba) 244f else 164f) * unit
-        val actionHeight = 82f * unit
-
         actions = buildList {
             add(
                 MenuAction(
@@ -346,15 +344,24 @@ class ChessMenuView(
             )
         }
 
-        actions.forEachIndexed { index, action ->
-            if (index < 2) {
-                val left = sidePadding + index * (actionWidth + gap)
-                action.rect = RectF(left, actionTop, left + actionWidth, actionTop + actionHeight)
-            } else {
-                val row = index - 1
-                val top = actionTop + row * (actionHeight + gap)
-                action.rect = RectF(sidePadding, top, width - sidePadding, top + actionHeight)
-            }
+        val firstRowHeight = actions
+            .take(2)
+            .maxOfOrNull { actionHeightFor(it.label, actionWidth) }
+            ?: 82f * unit
+        actions.take(2).forEachIndexed { index, action ->
+            val left = sidePadding + index * (actionWidth + gap)
+            val actionHeight = actionHeightFor(action.label, actionWidth)
+            val top = actionTop + (firstRowHeight - actionHeight) / 2f
+            action.rect = RectF(left, top, left + actionWidth, top + actionHeight)
+        }
+        var nextRowTop = actionTop + firstRowHeight + gap
+        actions.drop(2).forEach { action ->
+            val rowWidth = width - sidePadding * 2f
+            val actionHeight = actionHeightFor(action.label, rowWidth)
+            action.rect = RectF(sidePadding, nextRowTop, width - sidePadding, nextRowTop + actionHeight)
+            nextRowTop = action.rect.bottom + gap
+        }
+        actions.forEach {
             actionScale[action.label] = 1f
         }
         resumeRect.set(
@@ -951,6 +958,18 @@ class ChessMenuView(
         canvas.drawText(action.label, rect.centerX(), drawnTop + 55f * unit, actionLabelPaint)
         actionDetailPaint.color = Color.parseColor("#6A2D1B")
         canvas.drawText(action.detail, rect.centerX(), drawnTop + 72f * unit, actionDetailPaint)
+    }
+
+    private fun actionHeightFor(label: String, actionWidth: Float): Float {
+        val image = when (label) {
+            "vs CPU" -> vsCpuButtonBitmap
+            "2 Players" -> twoPlayersButtonBitmap
+            "How To Play" -> howToPlayButtonBitmap
+            else -> null
+        }
+        return image?.let {
+            actionWidth * it.height.toFloat() / it.width.toFloat()
+        } ?: 82f * unit
     }
 
     private fun loadAssetBitmap(ctx: Context, assetName: String): Bitmap? =

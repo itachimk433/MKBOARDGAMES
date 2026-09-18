@@ -156,12 +156,15 @@ class ModeSelectionView(context: Context) : View(context) {
         val buttonWidth = originalButtonWidth / 1.5f * 1.1f
         val left = (width - buttonWidth) / 2f
         val buttonHeight = 136f / 3f * 1.1f * unit
+        val normalButtonHeight = playButtonBitmap?.let {
+            buttonWidth * it.height.toFloat() / it.width.toFloat()
+        } ?: buttonHeight
         val gap = 10f * unit
-        val totalHeight = buttonHeight * 3f + gap * 2f
+        val totalHeight = normalButtonHeight + buttonHeight * 2f + gap * 2f
         val firstTop = (height * 0.16f).coerceAtMost(
             (height - totalHeight - 12f * unit).coerceAtLeast(12f * unit),
         )
-        normalRect.set(left, firstTop, left + buttonWidth, firstTop + buttonHeight)
+        normalRect.set(left, firstTop, left + buttonWidth, firstTop + normalButtonHeight)
         irregularRect.set(
             left,
             normalRect.bottom + gap,
