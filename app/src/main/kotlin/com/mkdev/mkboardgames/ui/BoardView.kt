@@ -438,6 +438,16 @@ class BoardView(context: Context) : View(context) {
     } catch (_: Throwable) {
         null
     }
+    private val amazonsBlackAmazonBitmap = loadAssetBitmap("amazons_black_amazon.webp")
+    private val amazonsWhiteAmazonBitmap = loadAssetBitmap("amazons_white_amazon.webp")
+    private val amazonsBlackArrowBitmap = loadAssetBitmap("amazons_black_arrow.webp")
+    private val amazonsWhiteArrowBitmap = loadAssetBitmap("amazons_white_arrow.webp")
+
+    private fun loadAssetBitmap(name: String): Bitmap? = try {
+        context.assets.open(name).use { BitmapFactory.decodeStream(it) }
+    } catch (_: Throwable) {
+        null
+    }
 
     private fun createRealisticChessBoardBitmap(): Bitmap {
         val size = 1024
@@ -516,6 +526,9 @@ class BoardView(context: Context) : View(context) {
         textAlign = Paint.Align.CENTER; isFakeBoldText = true
     }
     private val foxAndGeesePiecePaint = Paint(
+        Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG,
+    )
+    private val amazonsPiecePaint = Paint(
         Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG,
     )
     private val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -1872,6 +1885,17 @@ class BoardView(context: Context) : View(context) {
         cx: Float,
         cy: Float,
     ) {
+        amazonsPieceBitmap(piece)?.let { bitmap ->
+            val size = cellSize * 0.86f
+            canvas.drawBitmap(
+                bitmap,
+                null,
+                RectF(cx - size / 2f, cy - size / 2f, cx + size / 2f, cy + size / 2f),
+                amazonsPiecePaint,
+            )
+            return
+        }
+
         if (piece.type == AmazonsPieceType.ARROW) {
             val arrowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.parseColor("#4A3326")
@@ -3189,6 +3213,29 @@ class BoardView(context: Context) : View(context) {
 
     private fun isAmazons10Board(): Boolean =
         isAmazonsBoard() && gameState.boardSize == 10
+
+    private fun isAmazonsImageBoard(): Boolean =
+        if (isAmazons8Board()) chessBitmap() != null
+        else if (isAmazons10Board()) draughtsBitmap() != null
+        else false
+
+    private fun amazonsPieceBitmap(piece: AmazonsPiece): Bitmap? {
+        if (!isAmazonsImageBoard()) return null
+        return when (piece.type) {
+            AmazonsPieceType.AMAZON ->
+                if (piece.color == PieceColor.WHITE) {
+                    amazonsWhiteAmazonBitmap
+                } else {
+                    amazonsBlackAmazonBitmap
+                }
+            AmazonsPieceType.ARROW ->
+                if (piece.color == PieceColor.WHITE) {
+                    amazonsWhiteArrowBitmap
+                } else {
+                    amazonsBlackArrowBitmap
+                }
+        }
+    }
 
     private fun isDraughtsBoard(): Boolean =
         ruleEngine is CheckersRuleEngine ||
