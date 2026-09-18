@@ -44,6 +44,21 @@ class AmazonsRuleEngineTest {
     }
 
     @Test
+    fun `an arrow may be fired back onto the amazon source square`() {
+        val engine = AmazonsRuleEngine(8)
+        val state = engine.initialState()
+        val from = Position(7, 2)
+        val move = assertNotNull(engine.legalMovesFrom(state, from).firstOrNull {
+            it.to == Position(6, 2) &&
+                it.metadata[AmazonsRuleEngine.ARROW_METADATA] == from
+        })
+
+        val next = engine.applyMove(state, move)
+        assertEquals(AmazonsPieceType.ARROW, (next.get(from) as AmazonsPiece).type)
+        assertEquals(PieceColor.WHITE, (next.get(move.to) as AmazonsPiece).color)
+    }
+
+    @Test
     fun `an arrow blocks later rays and cannot pass through a piece`() {
         val engine = AmazonsRuleEngine(8)
         val state = engine.initialState()

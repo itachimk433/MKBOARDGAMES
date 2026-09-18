@@ -30,6 +30,7 @@ class ChessRulesView(
 
     private val density = resources.displayMetrics.density
     private val isChess = isChessStyledLabel(gameLabel)
+    private val isAmazons = isAmazonsStyledLabel(gameLabel)
     private val isDraughts = isDraughtsStyledLabel(gameLabel)
     private val isOthello = isOthelloStyledLabel(gameLabel)
     private val isMorabaraba = isMorabarabaStyledLabel(gameLabel)
@@ -43,7 +44,7 @@ class ChessRulesView(
     private val isLudo = gameLabel.replace(" ", "").equals("LUDO", ignoreCase = true)
     private val isOnitama = gameLabel.replace(" ", "").equals("ONITAMA", ignoreCase = true)
     private val isChessFamily =
-        isChess || isDraughts || isOthello || isFoxAndGeese || isGo || isShogi ||
+        isChess || isAmazons || isDraughts || isOthello || isFoxAndGeese || isGo || isShogi ||
             isXiangqi || isTicTacToe || isConnectFour || isLudo || isOnitama
 
     init {
@@ -183,6 +184,7 @@ private class ChessMancalaRulesView(
 
     private val density = resources.displayMetrics.density
     private val isChess = isChessStyledLabel(gameLabel)
+    private val isAmazons = isAmazonsStyledLabel(gameLabel)
     private val isDraughts = isDraughtsStyledLabel(gameLabel)
     private val isOthello = isOthelloStyledLabel(gameLabel)
     private val isMorabaraba = isMorabarabaStyledLabel(gameLabel)
@@ -198,7 +200,7 @@ private class ChessMancalaRulesView(
         gameLabel.replace(" ", "").replace("&", "").equals("SNAKESLADDERS", ignoreCase = true)
     private val isOnitama = gameLabel.replace(" ", "").equals("ONITAMA", ignoreCase = true)
     private val isChessFamily =
-        isChess || isDraughts || isOthello || isFoxAndGeese || isGo || isShogi ||
+        isChess || isAmazons || isDraughts || isOthello || isFoxAndGeese || isGo || isShogi ||
             isXiangqi || isTicTacToe || isConnectFour || isLudo || isSnakesLadders || isOnitama
     private val gameIconBitmap = run {
         val assetName = when {

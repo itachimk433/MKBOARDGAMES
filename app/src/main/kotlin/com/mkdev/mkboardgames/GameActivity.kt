@@ -617,23 +617,41 @@ class GameActivity : AppCompatActivity() {
     }
 
     private fun showAmazonsVariantPicker() {
-        val variants = arrayOf(
-            "8×8 — Chess board",
-            "10×10 — International Draughts board",
+        val view = ChessChoiceView(
+            this,
+            title = "Amazons Board",
+            subtitle = "Choose the board size for this match.",
+            choices = listOf(
+                ChessChoiceView.Choice(
+                    "8 × 8",
+                    "Chess board presentation",
+                    "8",
+                    Color.parseColor("#E3B86A"),
+                ),
+                ChessChoiceView.Choice(
+                    "10 × 10",
+                    "International Draughts presentation",
+                    "10",
+                    Color.parseColor("#8EC7B9"),
+                ),
+            ),
+            gameLabel = styledGameLabel(),
         )
-        AlertDialog.Builder(this)
-            .setTitle("Amazons board")
-            .setItems(variants) { _, which ->
-                amazonsBoardSize = if (which == 0) 8 else 10
-                engine = AmazonsRuleEngine(amazonsBoardSize)
-                gameState = engine.initialState()
-                boardView.ruleEngine = engine
-                boardView.gameState = gameState
-                showBoardSelection()
-            }
-            .setNegativeButton("Back") { _, _ -> showChessMenu() }
-            .setOnCancelListener { showChessMenu() }
-            .show()
+        view.onChoiceSelected = { which ->
+            amazonsBoardSize = if (which == 0) 8 else 10
+            dismissStyledOverlay()
+            engine = AmazonsRuleEngine(amazonsBoardSize)
+            gameState = engine.initialState()
+            boardView.ruleEngine = engine
+            boardView.gameState = gameState
+            showBoardSelection()
+        }
+        view.onBackRequested = { showChessMenu() }
+        showStyledOverlay(
+            view = view,
+            fullScreen = true,
+            onCancel = { showChessMenu() },
+        )
     }
 
     private fun showColorPickerDialog() {
@@ -1697,10 +1715,13 @@ Checkmate your opponent's King.
                             ai.bestMove(thinkingState)
                         }
                         "AMAZONS" -> {
+                            val profile = SettingsManager.amazonsAiProfileForLevel(
+                                SettingsManager.getAmazonsDifficulty(this@GameActivity),
+                            )
                             AIPlayer(
                                 engine,
-                                maxDepth = 2,
-                                timeLimitMs = 1800L,
+                                maxDepth = profile.depth,
+                                timeLimitMs = profile.timeLimitMs,
                             ).bestMove(thinkingState)
                         }
                         else -> {
@@ -1982,6 +2003,10 @@ Checkmate your opponent's King.
                 getDiff = { SettingsManager.getShogiDifficulty(this) }
                 setDiff = { v -> SettingsManager.setShogiDifficulty(this, v) }
             }
+            "AMAZONS" -> {
+                getDiff = { SettingsManager.getAmazonsDifficulty(this) }
+                setDiff = { v -> SettingsManager.setAmazonsDifficulty(this, v) }
+            }
             else       -> { getDiff = { SettingsManager.getChessDifficulty(this) };    setDiff = { v -> SettingsManager.setChessDifficulty(this, v) } }
         }
         val current = getDiff()
@@ -2014,7 +2039,9 @@ Checkmate your opponent's King.
                 "IV",
                 Color.parseColor("#D8A7FF"),
             ),
-        )
+        ).let { choices ->
+            if (gameType == "AMAZONS") choices.take(3) else choices
+        }
         val view = ChessChoiceView(
             this,
             title = "CPU Difficulty",

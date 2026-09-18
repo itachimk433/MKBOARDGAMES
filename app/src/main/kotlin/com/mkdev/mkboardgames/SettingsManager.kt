@@ -21,6 +21,7 @@ object SettingsManager {
     private const val KEY_MANCALA_DIFFICULTY = "mancala_ai_difficulty"
     private const val KEY_YOTE_DIFFICULTY = "yote_ai_difficulty"
     private const val KEY_ONITAMA_DIFFICULTY = "onitama_ai_difficulty"
+    private const val KEY_AMAZONS_DIFFICULTY = "amazons_ai_difficulty"
     private const val KEY_MANCALA_MOVEMENT_SPEED = "mancala_movement_speed"
 
     // ── Hints keys ───────────────────────────────────────────────────────────
@@ -232,6 +233,28 @@ object SettingsManager {
         2 -> 4
         else -> 3
     }
+
+    // ── Amazons ───────────────────────────────────────────────────────────────
+    data class AmazonsAiProfile(val depth: Int, val timeLimitMs: Long)
+
+    fun amazonsAiProfileForLevel(level: Int): AmazonsAiProfile =
+        when (level.coerceIn(0, 2)) {
+            0 -> AmazonsAiProfile(depth = 1, timeLimitMs = 900L)
+            1 -> AmazonsAiProfile(depth = 2, timeLimitMs = 1600L)
+            else -> AmazonsAiProfile(depth = 3, timeLimitMs = 2600L)
+        }
+
+    fun getAmazonsDifficulty(ctx: Context) =
+        prefs(ctx).getInt(KEY_AMAZONS_DIFFICULTY, 1).coerceIn(0, 2)
+
+    fun setAmazonsDifficulty(ctx: Context, v: Int) =
+        prefs(ctx).edit().putInt(KEY_AMAZONS_DIFFICULTY, v.coerceIn(0, 2)).apply()
+
+    fun amazonsAiDepth(ctx: Context) =
+        amazonsAiProfileForLevel(getAmazonsDifficulty(ctx)).depth
+
+    fun amazonsAiTimeLimitMs(ctx: Context): Long =
+        amazonsAiProfileForLevel(getAmazonsDifficulty(ctx)).timeLimitMs
 
     fun getMancalaMovementSpeed(ctx: Context) =
         prefs(ctx).getInt(KEY_MANCALA_MOVEMENT_SPEED, 1).coerceIn(1, 4)

@@ -16,6 +16,9 @@ import kotlin.math.sin
 internal fun isChessStyledLabel(label: String): Boolean =
     label.replace(" ", "").equals("CHESS", ignoreCase = true)
 
+internal fun isAmazonsStyledLabel(label: String): Boolean =
+    label.replace(" ", "").equals("AMAZONS", ignoreCase = true)
+
 internal fun isDraughtsStyledLabel(label: String): Boolean =
     label.replace(" ", "").uppercase() in setOf("DRAUGHTS", "INTLDRAUGHTS")
 

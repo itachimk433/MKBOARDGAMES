@@ -758,7 +758,7 @@ class BoardView(context: Context) : View(context) {
         cellSize  = boardSz / gameState.boardSize.toFloat()
         boardLeft = (width - boardSz) / 2f
         boardTop  = (height - boardSz) / 2f
-        if (isChessBoard()) {
+        if (isChessBoard() || isAmazons8Board()) {
             chessCellWidth = cellSize
             chessCellHeight = cellSize
         }

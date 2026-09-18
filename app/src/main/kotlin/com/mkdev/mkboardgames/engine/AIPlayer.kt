@@ -1,5 +1,7 @@
 package com.mkdev.mkboardgames.engine
 
+import com.mkdev.mkboardgames.games.amazons.AmazonsRuleEngine
+
 /**
  * Minimax AI with alpha-beta pruning, iterative deepening, Zobrist hashing,
  * transposition table, quiescence search, and MVV-LVA capture ordering.
@@ -28,7 +30,7 @@ class AIPlayer(
     private val tt = HashMap<Long, TTEntry>(1 shl 16)
 
     /** Simple Zobrist key: XOR of random longs indexed by (cell, pieceType). */
-    private val zobristTable: Array<LongArray> = Array(64 * 8) { LongArray(16) { java.util.Random().nextLong() } }
+    private val zobristTable: Array<LongArray> = Array(100 * 8) { LongArray(16) { java.util.Random().nextLong() } }
 
     private fun boardKey(state: GameState): Long {
         var key = if (state.currentTurn == PieceColor.WHITE) 0L else -1L
@@ -36,7 +38,7 @@ class AIPlayer(
             val p = state.board[i] ?: continue
             val colorOff = if (p.color == PieceColor.WHITE) 0 else 8
             val typeOff  = (p.value() / 100).coerceIn(0, 7)
-            key = key xor zobristTable[i % (64 * 8)][(colorOff + typeOff).coerceIn(0, 15)]
+            key = key xor zobristTable[i][(colorOff + typeOff).coerceIn(0, 15)]
         }
         // A Shogi position is not defined by the board alone: the pieces in
         // each player's hand are also part of the position.
@@ -65,7 +67,13 @@ class AIPlayer(
         // Tactical moves must never be lost to search depth or a short time
         // budget. This is especially important for gravity games such as
         // Connect Four, where a playable three-in-a-row is an immediate threat.
-        immediateTacticalMove(state)?.let { return it }
+        // Amazons has a very large move fan-out. The generic tactical pre-pass
+        // applies every candidate twice and can turn a bounded search into an
+        // unbounded wait. Mobility is the useful tactical signal for Amazons,
+        // so let its normal time-bounded search choose the move.
+        if (engine !is AmazonsRuleEngine) {
+            immediateTacticalMove(state)?.let { return it }
+        }
 
         val maximising = state.currentTurn == PieceColor.WHITE
         var completedBestMove: Move? = moves.first()
@@ -85,7 +93,7 @@ class AIPlayer(
                     searchAborted = true
                     break
                 }
-                val next  = engine.applyMove(state, move)
+                val next  = applyForSearch(state, move)
                 val score = minimax(next, depth - 1, Int.MIN_VALUE, Int.MAX_VALUE, !maximising)
                 if (searchAborted) break
                 depthScored.add(move to score)
@@ -175,9 +183,9 @@ class AIPlayer(
     ): Int {
         if (System.currentTimeMillis() > deadline) {
             searchAborted = true
-            return engine.evaluate(state)
+            return evaluateState(state)
         }
-        if (state.status != GameStatus.IN_PROGRESS)  return engine.evaluate(state)
+        if (state.status != GameStatus.IN_PROGRESS)  return evaluateState(state)
 
         // Transposition table lookup
         val key = boardKey(state)
@@ -194,20 +202,20 @@ class AIPlayer(
             return if (quiesceDepth > 0)
                 quiescence(state, alpha, beta, maximising, quiesceDepth)
             else
-                engine.evaluate(state)
+                evaluateState(state)
         }
 
         val color = if (maximising) PieceColor.WHITE else PieceColor.BLACK
         val moves = orderedMoves(state, color)
-        if (moves.isEmpty()) return engine.evaluate(state)
+        if (moves.isEmpty()) return evaluateState(state)
 
         var a = alpha; var b = beta
         val score: Int
         if (maximising) {
             var best = Int.MIN_VALUE
             for (move in moves) {
-                val childScore = minimax(engine.applyMove(state, move), depth - 1, a, b, false)
-                if (searchAborted) return engine.evaluate(state)
+                val childScore = minimax(applyForSearch(state, move), depth - 1, a, b, false)
+                if (searchAborted) return evaluateState(state)
                 best = maxOf(best, childScore)
                 a = maxOf(a, best)
                 if (b <= a) break
@@ -216,8 +224,8 @@ class AIPlayer(
         } else {
             var best = Int.MAX_VALUE
             for (move in moves) {
-                val childScore = minimax(engine.applyMove(state, move), depth - 1, a, b, true)
-                if (searchAborted) return engine.evaluate(state)
+                val childScore = minimax(applyForSearch(state, move), depth - 1, a, b, true)
+                if (searchAborted) return evaluateState(state)
                 best = minOf(best, childScore)
                 b = minOf(b, best)
                 if (b <= a) break
@@ -242,11 +250,11 @@ class AIPlayer(
     ): Int {
         if (System.currentTimeMillis() > deadline) {
             searchAborted = true
-            return engine.evaluate(state)
+            return evaluateState(state)
         }
-        if (state.status != GameStatus.IN_PROGRESS)  return engine.evaluate(state)
+        if (state.status != GameStatus.IN_PROGRESS)  return evaluateState(state)
 
-        val standPat = engine.evaluate(state)
+        val standPat = evaluateState(state)
 
         if (maximising) {
             if (standPat >= beta) return standPat
@@ -261,8 +269,8 @@ class AIPlayer(
                     searchAborted = true
                     break
                 }
-                val score = quiescence(engine.applyMove(state, move), a, beta, false, depthLeft - 1)
-                if (searchAborted) return engine.evaluate(state)
+                val score = quiescence(applyForSearch(state, move), a, beta, false, depthLeft - 1)
+                if (searchAborted) return evaluateState(state)
                 best = maxOf(best, score)
                 a    = maxOf(a, best)
                 if (beta <= a) break
@@ -281,8 +289,8 @@ class AIPlayer(
                     searchAborted = true
                     break
                 }
-                val score = quiescence(engine.applyMove(state, move), alpha, b, true, depthLeft - 1)
-                if (searchAborted) return engine.evaluate(state)
+                val score = quiescence(applyForSearch(state, move), alpha, b, true, depthLeft - 1)
+                if (searchAborted) return evaluateState(state)
                 best = minOf(best, score)
                 b    = minOf(b, best)
                 if (b <= alpha) break
@@ -330,4 +338,18 @@ class AIPlayer(
         return engine.allLegalMoves(state, color)
             .sortedByDescending { orderingScore(state, it) }
     }
+
+    private fun evaluateState(state: GameState): Int =
+        if (engine is AmazonsRuleEngine) {
+            engine.evaluateForSearch(state)
+        } else {
+            engine.evaluate(state)
+        }
+
+    private fun applyForSearch(state: GameState, move: Move): GameState =
+        if (engine is AmazonsRuleEngine) {
+            engine.applyMoveForSearch(state, move)
+        } else {
+            engine.applyMove(state, move)
+        }
 }

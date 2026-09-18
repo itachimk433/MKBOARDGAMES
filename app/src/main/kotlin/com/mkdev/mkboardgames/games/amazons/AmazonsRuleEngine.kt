@@ -67,6 +67,23 @@ class AmazonsRuleEngine(val boardSize: Int) : com.mkdev.mkboardgames.engine.Rule
         }
 
     override fun applyMove(state: GameState, move: Move): GameState {
+        return applyMoveInternal(state, move, calculateStatus = true)
+    }
+
+    /**
+     * Apply a move without recalculating mobility. AI search calls this because
+     * Amazons has a large branching factor and only needs the resulting board
+     * to evaluate a candidate. The public rule-engine path still calculates
+     * status so the live game ends immediately when a player is trapped.
+     */
+    fun applyMoveForSearch(state: GameState, move: Move): GameState =
+        applyMoveInternal(state, move, calculateStatus = false)
+
+    private fun applyMoveInternal(
+        state: GameState,
+        move: Move,
+        calculateStatus: Boolean,
+    ): GameState {
         val amazon = state.get(move.from) as? AmazonsPiece
             ?: error("Amazons move must start on an amazon")
         val arrow = move.metadata[ARROW_METADATA] as? Position
@@ -74,7 +91,7 @@ class AmazonsRuleEngine(val boardSize: Int) : com.mkdev.mkboardgames.engine.Rule
         require(move.to.isValid(boardSize) && arrow.isValid(boardSize)) {
             "Amazons move is outside the board"
         }
-        require(state.get(move.to) == null && state.get(arrow) == null) {
+        require(state.get(move.to) == null) {
             "Amazons move must land on empty squares"
         }
         require(isClearRay(state, move.from, move.to)) {
@@ -86,6 +103,9 @@ class AmazonsRuleEngine(val boardSize: Int) : com.mkdev.mkboardgames.engine.Rule
         movedBoard[move.to.row * boardSize + move.to.col] = amazon
 
         val arrowState = state.copy(board = movedBoard)
+        require(arrowState.get(arrow) == null) {
+            "Arrow must land on an empty square"
+        }
         require(isClearRay(arrowState, move.to, arrow)) {
             "Arrow path is blocked"
         }
@@ -97,7 +117,7 @@ class AmazonsRuleEngine(val boardSize: Int) : com.mkdev.mkboardgames.engine.Rule
             turn = amazon.color.opponent(),
             move = move,
         )
-        return nextState.copy(status = gameStatus(nextState))
+        return if (calculateStatus) nextState.copy(status = gameStatus(nextState)) else nextState
     }
 
     override fun gameStatus(state: GameState): GameStatus {
@@ -130,6 +150,48 @@ class AmazonsRuleEngine(val boardSize: Int) : com.mkdev.mkboardgames.engine.Rule
         }
         return (whiteMobility - blackMobility) +
             (whiteAmazonCount - blackAmazonCount) * 100
+    }
+
+    /**
+     * A cheaper mobility evaluation for bounded AI search. The public
+     * evaluation counts complete move objects for both sides; doing that at
+     * every search leaf is needlessly expensive for Amazons, where each move
+     * contains a second queen ray for the arrow. Search only needs the side
+     * to move's mobility, with the sign flipped to White's perspective.
+     */
+    fun evaluateForSearch(state: GameState): Int {
+        val mobility = mobilityCount(state, state.currentTurn)
+        if (mobility == 0) {
+            return if (state.currentTurn == PieceColor.WHITE) -100_000 else 100_000
+        }
+        val whiteAmazonCount = state.board.count {
+            it is AmazonsPiece &&
+                it.type == AmazonsPieceType.AMAZON &&
+                it.color == PieceColor.WHITE
+        }
+        val blackAmazonCount = state.board.count {
+            it is AmazonsPiece &&
+                it.type == AmazonsPieceType.AMAZON &&
+                it.color == PieceColor.BLACK
+        }
+        return (if (state.currentTurn == PieceColor.WHITE) -mobility else mobility) +
+            (whiteAmazonCount - blackAmazonCount) * 100
+    }
+
+    private fun mobilityCount(state: GameState, color: PieceColor): Int {
+        var count = 0
+        state.board.indices.forEach { index ->
+            val position = Position(index / boardSize, index % boardSize)
+            val amazon = state.get(position) as? AmazonsPiece ?: return@forEach
+            if (amazon.type != AmazonsPieceType.AMAZON || amazon.color != color) return@forEach
+            raySquares(state, position).forEach { destination ->
+                val movedBoard = state.board.copyOf()
+                movedBoard[position.row * boardSize + position.col] = null
+                movedBoard[destination.row * boardSize + destination.col] = amazon
+                count += raySquares(state.copy(board = movedBoard), destination).size
+            }
+        }
+        return count
     }
 
     private fun raySquares(state: GameState, start: Position): List<Position> {

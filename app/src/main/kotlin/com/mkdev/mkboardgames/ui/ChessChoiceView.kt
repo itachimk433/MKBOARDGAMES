@@ -13,6 +13,7 @@ import com.mkdev.mkboardgames.SoundPlayer
 internal fun isFullScreenStyledGameLabel(gameLabel: String): Boolean =
     gameLabel.replace(" ", "").replace("·", "").uppercase() in setOf(
         "CHESS",
+        "AMAZONS",
         "DRAUGHTS",
         "INTLDRAUGHTS",
         "OTHELLO",
@@ -76,6 +77,7 @@ class ChessChoiceView(
     private val textScale = scaledDensity.coerceAtMost(2f)
     private val fullScreen = fullScreenOverride ?: isFullScreenStyledGameLabel(gameLabel)
     private val isChess = isChessStyledLabel(gameLabel)
+    private val isAmazons = isAmazonsStyledLabel(gameLabel)
     private val isDraughts = isDraughtsStyledLabel(gameLabel)
     private val isOthello = isOthelloStyledLabel(gameLabel)
     private val isMorabaraba = isMorabarabaStyledLabel(gameLabel)
@@ -93,7 +95,7 @@ class ChessChoiceView(
     private val isYote = gameLabel.replace(" ", "").replace("É", "E").equals("YOTE", ignoreCase = true)
     private val isOnitama = gameLabel.replace(" ", "").equals("ONITAMA", ignoreCase = true)
     private val isChessFamily =
-        isChess || isDraughts || isOthello || isFoxAndGeese || isGo || isShogi ||
+        isChess || isAmazons || isDraughts || isOthello || isFoxAndGeese || isGo || isShogi ||
             isXiangqi || isTicTacToe || isConnectFour || isLudo || isSnakesLadders ||
             isMancala || isYote || isOnitama
     private val gameIconBitmap = run {

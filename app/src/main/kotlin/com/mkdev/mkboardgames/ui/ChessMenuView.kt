@@ -48,6 +48,7 @@ class ChessMenuView(
     private val textScale = scaledDensity.coerceAtMost(2f)
     private val fullScreen = isFullScreenStyledGameLabel(gameLabel)
     private val isChess = gameLabel.replace(" ", "").equals("CHESS", ignoreCase = true)
+    private val isAmazons = isAmazonsStyledLabel(gameLabel)
     private val isDraughts = isDraughtsStyledLabel(gameLabel)
     private val isOthello = isOthelloStyledLabel(gameLabel)
     private val isMorabaraba = isMorabarabaStyledLabel(gameLabel)
@@ -64,7 +65,7 @@ class ChessMenuView(
     private val isYote = gameLabel.replace(" ", "").replace("É", "E").equals("YOTE", ignoreCase = true)
     private val isOnitama = gameLabel.replace(" ", "").equals("ONITAMA", ignoreCase = true)
     private val isChessFamily =
-        isChess || isDraughts || isOthello || isFoxAndGeese || isGo || isShogi ||
+        isChess || isAmazons || isDraughts || isOthello || isFoxAndGeese || isGo || isShogi ||
             isXiangqi || isTicTacToe || isConnectFour || isLudo || isSnakesLadders ||
             isMancala || isYote || isOnitama
     private val isInternationalDraughts =
