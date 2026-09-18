@@ -140,7 +140,14 @@ object SoundPlayer {
 
     /** Play a movement/game sound only when movement sounds are enabled. */
     fun playMovement(key: String, volume: Float = 1f, rate: Float = 1f) {
-        if (movementSoundsEnabled) play(key, volume, rate)
+        if (!movementSoundsEnabled) return
+        val soundId = ids[key] ?: return
+        if (loadedSampleIds.contains(soundId)) {
+            playLoaded(key, volume, rate)
+        } else {
+            pendingPlays.getOrPut(soundId) { mutableListOf() }
+                .add(PendingPlay(key, volume, rate))
+        }
     }
 
     fun stop(vararg keys: String) {
