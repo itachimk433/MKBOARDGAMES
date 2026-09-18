@@ -218,6 +218,7 @@ class MenuView(
     }
     private val gridColumns = 3
     private val baseCardH = 136f * dp
+    private val gameCardScale = 1.06f
     private val cardH get() = baseCardH
     private val gridPadding = 12f * dp
     private val gridSpacing = 8f * dp
@@ -278,7 +279,7 @@ class MenuView(
             val top = headerH + row * (cardH + gridSpacing)
             cards[i].rect = RectF(left, top, left + cardW, top + cardH)
         }
-        val contentBottom = cards.last().rect.bottom + 56f * dp   // room for two-line footer
+        val contentBottom = scaledCardRect(cards.last()).bottom + 56f * dp   // room for two-line footer
         maxScrollY = maxOf(0f, contentBottom - height)
         scrollY = scrollY.coerceIn(0f, maxScrollY)
     }
@@ -295,7 +296,9 @@ class MenuView(
                 pressedBack = backTouch.contains(event.x, event.y)
                 pressedGear = !pressedBack && gearTouch.contains(event.x, cy)
                 pressedCard =
-                    if (!pressedGear && !pressedBack) cards.firstOrNull { it.rect.contains(event.x, cy) }?.type
+                    if (!pressedGear && !pressedBack) cards.firstOrNull {
+                        scaledCardRect(it).contains(event.x, cy)
+                    }?.type
                     else null
                 pressedCard?.let { animateCardScale(it, 0.96f) }
                 invalidate()
@@ -332,7 +335,7 @@ class MenuView(
                     postDelayed({ onSettingsClicked?.invoke() }, 180L)
                     pressedGear = false; invalidate(); return true
                 }
-                val hit = cards.firstOrNull { it.rect.contains(event.x, cy) }?.type
+                val hit = cards.firstOrNull { scaledCardRect(it).contains(event.x, cy) }?.type
                 pressedCard?.let { animateCardScale(it, 1f) }
                 if (hit != null && hit == pressedCard && !isChallengeLocked(hit)) {
                     com.mkdev.mkboardgames.SoundPlayer.play("ui_click")
@@ -405,7 +408,7 @@ class MenuView(
 
     private fun drawCard(canvas: Canvas, card: Card) {
         val scale = cardScales[card.type] ?: 1f
-        val r = card.rect; val pressed = pressedCard == card.type
+        val r = scaledCardRect(card); val pressed = pressedCard == card.type
         if (scale != 1f) { canvas.save(); canvas.scale(scale, scale, r.centerX(), r.centerY()) }
         if (homeStyle == SettingsManager.HomeStyle.BROWN && !isLightMode) {
             drawWoodCardShell(canvas, r, pressed)
@@ -475,6 +478,18 @@ class MenuView(
             drawChallengeLockOverlay(canvas, r)
         }
         if (scale != 1f) canvas.restore()
+    }
+
+    private fun scaledCardRect(card: Card): RectF {
+        val rect = card.rect
+        val halfWidth = rect.width() * gameCardScale / 2f
+        val halfHeight = rect.height() * gameCardScale / 2f
+        return RectF(
+            rect.centerX() - halfWidth,
+            rect.centerY() - halfHeight,
+            rect.centerX() + halfWidth,
+            rect.centerY() + halfHeight,
+        )
     }
 
     private fun isChallengeLocked(type: GameType): Boolean =

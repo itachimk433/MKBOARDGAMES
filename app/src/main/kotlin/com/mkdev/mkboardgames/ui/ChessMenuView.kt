@@ -72,8 +72,8 @@ class ChessMenuView(
         gameLabel.replace(" ", "").equals("INTLDRAUGHTS", ignoreCase = true)
     private val contentHeightDp = when {
         // Snakes & Ladders has two full-width image cards below its first row.
-        // Leave room for their preserved aspect ratios after the 10% card scale.
-        isSnakesLadders -> 800f
+        // Leave room for their preserved aspect ratios.
+        isSnakesLadders -> 760f
         (isChessFamily || isMorabaraba) && hasResumeMatch -> 548f
         isChessFamily || isMorabaraba -> 500f
         hasResumeMatch -> 462f
@@ -116,7 +116,6 @@ class ChessMenuView(
     private val howToPlayButtonBitmap: Bitmap? =
         loadAssetBitmap(context, "game_button_how_to_play.webp")
     private val gameButtonPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-    private val actionCardScale = 1.1f
     private val surfacePaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val panelPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val panelBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -874,7 +873,7 @@ class ChessMenuView(
             return
         }
         val scale = actionScale[action.label] ?: 1f
-        val rect = scaledActionRect(action)
+        val rect = action.rect
         val pressed = pressedAction == action
 
         canvas.save()
@@ -904,7 +903,7 @@ class ChessMenuView(
     }
 
     private fun drawDraughtsAction(canvas: Canvas, action: MenuAction) {
-        val rect = scaledActionRect(action)
+        val rect = action.rect
         val pressed = pressedAction == action
         drawDraughtsButton(canvas, rect, pressed, unit)
         val drawnTop = rect.top + if (pressed) 2f * unit else 0f
@@ -918,7 +917,7 @@ class ChessMenuView(
     }
 
     private fun drawOthelloAction(canvas: Canvas, action: MenuAction) {
-        val rect = scaledActionRect(action)
+        val rect = action.rect
         val pressed = pressedAction == action
         drawOthelloButton(canvas, rect, pressed, unit)
         val drawnTop = rect.top + if (pressed) 2f * unit else 0f
@@ -932,7 +931,7 @@ class ChessMenuView(
     }
 
     private fun drawChessAction(canvas: Canvas, action: MenuAction) {
-        val rect = scaledActionRect(action)
+        val rect = action.rect
         val pressed = pressedAction == action
         val image = when (action.label) {
             "vs CPU" -> vsCpuButtonBitmap
@@ -977,20 +976,6 @@ class ChessMenuView(
         return image?.let {
             actionWidth * it.height.toFloat() / it.width.toFloat()
         } ?: 82f * unit
-    }
-
-    private fun scaledActionRect(action: MenuAction): RectF {
-        val rect = action.rect
-        val centerX = rect.centerX()
-        val centerY = rect.centerY()
-        val halfWidth = rect.width() * actionCardScale / 2f
-        val halfHeight = rect.height() * actionCardScale / 2f
-        return RectF(
-            centerX - halfWidth,
-            centerY - halfHeight,
-            centerX + halfWidth,
-            centerY + halfHeight,
-        )
     }
 
     private fun loadAssetBitmap(ctx: Context, assetName: String): Bitmap? =
@@ -1092,7 +1077,7 @@ class ChessMenuView(
                     invalidate()
                     return true
                 }
-                pressedAction = actions.firstOrNull { scaledActionRect(it).contains(event.x, event.y) }
+                pressedAction = actions.firstOrNull { it.rect.contains(event.x, event.y) }
                 if (pressedAction == null && hasResumeMatch && resumeRect.contains(event.x, event.y)) {
                     resumePressed = true
                     performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
@@ -1126,7 +1111,7 @@ class ChessMenuView(
                 }
                 val action = pressedAction
                 if (!isChessFamily && !isMorabaraba) action?.let { animateAction(it, 1f) }
-                if (action != null && scaledActionRect(action).contains(event.x, event.y)) {
+                if (action != null && action.rect.contains(event.x, event.y)) {
                     SoundPlayer.play("ui_click")
                     action.action()
                 } else if (hasResumeMatch && resumePressed && resumeRect.contains(event.x, event.y)) {
