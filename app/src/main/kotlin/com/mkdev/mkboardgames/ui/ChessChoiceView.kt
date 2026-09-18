@@ -222,8 +222,8 @@ class ChessChoiceView(
     private val hasPlayAsButtonAssets =
         !isGo && !isXiangqi && choices.any { it.label == "White" || it.label == "Black" }
     private val playAsButtonScale = 0.8f
-    private val playAsButtonGap = 8f
-    private val playAsButtonOffset = 8f
+    private val playAsButtonGap = 4f
+    private val playAsButtonOffset = 24f
     private val backButtonPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val backButtonBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
