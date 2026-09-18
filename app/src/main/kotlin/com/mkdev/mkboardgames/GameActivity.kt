@@ -1256,7 +1256,8 @@ Checkmate your opponent's King.
         boardView.gameState            = gameState
         boardView.isFlipped            = false
         boardView.isLocked             = false
-        boardView.rotateBlackPieces    = (!vsAI && gameType == "CHESS")
+        boardView.rotateBlackPieces    =
+            gameType == "AMAZONS" || (!vsAI && gameType == "CHESS")
         boardView.onMoveMade           = { move -> handleMove(move) }
         boardView.onPromotionChoice   = ::showPromotionChoice
         // Tap after game ends → re-show result dialog without double-recording stats

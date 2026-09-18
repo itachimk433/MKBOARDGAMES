@@ -1887,12 +1887,18 @@ class BoardView(context: Context) : View(context) {
     ) {
         amazonsPieceBitmap(piece)?.let { bitmap ->
             val size = cellSize * 0.86f
+            val shouldRotate = rotateBlackPieces && piece.color == PieceColor.BLACK
+            canvas.save()
+            if (shouldRotate) {
+                canvas.rotate(180f, cx, cy)
+            }
             canvas.drawBitmap(
                 bitmap,
                 null,
                 RectF(cx - size / 2f, cy - size / 2f, cx + size / 2f, cy + size / 2f),
                 amazonsPiecePaint,
             )
+            canvas.restore()
             return
         }
 
