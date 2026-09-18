@@ -106,6 +106,12 @@ class ChessMenuView(
             }
         }
     }
+    private val vsCpuButtonBitmap: Bitmap? = loadAssetBitmap(context, "game_button_vs_cpu.webp")
+    private val twoPlayersButtonBitmap: Bitmap? =
+        loadAssetBitmap(context, "game_button_two_players.webp")
+    private val howToPlayButtonBitmap: Bitmap? =
+        loadAssetBitmap(context, "game_button_how_to_play.webp")
+    private val gameButtonPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private val surfacePaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val panelPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val panelBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -916,6 +922,26 @@ class ChessMenuView(
     private fun drawChessAction(canvas: Canvas, action: MenuAction) {
         val rect = action.rect
         val pressed = pressedAction == action
+        val image = when (action.label) {
+            "vs CPU" -> vsCpuButtonBitmap
+            "2 Players" -> twoPlayersButtonBitmap
+            "How To Play" -> howToPlayButtonBitmap
+            else -> null
+        }
+        if (image != null) {
+            canvas.drawBitmap(
+                image,
+                null,
+                RectF(
+                    rect.left,
+                    rect.top + if (pressed) 2f * unit else 0f,
+                    rect.right,
+                    rect.bottom + if (pressed) 2f * unit else 0f,
+                ),
+                gameButtonPaint,
+            )
+            return
+        }
         drawChessWoodButton(canvas, rect, pressed, unit)
         val drawnTop = rect.top + if (pressed) 2f * unit else 0f
         actionSymbolPaint.color = Color.parseColor("#63301F")
@@ -926,6 +952,13 @@ class ChessMenuView(
         actionDetailPaint.color = Color.parseColor("#6A2D1B")
         canvas.drawText(action.detail, rect.centerX(), drawnTop + 72f * unit, actionDetailPaint)
     }
+
+    private fun loadAssetBitmap(ctx: Context, assetName: String): Bitmap? =
+        try {
+            ctx.assets.open(assetName).use { BitmapFactory.decodeStream(it) }
+        } catch (_: Throwable) {
+            null
+        }
 
     private fun drawCenteredActionText(canvas: Canvas, rect: RectF, action: MenuAction) {
         actionLabelPaint.color = Color.WHITE

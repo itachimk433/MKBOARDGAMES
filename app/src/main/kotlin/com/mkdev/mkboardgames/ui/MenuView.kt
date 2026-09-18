@@ -89,6 +89,9 @@ class MenuView(
     private val homeBackgroundBitmap: Bitmap? = try {
         context.assets.open("mk_board_home_background.webp").use { BitmapFactory.decodeStream(it) }
     } catch (e: Exception) { null }
+    private val gameCardFrameBitmap: Bitmap? = try {
+        context.assets.open("brown_game_card.webp").use { BitmapFactory.decodeStream(it) }
+    } catch (e: Exception) { null }
 
     private val ludoHomeIconBitmap: Bitmap? = try {
         context.assets.open("ludo_home_icon.webp").use { BitmapFactory.decodeStream(it) }
@@ -518,6 +521,16 @@ class MenuView(
     }
 
     private fun drawWoodCardShell(canvas: Canvas, r: RectF, pressed: Boolean) {
+        gameCardFrameBitmap?.let {
+            val offset = if (pressed) 2f * dp else 0f
+            canvas.drawBitmap(
+                it,
+                null,
+                RectF(r.left, r.top + offset, r.right, r.bottom + offset),
+                bitmapPaint,
+            )
+            return
+        }
         brownWoodCardRenderer.draw(canvas, r, pressed)
     }
 
