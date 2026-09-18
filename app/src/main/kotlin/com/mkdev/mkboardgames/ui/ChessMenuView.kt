@@ -360,9 +360,14 @@ class ChessMenuView(
         }
         var nextRowTop = actionTop + firstRowHeight + gap
         actions.drop(2).forEach { action ->
-            val rowWidth = width - sidePadding * 2f
+            val rowWidth = if (isSnakesLadders && action.label == "4 Players") {
+                actionWidth
+            } else {
+                width - sidePadding * 2f
+            }
             val actionHeight = actionHeightFor(action.label, rowWidth)
-            action.rect = RectF(sidePadding, nextRowTop, width - sidePadding, nextRowTop + actionHeight)
+            val rowLeft = (width - rowWidth) / 2f
+            action.rect = RectF(rowLeft, nextRowTop, rowLeft + rowWidth, nextRowTop + actionHeight)
             nextRowTop = action.rect.bottom + gap
         }
         actions.forEach {
