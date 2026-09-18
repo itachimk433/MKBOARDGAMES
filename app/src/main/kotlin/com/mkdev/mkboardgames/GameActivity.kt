@@ -2286,8 +2286,11 @@ Checkmate your opponent's King.
             putExtra(ReplayActivity.EXTRA_GAME_TYPE,  gameType)
             putExtra(ReplayActivity.EXTRA_MOVES_JSON, movesJson)
             putExtra(ReplayActivity.EXTRA_RESULT,     resultLabel)
+            putExtra(ReplayActivity.EXTRA_BOARD_STYLE_INDEX, currentBoardStyleIndex())
+            if (gameType == "AMAZONS") {
+                putExtra(ReplayActivity.EXTRA_AMAZONS_BOARD_SIZE, amazonsBoardSize)
+            }
             if (lockBoardStyle) {
-                putExtra(ReplayActivity.EXTRA_BOARD_STYLE_INDEX, currentBoardStyleIndex())
                 putExtra(ReplayActivity.EXTRA_LOCK_BOARD_STYLE, true)
             }
         })

@@ -1257,9 +1257,26 @@ class BoardView(context: Context) : View(context) {
 
     private fun drawDraughtsBoard(canvas: Canvas) {
         canvas.drawColor(Color.rgb(20, 20, 20))
-        draughtsBitmap()?.let {
+        val bitmap = draughtsBitmap()
+        if (bitmap == null) {
+            for (row in 0 until gameState.boardSize) {
+                for (col in 0 until gameState.boardSize) {
+                    val displayedCol = if (isFlipped) gameState.boardSize - 1 - col else col
+                    val displayedRow = if (isFlipped) gameState.boardSize - 1 - row else row
+                    val left = draughtsLineX(displayedCol)
+                    val top = draughtsLineY(displayedRow)
+                    canvas.drawRect(
+                        left,
+                        top,
+                        draughtsLineX(displayedCol + 1),
+                        draughtsLineY(displayedRow + 1),
+                        if ((row + col) % 2 == 0) lightPaint else darkPaint,
+                    )
+                }
+            }
+        } else {
             canvas.drawBitmap(
-                it,
+                bitmap,
                 null,
                 draughtsImageRect,
                 Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG),

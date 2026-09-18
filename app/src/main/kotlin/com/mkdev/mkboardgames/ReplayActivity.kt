@@ -16,6 +16,7 @@ import android.view.animation.OvershootInterpolator
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import com.mkdev.mkboardgames.engine.*
+import com.mkdev.mkboardgames.games.amazons.AmazonsRuleEngine
 import com.mkdev.mkboardgames.games.checkers.CheckersPiece
 import com.mkdev.mkboardgames.games.checkers.CheckersRuleEngine
 import com.mkdev.mkboardgames.games.checkers.InternationalDraughtsRuleEngine
@@ -62,10 +63,12 @@ class ReplayActivity : AppCompatActivity() {
         const val EXTRA_LOCK_BOARD_STYLE = "lock_board_style"
         const val EXTRA_ONITAMA_SETUP_SEED = "onitama_setup_seed"
         const val EXTRA_BOARD_SIZE = "board_size"   // for TicTacToe
+        const val EXTRA_AMAZONS_BOARD_SIZE = "amazons_board_size"
         const val EXTRA_MORABARABA_PIECE_COUNT = "morabaraba_piece_count"
         private val MOVE_METADATA_KEYS = arrayOf(
             "dice", "player", "token", "targetProgress", "drop", "promote", "pass",
             "pawnDouble", "enPassant", "castle", "card",
+            AmazonsRuleEngine.ARROW_METADATA,
         )
 
         fun buildMovesJson(moves: List<Move>): String {
@@ -93,8 +96,16 @@ class ReplayActivity : AppCompatActivity() {
                     )
                 }
                 for (key in MOVE_METADATA_KEYS) {
-                    val value = m.metadata[key]
-                    if (value is Int || value is String || value is Boolean) obj.put(key, value)
+                    when (val value = m.metadata[key]) {
+                        is Int, is String, is Boolean -> obj.put(key, value)
+                        is Position -> obj.put(
+                            key,
+                            JSONObject().apply {
+                                put("r", value.row)
+                                put("c", value.col)
+                            },
+                        )
+                    }
                 }
                 arr.put(obj)
             }
@@ -130,6 +141,9 @@ class ReplayActivity : AppCompatActivity() {
                         is Boolean -> metadata[key] = value
                         is String -> metadata[key] = value
                         is Number -> metadata[key] = value.toInt()
+                        is JSONObject -> if (value.has("r") && value.has("c")) {
+                            metadata[key] = Position(value.getInt("r"), value.getInt("c"))
+                        }
                     }
                 }
                 list += Move(from, to, caps, promo, metadata)
@@ -188,6 +202,7 @@ class ReplayActivity : AppCompatActivity() {
     private var resultText = ""
     private var gameType   = "CHESS"
     private var lockedBoardStyleIndex: Int? = null
+    private var initialBoardStyleIndex: Int? = null
 
 
     // ─── Vibration ────────────────────────────────────────────────────────────
@@ -241,10 +256,14 @@ class ReplayActivity : AppCompatActivity() {
         gameType          = intent.getStringExtra(EXTRA_GAME_TYPE)  ?: "CHESS"
         val movesJson     = intent.getStringExtra(EXTRA_MOVES_JSON) ?: "[]"
         resultText        = intent.getStringExtra(EXTRA_RESULT)     ?: ""
+        initialBoardStyleIndex = intent.getIntExtra(EXTRA_BOARD_STYLE_INDEX, -1)
+            .takeIf { it >= 0 }
         if (intent.getBooleanExtra(EXTRA_LOCK_BOARD_STYLE, false)) {
-            lockedBoardStyleIndex = intent.getIntExtra(EXTRA_BOARD_STYLE_INDEX, 0)
+            lockedBoardStyleIndex = initialBoardStyleIndex ?: 0
         }
         val ticBoardSize  = intent.getIntExtra(EXTRA_BOARD_SIZE, 3)
+        val amazonsBoardSize = intent.getIntExtra(EXTRA_AMAZONS_BOARD_SIZE, 8)
+            .takeIf { it == 8 || it == 10 } ?: 8
         val morabarabaPieceCount = intent.getIntExtra(EXTRA_MORABARABA_PIECE_COUNT, 12)
         val onitamaSetupSeed = intent.getLongExtra(EXTRA_ONITAMA_SETUP_SEED, Long.MIN_VALUE)
 
@@ -256,6 +275,7 @@ class ReplayActivity : AppCompatActivity() {
         val isOnitama = gameType == "ONITAMA"
 
         val engine: RuleEngine = when (gameType) {
+            "AMAZONS" -> AmazonsRuleEngine(amazonsBoardSize)
             "TICTACTOE"  -> TicTacToeRuleEngine(ticBoardSize, ticBoardSize)
             "CONNECTFOUR" -> ConnectFourRuleEngine()
             "CHECKERS"   -> CheckersRuleEngine()
@@ -427,6 +447,7 @@ class ReplayActivity : AppCompatActivity() {
                 val bv = BoardView(this).apply {
                     isLocked = true
                     ruleEngine = engine
+                    gameState = states.first()
                     onGameOverTapped = { showReplayResultDialog() }
                 }
                 boardView = bv
@@ -458,7 +479,7 @@ class ReplayActivity : AppCompatActivity() {
     }
 
     private fun supportsBoardStyleSwitch(): Boolean = when (gameType) {
-        "CHESS", "CHECKERS", "INTERNATIONAL_DRAUGHTS", "OTHELLO",
+        "CHESS", "AMAZONS", "CHECKERS", "INTERNATIONAL_DRAUGHTS", "OTHELLO",
         "FOX_AND_GEESE", "XIANGQI", "SHOGI", "CONNECTFOUR", "MORABARABA" -> true
         else -> false
     }
@@ -472,6 +493,11 @@ class ReplayActivity : AppCompatActivity() {
 
         val styleCount = when (gameType) {
             "CHESS" -> ChessBoardStyle.entries.size
+            "AMAZONS" -> if (states.firstOrNull()?.boardSize == 10) {
+                internationalDraughtsStyles.size
+            } else {
+                ChessBoardStyle.entries.size
+            }
             "INTERNATIONAL_DRAUGHTS" -> internationalDraughtsStyles.size
             "CHECKERS" ->
                 DraughtsBoardStyle.entries.size -
@@ -485,12 +511,21 @@ class ReplayActivity : AppCompatActivity() {
             else -> 2
         }
         boardStyleSwitch.setStyleCount(styleCount)
+        val styleIndex = initialBoardStyleIndex ?: currentBoardStyleIndex()
+        applyBoardStyle(styleIndex)
         boardStyleSwitch.setSelectedIndex(currentBoardStyleIndex(), animate = false)
         boardStyleSwitch.onStyleChanged = ::applyBoardStyle
     }
 
     private fun currentBoardStyleIndex(): Int = when (gameType) {
         "CHESS" -> boardView?.chessBoardStyle?.ordinal ?: 0
+        "AMAZONS" -> if (states.firstOrNull()?.boardSize == 10) {
+            internationalDraughtsStyles.indexOf(
+                boardView?.draughtsBoardStyle ?: DraughtsBoardStyle.CANVAS,
+            ).coerceAtLeast(0)
+        } else {
+            boardView?.chessBoardStyle?.ordinal ?: 0
+        }
         "CHECKERS", "INTERNATIONAL_DRAUGHTS" -> {
             val style = boardView?.draughtsBoardStyle ?: DraughtsBoardStyle.CANVAS
             if (gameType == "INTERNATIONAL_DRAUGHTS") {
@@ -518,6 +553,15 @@ class ReplayActivity : AppCompatActivity() {
         when (gameType) {
             "CHESS" -> boardView?.chessBoardStyle =
                 ChessBoardStyle.entries.getOrElse(index) { ChessBoardStyle.CANVAS }
+            "AMAZONS" -> if (states.firstOrNull()?.boardSize == 10) {
+                boardView?.draughtsBoardStyle =
+                    internationalDraughtsStyles.getOrElse(index) {
+                        internationalDraughtsStyles.first()
+                    }
+            } else {
+                boardView?.chessBoardStyle =
+                    ChessBoardStyle.entries.getOrElse(index) { ChessBoardStyle.CANVAS }
+            }
             "CHECKERS" -> boardView?.draughtsBoardStyle =
                 DraughtsBoardStyle.entries.getOrElse(index) { DraughtsBoardStyle.CANVAS }
             "INTERNATIONAL_DRAUGHTS" -> boardView?.draughtsBoardStyle =
