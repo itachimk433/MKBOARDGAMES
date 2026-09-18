@@ -1069,7 +1069,7 @@ class MancalaActivity : AppCompatActivity() {
                 animation.placementDuration,
             )
             while (sowingLandingSoundsPlayed < sowingLanded) {
-                SoundPlayer.playMovement("checkers_move")
+                SoundPlayer.playMovement("ludo_move")
                 sowingLandingSoundsPlayed++
             }
 
@@ -1079,7 +1079,7 @@ class MancalaActivity : AppCompatActivity() {
                 animation.placementDuration,
             )
             while (settlementLandingSoundsPlayed < settlementLanded) {
-                SoundPlayer.playMovement("checkers_move")
+                SoundPlayer.playMovement("ludo_move")
                 settlementLandingSoundsPlayed++
             }
         }
