@@ -52,13 +52,13 @@ class MenuView(
     }
 
     enum class GameType {
-        CHESS, CHECKERS, INTERNATIONAL_DRAUGHTS, OTHELLO, MORABARABA, TICTACTOE, CONNECT_FOUR,
+        CHESS, AMAZONS, CHECKERS, INTERNATIONAL_DRAUGHTS, OTHELLO, MORABARABA, TICTACTOE, CONNECT_FOUR,
         FOX_AND_GEESE, LUDO, SNAKES_LADDERS, XIANGQI, SHOGI, GO, MANCALA, YOTE, ONITAMA
     }
 
     private data class Card(val type: GameType, var rect: RectF = RectF())
     private val cards = listOf(
-        Card(GameType.CHESS), Card(GameType.CHECKERS),
+        Card(GameType.CHESS), Card(GameType.AMAZONS), Card(GameType.CHECKERS),
         Card(GameType.INTERNATIONAL_DRAUGHTS),
         Card(GameType.OTHELLO), Card(GameType.MORABARABA),
         Card(GameType.TICTACTOE), Card(GameType.CONNECT_FOUR),
@@ -428,6 +428,7 @@ class MenuView(
 
         val (title, desc) = when (card.type) {
             GameType.CHESS       -> "Chess"        to "vs CPU  •  2 Players"
+            GameType.AMAZONS     -> "Amazons"      to "8×8  •  10×10"
             GameType.CHECKERS    -> "Draughts"     to "vs CPU  •  2 Players"
             GameType.INTERNATIONAL_DRAUGHTS ->
                 "International Draughts" to "vs CPU  •  2 Players"
@@ -521,6 +522,7 @@ class MenuView(
         when (type) {
             GameType.CHESS, GameType.INTERNATIONAL_DRAUGHTS ->
                 drawChessCheckersMini(canvas, left, top, size, type)
+            GameType.AMAZONS -> drawAmazonsMini(canvas, left, top, size)
             GameType.CHECKERS -> drawChessCheckersMini(canvas, left, top, size, type)
             GameType.OTHELLO    -> drawOthelloMini(canvas, left, top, size)
             GameType.MORABARABA -> drawMorabarabaMini(canvas, left, top, size)
@@ -536,6 +538,57 @@ class MenuView(
             GameType.YOTE -> drawYoteMini(canvas, left, top, size)
             GameType.ONITAMA -> drawOnitamaMini(canvas, left, top, size)
         }
+    }
+
+    private fun drawAmazonsMini(canvas: Canvas, left: Float, top: Float, size: Float) {
+        val cell = size / 8f
+        val light = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#D8C39A") }
+        val dark = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#7E5137") }
+        for (row in 0 until 8) {
+            for (col in 0 until 8) {
+                canvas.drawRect(
+                    left + col * cell,
+                    top + row * cell,
+                    left + (col + 1) * cell,
+                    top + (row + 1) * cell,
+                    if ((row + col) % 2 == 0) light else dark,
+                )
+            }
+        }
+        val white = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#FFF8E8")
+            textAlign = Paint.Align.CENTER
+            textSize = cell * 0.72f
+        }
+        val black = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#211A18")
+            textAlign = Paint.Align.CENTER
+            textSize = cell * 0.72f
+        }
+        listOf(0 to 2, 0 to 5, 2 to 0, 2 to 7).forEach { (row, col) ->
+            canvas.drawText("♛", left + (col + 0.5f) * cell, top + (row + 0.74f) * cell, black)
+        }
+        listOf(5 to 0, 5 to 7, 7 to 2, 7 to 5).forEach { (row, col) ->
+            canvas.drawText("♕", left + (col + 0.5f) * cell, top + (row + 0.74f) * cell, white)
+        }
+        val arrow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(210, 44, 34, 29)
+            style = Paint.Style.STROKE
+            strokeWidth = cell * 0.08f
+            strokeCap = Paint.Cap.ROUND
+        }
+        canvas.drawLine(
+            left + 3.5f * cell, top + 3.5f * cell,
+            left + 4.5f * cell, top + 4.5f * cell, arrow,
+        )
+        canvas.drawLine(
+            left + 4.5f * cell, top + 4.5f * cell,
+            left + 4.05f * cell, top + 4.42f * cell, arrow,
+        )
+        canvas.drawLine(
+            left + 4.5f * cell, top + 4.5f * cell,
+            left + 4.42f * cell, top + 4.05f * cell, arrow,
+        )
     }
 
     private fun drawOnitamaMini(canvas: Canvas, left: Float, top: Float, size: Float) {

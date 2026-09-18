@@ -11,6 +11,9 @@ import android.view.animation.AccelerateDecelerateInterpolator
 import android.view.animation.OvershootInterpolator
 import com.mkdev.mkboardgames.SettingsManager
 import com.mkdev.mkboardgames.engine.*
+import com.mkdev.mkboardgames.games.amazons.AmazonsPiece
+import com.mkdev.mkboardgames.games.amazons.AmazonsPieceType
+import com.mkdev.mkboardgames.games.amazons.AmazonsRuleEngine
 import com.mkdev.mkboardgames.games.checkers.CheckersPiece
 import com.mkdev.mkboardgames.games.checkers.CheckersRuleEngine
 import com.mkdev.mkboardgames.games.checkers.InternationalDraughtsRuleEngine
@@ -39,6 +42,7 @@ class BoardView(context: Context) : View(context) {
             field = value
             updateBoardGeometry()
             selectedPos = null
+            amazonsPendingMoves = null
             legalMoves  = if (shogiDropPiece != null && ruleEngine is ShogiRuleEngine) {
                 (ruleEngine as ShogiRuleEngine).legalDropsFrom(value, shogiDropPiece!!)
             } else {
@@ -106,6 +110,7 @@ class BoardView(context: Context) : View(context) {
     // ─── Selection ───────────────────────────────────────────────────────────
     private var selectedPos: Position? = null
     private var legalMoves: List<Move> = emptyList()
+    private var amazonsPendingMoves: List<Move>? = null
     private var shogiDropPiece: ShogiPieceType? = null
     private var hintMove: Move? = null
     private var hintStage: Int = 3
@@ -789,6 +794,10 @@ class BoardView(context: Context) : View(context) {
     }
 
     private fun handleTap(pos: Position) {
+        if (isAmazonsBoard()) {
+            handleAmazonsTap(pos)
+            return
+        }
         if (isGoBoard()) {
             val engine = ruleEngine ?: return
             val move = engine.allLegalMoves(gameState, gameState.currentTurn)
@@ -849,6 +858,52 @@ class BoardView(context: Context) : View(context) {
         if (piece.color != gameState.currentTurn) { invalidate(); return }
         val moves = engine.legalMovesFrom(gameState, pos)
         if (moves.isNotEmpty()) { selectedPos = pos; legalMoves = moves }
+        invalidate()
+    }
+
+    private fun handleAmazonsTap(pos: Position) {
+        val engine = ruleEngine as? AmazonsRuleEngine ?: return
+        amazonsPendingMoves?.let { pending ->
+            val move = pending.firstOrNull {
+                (it.metadata[AmazonsRuleEngine.ARROW_METADATA] as? Position) == pos
+            }
+            if (move != null) {
+                amazonsPendingMoves = null
+                startMoveAnimation(move)
+                return
+            }
+            amazonsPendingMoves = null
+            selectedPos = null
+            legalMoves = emptyList()
+        }
+
+        val piece = gameState.get(pos)
+        if (piece is AmazonsPiece &&
+            piece.type == AmazonsPieceType.AMAZON &&
+            piece.color == gameState.currentTurn
+        ) {
+            val moves = engine.legalMovesFrom(gameState, pos)
+            selectedPos = pos
+            legalMoves = moves
+            invalidate()
+            return
+        }
+
+        val choices = legalMoves.filter { it.to == pos }
+        if (choices.isNotEmpty()) {
+            if (choices.size == 1) {
+                startMoveAnimation(choices.first())
+            } else {
+                amazonsPendingMoves = choices
+                selectedPos = pos
+                legalMoves = choices
+                invalidate()
+            }
+            return
+        }
+
+        selectedPos = null
+        legalMoves = emptyList()
         invalidate()
     }
 
@@ -953,6 +1008,8 @@ class BoardView(context: Context) : View(context) {
         if (isGoBoard()) return goPoint(pos)
         if (isOthelloImageBoard()) return othelloPoint(pos)
         if (isFoxAndGeeseImageBoard()) return foxAndGeesePoint(pos)
+        if (isAmazons10Board()) return draughtsPoint(pos)
+        if (isAmazons8Board()) return chessPoint(pos)
         if (isChessBoard()) return chessPoint(pos)
         if (isDraughtsImageBoard()) return draughtsPoint(pos)
         val last = gameState.boardSize - 1
@@ -964,6 +1021,18 @@ class BoardView(context: Context) : View(context) {
 
     // ─── Drawing ─────────────────────────────────────────────────────────────
     override fun onDraw(canvas: Canvas) {
+        if (isAmazonsBoard()) {
+            if (isAmazons8Board()) {
+                if (isChessImageBoard()) drawChessBoard(canvas) else drawBoard(canvas)
+                drawAmazonsHighlights(canvas)
+                drawChessLabels(canvas)
+            } else {
+                drawDraughtsBoard(canvas)
+                drawAmazonsHighlights(canvas)
+            }
+            drawAmazonsPieces(canvas)
+            return
+        }
         if (isFoxAndGeeseImageBoard()) {
             drawFoxAndGeeseImageBoard(canvas)
             drawFoxAndGeeseHighlights(canvas)
@@ -1122,6 +1191,57 @@ class BoardView(context: Context) : View(context) {
                 if (showMustCaptureHints && position in mustCapturePieces) {
                     canvas.drawCircle(point.x, point.y, cellSize * 0.42f, mustCapturePaint)
                 }
+                drawPieceAt(canvas, piece, point.x, point.y, position)
+            }
+        }
+        animPiece?.let {
+            drawPieceAt(
+                canvas,
+                it,
+                lerp(animFromPx.x, animToPx.x, animProgress),
+                lerp(animFromPx.y, animToPx.y, animProgress),
+            )
+        }
+    }
+
+    private fun drawAmazonsHighlights(canvas: Canvas) {
+        val drawCell: (Canvas, Position, Paint) -> Unit =
+            if (isAmazons8Board()) {
+                { target, position, paint -> drawChessCell(target, position, paint) }
+            } else {
+                { target, position, paint -> drawDraughtsCell(target, position, paint) }
+            }
+
+        gameState.lastMove?.let { move ->
+            drawCell(canvas, move.from, highlightGold)
+            drawCell(canvas, move.to, highlightGold)
+            (move.metadata[AmazonsRuleEngine.ARROW_METADATA] as? Position)?.let {
+                drawCell(canvas, it, highlightGold)
+            }
+        }
+        selectedPos?.let { drawCell(canvas, it, highlightBlue) }
+
+        val targets = if (amazonsPendingMoves != null) {
+            legalMoves.mapNotNull {
+                it.metadata[AmazonsRuleEngine.ARROW_METADATA] as? Position
+            }.distinct()
+        } else {
+            legalMoves.map { it.to }.distinct()
+        }
+        targets.forEach { position ->
+            val point = cellCenter(position)
+            canvas.drawCircle(point.x, point.y, cellSize * 0.17f, dotPaint)
+        }
+    }
+
+    private fun drawAmazonsPieces(canvas: Canvas) {
+        val skipPos = animFromPos
+        for (row in 0 until gameState.boardSize) {
+            for (col in 0 until gameState.boardSize) {
+                val position = Position(row, col)
+                if (position == skipPos) continue
+                val piece = gameState.get(position) as? AmazonsPiece ?: continue
+                val point = cellCenter(position)
                 drawPieceAt(canvas, piece, point.x, point.y, position)
             }
         }
@@ -1719,6 +1839,7 @@ class BoardView(context: Context) : View(context) {
 
     private fun drawPieceAt(canvas: Canvas, piece: Piece, cx: Float, cy: Float, pos: Position? = null) {
         when (piece) {
+            is AmazonsPiece  -> drawAmazonsPiece(canvas, piece, cx, cy)
             is ChessPiece    -> drawChessPiece(canvas, piece, cx, cy)
             is CheckersPiece -> drawCheckersPiece(canvas, piece, cx, cy)
             is FoxAndGeesePiece -> drawFoxAndGeesePiece(canvas, piece, cx, cy)
@@ -1726,6 +1847,47 @@ class BoardView(context: Context) : View(context) {
             is ShogiPiece    -> drawShogiPiece(canvas, piece, cx, cy)
             is XiangqiPiece  -> drawXiangqiPiece(canvas, piece, cx, cy)
         }
+    }
+
+    private fun drawAmazonsPiece(
+        canvas: Canvas,
+        piece: AmazonsPiece,
+        cx: Float,
+        cy: Float,
+    ) {
+        if (piece.type == AmazonsPieceType.ARROW) {
+            val arrowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.parseColor("#4A3326")
+                style = Paint.Style.STROKE
+                strokeWidth = cellSize * 0.075f
+                strokeCap = Paint.Cap.ROUND
+            }
+            val radius = cellSize * 0.23f
+            canvas.drawLine(cx - radius, cy - radius, cx + radius, cy + radius, arrowPaint)
+            canvas.drawLine(cx + radius, cy - radius, cx - radius, cy + radius, arrowPaint)
+            return
+        }
+
+        val symbol = piece.symbol()
+        piecePaint.textSize = cellSize * 0.62f
+        piecePaint.textAlign = Paint.Align.CENTER
+        piecePaint.style = Paint.Style.FILL
+        piecePaint.color = if (piece.color == PieceColor.WHITE) {
+            Color.parseColor("#FFF8E8")
+        } else {
+            Color.parseColor("#211A18")
+        }
+        val bounds = Rect()
+        piecePaint.getTextBounds(symbol, 0, symbol.length, bounds)
+        val baseline = cy - (bounds.top + bounds.bottom) / 2f
+        piecePaint.setShadowLayer(
+            cellSize * 0.045f,
+            cellSize * 0.025f,
+            cellSize * 0.04f,
+            Color.argb(150, 0, 0, 0),
+        )
+        canvas.drawText(symbol, cx, baseline, piecePaint)
+        piecePaint.clearShadowLayer()
     }
 
     private fun drawChessPiece(canvas: Canvas, piece: ChessPiece, cx: Float, cy: Float) {
@@ -2990,10 +3152,21 @@ class BoardView(context: Context) : View(context) {
     private fun isChessBoard(): Boolean =
         ruleEngine is ChessRuleEngine || gameState.board.any { it is ChessPiece }
 
+    private fun isAmazonsBoard(): Boolean =
+        ruleEngine is AmazonsRuleEngine ||
+            gameState.board.any { it is AmazonsPiece }
+
+    private fun isAmazons8Board(): Boolean =
+        isAmazonsBoard() && gameState.boardSize == 8
+
+    private fun isAmazons10Board(): Boolean =
+        isAmazonsBoard() && gameState.boardSize == 10
+
     private fun isDraughtsBoard(): Boolean =
         ruleEngine is CheckersRuleEngine ||
             ruleEngine is InternationalDraughtsRuleEngine ||
-            gameState.board.any { it is CheckersPiece }
+            gameState.board.any { it is CheckersPiece } ||
+            isAmazons10Board()
 
     private fun isDraughtsImageBoard(): Boolean =
         isDraughtsBoard() && draughtsBitmap() != null
@@ -3040,7 +3213,7 @@ class BoardView(context: Context) : View(context) {
     }
 
     private fun isChessImageBoard(): Boolean =
-        isChessBoard() && chessBitmap() != null
+        (isChessBoard() || isAmazons8Board()) && chessBitmap() != null
 
     private fun chessGridX(): FloatArray = when (chessBoardStyle) {
         ChessBoardStyle.SUPPLIED_WOOD -> suppliedChessGridX
@@ -3139,7 +3312,7 @@ class BoardView(context: Context) : View(context) {
     }
 
     private fun screenToBoard(x: Float, y: Float): Position? {
-        if (isChessBoard()) {
+        if (isChessBoard() || isAmazons8Board()) {
             if (chessCellWidth <= 0f || chessCellHeight <= 0f) return null
             val displayedCol = (0 until 8).firstOrNull {
                 x >= chessLineX(it) && x < chessLineX(it + 1)

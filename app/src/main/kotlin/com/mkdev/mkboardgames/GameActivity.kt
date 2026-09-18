@@ -10,6 +10,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.mkdev.mkboardgames.engine.*
+import com.mkdev.mkboardgames.games.amazons.AmazonsRuleEngine
 import com.mkdev.mkboardgames.games.checkers.CheckersPiece
 import com.mkdev.mkboardgames.games.checkers.CheckersRuleEngine
 import com.mkdev.mkboardgames.games.checkers.InternationalDraughtsRuleEngine
@@ -59,6 +60,7 @@ class GameActivity : AppCompatActivity() {
     private lateinit var gameContainer:    View
     private lateinit var screenRoot:       FrameLayout
     private lateinit var styledOverlayHost: FrameLayout
+    private var amazonsBoardSize: Int = 8
     private val internationalDraughtsStyles = arrayOf(
         DraughtsBoardStyle.CANVAS,
         DraughtsBoardStyle.INTERNATIONAL_DARK_WOOD,
@@ -112,6 +114,7 @@ class GameActivity : AppCompatActivity() {
         gameType = intent.getStringExtra(EXTRA_GAME) ?: "CHESS"
 
         engine   = when (gameType) {
+            "AMAZONS" -> AmazonsRuleEngine(amazonsBoardSize)
             "OTHELLO"   -> OthelloRuleEngine()
             "CHECKERS"  -> CheckersRuleEngine()
             "INTERNATIONAL_DRAUGHTS" -> InternationalDraughtsRuleEngine()
@@ -223,7 +226,7 @@ class GameActivity : AppCompatActivity() {
             })
         container.addView(bottomCaptureView,
             android.widget.LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, capH))
-        val showCaptures = gameType != "OTHELLO"
+        val showCaptures = gameType != "OTHELLO" && gameType != "AMAZONS"
         topCaptureView.visibility    = if (showCaptures) View.VISIBLE else View.GONE
         bottomCaptureView.visibility = if (showCaptures) View.VISIBLE else View.GONE
 
@@ -336,6 +339,15 @@ class GameActivity : AppCompatActivity() {
         when (gameType) {
             "CHESS" -> boardView.chessBoardStyle =
                 ChessBoardStyle.entries.getOrElse(styleIndex) { ChessBoardStyle.CANVAS }
+            "AMAZONS" -> if (amazonsBoardSize == 8) {
+                boardView.chessBoardStyle =
+                    ChessBoardStyle.entries.getOrElse(styleIndex) { ChessBoardStyle.CANVAS }
+            } else {
+                boardView.draughtsBoardStyle =
+                    internationalDraughtsStyles.getOrElse(styleIndex) {
+                        internationalDraughtsStyles.first()
+                    }
+            }
             "CHECKERS" -> boardView.draughtsBoardStyle =
                 DraughtsBoardStyle.entries.getOrElse(styleIndex) { DraughtsBoardStyle.CANVAS }
             "INTERNATIONAL_DRAUGHTS" ->
@@ -357,6 +369,9 @@ class GameActivity : AppCompatActivity() {
 
     private fun currentBoardStyleIndex(): Int = when {
         gameType == "CHESS" -> boardView.chessBoardStyle.ordinal
+        gameType == "AMAZONS" && amazonsBoardSize == 8 -> boardView.chessBoardStyle.ordinal
+        gameType == "AMAZONS" ->
+            internationalDraughtsStyles.indexOf(boardView.draughtsBoardStyle).coerceAtLeast(0)
         gameType == "CHECKERS" -> boardView.draughtsBoardStyle.ordinal
         gameType == "INTERNATIONAL_DRAUGHTS" ->
             internationalDraughtsStyles.indexOf(boardView.draughtsBoardStyle).coerceAtLeast(0)
@@ -486,6 +501,7 @@ class GameActivity : AppCompatActivity() {
             vsAI = vsAI,
             playerColor = playerColor.name,
             moves = gameState.moveHistory,
+            boardSize = if (gameType == "AMAZONS") amazonsBoardSize else null,
             boardStyle = currentBoardStyleIndex(),
         )
     }
@@ -506,6 +522,7 @@ class GameActivity : AppCompatActivity() {
 
     private fun isStyledBoardGame(): Boolean =
         gameType == "CHESS" ||
+            gameType == "AMAZONS" ||
             gameType == "CHECKERS" ||
             gameType == "INTERNATIONAL_DRAUGHTS" ||
             gameType == "OTHELLO" ||
@@ -561,7 +578,9 @@ class GameActivity : AppCompatActivity() {
         )
         menuView.onVsAi = {
             vsAI = true
-            if (gameType == "CHESS") {
+            if (gameType == "AMAZONS") {
+                showAmazonsVariantPicker()
+            } else if (gameType == "CHESS") {
                 showChessBoardSelection()
             } else if (boardSelectionOptions() != null) {
                 showBoardSelection()
@@ -571,7 +590,9 @@ class GameActivity : AppCompatActivity() {
         }
         menuView.onTwoPlayers = {
             vsAI = false
-            if (gameType == "CHESS") {
+            if (gameType == "AMAZONS") {
+                showAmazonsVariantPicker()
+            } else if (gameType == "CHESS") {
                 showChessBoardSelection()
             } else if (boardSelectionOptions() != null) {
                 showBoardSelection()
@@ -593,6 +614,26 @@ class GameActivity : AppCompatActivity() {
             fullScreen = true,
             onCancel = { if (!matchStarted) finish() else showChessBoardAfterDialog() },
         )
+    }
+
+    private fun showAmazonsVariantPicker() {
+        val variants = arrayOf(
+            "8×8 — Chess board",
+            "10×10 — International Draughts board",
+        )
+        AlertDialog.Builder(this)
+            .setTitle("Amazons board")
+            .setItems(variants) { _, which ->
+                amazonsBoardSize = if (which == 0) 8 else 10
+                engine = AmazonsRuleEngine(amazonsBoardSize)
+                gameState = engine.initialState()
+                boardView.ruleEngine = engine
+                boardView.gameState = gameState
+                showBoardSelection()
+            }
+            .setNegativeButton("Back") { _, _ -> showChessMenu() }
+            .setOnCancelListener { showChessMenu() }
+            .show()
     }
 
     private fun showColorPickerDialog() {
@@ -732,6 +773,21 @@ class GameActivity : AppCompatActivity() {
     }
 
     private fun boardSelectionOptions(): List<BoardSelectionOption>? = when (gameType) {
+        "AMAZONS" -> if (amazonsBoardSize == 8) {
+            listOf(
+                BoardSelectionOption("Canvas board", "Clean and modern"),
+                BoardSelectionOption("Classic wood", "Warm tournament feel", "chess_board.jpg"),
+                BoardSelectionOption("Supplied wood", "Rich natural grain", "chess_board_wood.jpg"),
+                BoardSelectionOption("Realistic dark", "High-contrast frame"),
+                BoardSelectionOption("Black & white", "Bold monochrome", "chess_board_black_white.png"),
+            )
+        } else {
+            listOf(
+                BoardSelectionOption("Canvas board", "Clean and modern", preview = BoardSelectionPreview.CHECKERS),
+                BoardSelectionOption("Dark wood", "Deep natural grain", "international_draughts_board_dark.jpg", BoardSelectionPreview.CHECKERS),
+                BoardSelectionOption("Light wood", "Bright natural grain", "international_draughts_board_light.jpg", BoardSelectionPreview.CHECKERS),
+            )
+        }
         "CHECKERS" -> listOf(
             BoardSelectionOption("Canvas board", "Clean and modern", preview = BoardSelectionPreview.CHECKERS),
             BoardSelectionOption("Red & black", "Bold contrast", "draughts_board_red_black.png", BoardSelectionPreview.CHECKERS),
@@ -802,6 +858,7 @@ class GameActivity : AppCompatActivity() {
 
     private fun showRules(showModeAfter: Boolean = false) {
         val gameName = when (gameType) {
+            "AMAZONS" -> "Amazons"
             "OTHELLO" -> "Othello"
             "CHECKERS" -> "Draughts"
             "INTERNATIONAL_DRAUGHTS" -> "International Draughts"
@@ -812,6 +869,21 @@ class GameActivity : AppCompatActivity() {
             else -> "Chess"
         }
         val rulesText = when (gameType) {
+            "AMAZONS" -> """
+AMAZONS — Rules
+
+Overview
+Amazons is played on either an 8×8 or 10×10 board. The 8×8 variant uses Chess board presentations; the 10×10 variant uses International Draughts board presentations. White moves first.
+
+Moving an Amazon
+On your turn, move one of your four amazons any distance horizontally, vertically, or diagonally, like a chess queen. The path must be clear, and the destination must be empty.
+
+Firing an Arrow
+After moving, fire an arrow from the amazon's new square. The arrow travels in any queen direction through clear squares and permanently blocks the square where it lands. The amazon may not fire through another amazon or arrow.
+
+Winning
+The player who can make the last legal move wins. If you cannot move any amazon and fire an arrow, you lose.
+            """.trimIndent()
             "GO" -> """
 GO 围棋 — Rules
 
@@ -1199,7 +1271,7 @@ Checkmate your opponent's King.
         refreshCaptureViews()
         if (gameType == "CHESS" || gameType == "CHECKERS" ||
             gameType == "INTERNATIONAL_DRAUGHTS" || gameType == "OTHELLO" ||
-            gameType == "FOX_AND_GEESE"
+            gameType == "FOX_AND_GEESE" || gameType == "AMAZONS"
         ) SoundPlayer.play("game_start")
         updateHud()
         if (restoring != null) {
@@ -1217,6 +1289,12 @@ Checkmate your opponent's King.
         val paused = PausedMatchStore.load(this, gameType) ?: run {
             showModeDialog()
             return
+        }
+        if (gameType == "AMAZONS") {
+            amazonsBoardSize = paused.boardSize?.takeIf { it == 8 || it == 10 } ?: 8
+            engine = AmazonsRuleEngine(amazonsBoardSize)
+            boardView.ruleEngine = engine
+            boardView.gameState = engine.initialState()
         }
         vsAI = paused.vsAI
         playerColor = runCatching { PieceColor.valueOf(paused.playerColor) }
@@ -1378,6 +1456,7 @@ Checkmate your opponent's King.
             if ((gameType == "FOX_AND_GEESE" ||
                     gameType == "XIANGQI" ||
                     gameType == "SHOGI" ||
+                    gameType == "AMAZONS" ||
                     gameType == "GO") &&
                 move.metadata[GoRuleEngine.PASS_METADATA] != true
             ) SoundPlayer.playMovement("board_piece_move")
@@ -1616,6 +1695,13 @@ Checkmate your opponent's King.
                                 timeLimitMs = SettingsManager.foxAndGeeseAiTimeLimitMs(this@GameActivity)
                             )
                             ai.bestMove(thinkingState)
+                        }
+                        "AMAZONS" -> {
+                            AIPlayer(
+                                engine,
+                                maxDepth = 2,
+                                timeLimitMs = 1800L,
+                            ).bestMove(thinkingState)
                         }
                         else -> {
                             // Chess — deeper search with quiescence and time limit
@@ -1954,6 +2040,7 @@ Checkmate your opponent's King.
     }
 
     private fun styledGameLabel(): String = when (gameType) {
+        "AMAZONS" -> "A M A Z O N S"
         "CHECKERS" -> "D R A U G H T S"
         "INTERNATIONAL_DRAUGHTS" -> "I N T L  D R A U G H T S"
         "OTHELLO" -> "O T H E L L O"

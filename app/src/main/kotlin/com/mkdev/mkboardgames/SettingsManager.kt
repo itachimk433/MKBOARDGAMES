@@ -464,7 +464,7 @@ object SettingsManager {
         edit.putInt(KEY_STATS_WINS, 0).putInt(KEY_STATS_LOSSES, 0)
             .putInt(KEY_STATS_DRAWS, 0).putInt(KEY_STATS_FORFEITS, 0)
         for (g in listOf(
-            "chess", "checkers", "international_draughts",
+            "chess", "amazons", "checkers", "international_draughts",
             "othello", "morabaraba", "ttt", "connect_four", "overall",
             "fox_and_geese", "ludo", "shogi", "go"
         )) {
