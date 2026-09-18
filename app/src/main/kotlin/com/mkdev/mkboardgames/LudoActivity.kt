@@ -44,6 +44,7 @@ import com.mkdev.mkboardgames.ui.MotionDiceDirection
 import com.mkdev.mkboardgames.ui.BoardSelectionOption
 import com.mkdev.mkboardgames.ui.BoardSelectionView
 import com.mkdev.mkboardgames.ui.ChessMenuView
+import com.mkdev.mkboardgames.ui.LudoMatchBackgroundView
 import com.mkdev.mkboardgames.ui.StyledDialogs
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -104,9 +105,16 @@ class LudoActivity : AppCompatActivity() {
         val contentRoot = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding((8 * dp).toInt(), (8 * dp).toInt(), (8 * dp).toInt(), (6 * dp).toInt())
-            setBackgroundColor(Color.parseColor("#10151A"))
+            setBackgroundColor(Color.TRANSPARENT)
         }
         overlay = FrameLayout(this)
+        overlay.addView(
+            LudoMatchBackgroundView(this),
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+            ),
+        )
         overlay.addView(contentRoot, FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
             ViewGroup.LayoutParams.MATCH_PARENT,
