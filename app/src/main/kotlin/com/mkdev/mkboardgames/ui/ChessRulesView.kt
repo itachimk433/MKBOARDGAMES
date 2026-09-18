@@ -205,6 +205,7 @@ private class ChessMancalaRulesView(
     private val gameIconBitmap = run {
         val assetName = when {
             isChess -> "chess_home_icon.webp"
+            isAmazons -> "amazons_home_icon.webp"
             isDraughts && gameLabel.replace(" ", "").equals("INTLDRAUGHTS", ignoreCase = true) ->
                 "international_draughts_home_icon.webp"
             isDraughts -> "draughts_home_icon.webp"

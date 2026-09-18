@@ -93,6 +93,9 @@ class MenuView(
     private val ludoHomeIconBitmap: Bitmap? = try {
         context.assets.open("ludo_home_icon.webp").use { BitmapFactory.decodeStream(it) }
     } catch (e: Exception) { null }
+    private val amazonsHomeIconBitmap: Bitmap? = try {
+        context.assets.open("amazons_home_icon.webp").use { BitmapFactory.decodeStream(it) }
+    } catch (e: Exception) { null }
     private val othelloHomeIconBitmap: Bitmap? = try {
         context.assets.open("othello_home_icon.webp").use { BitmapFactory.decodeStream(it) }
     } catch (e: Exception) { null }
@@ -541,6 +544,11 @@ class MenuView(
     }
 
     private fun drawAmazonsMini(canvas: Canvas, left: Float, top: Float, size: Float) {
+        amazonsHomeIconBitmap?.let {
+            canvas.drawBitmap(it, null, RectF(left, top, left + size, top + size), bitmapPaint)
+            return
+        }
+
         val cell = size / 8f
         val light = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#D8C39A") }
         val dark = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#7E5137") }

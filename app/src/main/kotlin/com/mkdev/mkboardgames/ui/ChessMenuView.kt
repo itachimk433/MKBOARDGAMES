@@ -80,6 +80,7 @@ class ChessMenuView(
     private val gameHomeIconBitmap = run {
         val assetName = when {
             isChess -> "chess_home_icon.webp"
+            isAmazons -> "amazons_home_icon.webp"
             isDraughts && isInternationalDraughts -> "international_draughts_home_icon.webp"
             isDraughts -> "draughts_home_icon.webp"
             isOthello -> "othello_home_icon.webp"
