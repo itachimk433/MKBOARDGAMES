@@ -218,7 +218,8 @@ class MenuView(
     }
     private val gridColumns = 3
     private val baseCardH = 136f * dp
-    private val gameCardScale = 1.06f
+    private val gameCardScale: Float
+        get() = if (homeStyle == SettingsManager.HomeStyle.CLASSIC) 1f else 1.06f
     private val cardH get() = baseCardH
     private val gridPadding = 12f * dp
     private val gridSpacing = 8f * dp
@@ -430,7 +431,14 @@ class MenuView(
         }
 
         val contentCardH = r.height()
-        val previewSz   = minOf(contentCardH * 0.46f, r.width() * 0.64f)
+        val iconScale = if (
+            card.type == GameType.AMAZONS || card.type == GameType.MANCALA
+        ) {
+            1f
+        } else {
+            0.95f
+        }
+        val previewSz   = minOf(contentCardH * 0.46f, r.width() * 0.64f) * iconScale
         val previewLeft = r.centerX() - previewSz / 2f
         val previewTop  = r.top + 10f * dp
         drawMiniBoard(canvas, previewLeft, previewTop, previewSz, card.type)
@@ -537,11 +545,10 @@ class MenuView(
 
     private fun drawWoodCardShell(canvas: Canvas, r: RectF, pressed: Boolean) {
         gameCardFrameBitmap?.let {
-            val offset = if (pressed) 2f * dp else 0f
             canvas.drawBitmap(
                 it,
                 null,
-                RectF(r.left, r.top + offset, r.right, r.bottom + offset),
+                r,
                 bitmapPaint,
             )
             return
