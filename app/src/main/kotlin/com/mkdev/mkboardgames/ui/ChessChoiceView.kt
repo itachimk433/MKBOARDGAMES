@@ -221,10 +221,10 @@ class ChessChoiceView(
     private val playAsBlackButtonBitmap: Bitmap? = loadAssetBitmap("play_as_black.webp")
     private val hasPlayAsButtonAssets =
         !isGo && !isXiangqi && choices.any { it.label == "White" || it.label == "Black" }
-    private val playAsButtonScale = 0.8f
+    private val playAsButtonScale = 0.9f
     private val playAsButtonGap = 4f
-    private val playAsButtonOffset = 96f
-    private val playAsBlackVerticalOffset = -4f
+    private val playAsButtonOffset = 0f
+    private val playAsBlackVerticalOffset = -6f
     private val hits = choices.mapIndexed { index, choice ->
         ChoiceHit(choice, index, choice.assetName?.let(::loadAssetBitmap))
     }
