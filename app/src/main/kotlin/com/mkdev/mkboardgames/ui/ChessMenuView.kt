@@ -176,8 +176,8 @@ class ChessMenuView(
     private val backButtonPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val backButtonBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
-        strokeWidth = 1.5f * unit
-        color = Color.parseColor("#733A25")
+        strokeWidth = 1f * unit
+        color = Color.argb(185, 255, 235, 182)
     }
     private val backArrowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#4A1714")
@@ -185,11 +185,6 @@ class ChessMenuView(
         strokeWidth = 2.2f * unit
         strokeCap = Paint.Cap.ROUND
         strokeJoin = Paint.Join.ROUND
-    }
-    private val backLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#4A1714")
-        textAlign = Paint.Align.CENTER
-        isFakeBoldText = true
     }
     private val chessWavePaths = Array(3) { Path() }
     private val chessWaveEdgePaths = Array(3) { Path() }
@@ -360,16 +355,15 @@ class ChessMenuView(
             width * 0.82f,
             contentOffset + contentHeight - 8f * unit,
         )
-        val backWidth = 86f * unit
-        val backHeight = 38f * unit
+        val backSize = 34f * unit
         val backLeft = 14f * unit
         val backTop = 14f * unit
-        backRect.set(backLeft, backTop, backLeft + backWidth, backTop + backHeight)
+        backRect.set(backLeft, backTop, backLeft + backSize, backTop + backSize)
         backTouchRect.set(
             backLeft - 6f * unit,
             backTop - 6f * unit,
-            backRect.right + 6f * unit,
-            backRect.bottom + 6f * unit,
+            backLeft + backSize + 6f * unit,
+            backTop + backSize + 6f * unit,
         )
     }
 
@@ -988,32 +982,24 @@ class ChessMenuView(
 
     private fun drawBackButton(canvas: Canvas) {
         backButtonPaint.shader = LinearGradient(
-            0f,
+            backRect.left,
             backRect.top,
-            0f,
+            backRect.right,
             backRect.bottom,
-            Color.parseColor("#F5D49A"),
-            Color.parseColor("#A76438"),
+            Color.parseColor(if (pressedBack) "#D9A96D" else "#E9C38B"),
+            Color.parseColor(if (pressedBack) "#A8683E" else "#B8784B"),
             Shader.TileMode.CLAMP,
         )
-        canvas.drawRoundRect(backRect, 12f * unit, 12f * unit, backButtonPaint)
+        canvas.drawRoundRect(backRect, 10f * unit, 10f * unit, backButtonPaint)
         backButtonPaint.shader = null
-        canvas.drawRoundRect(backRect, 12f * unit, 12f * unit, backButtonBorderPaint)
+        canvas.drawRoundRect(backRect, 10f * unit, 10f * unit, backButtonBorderPaint)
 
         val offset = if (pressedBack) 2f * unit else 0f
         val centerY = backRect.centerY() + offset
-        val arrow = Path().apply {
-            moveTo(backRect.left + 19f * unit, centerY)
-            lineTo(backRect.left + 29f * unit, centerY - 7f * unit)
-            moveTo(backRect.left + 19f * unit, centerY)
-            lineTo(backRect.left + 29f * unit, centerY + 7f * unit)
-            moveTo(backRect.left + 19f * unit, centerY)
-            lineTo(backRect.left + 39f * unit, centerY)
-        }
-        canvas.drawPath(arrow, backArrowPaint)
-        backLabelPaint.textSize = 12f * textScale
-        canvas.drawText("Back", backRect.left + 62f * unit, centerY -
-            (backLabelPaint.ascent() + backLabelPaint.descent()) / 2f, backLabelPaint)
+        val tipX = backRect.left + 9f * unit
+        canvas.drawLine(tipX, centerY, backRect.right - 8f * unit, centerY, backArrowPaint)
+        canvas.drawLine(tipX, centerY, tipX + 9f * unit, centerY - 8f * unit, backArrowPaint)
+        canvas.drawLine(tipX, centerY, tipX + 9f * unit, centerY + 8f * unit, backArrowPaint)
     }
 
     private fun requestBack() {

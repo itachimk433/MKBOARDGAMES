@@ -657,7 +657,6 @@ class MancalaActivity : AppCompatActivity() {
         }
         boardView.setGameState(gameState)
         updateHud()
-        SoundPlayer.playMovement("checkers_move")
         if (gameState.status != GameStatus.IN_PROGRESS) {
             autoplayEnabled = false
             autoplayMoveInProgress = false
@@ -845,6 +844,8 @@ class MancalaActivity : AppCompatActivity() {
         private var moveAnimation: MoveAnimation? = null
         private var animationProgress = 1f
         private var animationGeneration = 0
+        private var sowingLandingSoundsPlayed = 0
+        private var settlementLandingSoundsPlayed = 0
         private var captureFeedback: CaptureFeedback? = null
         private var captureFeedbackAnimator: ValueAnimator? = null
         private var captureFeedbackProgress = 0f
@@ -1032,6 +1033,8 @@ class MancalaActivity : AppCompatActivity() {
                 settlementTransfers = transition.settlementTransfers,
                 speedMultiplier = movementSpeedMultiplier,
             )
+            sowingLandingSoundsPlayed = 0
+            settlementLandingSoundsPlayed = 0
             animationProgress = 0f
             isLocked = true
             moveAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
@@ -1039,11 +1042,13 @@ class MancalaActivity : AppCompatActivity() {
                 interpolator = AccelerateDecelerateInterpolator()
                 addUpdateListener {
                     animationProgress = it.animatedValue as Float
+                    moveAnimation?.let(::playLandingSounds)
                     invalidate()
                 }
                 addListener(object : AnimatorListenerAdapter() {
                     override fun onAnimationEnd(animation: Animator) {
                         if (generation != animationGeneration) return
+                        moveAnimation?.let(::playLandingSounds)
                         moveAnimator = null
                         moveAnimation = null
                         animationProgress = 1f
@@ -1053,6 +1058,29 @@ class MancalaActivity : AppCompatActivity() {
                     }
                 })
                 start()
+            }
+        }
+
+        private fun playLandingSounds(animation: MoveAnimation) {
+            val elapsed = animationElapsed(animation)
+            val sowingLanded = completedRouteCount(
+                animation.sowingRoutes,
+                elapsed - animation.pickupDuration - animation.stagingDuration,
+                animation.placementDuration,
+            )
+            while (sowingLandingSoundsPlayed < sowingLanded) {
+                SoundPlayer.playMovement("checkers_move")
+                sowingLandingSoundsPlayed++
+            }
+
+            val settlementLanded = completedRouteCount(
+                animation.settlementTransfers.map { it.route },
+                elapsed - animation.sowingDuration,
+                animation.placementDuration,
+            )
+            while (settlementLandingSoundsPlayed < settlementLanded) {
+                SoundPlayer.playMovement("checkers_move")
+                settlementLandingSoundsPlayed++
             }
         }
 
