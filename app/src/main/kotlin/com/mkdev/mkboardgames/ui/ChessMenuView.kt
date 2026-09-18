@@ -362,7 +362,7 @@ class ChessMenuView(
             nextRowTop = action.rect.bottom + gap
         }
         actions.forEach {
-            actionScale[action.label] = 1f
+            actionScale[it.label] = 1f
         }
         resumeRect.set(
             width * 0.18f,
