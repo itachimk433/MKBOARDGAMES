@@ -1888,8 +1888,10 @@ class BoardView(context: Context) : View(context) {
         val symbol = piece.symbol()
         piecePaint.textSize = cellSize * 0.62f
         piecePaint.textAlign = Paint.Align.CENTER
+        val isBlack = piece.color == PieceColor.BLACK
         piecePaint.style = Paint.Style.FILL
-        piecePaint.color = if (piece.color == PieceColor.WHITE) {
+        piecePaint.strokeWidth = 0f
+        piecePaint.color = if (!isBlack) {
             Color.parseColor("#FFF8E8")
         } else {
             Color.parseColor("#211A18")
@@ -1903,6 +1905,15 @@ class BoardView(context: Context) : View(context) {
             cellSize * 0.04f,
             Color.argb(150, 0, 0, 0),
         )
+        if (isBlack) {
+            piecePaint.style = Paint.Style.STROKE
+            piecePaint.strokeWidth = maxOf(1f, cellSize * 0.018f)
+            piecePaint.color = Color.parseColor("#E8E8E8")
+            canvas.drawText(symbol, cx, baseline, piecePaint)
+            piecePaint.style = Paint.Style.FILL
+            piecePaint.strokeWidth = 0f
+            piecePaint.color = Color.parseColor("#211A18")
+        }
         canvas.drawText(symbol, cx, baseline, piecePaint)
         piecePaint.clearShadowLayer()
     }

@@ -428,7 +428,7 @@ class MenuView(
 
         val (title, desc) = when (card.type) {
             GameType.CHESS       -> "Chess"        to "vs CPU  •  2 Players"
-            GameType.AMAZONS     -> "Amazons"      to "8×8  •  10×10"
+            GameType.AMAZONS     -> "Amazons"      to "vs CPU  •  2 Players"
             GameType.CHECKERS    -> "Draughts"     to "vs CPU  •  2 Players"
             GameType.INTERNATIONAL_DRAUGHTS ->
                 "International Draughts" to "vs CPU  •  2 Players"
