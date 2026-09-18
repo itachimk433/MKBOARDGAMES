@@ -1,6 +1,8 @@
 package com.mkdev.mkboardgames
 
 import android.app.Dialog
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.os.Bundle
 import android.os.Handler
@@ -19,6 +21,7 @@ import android.text.InputType
 import android.view.Gravity
 import android.widget.FrameLayout
 import android.widget.EditText
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -61,6 +64,8 @@ class LudoActivity : AppCompatActivity() {
     private lateinit var economyView: TextView
     private lateinit var storeView: TextView
     private lateinit var overlay: FrameLayout
+    private lateinit var matchBackgroundView: LudoMatchBackgroundView
+    private lateinit var boardBackdropView: ImageView
     private lateinit var notificationHost: LinearLayout
     private lateinit var modeBar: LinearLayout
     private val engine = LudoRuleEngine()
@@ -108,8 +113,22 @@ class LudoActivity : AppCompatActivity() {
             setBackgroundColor(Color.TRANSPARENT)
         }
         overlay = FrameLayout(this)
+        matchBackgroundView = LudoMatchBackgroundView(this)
         overlay.addView(
-            LudoMatchBackgroundView(this),
+            matchBackgroundView,
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+            ),
+        )
+        boardBackdropView = ImageView(this).apply {
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            visibility = View.GONE
+            isClickable = false
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        }
+        overlay.addView(
+            boardBackdropView,
             FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -221,7 +240,8 @@ class LudoActivity : AppCompatActivity() {
         playerBadgeViews = Array(LudoSetup.PLAYER_COUNT) { player ->
             LudoPlayerBadgeView(this).apply {
                 accentColor = LudoSetup.PLAYER_COLORS[player]
-                avatarScale = 0.7f
+                avatarScale = if (selectedBoard == LudoBoardView.Board.TWO) 0.9f else 0.7f
+                ringAndGlowEnabled = selectedBoard != LudoBoardView.Board.TWO
                 label = playerDisplayName(player)
                 setOnClickListener {
                     if (profilesEnabled() && matchStarted) showPlayerProfile(player)
@@ -231,7 +251,12 @@ class LudoActivity : AppCompatActivity() {
         playerControlViews = Array(LudoSetup.PLAYER_COUNT) { player ->
             LudoPlayerControlView(this).apply {
                 accentColor = LudoSetup.PLAYER_COLORS[player]
-                dieScale = 0.7f
+                frameAssetName = if (selectedBoard == LudoBoardView.Board.TWO) {
+                    SNOW_PLAYER_FRAME_ASSET
+                } else {
+                    null
+                }
+                dieScale = if (selectedBoard == LudoBoardView.Board.TWO) 1f else 0.7f
                 label = playerDisplayName(player)
                 labelBelow = player == 0 || player == 1
                 bind(
@@ -491,6 +516,7 @@ class LudoActivity : AppCompatActivity() {
         picker.onSelectionConfirmed = { index ->
             selectedBoard = LudoBoardView.Board.values()[index]
             boardView.setBoard(selectedBoard)
+            applySelectedBoardPresentation()
             StyledDialogs.dismiss()
             onSelected()
         }
@@ -545,6 +571,7 @@ class LudoActivity : AppCompatActivity() {
 
     private fun startGame() {
         boardView.setBoard(selectedBoard)
+        applySelectedBoardPresentation()
         showBoardAfterDialog()
         moves.clear()
         resultDialogVisible = false
@@ -583,6 +610,31 @@ class LudoActivity : AppCompatActivity() {
         syncMotionSensor()
         updateHud()
         if (isAiTurn()) postGameplay(650L) { rollDice() }
+    }
+
+    private fun applySelectedBoardPresentation() {
+        val isSnowBoard = selectedBoard == LudoBoardView.Board.TWO
+        matchBackgroundView.visibility = if (isSnowBoard) View.GONE else View.VISIBLE
+        boardBackdropView.setImageBitmap(
+            if (isSnowBoard) loadAssetBitmap(SNOW_BOARD_BACKGROUND_ASSET) else null,
+        )
+        boardBackdropView.visibility = if (isSnowBoard) View.VISIBLE else View.GONE
+
+        if (!::playerControlViews.isInitialized) return
+        playerControlViews.forEachIndexed { player, control ->
+            control.frameAssetName = if (isSnowBoard) SNOW_PLAYER_FRAME_ASSET else null
+            control.dieScale = if (isSnowBoard) 1f else 0.7f
+            playerBadgeViews[player].avatarScale = if (isSnowBoard) 0.9f else 0.7f
+            playerBadgeViews[player].ringAndGlowEnabled = !isSnowBoard
+            control.bind(
+                playerBadgeViews[player],
+                playerDiceViews[player],
+                profileOnEnd = player == 1 || player == 3,
+            )
+        }
+        syncPlayerOrientations()
+        boardStage.requestLayout()
+        boardStage.post { positionPlayerDice() }
     }
 
     private fun rollDice() {
@@ -2171,6 +2223,15 @@ class LudoActivity : AppCompatActivity() {
         setPlayerDiceVisible(true)
         boardView.resumeAnimations()
         recoverInterruptedGameplay()
+    }
+
+    private fun loadAssetBitmap(assetName: String): Bitmap? = runCatching {
+        assets.open(assetName).use { BitmapFactory.decodeStream(it) }
+    }.getOrNull()
+
+    private companion object {
+        const val SNOW_BOARD_BACKGROUND_ASSET = "snakes_ladders_board_two_background.webp"
+        const val SNOW_PLAYER_FRAME_ASSET = "snakes_ladders_board_two_profile_dice.webp"
     }
 
 }
