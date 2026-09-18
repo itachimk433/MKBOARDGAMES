@@ -55,14 +55,17 @@ class ChessChoiceView(
         val detail: String,
         val symbol: String,
         val accent: Int,
+        val assetName: String? = null,
     )
 
     var onChoiceSelected: ((Int) -> Unit)? = null
     var onDismissRequested: (() -> Unit)? = null
+    var onBackRequested: (() -> Unit)? = null
 
     private data class ChoiceHit(
         val choice: Choice,
         val index: Int,
+        val assetBitmap: Bitmap? = null,
         var rect: RectF = RectF(),
         var infoRect: RectF = RectF(),
     )
@@ -210,8 +213,29 @@ class ChessChoiceView(
         textAlign = Paint.Align.CENTER
         isFakeBoldText = true
     }
+    private val choiceAssetPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+    private val backButtonPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val backButtonBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 1.5f * unit
+        color = Color.parseColor("#733A25")
+    }
+    private val backArrowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#4A1714")
+        style = Paint.Style.STROKE
+        strokeWidth = 2.2f * unit
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+    }
+    private val backLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#4A1714")
+        textAlign = Paint.Align.CENTER
+        isFakeBoldText = true
+    }
 
-    private val hits = choices.mapIndexed { index, choice -> ChoiceHit(choice, index) }
+    private val hits = choices.mapIndexed { index, choice ->
+        ChoiceHit(choice, index, choice.assetName?.let(::loadAssetBitmap))
+    }
     private val scales = HashMap<Int, Float>()
     private var pressedIndex: Int? = null
     private var animator: ValueAnimator? = null
@@ -220,7 +244,10 @@ class ChessChoiceView(
     private var pressedInfoIndex: Int? = null
     private var infoIndex: Int? = null
     private var pressedClose = false
+    private var pressedBack = false
     private val closeRect = RectF()
+    private val backRect = RectF()
+    private val backTouchRect = RectF()
     private var contentOffset = 0f
     private var atmospherePhase = 0f
     private val chessFamilyBackdrop = ChessFamilyBackdrop(unit)
@@ -321,6 +348,17 @@ class ChessChoiceView(
         } else {
             closeRect.setEmpty()
         }
+        val backWidth = 86f * unit
+        val backHeight = 38f * unit
+        val backLeft = 14f * unit
+        val backTop = 14f * unit
+        backRect.set(backLeft, backTop, backLeft + backWidth, backTop + backHeight)
+        backTouchRect.set(
+            backLeft - 6f * unit,
+            backTop - 6f * unit,
+            backRect.right + 6f * unit,
+            backRect.bottom + 6f * unit,
+        )
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -363,6 +401,7 @@ class ChessChoiceView(
             surfacePaint.shader = null
         }
 
+        drawBackButton(canvas)
         when {
             compactGrid -> drawCompactGridHeader(canvas, width)
             isChessFamily -> drawChessFamilyHeader(canvas, width, contentOffset)
@@ -629,14 +668,32 @@ class ChessChoiceView(
         drawChessWoodButton(canvas, rect, pressed, unit)
         val top = rect.top + if (pressed) 2f * unit else 0f
 
-        iconPaint.color = Color.parseColor("#63301F")
-        iconPaint.textSize = if (compactGrid) 15f * textScale else 21f * textScale
-        canvas.drawText(
-            hit.choice.symbol,
-            rect.centerX(),
-            top + (if (compactGrid) 18f else 31f) * unit,
-            iconPaint,
-        )
+        if (hit.assetBitmap != null) {
+            val tokenHeight = if (compactGrid) 18f else 34f
+            val tokenWidth = tokenHeight * hit.assetBitmap.width.toFloat() /
+                hit.assetBitmap.height.toFloat()
+            val tokenTop = top + (if (compactGrid) 3f else 4f) * unit
+            canvas.drawBitmap(
+                hit.assetBitmap,
+                null,
+                RectF(
+                    rect.centerX() - tokenWidth * unit / 2f,
+                    tokenTop,
+                    rect.centerX() + tokenWidth * unit / 2f,
+                    tokenTop + tokenHeight * unit,
+                ),
+                choiceAssetPaint,
+            )
+        } else {
+            iconPaint.color = Color.parseColor("#63301F")
+            iconPaint.textSize = if (compactGrid) 15f * textScale else 21f * textScale
+            canvas.drawText(
+                hit.choice.symbol,
+                rect.centerX(),
+                top + (if (compactGrid) 18f else 31f) * unit,
+                iconPaint,
+            )
+        }
         labelPaint.color = Color.parseColor("#4A1714")
         labelPaint.textSize = if (compactGrid) 13f * textScale else 16f * textScale
         canvas.drawText(
@@ -669,6 +726,46 @@ class ChessChoiceView(
             )
         }
     }
+
+    private fun drawBackButton(canvas: Canvas) {
+        backButtonPaint.shader = LinearGradient(
+            0f,
+            backRect.top,
+            0f,
+            backRect.bottom,
+            Color.parseColor("#F5D49A"),
+            Color.parseColor("#A76438"),
+            Shader.TileMode.CLAMP,
+        )
+        canvas.drawRoundRect(backRect, 12f * unit, 12f * unit, backButtonPaint)
+        backButtonPaint.shader = null
+        canvas.drawRoundRect(backRect, 12f * unit, 12f * unit, backButtonBorderPaint)
+
+        val offset = if (pressedBack) 2f * unit else 0f
+        val centerY = backRect.centerY() + offset
+        val arrow = Path().apply {
+            moveTo(backRect.left + 19f * unit, centerY)
+            lineTo(backRect.left + 29f * unit, centerY - 7f * unit)
+            moveTo(backRect.left + 19f * unit, centerY)
+            lineTo(backRect.left + 29f * unit, centerY + 7f * unit)
+            moveTo(backRect.left + 19f * unit, centerY)
+            lineTo(backRect.left + 39f * unit, centerY)
+        }
+        canvas.drawPath(arrow, backArrowPaint)
+        backLabelPaint.textSize = 12f * textScale
+        canvas.drawText("Back", backRect.left + 62f * unit, centerY -
+            (backLabelPaint.ascent() + backLabelPaint.descent()) / 2f, backLabelPaint)
+    }
+
+    private fun requestBack() {
+        onBackRequested?.invoke()
+            ?: onDismissRequested?.invoke()
+            ?: (context as? android.app.Activity)?.onBackPressed()
+    }
+
+    private fun loadAssetBitmap(assetName: String): Bitmap? = runCatching {
+        context.assets.open(assetName).use { BitmapFactory.decodeStream(it) }
+    }.getOrNull()
 
     private fun drawChoiceInfo(canvas: Canvas, hit: ChoiceHit) {
         canvas.drawColor(Color.argb(165, 0, 0, 0))
@@ -788,6 +885,12 @@ class ChessChoiceView(
             MotionEvent.ACTION_DOWN -> {
                 downX = event.x
                 downY = event.y
+                pressedBack = backTouchRect.contains(event.x, event.y)
+                if (pressedBack) {
+                    performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                    invalidate()
+                    return true
+                }
                 pressedClose = compactGrid && closeRect.contains(event.x, event.y)
                 if (pressedClose) {
                     performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
@@ -812,12 +915,23 @@ class ChessChoiceView(
                     if (!isChessFamily && !isMorabaraba) pressedIndex?.let { animateScale(it, 1f) }
                     pressedInfoIndex = null
                     pressedClose = false
+                    pressedBack = false
                     pressedIndex = null
                     invalidate()
                 }
                 return true
             }
             MotionEvent.ACTION_UP -> {
+                if (pressedBack) {
+                    val shouldGoBack = backTouchRect.contains(event.x, event.y)
+                    pressedBack = false
+                    if (shouldGoBack) {
+                        SoundPlayer.play("ui_click")
+                        requestBack()
+                    }
+                    invalidate()
+                    return true
+                }
                 if (pressedClose) {
                     val shouldDismiss = closeRect.contains(event.x, event.y)
                     pressedClose = false
@@ -854,6 +968,7 @@ class ChessChoiceView(
                 if (!isChessFamily && !isMorabaraba) pressedIndex?.let { animateScale(it, 1f) }
                 pressedInfoIndex = null
                 pressedClose = false
+                pressedBack = false
                 pressedIndex = null
                 invalidate()
                 return true

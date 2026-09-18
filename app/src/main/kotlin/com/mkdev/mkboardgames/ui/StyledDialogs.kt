@@ -54,6 +54,14 @@ object StyledDialogs {
             removeOverlay()
             onChoice(index, dialog)
         }
+        view.onDismissRequested = {
+            removeOverlay()
+            onCancel?.invoke()
+        }
+        view.onBackRequested = {
+            removeOverlay()
+            onCancel?.invoke()
+        }
         showOverlay(
             context = context,
             content = view,

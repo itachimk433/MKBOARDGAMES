@@ -173,6 +173,24 @@ class ChessMenuView(
         typeface = Typeface.create("serif", Typeface.BOLD)
     }
     private val chessStarsPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val backButtonPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val backButtonBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 1.5f * unit
+        color = Color.parseColor("#733A25")
+    }
+    private val backArrowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#4A1714")
+        style = Paint.Style.STROKE
+        strokeWidth = 2.2f * unit
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+    }
+    private val backLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#4A1714")
+        textAlign = Paint.Align.CENTER
+        isFakeBoldText = true
+    }
     private val chessWavePaths = Array(3) { Path() }
     private val chessWaveEdgePaths = Array(3) { Path() }
     private val backgroundSpeedMultiplier = 2f
@@ -228,9 +246,12 @@ class ChessMenuView(
     private var actionScale = HashMap<String, Float>()
     private var actionAnimator: ValueAnimator? = null
     private val resumeRect = RectF()
+    private val backRect = RectF()
+    private val backTouchRect = RectF()
     private var downX = 0f
     private var downY = 0f
     private var contentOffset = 0f
+    private var pressedBack = false
 
     init {
         isClickable = true
@@ -339,6 +360,17 @@ class ChessMenuView(
             width * 0.82f,
             contentOffset + contentHeight - 8f * unit,
         )
+        val backWidth = 86f * unit
+        val backHeight = 38f * unit
+        val backLeft = 14f * unit
+        val backTop = 14f * unit
+        backRect.set(backLeft, backTop, backLeft + backWidth, backTop + backHeight)
+        backTouchRect.set(
+            backLeft - 6f * unit,
+            backTop - 6f * unit,
+            backRect.right + 6f * unit,
+            backRect.bottom + 6f * unit,
+        )
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -376,6 +408,7 @@ class ChessMenuView(
         if (!isChessFamily && !isMorabaraba) {
             drawHeader(canvas, width, contentOffset)
         }
+        drawBackButton(canvas)
         actions.forEach { drawAction(canvas, it) }
         if (hasResumeMatch) {
             drawResumeAction(canvas, width)
@@ -953,11 +986,51 @@ class ChessMenuView(
         canvas.drawText("Tap here to continue your last game", width / 2f, drawnTop + 38f * unit, footerPaint)
     }
 
+    private fun drawBackButton(canvas: Canvas) {
+        backButtonPaint.shader = LinearGradient(
+            0f,
+            backRect.top,
+            0f,
+            backRect.bottom,
+            Color.parseColor("#F5D49A"),
+            Color.parseColor("#A76438"),
+            Shader.TileMode.CLAMP,
+        )
+        canvas.drawRoundRect(backRect, 12f * unit, 12f * unit, backButtonPaint)
+        backButtonPaint.shader = null
+        canvas.drawRoundRect(backRect, 12f * unit, 12f * unit, backButtonBorderPaint)
+
+        val offset = if (pressedBack) 2f * unit else 0f
+        val centerY = backRect.centerY() + offset
+        val arrow = Path().apply {
+            moveTo(backRect.left + 19f * unit, centerY)
+            lineTo(backRect.left + 29f * unit, centerY - 7f * unit)
+            moveTo(backRect.left + 19f * unit, centerY)
+            lineTo(backRect.left + 29f * unit, centerY + 7f * unit)
+            moveTo(backRect.left + 19f * unit, centerY)
+            lineTo(backRect.left + 39f * unit, centerY)
+        }
+        canvas.drawPath(arrow, backArrowPaint)
+        backLabelPaint.textSize = 12f * textScale
+        canvas.drawText("Back", backRect.left + 62f * unit, centerY -
+            (backLabelPaint.ascent() + backLabelPaint.descent()) / 2f, backLabelPaint)
+    }
+
+    private fun requestBack() {
+        (context as? android.app.Activity)?.onBackPressed()
+    }
+
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 downX = event.x
                 downY = event.y
+                pressedBack = backTouchRect.contains(event.x, event.y)
+                if (pressedBack) {
+                    performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                    invalidate()
+                    return true
+                }
                 pressedAction = actions.firstOrNull { it.rect.contains(event.x, event.y) }
                 if (pressedAction == null && hasResumeMatch && resumeRect.contains(event.x, event.y)) {
                     resumePressed = true
@@ -973,12 +1046,23 @@ class ChessMenuView(
                     if (!isChessFamily && !isMorabaraba) pressedAction?.let { animateAction(it, 1f) }
                     pressedAction = null
                     resumePressed = false
+                    pressedBack = false
                     invalidate()
                 }
                 return true
             }
 
             MotionEvent.ACTION_UP -> {
+                if (pressedBack) {
+                    val shouldGoBack = backTouchRect.contains(event.x, event.y)
+                    pressedBack = false
+                    if (shouldGoBack) {
+                        SoundPlayer.play("ui_click")
+                        requestBack()
+                    }
+                    invalidate()
+                    return true
+                }
                 val action = pressedAction
                 if (!isChessFamily && !isMorabaraba) action?.let { animateAction(it, 1f) }
                 if (action != null && action.rect.contains(event.x, event.y)) {
@@ -990,6 +1074,7 @@ class ChessMenuView(
                 }
                 pressedAction = null
                 resumePressed = false
+                pressedBack = false
                 invalidate()
                 return true
             }
@@ -998,6 +1083,7 @@ class ChessMenuView(
                 if (!isChessFamily && !isMorabaraba) pressedAction?.let { animateAction(it, 1f) }
                 pressedAction = null
                 resumePressed = false
+                pressedBack = false
                 invalidate()
                 return true
             }

@@ -289,6 +289,9 @@ class YoteActivity : AppCompatActivity() {
             dismissOverlay()
             onDismiss?.invoke()
         }
+        overlay.onBackRequested = {
+            cancelOverlay()
+        }
         showOverlay(overlay, bottomAligned = gridChoices, onCancel = onCancel)
     }
 
