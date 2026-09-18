@@ -223,20 +223,8 @@ class ChessChoiceView(
         !isGo && !isXiangqi && choices.any { it.label == "White" || it.label == "Black" }
     private val playAsButtonScale = 0.8f
     private val playAsButtonGap = 4f
-    private val playAsButtonOffset = 24f
-    private val backButtonPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val backButtonBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-        strokeWidth = 1f * unit
-        color = Color.argb(185, 255, 235, 182)
-    }
-    private val backArrowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#4A1714")
-        style = Paint.Style.STROKE
-        strokeWidth = 2.2f * unit
-        strokeCap = Paint.Cap.ROUND
-        strokeJoin = Paint.Join.ROUND
-    }
+    private val playAsButtonOffset = 96f
+    private val playAsBlackVerticalOffset = -4f
     private val hits = choices.mapIndexed { index, choice ->
         ChoiceHit(choice, index, choice.assetName?.let(::loadAssetBitmap))
     }
@@ -370,7 +358,12 @@ class ChessChoiceView(
                 width - sidePadding * 2f
             }
             hits.forEachIndexed { index, hit ->
-                val cardTop = top + index * (cardHeight + gap)
+                val verticalOffset = if (hasPlayAsButtonAssets && hit.choice.label == "Black") {
+                    playAsBlackVerticalOffset * unit
+                } else {
+                    0f
+                }
+                val cardTop = top + index * (cardHeight + gap) + verticalOffset
                 val horizontalOffset = if (hasPlayAsButtonAssets) {
                     when (hit.choice.label) {
                         "White" -> -playAsButtonOffset * unit
@@ -774,25 +767,7 @@ class ChessChoiceView(
     }
 
     private fun drawBackButton(canvas: Canvas) {
-        backButtonPaint.shader = LinearGradient(
-            backRect.left,
-            backRect.top,
-            backRect.right,
-            backRect.bottom,
-            Color.parseColor(if (pressedBack) "#D9A96D" else "#E9C38B"),
-            Color.parseColor(if (pressedBack) "#A8683E" else "#B8784B"),
-            Shader.TileMode.CLAMP,
-        )
-        canvas.drawRoundRect(backRect, 10f * unit, 10f * unit, backButtonPaint)
-        backButtonPaint.shader = null
-        canvas.drawRoundRect(backRect, 10f * unit, 10f * unit, backButtonBorderPaint)
-
-        val offset = if (pressedBack) 2f * unit else 0f
-        val centerY = backRect.centerY() + offset
-        val tipX = backRect.left + 9f * unit
-        canvas.drawLine(tipX, centerY, backRect.right - 8f * unit, centerY, backArrowPaint)
-        canvas.drawLine(tipX, centerY, tipX + 9f * unit, centerY - 8f * unit, backArrowPaint)
-        canvas.drawLine(tipX, centerY, tipX + 9f * unit, centerY + 8f * unit, backArrowPaint)
+        GamesSelectionBackButton.draw(canvas, backRect, unit)
     }
 
     private fun requestBack() {

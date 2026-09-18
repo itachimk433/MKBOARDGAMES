@@ -96,13 +96,6 @@ class SnakesLaddersBoardSelectionView(
         textAlign = Paint.Align.CENTER
         textSize = sp(10f)
     }
-    private val backArrowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#4A1714")
-        style = Paint.Style.STROKE
-        strokeWidth = dp(2.2f)
-        strokeCap = Paint.Cap.ROUND
-        strokeJoin = Paint.Join.ROUND
-    }
     private val backgroundPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
@@ -425,14 +418,7 @@ class SnakesLaddersBoardSelectionView(
     }
 
     private fun drawBackButton(canvas: Canvas) {
-        drawChessWoodButton(canvas, backRect, pressedBack, density)
-        backArrowPaint.color = Color.parseColor("#4A1714")
-        val offset = if (pressedBack) 2f * density else 0f
-        val cy = backRect.centerY() + offset
-        val tipX = backRect.left + dp(9f)
-        canvas.drawLine(tipX, cy, backRect.right - dp(8f), cy, backArrowPaint)
-        canvas.drawLine(tipX, cy, tipX + dp(9f), cy - dp(8f), backArrowPaint)
-        canvas.drawLine(tipX, cy, tipX + dp(9f), cy + dp(8f), backArrowPaint)
+        GamesSelectionBackButton.draw(canvas, backRect, density)
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {

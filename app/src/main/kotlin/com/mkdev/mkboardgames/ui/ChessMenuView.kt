@@ -185,19 +185,6 @@ class ChessMenuView(
         typeface = Typeface.create("serif", Typeface.BOLD)
     }
     private val chessStarsPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val backButtonPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val backButtonBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-        strokeWidth = 1f * unit
-        color = Color.argb(185, 255, 235, 182)
-    }
-    private val backArrowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#4A1714")
-        style = Paint.Style.STROKE
-        strokeWidth = 2.2f * unit
-        strokeCap = Paint.Cap.ROUND
-        strokeJoin = Paint.Join.ROUND
-    }
     private val chessWavePaths = Array(3) { Path() }
     private val chessWaveEdgePaths = Array(3) { Path() }
     private val backgroundSpeedMultiplier = 2f
@@ -1046,25 +1033,7 @@ class ChessMenuView(
     }
 
     private fun drawBackButton(canvas: Canvas) {
-        backButtonPaint.shader = LinearGradient(
-            backRect.left,
-            backRect.top,
-            backRect.right,
-            backRect.bottom,
-            Color.parseColor(if (pressedBack) "#D9A96D" else "#E9C38B"),
-            Color.parseColor(if (pressedBack) "#A8683E" else "#B8784B"),
-            Shader.TileMode.CLAMP,
-        )
-        canvas.drawRoundRect(backRect, 10f * unit, 10f * unit, backButtonPaint)
-        backButtonPaint.shader = null
-        canvas.drawRoundRect(backRect, 10f * unit, 10f * unit, backButtonBorderPaint)
-
-        val offset = if (pressedBack) 2f * unit else 0f
-        val centerY = backRect.centerY() + offset
-        val tipX = backRect.left + 9f * unit
-        canvas.drawLine(tipX, centerY, backRect.right - 8f * unit, centerY, backArrowPaint)
-        canvas.drawLine(tipX, centerY, tipX + 9f * unit, centerY - 8f * unit, backArrowPaint)
-        canvas.drawLine(tipX, centerY, tipX + 9f * unit, centerY + 8f * unit, backArrowPaint)
+        GamesSelectionBackButton.draw(canvas, backRect, unit)
     }
 
     private fun requestBack() {

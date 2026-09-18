@@ -89,13 +89,6 @@ class ChessBoardSelectionView(
         textAlign = Paint.Align.CENTER
         textSize = sp(10f)
     }
-    private val backArrowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#4A1714")
-        style = Paint.Style.STROKE
-        strokeWidth = dp(2.2f)
-        strokeCap = Paint.Cap.ROUND
-        strokeJoin = Paint.Join.ROUND
-    }
     private val selectionBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
     }
@@ -367,13 +360,7 @@ class ChessBoardSelectionView(
     }
 
     private fun drawBackButton(canvas: Canvas) {
-        drawChessWoodButton(canvas, backRect, pressedBack)
-        val offset = if (pressedBack) dp(2f) else 0f
-        val cy = backRect.centerY() + offset
-        val tipX = backRect.left + dp(9f)
-        canvas.drawLine(tipX, cy, backRect.right - dp(8f), cy, backArrowPaint)
-        canvas.drawLine(tipX, cy, tipX + dp(9f), cy - dp(8f), backArrowPaint)
-        canvas.drawLine(tipX, cy, tipX + dp(9f), cy + dp(8f), backArrowPaint)
+        GamesSelectionBackButton.draw(canvas, backRect, density)
     }
 
     private fun drawChessWoodButton(canvas: Canvas, rect: RectF, pressed: Boolean) {

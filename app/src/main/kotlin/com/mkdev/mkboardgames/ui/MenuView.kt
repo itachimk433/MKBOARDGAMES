@@ -175,21 +175,6 @@ class MenuView(
         letterSpacing = 0.12f
         setShadowLayer(2f * dp, 0f, 1f * dp, Color.argb(210, 0, 0, 0))
     }
-    private val backButtonPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(210, 34, 18, 13)
-    }
-    private val backButtonEdgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#D3A05F")
-        style = Paint.Style.STROKE
-        strokeWidth = 1f * dp
-    }
-    private val backArrowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#F7D99B")
-        style = Paint.Style.STROKE
-        strokeWidth = 2.2f * dp
-        strokeCap = Paint.Cap.ROUND
-        strokeJoin = Paint.Join.ROUND
-    }
     private val gearFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#E3B86A")
         style = Paint.Style.FILL
@@ -373,13 +358,7 @@ class MenuView(
     }
 
     private fun drawBackArrow(canvas: Canvas) {
-        canvas.drawRoundRect(backRect, 10f * dp, 10f * dp, backButtonPaint)
-        canvas.drawRoundRect(backRect, 10f * dp, 10f * dp, backButtonEdgePaint)
-        val cy = backRect.centerY()
-        val tipX = backRect.left + 9f * dp
-        canvas.drawLine(tipX, cy, backRect.right - 8f * dp, cy, backArrowPaint)
-        canvas.drawLine(tipX, cy, tipX + 9f * dp, cy - 8f * dp, backArrowPaint)
-        canvas.drawLine(tipX, cy, tipX + 9f * dp, cy + 8f * dp, backArrowPaint)
+        GamesSelectionBackButton.draw(canvas, backRect, dp, isLightMode)
     }
 
     private fun drawHomeBackground(canvas: Canvas) {
@@ -1367,9 +1346,6 @@ class MenuView(
             gearHolePaint.color  = Color.parseColor("#F5F5F5")
             gearLabelPaint.color = Color.parseColor("#1976A8")
             irregularModePaint.color = Color.parseColor("#1976A8")
-            backButtonPaint.color = Color.WHITE
-            backButtonEdgePaint.color = Color.parseColor("#1976A8")
-            backArrowPaint.color = Color.parseColor("#1976A8")
         } else {
             bgPaint.color        = Color.parseColor("#121212")
             cardPaint.color      = Color.parseColor("#202429")
@@ -1383,9 +1359,6 @@ class MenuView(
             gearHolePaint.color  = Color.parseColor("#102C32")
             gearLabelPaint.color = Color.parseColor("#E3B86A")
             irregularModePaint.color = Color.parseColor("#F7D99B")
-            backButtonPaint.color = Color.argb(210, 34, 18, 13)
-            backButtonEdgePaint.color = Color.parseColor("#D3A05F")
-            backArrowPaint.color = Color.parseColor("#F7D99B")
         }
     }
 
