@@ -37,6 +37,10 @@ class ChessBoardSelectionView(
         const val FRAME_INNER_TOP = 114f
         const val FRAME_INNER_RIGHT = 498f
         const val FRAME_INNER_BOTTOM = 398f
+        const val FRAME_VISIBLE_LEFT = 70f
+        const val FRAME_VISIBLE_TOP = 87f
+        const val FRAME_VISIBLE_RIGHT = 530f
+        const val FRAME_VISIBLE_BOTTOM = 505f
         const val FRAME_SOURCE_SIZE = 600f
     }
 
@@ -269,24 +273,25 @@ class ChessBoardSelectionView(
         val drawnCard = RectF(card.left, card.top + offset, card.right, card.bottom + offset)
         val drawnImage = RectF(image.left, image.top + offset, image.right, image.bottom + offset)
 
-        drawCardBase(canvas, drawnCard)
         canvas.save()
         canvas.clipRect(drawnImage)
         drawPreview(canvas, style, drawnImage)
         canvas.drawRect(drawnImage, scrimPaint)
         canvas.restore()
-        frameBitmap?.let { drawFrameAlignedToImage(canvas, it, drawnImage, drawnCard) }
+        val frameBounds = frameBitmap?.let {
+            drawFrameAlignedToImage(canvas, it, drawnImage, drawnCard)
+        } ?: RectF(drawnImage)
 
         val name = styleNames[index].first
         canvas.drawText(name, drawnCard.centerX(), drawnCard.bottom - dp(26f), boardTitlePaint)
 
         if (selectedStyle != null && !selected) {
-            canvas.drawRoundRect(drawnCard, dp(10f), dp(10f), dimPaint)
+            canvas.drawRect(frameBounds, dimPaint)
         }
         if (selected) {
             selectionBorderPaint.color = Color.parseColor("#F6D78F")
             selectionBorderPaint.strokeWidth = dp(3f)
-            canvas.drawRoundRect(drawnCard, dp(10f), dp(10f), selectionBorderPaint)
+            canvas.drawRect(frameBounds, selectionBorderPaint)
         }
     }
 
@@ -371,32 +376,37 @@ class ChessBoardSelectionView(
         GamesSelectionBackButton.draw(canvas, backRect, density)
     }
 
-    private fun drawCardBase(canvas: Canvas, rect: RectF) {
-        cardPaint.color = Color.parseColor("#17262D")
-        canvas.drawRoundRect(rect, dp(8f), dp(8f), cardPaint)
-    }
-
     private fun drawFrameAlignedToImage(
         canvas: Canvas,
         frame: Bitmap,
         image: RectF,
         card: RectF,
-    ) {
+    ): RectF {
         val innerWidth = FRAME_INNER_RIGHT - FRAME_INNER_LEFT
         val innerHeight = FRAME_INNER_BOTTOM - FRAME_INNER_TOP
         val scale = min(image.width() / innerWidth, image.height() / innerHeight)
         val frameSize = FRAME_SOURCE_SIZE * scale
+        val frameLeft = image.left - FRAME_INNER_LEFT * scale
+        val frameTop = image.top - FRAME_INNER_TOP * scale
         val destination = RectF(
-            image.left - FRAME_INNER_LEFT * scale,
-            image.top - FRAME_INNER_TOP * scale,
-            image.left - FRAME_INNER_LEFT * scale + frameSize,
-            image.top - FRAME_INNER_TOP * scale + frameSize,
+            frameLeft,
+            frameTop,
+            frameLeft + frameSize,
+            frameTop + frameSize,
+        )
+        val visibleBounds = RectF(
+            frameLeft + FRAME_VISIBLE_LEFT * scale,
+            frameTop + FRAME_VISIBLE_TOP * scale,
+            frameLeft + FRAME_VISIBLE_RIGHT * scale,
+            frameTop + FRAME_VISIBLE_BOTTOM * scale,
         )
 
         canvas.save()
         canvas.clipRect(card)
         canvas.drawBitmap(frame, null, destination, imagePaint)
         canvas.restore()
+        visibleBounds.intersect(card)
+        return visibleBounds
     }
 
     private fun drawBitmapCover(canvas: Canvas, bitmap: Bitmap, destination: RectF) {

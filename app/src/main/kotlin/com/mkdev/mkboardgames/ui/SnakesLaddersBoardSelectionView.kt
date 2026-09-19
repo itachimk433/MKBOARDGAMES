@@ -54,6 +54,10 @@ class SnakesLaddersBoardSelectionView(
         const val FRAME_INNER_TOP = 114f
         const val FRAME_INNER_RIGHT = 498f
         const val FRAME_INNER_BOTTOM = 398f
+        const val FRAME_VISIBLE_LEFT = 70f
+        const val FRAME_VISIBLE_TOP = 87f
+        const val FRAME_VISIBLE_RIGHT = 530f
+        const val FRAME_VISIBLE_BOTTOM = 505f
         const val FRAME_SOURCE_SIZE = 600f
     }
 
@@ -319,8 +323,6 @@ class SnakesLaddersBoardSelectionView(
         val drawnCard = RectF(card.left, card.top + offset, card.right, card.bottom + offset)
         val drawnImage = RectF(image.left, image.top + offset, image.right, image.bottom + offset)
 
-        drawCardBase(canvas, drawnCard)
-
         canvas.save()
         canvas.clipRect(drawnImage)
         bitmaps[index]?.let { bitmap ->
@@ -331,21 +333,18 @@ class SnakesLaddersBoardSelectionView(
         }
         canvas.drawRect(drawnImage, scrimPaint)
         canvas.restore()
-        frameBitmap?.let { drawFrameAlignedToImage(canvas, it, drawnImage, drawnCard) }
+        val frameBounds = frameBitmap?.let {
+            drawFrameAlignedToImage(canvas, it, drawnImage, drawnCard)
+        } ?: RectF(drawnImage)
 
         canvas.drawText(board.displayName, drawnCard.centerX(), drawnCard.bottom - dp(31f), boardTitlePaint)
         if (selectedBoard != null && !selected) {
-            canvas.drawRoundRect(drawnCard, dp(10f), dp(10f), dimPaint)
+            canvas.drawRect(frameBounds, dimPaint)
         }
         if (selected) {
             selectionBorderPaint.color = Color.parseColor("#F6D78F")
             selectionBorderPaint.strokeWidth = dp(3f)
-            canvas.drawRoundRect(
-                drawnCard,
-                dp(10f),
-                dp(10f),
-                selectionBorderPaint,
-            )
+            canvas.drawRect(frameBounds, selectionBorderPaint)
         }
     }
 
@@ -394,33 +393,37 @@ class SnakesLaddersBoardSelectionView(
         canvas.drawText("START", centerX, continueRect.bottom + dp(13f), continueLabelPaint)
     }
 
-    private fun drawCardBase(canvas: Canvas, rect: RectF) {
-        cardPaint.color = Color.parseColor("#17262D")
-        canvas.drawRoundRect(rect, dp(8f), dp(8f), cardPaint)
-    }
-
     private fun drawFrameAlignedToImage(
         canvas: Canvas,
         frame: Bitmap,
         image: RectF,
         card: RectF,
-    ) {
+    ): RectF {
         val innerWidth = FRAME_INNER_RIGHT - FRAME_INNER_LEFT
         val innerHeight = FRAME_INNER_BOTTOM - FRAME_INNER_TOP
         val scale = min(image.width() / innerWidth, image.height() / innerHeight)
-        val frameWidth = FRAME_SOURCE_SIZE * scale
-        val frameHeight = FRAME_SOURCE_SIZE * scale
+        val frameSize = FRAME_SOURCE_SIZE * scale
+        val frameLeft = image.left - FRAME_INNER_LEFT * scale
+        val frameTop = image.top - FRAME_INNER_TOP * scale
         val destination = RectF(
-            image.left - FRAME_INNER_LEFT * scale,
-            image.top - FRAME_INNER_TOP * scale,
-            image.left - FRAME_INNER_LEFT * scale + frameWidth,
-            image.top - FRAME_INNER_TOP * scale + frameHeight,
+            frameLeft,
+            frameTop,
+            frameLeft + frameSize,
+            frameTop + frameSize,
+        )
+        val visibleBounds = RectF(
+            frameLeft + FRAME_VISIBLE_LEFT * scale,
+            frameTop + FRAME_VISIBLE_TOP * scale,
+            frameLeft + FRAME_VISIBLE_RIGHT * scale,
+            frameTop + FRAME_VISIBLE_BOTTOM * scale,
         )
 
         canvas.save()
         canvas.clipRect(card)
         canvas.drawBitmap(frame, null, destination, imagePaint)
         canvas.restore()
+        visibleBounds.intersect(card)
+        return visibleBounds
     }
 
     private fun drawBitmapCover(canvas: Canvas, bitmap: Bitmap, destination: RectF) {
