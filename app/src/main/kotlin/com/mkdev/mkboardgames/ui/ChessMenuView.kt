@@ -100,7 +100,7 @@ class ChessMenuView(
             isMancala -> "mancala_home_icon.webp"
             isYote -> "yote_home_icon.webp"
             isOnitama -> "onitama_home_icon.webp"
-            isFiveFieldKono -> "five_field_kono_home_icon.png"
+            isFiveFieldKono -> "five_field_kono_home_icon.webp"
             else -> null
         }
         assetName?.let {

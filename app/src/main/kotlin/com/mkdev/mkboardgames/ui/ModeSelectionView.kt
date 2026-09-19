@@ -235,22 +235,6 @@ class ModeSelectionView(context: Context) : View(context) {
         canvas.drawText("SELECT MODE", centerX, height * 0.13f, sectionPaint)
 
         drawModeCard(canvas, normalRect, GameMode.NORMAL, "♟️", "Play", "Standard rules")
-        drawModeCard(
-            canvas,
-            irregularRect,
-            GameMode.IRREGULAR,
-            "♟️♟️",
-            "Play (IRREGULAR MODE)",
-            "",
-        )
-        drawModeCard(
-            canvas,
-            challengesRect,
-            GameMode.CHALLENGES,
-            "♞",
-            "Challenges",
-            "",
-        )
         drawSettings(canvas)
     }
 

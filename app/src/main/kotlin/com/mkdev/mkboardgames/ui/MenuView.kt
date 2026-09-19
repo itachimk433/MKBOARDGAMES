@@ -4,7 +4,11 @@ import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.*
 import android.view.MotionEvent
+import android.view.ViewConfiguration
 import android.view.View
+import android.view.VelocityTracker
+import android.view.animation.DecelerateInterpolator
+import android.widget.OverScroller
 import com.mkdev.mkboardgames.GameMode
 import com.mkdev.mkboardgames.SettingsManager
 import com.mkdev.mkboardgames.engine.Position
@@ -238,7 +242,17 @@ class MenuView(
     private var scrollY    = 0f
     private var maxScrollY = 0f
     private var lastTouchY = 0f
+    private var downTouchY = 0f
+    private var touchSlop = 0f
+    private var isDragging = false
+    private var velocityTracker: VelocityTracker? = null
+    private val scrollScroller = OverScroller(context, DecelerateInterpolator(1.5f))
     private var headerH    = 0f   // Y where cards begin (below the compact header)
+
+    init {
+        touchSlop = ViewConfiguration.get(context).scaledTouchSlop.toFloat()
+        isClickable = true
+    }
 
     override fun onSizeChanged(w: Int, h: Int, ow: Int, oh: Int) {
         headerH = if (currentGameMode == GameMode.IRREGULAR) 82f * dp else 64f * dp
@@ -260,6 +274,7 @@ class MenuView(
     }
 
     private fun updateCardLayout() {
+        scrollScroller.forceFinished(true)
         for (i in cards.indices) {
             val column = i % gridColumns
             val row = i / gridColumns
@@ -280,6 +295,12 @@ class MenuView(
         val cy = event.y + scrollY
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
+                scrollScroller.forceFinished(true)
+                velocityTracker?.recycle()
+                velocityTracker = VelocityTracker.obtain()
+                velocityTracker?.addMovement(event)
+                downTouchY = event.y
+                isDragging = false
                 lastTouchY  = event.y
                 pressedBack = backTouch.contains(event.x, event.y)
                 pressedGear = !pressedBack && gearTouch.contains(event.x, cy)
@@ -292,21 +313,52 @@ class MenuView(
                 invalidate()
             }
             MotionEvent.ACTION_MOVE -> {
+                velocityTracker?.addMovement(event)
+                if (!isDragging && kotlin.math.abs(event.y - downTouchY) > touchSlop) {
+                    isDragging = true
+                }
                 if (pressedBack && !backTouch.contains(event.x, event.y)) {
                     pressedBack = false
                     invalidate()
                     return true
                 }
                 val dy = lastTouchY - event.y
-                if (kotlin.math.abs(dy) > 6f) {
+                if (isDragging) {
                     pressedCard?.let { animateCardScale(it, 1f) }
                     pressedCard = null; pressedGear = false
                 }
                 scrollY = (scrollY + dy).coerceIn(0f, maxScrollY)
                 lastTouchY = event.y
-                invalidate()
+                postInvalidateOnAnimation()
             }
             MotionEvent.ACTION_UP -> {
+                velocityTracker?.addMovement(event)
+                if (isDragging) {
+                    velocityTracker?.computeCurrentVelocity(1000)
+                    val velocityY = velocityTracker?.yVelocity ?: 0f
+                    if (kotlin.math.abs(velocityY) > 80f && maxScrollY > 0f) {
+                        scrollScroller.fling(
+                            0,
+                            scrollY.toInt(),
+                            0,
+                            -velocityY.toInt(),
+                            0,
+                            0,
+                            0,
+                            maxScrollY.toInt(),
+                        )
+                        postInvalidateOnAnimation()
+                    }
+                    velocityTracker?.recycle()
+                    velocityTracker = null
+                    pressedCard = null
+                    pressedGear = false
+                    pressedBack = false
+                    invalidate()
+                    return true
+                }
+                velocityTracker?.recycle()
+                velocityTracker = null
                 if (pressedBack) {
                     val selectedBack = backTouch.contains(event.x, event.y)
                     pressedBack = false
@@ -332,11 +384,28 @@ class MenuView(
                 pressedCard = null; pressedGear = false; invalidate()
             }
             MotionEvent.ACTION_CANCEL -> {
+                velocityTracker?.recycle()
+                velocityTracker = null
+                scrollScroller.forceFinished(true)
                 pressedCard?.let { animateCardScale(it, 1f) }
                 pressedCard = null; pressedGear = false; pressedBack = false; invalidate()
             }
         }
         return true
+    }
+
+    override fun computeScroll() {
+        if (scrollScroller.computeScrollOffset()) {
+            scrollY = scrollScroller.currY.toFloat().coerceIn(0f, maxScrollY)
+            postInvalidateOnAnimation()
+        }
+    }
+
+    override fun onDetachedFromWindow() {
+        velocityTracker?.recycle()
+        velocityTracker = null
+        scrollScroller.forceFinished(true)
+        super.onDetachedFromWindow()
     }
 
     // ── Draw ──────────────────────────────────────────────────────────────────
