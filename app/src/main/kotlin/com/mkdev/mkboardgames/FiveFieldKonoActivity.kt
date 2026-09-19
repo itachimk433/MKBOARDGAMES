@@ -1,9 +1,7 @@
 package com.mkdev.mkboardgames
 
-import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
-import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
 import android.widget.FrameLayout
@@ -20,7 +18,6 @@ import com.mkdev.mkboardgames.ui.BoardSelectionPreview
 import com.mkdev.mkboardgames.ui.BoardSelectionView
 import com.mkdev.mkboardgames.ui.ChessChoiceView
 import com.mkdev.mkboardgames.ui.ChessMenuView
-import com.mkdev.mkboardgames.ui.ChessRulesView
 import com.mkdev.mkboardgames.ui.FiveFieldKonoBoardStyle
 import com.mkdev.mkboardgames.ui.FiveFieldKonoBoardView
 import com.mkdev.mkboardgames.ui.SnakesLaddersGameOverView
@@ -66,7 +63,6 @@ class FiveFieldKonoActivity : AppCompatActivity() {
     private var matchStarted = false
     private var activityResumed = false
     private var resultRecorded = false
-    private var activeOverlay: View? = null
     private var aiJob: Job? = null
     private val previousStates = ArrayDeque<GameState>()
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
@@ -151,9 +147,7 @@ class FiveFieldKonoActivity : AppCompatActivity() {
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         if (StyledDialogs.handleBackPressed()) return
-        if (activeOverlay != null) {
-            cancelOverlay()
-        } else if (!matchStarted) {
+        if (!matchStarted) {
             @Suppress("DEPRECATION") super.onBackPressed()
         } else if (gameState.status != GameStatus.IN_PROGRESS) {
             showResultDialog()
@@ -180,30 +174,31 @@ class FiveFieldKonoActivity : AppCompatActivity() {
             gameLabel = GAME_LABEL,
         )
         menu.onVsAi = {
-            dismissOverlay()
+            StyledDialogs.dismiss()
             vsAI = true
             showBoardSelection(fromMode = true)
         }
         menu.onTwoPlayers = {
-            dismissOverlay()
+            StyledDialogs.dismiss()
             vsAI = false
             playerColor = PieceColor.WHITE
             showBoardSelection(fromMode = false)
         }
         menu.onHowToPlay = {
-            dismissOverlay()
+            StyledDialogs.dismiss()
             showRules(showModeAfter = !matchStarted)
         }
         menu.onResumeMatch = {
-            dismissOverlay()
+            StyledDialogs.dismiss()
             resumePausedMatch()
         }
-        showOverlay(menu) {
+        StyledDialogs.showFullScreenView(this, menu) {
             if (matchStarted) showBoardAfterDialog() else finish()
         }
     }
 
     private fun showBoardSelection(fromMode: Boolean) {
+        gameRoot.visibility = View.GONE
         val options = FiveFieldKonoBoardStyle.entries.map {
             BoardSelectionOption(
                 title = it.title,
@@ -214,13 +209,16 @@ class FiveFieldKonoActivity : AppCompatActivity() {
         }
         val picker = BoardSelectionView(this, "Five Field Kono", options)
         picker.onSelectionConfirmed = { index ->
-            dismissOverlay()
+            StyledDialogs.dismiss()
             boardStyle = FiveFieldKonoBoardStyle.entries[index]
             if (fromMode && vsAI) showColorPicker() else startGame()
         }
-        picker.onBackClicked = { showModeDialog() }
-        showOverlay(picker) {
-            if (matchStarted) showBoardAfterDialog() else showModeDialog()
+        picker.onBackClicked = {
+            StyledDialogs.dismiss()
+            showModeDialog()
+        }
+        StyledDialogs.showFullScreenView(this, picker) {
+            showModeDialog()
         }
     }
 
@@ -240,20 +238,13 @@ class FiveFieldKonoActivity : AppCompatActivity() {
     }
 
     private fun showRules(showModeAfter: Boolean) {
-        val rules = ChessRulesView(
+        StyledDialogs.showRules(
             this,
             gameName = "Five Field Kono",
-            rulesText = KONO_RULES,
+            rules = KONO_RULES,
             gameLabel = GAME_LABEL,
-            headerSymbol = "◆",
+            onDone = { if (showModeAfter) showModeDialog() else showBoardAfterDialog() },
         )
-        rules.onDone = {
-            dismissOverlay()
-            if (showModeAfter) showModeDialog() else showBoardAfterDialog()
-        }
-        showOverlay(rules) {
-            if (showModeAfter) showModeDialog() else showBoardAfterDialog()
-        }
     }
 
     private fun showChoiceOverlay(
@@ -263,42 +254,21 @@ class FiveFieldKonoActivity : AppCompatActivity() {
         onCancel: () -> Unit,
         onChoice: (Int) -> Unit,
     ) {
-        val overlay = ChessChoiceView(
+        gameRoot.visibility = View.GONE
+        StyledDialogs.showChoices(
             this,
             title,
             subtitle,
             choices,
             gameLabel = GAME_LABEL,
-        )
-        overlay.onChoiceSelected = {
-            dismissOverlay()
-            onChoice(it)
+            onCancel = onCancel,
+        ) { index, _ ->
+            onChoice(index)
         }
-        overlay.onDismissRequested = {
-            dismissOverlay()
-            onCancel()
-        }
-        overlay.onBackRequested = { cancelOverlay() }
-        showOverlay(overlay, onCancel = onCancel)
-    }
-
-    private fun showOverlay(view: View, onCancel: () -> Unit) {
-        dismissOverlay()
-        activeOverlay = view
-        view.tag = onCancel
-        screenRoot.addView(view, FrameLayout.LayoutParams(-1, -1))
-        view.requestFocus()
     }
 
     private fun dismissOverlay() {
-        activeOverlay?.let(screenRoot::removeView)
-        activeOverlay = null
-    }
-
-    private fun cancelOverlay() {
-        val callback = activeOverlay?.tag as? (() -> Unit)
-        dismissOverlay()
-        callback?.invoke()
+        StyledDialogs.dismiss()
     }
 
     private fun startGame(restoring: PausedMatchStore.Match? = null) {
@@ -412,7 +382,7 @@ class FiveFieldKonoActivity : AppCompatActivity() {
     }
 
     private fun triggerAI() {
-        if (!activityResumed || activeOverlay != null || !vsAI ||
+        if (!activityResumed || StyledDialogs.hasActiveOverlay() || !vsAI ||
             gameState.status != GameStatus.IN_PROGRESS || gameState.currentTurn == playerColor ||
             aiJob?.isActive == true
         ) return
@@ -432,7 +402,9 @@ class FiveFieldKonoActivity : AppCompatActivity() {
                 }.getOrNull() ?: engine.allLegalMoves(snapshot, snapshot.currentTurn).firstOrNull()
             }
             hudView.setThinking(false)
-            if (activityResumed && snapshot == gameState && activeOverlay == null && move != null) {
+            if (activityResumed && snapshot == gameState &&
+                !StyledDialogs.hasActiveOverlay() && move != null
+            ) {
                 boardView.animateMove(move, fromComputer = true)
             } else {
                 boardView.isLocked = false

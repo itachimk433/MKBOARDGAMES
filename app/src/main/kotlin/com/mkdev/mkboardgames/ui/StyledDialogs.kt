@@ -92,6 +92,8 @@ object StyledDialogs {
         removeOverlay()
     }
 
+    fun hasActiveOverlay(): Boolean = activeOverlay != null
+
     private fun showOverlay(
         context: Context,
         content: View,
@@ -195,6 +197,7 @@ object StyledDialogs {
             normalizedLabel.contains("TICTACTOE") -> "✕"
             gameLabel == "L U D O" -> "⚄"
             normalizedLabel.replace("&", "").contains("SNAKESLADDERS") -> "⚄"
+            normalizedLabel.contains("FIVEFIELDKONO") -> "◆"
             else -> "♛"
         }
         val view = ChessRulesView(context, gameName, rules, gameLabel, headerSymbol)
