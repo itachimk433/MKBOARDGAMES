@@ -103,6 +103,7 @@ class ChessChoiceView(
             isXiangqi || isTicTacToe || isConnectFour || isLudo || isSnakesLadders ||
             isMancala || isYote || isOnitama || isFiveFieldKono
     private val useLabelOnlyChoices = true
+    private val lowerButtonLift = 0.2f
     private val gameIconBitmap = run {
         val assetName = when {
             isChess -> "chess_home_icon.webp"
@@ -334,6 +335,7 @@ class ChessChoiceView(
         } else {
             10f * unit
         }
+        val rowStride = cardHeight + gap - cardHeight * lowerButtonLift
         val contentHeight = if (compactGrid) {
             (84f * unit) + rows * (cardHeight + gap)
         } else {
@@ -352,7 +354,7 @@ class ChessChoiceView(
                 val row = index / 2
                 val column = index % 2
                 val left = sidePadding + column * (cardWidth + columnGap)
-                val cardTop = top + row * (cardHeight + gap)
+                val cardTop = top + row * rowStride
                 hit.rect = RectF(left, cardTop, left + cardWidth, cardTop + cardHeight)
                 hit.infoRect = if (showChoiceInfo) {
                     RectF(
@@ -368,7 +370,7 @@ class ChessChoiceView(
         } else {
             val cardWidth = width - sidePadding * 2f
             hits.forEachIndexed { index, hit ->
-                val cardTop = top + index * (cardHeight + gap)
+                val cardTop = top + index * rowStride
                 val cardLeft = (width - cardWidth) / 2f
                 hit.rect = RectF(cardLeft, cardTop, cardLeft + cardWidth, cardTop + cardHeight)
                 hit.infoRect.setEmpty()
