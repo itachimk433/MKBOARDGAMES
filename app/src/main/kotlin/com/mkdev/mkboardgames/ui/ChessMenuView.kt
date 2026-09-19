@@ -254,6 +254,7 @@ class ChessMenuView(
     private var pressedBack = false
 
     init {
+        PlainGameButtonAssets.initialize(context)
         isClickable = true
     }
 
@@ -877,21 +878,32 @@ class ChessMenuView(
         canvas.save()
         canvas.scale(scale, scale, rect.centerX(), rect.centerY())
 
-        panelPaint.color = if (pressed) Color.parseColor("#21454A") else Color.parseColor("#16353B")
-        canvas.drawRoundRect(rect, 8f * unit, 8f * unit, panelPaint)
-        panelBorderPaint.color = if (pressed) action.accent else Color.parseColor("#2C5960")
-        canvas.drawRoundRect(
-            RectF(rect.left + 0.5f * unit, rect.top + 0.5f * unit, rect.right - 0.5f * unit, rect.bottom - 0.5f * unit),
-            8f * unit,
-            8f * unit,
-            panelBorderPaint,
-        )
+        val usesPlainPlate = PlainGameButtonAssets.styleFor(rect)?.let { style ->
+            PlainGameButtonAssets.draw(canvas, rect, style, pressed)
+        } == true
+        if (!usesPlainPlate) {
+            panelPaint.color = if (pressed) Color.parseColor("#21454A") else Color.parseColor("#16353B")
+            canvas.drawRoundRect(rect, 8f * unit, 8f * unit, panelPaint)
+            panelBorderPaint.color = if (pressed) action.accent else Color.parseColor("#2C5960")
+            canvas.drawRoundRect(
+                RectF(
+                    rect.left + 0.5f * unit,
+                    rect.top + 0.5f * unit,
+                    rect.right - 0.5f * unit,
+                    rect.bottom - 0.5f * unit,
+                ),
+                8f * unit,
+                8f * unit,
+                panelBorderPaint,
+            )
+        }
 
         if (action.symbol.isNotBlank()) {
-            actionSymbolPaint.color = action.accent
+            actionSymbolPaint.color = if (usesPlainPlate) Color.WHITE else action.accent
             actionSymbolPaint.textSize = 20f * textScale
             canvas.drawText(action.symbol, rect.centerX(), rect.top + 25f * unit, actionSymbolPaint)
             actionLabelPaint.color = Color.WHITE
+            actionDetailPaint.color = if (usesPlainPlate) Color.WHITE else Color.parseColor("#9FB5B8")
             canvas.drawText(action.label, rect.centerX(), rect.top + 52f * unit, actionLabelPaint)
             canvas.drawText(action.detail, rect.centerX(), rect.top + 69f * unit, actionDetailPaint)
         } else {

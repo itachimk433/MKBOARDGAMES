@@ -44,6 +44,9 @@ internal class BrownWoodCardRenderer(private val dp: Float) {
     }
 
     fun draw(canvas: Canvas, rect: RectF, pressed: Boolean) {
+        PlainGameButtonAssets.styleFor(rect)?.let { style ->
+            if (PlainGameButtonAssets.draw(canvas, rect, style, pressed)) return
+        }
         val radius = 11f * dp
         val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.argb(155, 0, 0, 0)

@@ -61,6 +61,7 @@ class MancalaWoodButton(
     }
 
     init {
+        PlainGameButtonAssets.initialize(context)
         isClickable = true
         isFocusable = true
         contentDescription = label
@@ -73,6 +74,15 @@ class MancalaWoodButton(
         val inset = dp(context, 3f)
         val lift = if (pressed) dp(context, 2f) else 0f
         val rect = RectF(inset, inset + lift, width - inset, height - inset + lift)
+        val plateStyle = PlainGameButtonAssets.styleFor(rect)
+        if (plateStyle != null && PlainGameButtonAssets.draw(canvas, rect, plateStyle, pressed)) {
+            labelPaint.color = Color.WHITE
+            labelPaint.textSize = min(width * 0.16f, height * 0.4f).coerceAtLeast(dp(context, 12f))
+            val metrics = labelPaint.fontMetrics
+            val baseline = rect.centerY() - (metrics.ascent + metrics.descent) / 2f
+            canvas.drawText(label, rect.centerX(), baseline, labelPaint)
+            return
+        }
         val radius = min(rect.height(), rect.width()) * 0.18f
 
         val colors = woodColors(style)
@@ -206,6 +216,7 @@ class MancalaHomeView(context: Context) : View(context) {
     private var pressedKey: String? = null
 
     init {
+        PlainGameButtonAssets.initialize(context)
         isClickable = true
         isFocusable = true
         contentDescription = "Mancala home"
@@ -539,6 +550,7 @@ open class MancalaChoiceOverlayView(
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
 
     init {
+        PlainGameButtonAssets.initialize(context)
         isClickable = true
         isFocusable = true
         contentDescription = title
@@ -668,6 +680,26 @@ open class MancalaChoiceOverlayView(
     }
 
     private fun drawChoiceButton(canvas: Canvas, rect: RectF, label: String, pressed: Boolean) {
+        if (PlainGameButtonAssets.draw(
+                canvas,
+                rect,
+                PlainGameButtonAssets.Style.LONG,
+                pressed,
+            )
+        ) {
+            textPaint.color = Color.WHITE
+            textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            textPaint.textSize = min(dp(context, 20f), rect.height() * 0.28f)
+            val metrics = textPaint.fontMetrics
+            val offset = if (pressed) dp(context, 2f) else 0f
+            canvas.drawText(
+                label,
+                rect.centerX(),
+                rect.centerY() + offset - (metrics.ascent + metrics.descent) / 2f,
+                textPaint,
+            )
+            return
+        }
         val offset = if (pressed) dp(context, 2f) else 0f
         val drawn = RectF(rect.left, rect.top + offset, rect.right, rect.bottom + offset)
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {

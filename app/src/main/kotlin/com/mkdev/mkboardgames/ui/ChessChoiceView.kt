@@ -221,14 +221,6 @@ class ChessChoiceView(
         isFakeBoldText = true
     }
     private val choiceAssetPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-    private val playAsWhiteButtonBitmap: Bitmap? = loadAssetBitmap("play_as_white.webp")
-    private val playAsBlackButtonBitmap: Bitmap? = loadAssetBitmap("play_as_black.webp")
-    private val hasPlayAsButtonAssets =
-        !isGo && !isXiangqi && choices.any { it.label == "White" || it.label == "Black" }
-    private val playAsButtonScale = 0.9f
-    private val playAsButtonGap = 4f
-    private val playAsButtonOffset = 0f
-    private val playAsBlackVerticalOffset = -6f
     private val hits = choices.mapIndexed { index, choice ->
         ChoiceHit(choice, index, choice.assetName?.let(::loadAssetBitmap))
     }
@@ -258,6 +250,7 @@ class ChessChoiceView(
     }
 
     init {
+        PlainGameButtonAssets.initialize(context)
         isClickable = true
         isFocusable = true
         contentDescription = "$title. $subtitle"
@@ -280,19 +273,21 @@ class ChessChoiceView(
         val measuredWidth = MeasureSpec.getSize(widthMeasureSpec)
         val sidePadding = (if (compactGrid) 12f else 22f) * unit
         val availableCardWidth = (measuredWidth - sidePadding * 2f).coerceAtLeast(0f)
-        val cardHeight = if (compactGrid) {
-            44f * unit
-        } else if (hasPlayAsButtonAssets) {
-            availableCardWidth * playAsButtonScale * 149f / 448f
-        } else {
-            88f * unit
-        }
+        val cardHeight = when {
+            compactGrid -> 44f * unit
+            gridChoices -> PlainGameButtonAssets.heightForWidth(
+                (availableCardWidth - 6f * unit) / 2f,
+                PlainGameButtonAssets.Style.SHORT,
+            )
+            else -> PlainGameButtonAssets.heightForWidth(
+                availableCardWidth,
+                PlainGameButtonAssets.Style.LONG,
+            )
+        }.coerceAtLeast(44f * unit)
         val gap = if (compactGrid) {
             6f * unit
-        } else if (hasPlayAsButtonAssets) {
-            playAsButtonGap * unit
         } else {
-            16f * unit
+            10f * unit
         }
         val desiredHeight = if (compactGrid) {
             84f * unit + rows * (cardHeight + gap)
@@ -310,24 +305,26 @@ class ChessChoiceView(
     override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
         val rows = if (gridChoices) (hits.size + 1) / 2 else hits.size
         val sidePadding = (if (compactGrid) 12f else 22f) * unit
-        val cardHeight = if (compactGrid) {
-            44f * unit
-        } else if (hasPlayAsButtonAssets) {
-            (width - sidePadding * 2f) * playAsButtonScale * 149f / 448f
-        } else {
-            88f * unit
-        }
+        val cardHeight = when {
+            compactGrid -> 44f * unit
+            gridChoices -> PlainGameButtonAssets.heightForWidth(
+                (width - sidePadding * 2f - 6f * unit) / 2f,
+                PlainGameButtonAssets.Style.SHORT,
+            )
+            else -> PlainGameButtonAssets.heightForWidth(
+                width - sidePadding * 2f,
+                PlainGameButtonAssets.Style.LONG,
+            )
+        }.coerceAtLeast(44f * unit)
         val gap = if (compactGrid) {
             6f * unit
-        } else if (hasPlayAsButtonAssets) {
-            playAsButtonGap * unit
         } else {
-            12f * unit
+            10f * unit
         }
         val contentHeight = if (compactGrid) {
             (84f * unit) + rows * (cardHeight + gap)
         } else {
-            (178f * unit) + rows * (cardHeight + if (hasPlayAsButtonAssets) gap else 16f * unit)
+            (178f * unit) + rows * (cardHeight + gap)
         }
         contentOffset = if (fullScreen && !compactGrid) {
             ((height - contentHeight) / 2f).coerceAtLeast(0f)
@@ -356,28 +353,10 @@ class ChessChoiceView(
                 }
             }
         } else {
-            val cardWidth = if (hasPlayAsButtonAssets) {
-                (width - sidePadding * 2f) * playAsButtonScale
-            } else {
-                width - sidePadding * 2f
-            }
+            val cardWidth = width - sidePadding * 2f
             hits.forEachIndexed { index, hit ->
-                val verticalOffset = if (hasPlayAsButtonAssets && hit.choice.label == "Black") {
-                    playAsBlackVerticalOffset * unit
-                } else {
-                    0f
-                }
-                val cardTop = top + index * (cardHeight + gap) + verticalOffset
-                val horizontalOffset = if (hasPlayAsButtonAssets) {
-                    when (hit.choice.label) {
-                        "White" -> -playAsButtonOffset * unit
-                        "Black" -> playAsButtonOffset * unit
-                        else -> 0f
-                    }
-                } else {
-                    0f
-                }
-                val cardLeft = (width - cardWidth) / 2f + horizontalOffset
+                val cardTop = top + index * (cardHeight + gap)
+                val cardLeft = (width - cardWidth) / 2f
                 hit.rect = RectF(cardLeft, cardTop, cardLeft + cardWidth, cardTop + cardHeight)
                 hit.infoRect.setEmpty()
             }
@@ -804,7 +783,6 @@ class ChessChoiceView(
     private fun drawDraughtsChoice(canvas: Canvas, hit: ChoiceHit) {
         val rect = hit.rect
         val pressed = pressedIndex == hit.index
-        if (drawPlayAsButtonAsset(canvas, hit)) return
         drawDraughtsButton(canvas, rect, pressed, unit)
         val top = rect.top + if (pressed) 2f * unit else 0f
 
@@ -830,7 +808,6 @@ class ChessChoiceView(
     private fun drawOthelloChoice(canvas: Canvas, hit: ChoiceHit) {
         val rect = hit.rect
         val pressed = pressedIndex == hit.index
-        if (drawPlayAsButtonAsset(canvas, hit)) return
         drawOthelloButton(canvas, rect, pressed, unit)
         val top = rect.top + if (pressed) 2f * unit else 0f
 
@@ -856,7 +833,6 @@ class ChessChoiceView(
     private fun drawChessChoice(canvas: Canvas, hit: ChoiceHit) {
         val rect = hit.rect
         val pressed = pressedIndex == hit.index
-        if (drawPlayAsButtonAsset(canvas, hit)) return
         drawChessWoodButton(canvas, rect, pressed, unit)
         val top = rect.top + if (pressed) 2f * unit else 0f
 
@@ -877,28 +853,6 @@ class ChessChoiceView(
                 hit.choice,
             )
         }
-    }
-
-    private fun drawPlayAsButtonAsset(canvas: Canvas, hit: ChoiceHit): Boolean {
-        if (!hasPlayAsButtonAssets) return false
-        val bitmap = when (hit.choice.label) {
-            "White" -> playAsWhiteButtonBitmap
-            "Black" -> playAsBlackButtonBitmap
-            else -> null
-        } ?: return false
-        val offset = if (pressedIndex == hit.index) 2f * unit else 0f
-        canvas.drawBitmap(
-            bitmap,
-            null,
-            RectF(
-                hit.rect.left,
-                hit.rect.top + offset,
-                hit.rect.right,
-                hit.rect.bottom + offset,
-            ),
-            choiceAssetPaint,
-        )
-        return true
     }
 
     private fun drawCenteredChoiceText(canvas: Canvas, rect: RectF, choice: Choice) {

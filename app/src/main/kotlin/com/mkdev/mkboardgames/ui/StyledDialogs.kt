@@ -66,7 +66,10 @@ object StyledDialogs {
             context = context,
             content = view,
             fullScreen = fullScreen,
-            contentHeightDp = max(heightDp, 178f + choices.size * 104f),
+            // The supplied long plate is intentionally taller than the old
+            // hand-drawn card. Give stacked choices enough vertical room so
+            // labels and descriptions never collide or get clipped.
+            contentHeightDp = max(heightDp, 200f + choices.size * 145f),
             cancelOnOutside = true,
             onBack = onCancel,
         )

@@ -145,6 +145,7 @@ class ModeSelectionView(context: Context) : View(context) {
     }
 
     init {
+        PlainGameButtonAssets.initialize(context)
         isClickable = true
         SoundPlayer.init(context)
     }
@@ -161,7 +162,10 @@ class ModeSelectionView(context: Context) : View(context) {
         val originalButtonWidth = min(width - 48f * unit, 360f * unit)
         val buttonWidth = originalButtonWidth / 1.5f * 1.1f
         val left = (width - buttonWidth) / 2f
-        val buttonHeight = 136f / 3f * 1.1f * unit
+        val buttonHeight = PlainGameButtonAssets.heightForWidth(
+            buttonWidth,
+            PlainGameButtonAssets.Style.LONG,
+        ).coerceAtLeast(44f * unit)
         val normalButtonHeight = playButtonBitmap?.let {
             buttonWidth * it.height.toFloat() / it.width.toFloat()
         } ?: buttonHeight

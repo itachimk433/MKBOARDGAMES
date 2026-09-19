@@ -115,6 +115,9 @@ internal fun drawChessWoodButton(
     unit: Float,
     maxCornerRadius: Float? = null,
 ) {
+    PlainGameButtonAssets.styleFor(rect)?.let { style ->
+        if (PlainGameButtonAssets.draw(canvas, rect, style, pressed)) return
+    }
     val offset = if (pressed) 2f * unit else 0f
     val drawn = RectF(rect.left, rect.top + offset, rect.right, rect.bottom + offset)
     val radius = (drawn.height() * 0.2f).let { defaultRadius ->
@@ -709,6 +712,9 @@ private fun blendDraughtsColor(start: Int, end: Int, fraction: Float): Int {
 }
 
 internal fun drawDraughtsButton(canvas: Canvas, rect: RectF, pressed: Boolean, unit: Float) {
+    PlainGameButtonAssets.styleFor(rect)?.let { style ->
+        if (PlainGameButtonAssets.draw(canvas, rect, style, pressed)) return
+    }
     val offset = if (pressed) 2f * unit else 0f
     val drawn = RectF(rect.left, rect.top + offset, rect.right, rect.bottom + offset)
     val radius = drawn.height() * 0.2f

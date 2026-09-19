@@ -166,6 +166,7 @@ class SnakesLaddersBoardSelectionView(
     }
 
     init {
+        PlainGameButtonAssets.initialize(context)
         isClickable = true
         contentDescription = "Choose a Snakes and Ladders board"
     }

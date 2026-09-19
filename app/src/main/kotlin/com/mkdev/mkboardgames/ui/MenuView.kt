@@ -294,6 +294,7 @@ class MenuView(
     }
 
     init {
+        PlainGameButtonAssets.initialize(context)
         val defaultOrder = listOf(
             GameType.CHESS, GameType.AMAZONS, GameType.CHECKERS,
             GameType.INTERNATIONAL_DRAUGHTS, GameType.OTHELLO, GameType.MORABARABA,

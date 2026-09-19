@@ -103,6 +103,7 @@ class ChallengeLevelGridView(
     private val scroller = OverScroller(context, DecelerateInterpolator(1.4f))
 
     init {
+        PlainGameButtonAssets.initialize(context)
         isClickable = true
         isFocusable = true
     contentDescription = "Chess challenge selector. Choose any available challenge."
