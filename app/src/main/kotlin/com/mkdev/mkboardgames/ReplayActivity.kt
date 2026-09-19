@@ -448,6 +448,10 @@ class ReplayActivity : AppCompatActivity() {
                     isLocked = true
                     ruleEngine = engine
                     gameState = states.first()
+                    // Match the live Amazons board: black queens and arrows
+                    // face the opposing player instead of using the default
+                    // unrotated replay orientation.
+                    rotateBlackPieces = gameType == "AMAZONS"
                     onGameOverTapped = { showReplayResultDialog() }
                 }
                 boardView = bv
