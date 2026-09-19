@@ -83,7 +83,7 @@ class ChessMenuView(
         else -> 414f
     }
     private val menuButtonScale = 0.9f
-    private val lowerButtonLift = 0.2f
+    private val lowerButtonLift = 0.22f
     private val gameHomeIconBitmap = run {
         val assetName = when {
             isChess -> "chess_home_icon.webp"

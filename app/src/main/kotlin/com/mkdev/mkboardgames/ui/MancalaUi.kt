@@ -620,11 +620,13 @@ open class MancalaChoiceOverlayView(
         val buttonHeight = min(
             dp(context, 58f),
             (panel.height() - dp(context, 138f) - gap * (optionCount - 1)) / optionCount,
-        )
-        val buttonStride = buttonHeight + gap - buttonHeight * 0.2f
+        ) * 0.96f
+        val buttonStride = buttonHeight + gap - buttonHeight * 0.22f
+        val buttonWidth = panelWidth * 0.74f * 0.96f
+        val buttonLeft = (w - buttonWidth) / 2f
         options.forEachIndexed { index, option ->
             val top = panel.top + dp(context, 116f) + index * buttonStride
-            val rect = RectF(panel.left + panelWidth * 0.13f, top, panel.right - panelWidth * 0.13f, top + buttonHeight)
+            val rect = RectF(buttonLeft, top, buttonLeft + buttonWidth, top + buttonHeight)
             hits += rect
             drawChoiceButton(canvas, rect, option, pressedIndex == index)
         }

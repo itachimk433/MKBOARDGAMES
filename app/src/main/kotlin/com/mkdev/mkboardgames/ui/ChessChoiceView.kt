@@ -103,7 +103,8 @@ class ChessChoiceView(
             isXiangqi || isTicTacToe || isConnectFour || isLudo || isSnakesLadders ||
             isMancala || isYote || isOnitama || isFiveFieldKono
     private val useLabelOnlyChoices = true
-    private val lowerButtonLift = 0.2f
+    private val choiceButtonScale = 0.96f
+    private val lowerButtonLift = 0.22f
     private val gameIconBitmap = run {
         val assetName = when {
             isChess -> "chess_home_icon.webp"
@@ -287,17 +288,19 @@ class ChessChoiceView(
         val measuredWidth = MeasureSpec.getSize(widthMeasureSpec)
         val sidePadding = (if (compactGrid) 12f else 22f) * unit
         val availableCardWidth = (measuredWidth - sidePadding * 2f).coerceAtLeast(0f)
+        val choiceWidth = if (gridChoices) {
+            ((availableCardWidth - 6f * unit) / 2f) * choiceButtonScale
+        } else {
+            availableCardWidth * choiceButtonScale
+        }
         val cardHeight = when {
-            compactGrid -> 44f * unit
-            gridChoices -> PlainGameButtonAssets.heightForWidth(
-                (availableCardWidth - 6f * unit) / 2f,
-                PlainGameButtonAssets.Style.SHORT,
-            )
+            compactGrid -> 44f * unit * choiceButtonScale
+            gridChoices -> PlainGameButtonAssets.heightForWidth(choiceWidth, PlainGameButtonAssets.Style.SHORT)
             else -> PlainGameButtonAssets.heightForWidth(
-                availableCardWidth,
+                choiceWidth,
                 PlainGameButtonAssets.Style.LONG,
             )
-        }.coerceAtLeast(44f * unit)
+        }.coerceAtLeast(44f * unit * choiceButtonScale)
         val gap = if (compactGrid) {
             6f * unit
         } else {
@@ -319,17 +322,20 @@ class ChessChoiceView(
     override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
         val rows = if (gridChoices) (hits.size + 1) / 2 else hits.size
         val sidePadding = (if (compactGrid) 12f else 22f) * unit
+        val availableCardWidth = (width - sidePadding * 2f).coerceAtLeast(0f)
+        val choiceWidth = if (gridChoices) {
+            ((availableCardWidth - 6f * unit) / 2f) * choiceButtonScale
+        } else {
+            availableCardWidth * choiceButtonScale
+        }
         val cardHeight = when {
-            compactGrid -> 44f * unit
-            gridChoices -> PlainGameButtonAssets.heightForWidth(
-                (width - sidePadding * 2f - 6f * unit) / 2f,
-                PlainGameButtonAssets.Style.SHORT,
-            )
+            compactGrid -> 44f * unit * choiceButtonScale
+            gridChoices -> PlainGameButtonAssets.heightForWidth(choiceWidth, PlainGameButtonAssets.Style.SHORT)
             else -> PlainGameButtonAssets.heightForWidth(
-                width - sidePadding * 2f,
+                choiceWidth,
                 PlainGameButtonAssets.Style.LONG,
             )
-        }.coerceAtLeast(44f * unit)
+        }.coerceAtLeast(44f * unit * choiceButtonScale)
         val gap = if (compactGrid) {
             6f * unit
         } else {
@@ -349,11 +355,13 @@ class ChessChoiceView(
         val top = contentOffset + (if (compactGrid) 70f else 153f) * unit
         if (gridChoices) {
             val columnGap = (if (compactGrid) 6f else 10f) * unit
-            val cardWidth = (width - sidePadding * 2f - columnGap) / 2f
+            val cardWidth = choiceWidth
+            val gridWidth = cardWidth * 2f + columnGap
+            val gridLeft = (width - gridWidth) / 2f
             hits.forEachIndexed { index, hit ->
                 val row = index / 2
                 val column = index % 2
-                val left = sidePadding + column * (cardWidth + columnGap)
+                val left = gridLeft + column * (cardWidth + columnGap)
                 val cardTop = top + row * rowStride
                 hit.rect = RectF(left, cardTop, left + cardWidth, cardTop + cardHeight)
                 hit.infoRect = if (showChoiceInfo) {
@@ -368,7 +376,7 @@ class ChessChoiceView(
                 }
             }
         } else {
-            val cardWidth = width - sidePadding * 2f
+            val cardWidth = choiceWidth
             hits.forEachIndexed { index, hit ->
                 val cardTop = top + index * rowStride
                 val cardLeft = (width - cardWidth) / 2f
