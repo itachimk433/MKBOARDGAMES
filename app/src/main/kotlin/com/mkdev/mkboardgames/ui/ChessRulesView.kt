@@ -43,9 +43,11 @@ class ChessRulesView(
     private val isConnectFour = gameLabel.replace(" ", "").replace("·", "").equals("CONNECTFOUR", ignoreCase = true)
     private val isLudo = gameLabel.replace(" ", "").equals("LUDO", ignoreCase = true)
     private val isOnitama = gameLabel.replace(" ", "").equals("ONITAMA", ignoreCase = true)
+    private val isFiveFieldKono =
+        gameLabel.replace(" ", "").replace("·", "").equals("FIVEFIELDKONO", ignoreCase = true)
     private val isChessFamily =
         isChess || isAmazons || isDraughts || isOthello || isFoxAndGeese || isGo || isShogi ||
-            isXiangqi || isTicTacToe || isConnectFour || isLudo || isOnitama
+            isXiangqi || isTicTacToe || isConnectFour || isLudo || isOnitama || isFiveFieldKono
 
     init {
         if (isChessFamily || isMorabaraba) {
@@ -199,9 +201,12 @@ private class ChessMancalaRulesView(
     private val isSnakesLadders =
         gameLabel.replace(" ", "").replace("&", "").equals("SNAKESLADDERS", ignoreCase = true)
     private val isOnitama = gameLabel.replace(" ", "").equals("ONITAMA", ignoreCase = true)
+    private val isFiveFieldKono =
+        gameLabel.replace(" ", "").replace("·", "").equals("FIVEFIELDKONO", ignoreCase = true)
     private val isChessFamily =
         isChess || isAmazons || isDraughts || isOthello || isFoxAndGeese || isGo || isShogi ||
-            isXiangqi || isTicTacToe || isConnectFour || isLudo || isSnakesLadders || isOnitama
+            isXiangqi || isTicTacToe || isConnectFour || isLudo || isSnakesLadders || isOnitama ||
+            isFiveFieldKono
     private val gameIconBitmap = run {
         val assetName = when {
             isChess -> "chess_home_icon.webp"
@@ -217,6 +222,7 @@ private class ChessMancalaRulesView(
             isConnectFour -> "connect_four_home_icon.webp"
             isLudo -> "ludo_home_icon.webp"
             isOnitama -> "onitama_home_icon.webp"
+            isFiveFieldKono -> "five_field_kono_home_icon.webp"
             else -> null
         }
         assetName?.let {
@@ -253,6 +259,7 @@ private class ChessMancalaRulesView(
             isOthello -> "Othello how to play"
             isMorabaraba -> "Morabaraba how to play"
             isOnitama -> "Onitama how to play"
+            isFiveFieldKono -> "Five Field Kono how to play"
             else -> "Chess how to play"
         }
     }
@@ -325,6 +332,7 @@ private class ChessMancalaRulesView(
             isTicTacToe -> "TIC-TAC-TOE"
             isConnectFour -> "CONNECT FOUR"
             isLudo -> "LUDO"
+            isFiveFieldKono -> "FIVE FIELD KONO"
             else -> gameLabel
         }
         if (isChessFamily) {
@@ -500,6 +508,10 @@ private class ChessMancalaRulesView(
             "Passing",
             "Winning",
             "Cards & Swapping",
+            "Setup",
+            "Move",
+            "Jump",
+            "The Boards",
         )
         val sections = mutableListOf<Pair<String, String>>()
         var currentHeading: String? = null

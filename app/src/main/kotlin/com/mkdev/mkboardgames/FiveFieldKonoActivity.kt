@@ -20,9 +20,9 @@ import com.mkdev.mkboardgames.ui.BoardSelectionPreview
 import com.mkdev.mkboardgames.ui.BoardSelectionView
 import com.mkdev.mkboardgames.ui.ChessChoiceView
 import com.mkdev.mkboardgames.ui.ChessMenuView
+import com.mkdev.mkboardgames.ui.ChessRulesView
 import com.mkdev.mkboardgames.ui.FiveFieldKonoBoardStyle
 import com.mkdev.mkboardgames.ui.FiveFieldKonoBoardView
-import com.mkdev.mkboardgames.ui.FiveFieldKonoRulesView
 import com.mkdev.mkboardgames.ui.SnakesLaddersGameOverView
 import com.mkdev.mkboardgames.ui.StandardGameHudView
 import com.mkdev.mkboardgames.ui.StyledDialogs
@@ -40,6 +40,22 @@ class FiveFieldKonoActivity : AppCompatActivity() {
         const val EXTRA_GAME = "FIVE_FIELD_KONO"
         private const val GAME_KEY = "FIVE_FIELD_KONO"
         private const val GAME_LABEL = "F I V E · F I E L D · K O N O"
+        private const val KONO_RULES = """
+            Setup
+            Five Field Kono uses a 5 × 5 board. Each player has five pieces on their home row. White moves first.
+
+            Move
+            Move one of your pieces diagonally to a neighbouring empty point.
+
+            Jump
+            A piece may also jump diagonally over one occupied point into the empty point beyond it. The jumped piece stays on the board.
+
+            Winning
+            Move all five of your pieces onto the opponent's starting row. White aims for the top row; Black aims for the bottom row.
+
+            The Boards
+            Choose between the supplied warm wood board and the clean black-and-white board before the match.
+        """
     }
 
     private val engine = FiveFieldKonoRuleEngine()
@@ -224,8 +240,14 @@ class FiveFieldKonoActivity : AppCompatActivity() {
     }
 
     private fun showRules(showModeAfter: Boolean) {
-        val rules = FiveFieldKonoRulesView(this)
-        rules.onBack = {
+        val rules = ChessRulesView(
+            this,
+            gameName = "Five Field Kono",
+            rulesText = KONO_RULES,
+            gameLabel = GAME_LABEL,
+            headerSymbol = "◆",
+        )
+        rules.onDone = {
             dismissOverlay()
             if (showModeAfter) showModeDialog() else showBoardAfterDialog()
         }

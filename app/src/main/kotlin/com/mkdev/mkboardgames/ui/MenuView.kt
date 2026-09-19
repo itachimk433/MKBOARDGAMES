@@ -1,5 +1,7 @@
 package com.mkdev.mkboardgames.ui
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.*
@@ -248,12 +250,33 @@ class MenuView(
     private var dragCenterX = 0f
     private var dragCenterY = 0f
     private var arrangeMode = false
+    private var arrangeTargetIndex = -1
+    private var arrangePreviewProgress = 1f
+    private val arrangePreviewStart = HashMap<GameType, RectF>()
+    private val arrangePreviewEnd = HashMap<GameType, RectF>()
+    private var arrangePreviewAnimator: ValueAnimator? = null
+    private var arrangeDropAnimator: ValueAnimator? = null
+    private val arrangeTargetFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(62, 247, 217, 155)
+    }
+    private val arrangeTargetBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(210, 247, 217, 155)
+        style = Paint.Style.STROKE
+        strokeWidth = 2f * dp
+    }
 
     private val longPressToArrange = Runnable {
         val card = pressedCard ?: return@Runnable
         if (!isDragging && !pressedBack && !pressedGear && !isChallengeLocked(card)) {
+            arrangeDropAnimator?.cancel()
+            arrangeDropAnimator = null
             arrangingCard = card
             arrangeMode = true
+            arrangeTargetIndex = cards.indexOfFirst { it.type == card }
+            arrangePreviewProgress = 1f
+            arrangePreviewStart.clear()
+            arrangePreviewEnd.clear()
+            arrangePreviewAnimator?.cancel()
             cardScales[card] = 1f
             dragCenterX = lastTouchX
             dragCenterY = lastTouchY + scrollY
@@ -312,11 +335,7 @@ class MenuView(
     private fun updateCardLayout() {
         scrollScroller.forceFinished(true)
         for (i in cards.indices) {
-            val column = i % gridColumns
-            val row = i / gridColumns
-            val left = gridPadding + column * (cardW + gridSpacing)
-            val top = headerH + row * (cardH + gridSpacing)
-            cards[i].rect = RectF(left, top, left + cardW, top + cardH)
+            cards[i].rect = cardSlotRect(i)
         }
         val contentBottom = scaledCardRect(cards.last()).bottom + 56f * dp   // room for two-line footer
         maxScrollY = maxOf(0f, contentBottom - height)
@@ -337,19 +356,73 @@ class MenuView(
         val draggedType = arrangingCard ?: return
         val fromIndex = cards.indexOfFirst { it.type == draggedType }
         if (fromIndex < 0) {
-            arrangingCard = null
-            arrangeMode = false
+            clearArrangeState()
             return
         }
         val targetIndex = nearestCardSlot(dropX, dropY)
+        animateArrangePreviewTo(targetIndex)
+
+        val targetRect = cardSlotRect(targetIndex)
+        val startX = dragCenterX
+        val startY = dragCenterY
+        val dropAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = 240L
+            interpolator = DecelerateInterpolator(1.7f)
+            addUpdateListener {
+                val progress = it.animatedValue as Float
+                dragCenterX = startX + (targetRect.centerX() - startX) * progress
+                dragCenterY = startY + (targetRect.centerY() - startY) * progress
+                postInvalidateOnAnimation()
+            }
+        }
+        dropAnimator.addListener(object : AnimatorListenerAdapter() {
+            override fun onAnimationEnd(animation: Animator) {
+                if (arrangeDropAnimator !== dropAnimator) return
+                arrangeDropAnimator = null
+                completeArranging(targetIndex)
+            }
+        })
+        arrangeDropAnimator = dropAnimator
+        dropAnimator.start()
+    }
+
+    private fun completeArranging(targetIndex: Int) {
+        val draggedType = arrangingCard ?: return
+        val fromIndex = cards.indexOfFirst { it.type == draggedType }
+        if (fromIndex < 0) {
+            clearArrangeState()
+            return
+        }
         val movedCard = cards.removeAt(fromIndex)
         val adjustedTarget = if (targetIndex > fromIndex) targetIndex - 1 else targetIndex
         cards.add(adjustedTarget.coerceIn(0, cards.size), movedCard)
         saveCardOrder()
-        arrangingCard = null
-        arrangeMode = false
+        clearArrangeState()
         updateCardLayout()
         invalidate()
+    }
+
+    private fun clearArrangeState() {
+        arrangeDropAnimator?.let {
+            arrangeDropAnimator = null
+            it.cancel()
+        }
+        arrangePreviewAnimator?.cancel()
+        arrangePreviewAnimator = null
+        arrangePreviewStart.clear()
+        arrangePreviewEnd.clear()
+        arrangePreviewProgress = 1f
+        arrangeTargetIndex = -1
+        arrangingCard = null
+        arrangeMode = false
+    }
+
+    private fun cardSlotRect(index: Int): RectF {
+        val column = index % gridColumns
+        val row = index / gridColumns
+        val left = gridPadding + column * (cardW + gridSpacing)
+        val top = headerH + row * (cardH + gridSpacing)
+        return RectF(left, top, left + cardW, top + cardH)
     }
 
     private fun nearestCardSlot(x: Float, contentY: Float): Int {
@@ -362,6 +435,58 @@ class MenuView(
         } ?: 0
     }
 
+    private fun previewSlotFor(cardIndex: Int, targetIndex: Int): Int {
+        val draggedIndex = cards.indexOfFirst { it.type == arrangingCard }
+        if (draggedIndex < 0 || cardIndex == draggedIndex) return cardIndex
+        return when {
+            draggedIndex < targetIndex && cardIndex in (draggedIndex + 1)..targetIndex -> cardIndex - 1
+            draggedIndex > targetIndex && cardIndex in targetIndex until draggedIndex -> cardIndex + 1
+            else -> cardIndex
+        }
+    }
+
+    private fun currentArrangeRect(card: Card): RectF {
+        val start = arrangePreviewStart[card.type]
+        val end = arrangePreviewEnd[card.type]
+        if (start == null || end == null) return RectF(card.rect)
+        val progress = arrangePreviewProgress
+        return RectF(
+            start.left + (end.left - start.left) * progress,
+            start.top + (end.top - start.top) * progress,
+            start.right + (end.right - start.right) * progress,
+            start.bottom + (end.bottom - start.bottom) * progress,
+        )
+    }
+
+    private fun animateArrangePreviewTo(targetIndex: Int) {
+        if (targetIndex !in cards.indices || targetIndex == arrangeTargetIndex && arrangePreviewEnd.isNotEmpty()) {
+            return
+        }
+        arrangePreviewAnimator?.cancel()
+        val currentRects = cards.associate { card ->
+            card.type to currentArrangeRect(card)
+        }
+        arrangePreviewStart.clear()
+        arrangePreviewStart.putAll(currentRects)
+        arrangeTargetIndex = targetIndex
+        arrangePreviewEnd.clear()
+        cards.forEachIndexed { index, card ->
+            if (card.type != arrangingCard) {
+                arrangePreviewEnd[card.type] = cardSlotRect(previewSlotFor(index, targetIndex))
+            }
+        }
+        arrangePreviewProgress = 0f
+        arrangePreviewAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = 180L
+            interpolator = DecelerateInterpolator(1.5f)
+            addUpdateListener {
+                arrangePreviewProgress = it.animatedValue as Float
+                postInvalidateOnAnimation()
+            }
+            start()
+        }
+    }
+
     private fun updateArrangePosition(x: Float, screenY: Float) {
         val edgeSize = 56f * dp
         val scrollStep = 14f * dp
@@ -372,6 +497,7 @@ class MenuView(
         }
         dragCenterX = x - dragOffsetX
         dragCenterY = screenY + scrollY - dragOffsetY
+        animateArrangePreviewTo(nearestCardSlot(dragCenterX, dragCenterY))
     }
 
     // ── Touch ─────────────────────────────────────────────────────────────────
@@ -399,7 +525,7 @@ class MenuView(
                     }?.type
                     else null
                 pressedCard?.let { animateCardScale(it, 0.96f) }
-                if (pressedCard != null) postDelayed(longPressToArrange, 5_000L)
+                if (pressedCard != null) postDelayed(longPressToArrange, 2_000L)
                 invalidate()
             }
             MotionEvent.ACTION_MOVE -> {
@@ -495,8 +621,7 @@ class MenuView(
                 velocityTracker?.recycle()
                 velocityTracker = null
                 scrollScroller.forceFinished(true)
-                arrangingCard = null
-                arrangeMode = false
+                clearArrangeState()
                 pressedCard?.let { animateCardScale(it, 1f) }
                 pressedCard = null; pressedGear = false; pressedBack = false; invalidate()
             }
@@ -516,8 +641,7 @@ class MenuView(
         velocityTracker?.recycle()
         velocityTracker = null
         scrollScroller.forceFinished(true)
-        arrangingCard = null
-        arrangeMode = false
+        clearArrangeState()
         super.onDetachedFromWindow()
     }
 
@@ -535,8 +659,20 @@ class MenuView(
         if (currentGameMode == GameMode.IRREGULAR) {
             canvas.drawText("IRREGULAR MODE", width / 2f, headerH - 18f * dp, irregularModePaint)
         }
+        if (arrangeMode && arrangeTargetIndex in cards.indices) {
+            val target = cardSlotRect(arrangeTargetIndex)
+            canvas.drawRoundRect(target, 18f * dp, 18f * dp, arrangeTargetFillPaint)
+            canvas.drawRoundRect(target, 18f * dp, 18f * dp, arrangeTargetBorderPaint)
+        }
         cards.forEach { card ->
-            if (card.type != arrangingCard) drawCard(canvas, card)
+            if (card.type != arrangingCard) {
+                if (arrangeMode) {
+                    val preview = currentArrangeRect(card)
+                    drawCardAtCenter(canvas, card, preview.centerX(), preview.centerY())
+                } else {
+                    drawCard(canvas, card)
+                }
+            }
         }
         drawFooter(canvas)
         arrangingCard?.let { type ->
@@ -554,6 +690,13 @@ class MenuView(
         canvas.restore()
         drawBackArrow(canvas)
         if (arrangeMode) drawArrangeHint(canvas)
+    }
+
+    private fun drawCardAtCenter(canvas: Canvas, card: Card, centerX: Float, centerY: Float) {
+        canvas.save()
+        canvas.translate(centerX - card.rect.centerX(), centerY - card.rect.centerY())
+        drawCard(canvas, card)
+        canvas.restore()
     }
 
     private fun drawArrangeHint(canvas: Canvas) {
