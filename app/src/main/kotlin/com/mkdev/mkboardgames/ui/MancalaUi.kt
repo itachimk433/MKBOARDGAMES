@@ -620,9 +620,9 @@ open class MancalaChoiceOverlayView(
         val buttonHeight = min(
             dp(context, 58f),
             (panel.height() - dp(context, 138f) - gap * (optionCount - 1)) / optionCount,
-        ) * 0.96f
+        ) * 0.93f
         val buttonStride = buttonHeight + gap - buttonHeight * 0.24f
-        val buttonWidth = panelWidth * 0.74f * 0.96f
+        val buttonWidth = panelWidth * 0.74f * 0.93f
         val buttonLeft = (w - buttonWidth) / 2f
         options.forEachIndexed { index, option ->
             val top = panel.top + dp(context, 116f) + index * buttonStride
