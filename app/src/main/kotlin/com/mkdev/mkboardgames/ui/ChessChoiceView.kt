@@ -103,8 +103,8 @@ class ChessChoiceView(
             isXiangqi || isTicTacToe || isConnectFour || isLudo || isSnakesLadders ||
             isMancala || isYote || isOnitama || isFiveFieldKono
     private val useLabelOnlyChoices = true
-    private val choiceButtonScale = 0.96f
-    private val lowerButtonLift = 0.22f
+    private val choiceButtonScale = 0.93f
+    private val lowerButtonLift = 0.24f
     private val gameIconBitmap = run {
         val assetName = when {
             isChess -> "chess_home_icon.webp"
@@ -180,11 +180,6 @@ class ChessChoiceView(
         textAlign = Paint.Align.CENTER
         typeface = Typeface.create("serif", Typeface.BOLD_ITALIC)
         setShadowLayer(2f * unit, 0f, 2f * unit, Color.argb(210, 0, 0, 0))
-    }
-    private val pressedChoiceBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#F6D78F")
-        style = Paint.Style.STROKE
-        strokeWidth = 3f * unit
     }
     private val detailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#9FB5B8")
@@ -682,7 +677,7 @@ class ChessChoiceView(
             val pressed = pressedIndex == hit.index
             drawChessWoodButton(canvas, rect, pressed, unit)
             val top = rect.top + if (pressed) 2f * unit else 0f
-            drawLabelOnlyChoice(canvas, rect, top, hit.choice, pressed)
+            drawLabelOnlyChoice(canvas, rect, top, hit.choice)
             return
         }
         if (isChessFamily || isMorabaraba) {
@@ -722,7 +717,7 @@ class ChessChoiceView(
         val top = rect.top + if (pressed) 2f * unit else 0f
 
         if (useLabelOnlyChoices) {
-            drawLabelOnlyChoice(canvas, rect, top, hit.choice, pressed)
+            drawLabelOnlyChoice(canvas, rect, top, hit.choice)
             return
         }
         if (hit.assetBitmap != null) {
@@ -821,7 +816,7 @@ class ChessChoiceView(
         drawDraughtsButton(canvas, rect, pressed, unit)
         val top = rect.top + if (pressed) 2f * unit else 0f
         if (useLabelOnlyChoices) {
-            drawLabelOnlyChoice(canvas, rect, top, hit.choice, pressed)
+            drawLabelOnlyChoice(canvas, rect, top, hit.choice)
             return
         }
 
@@ -850,7 +845,7 @@ class ChessChoiceView(
         drawOthelloButton(canvas, rect, pressed, unit)
         val top = rect.top + if (pressed) 2f * unit else 0f
         if (useLabelOnlyChoices) {
-            drawLabelOnlyChoice(canvas, rect, top, hit.choice, pressed)
+            drawLabelOnlyChoice(canvas, rect, top, hit.choice)
             return
         }
 
@@ -879,7 +874,7 @@ class ChessChoiceView(
         drawChessWoodButton(canvas, rect, pressed, unit)
         val top = rect.top + if (pressed) 2f * unit else 0f
         if (useLabelOnlyChoices) {
-            drawLabelOnlyChoice(canvas, rect, top, hit.choice, pressed)
+            drawLabelOnlyChoice(canvas, rect, top, hit.choice)
             return
         }
 
@@ -907,7 +902,6 @@ class ChessChoiceView(
         rect: RectF,
         top: Float,
         choice: Choice,
-        pressed: Boolean,
     ) {
         val drawnRect = RectF(
             rect.left,
@@ -915,27 +909,6 @@ class ChessChoiceView(
             rect.right,
             rect.bottom + (top - rect.top),
         )
-        if (pressed) {
-            val style = PlainGameButtonAssets.styleFor(rect)
-            val borderTarget = style?.let {
-                PlainGameButtonAssets.visibleRect(
-                    rect,
-                    it,
-                    pressed = true,
-                    pressedOffset = top - rect.top,
-                )
-            } ?: drawnRect
-            val inset = pressedChoiceBorderPaint.strokeWidth / 2f
-            val borderRect = RectF(
-                borderTarget.left + inset,
-                borderTarget.top + inset,
-                borderTarget.right - inset,
-                borderTarget.bottom - inset,
-            )
-            val radius = min(borderRect.height() * 0.2f, 12f * unit)
-            canvas.drawRoundRect(borderRect, radius, radius, pressedChoiceBorderPaint)
-        }
-
         plainChoiceLabelPaint.textSize = min(21f * textScale, drawnRect.height() * 0.28f)
         val maxTextWidth = (drawnRect.width() - 24f * unit).coerceAtLeast(1f)
         while (

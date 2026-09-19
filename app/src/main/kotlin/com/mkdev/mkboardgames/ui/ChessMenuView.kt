@@ -83,7 +83,7 @@ class ChessMenuView(
         else -> 414f
     }
     private val menuButtonScale = 0.9f
-    private val lowerButtonLift = 0.22f
+    private val lowerButtonLift = 0.24f
     private val gameHomeIconBitmap = run {
         val assetName = when {
             isChess -> "chess_home_icon.webp"
@@ -124,11 +124,6 @@ class ChessMenuView(
         textAlign = Paint.Align.CENTER
         typeface = Typeface.create("serif", Typeface.BOLD_ITALIC)
         setShadowLayer(2f * unit, 0f, 2f * unit, Color.argb(210, 0, 0, 0))
-    }
-    private val pressedButtonBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#F6D78F")
-        style = Paint.Style.STROKE
-        strokeWidth = 3f * unit
     }
     private val surfacePaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val panelPaint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -902,18 +897,6 @@ class ChessMenuView(
                 rect.right,
                 rect.bottom + if (pressed) 2f else 0f,
             )
-            if (pressed) {
-                val style = PlainGameButtonAssets.styleFor(rect)
-                val borderRect = style?.let {
-                    PlainGameButtonAssets.visibleRect(
-                        rect,
-                        it,
-                        pressed = true,
-                        pressedOffset = drawnTop - rect.top,
-                    )
-                } ?: drawnRect
-                drawPressedButtonBorder(canvas, borderRect)
-            }
             drawPlainButtonLabel(canvas, drawnRect, action.label)
             canvas.restore()
             return
@@ -925,7 +908,7 @@ class ChessMenuView(
         if (!usesPlainPlate) {
             panelPaint.color = if (pressed) Color.parseColor("#21454A") else Color.parseColor("#16353B")
             canvas.drawRoundRect(rect, 8f * unit, 8f * unit, panelPaint)
-            panelBorderPaint.color = if (pressed) action.accent else Color.parseColor("#2C5960")
+            panelBorderPaint.color = Color.parseColor("#2C5960")
             canvas.drawRoundRect(
                 RectF(
                     rect.left + 0.5f * unit,
@@ -994,18 +977,6 @@ class ChessMenuView(
                 drawnRect,
                 gameButtonPaint,
             )
-            if (pressed) {
-                val style = PlainGameButtonAssets.styleFor(rect)
-                val borderRect = style?.let {
-                    PlainGameButtonAssets.visibleRect(
-                        rect,
-                        it,
-                        pressed = true,
-                        pressedOffset = drawnTop - rect.top,
-                    )
-                } ?: drawnRect
-                drawPressedButtonBorder(canvas, borderRect)
-            }
             drawPlainButtonLabel(canvas, drawnRect, action.label)
             return
         }
@@ -1018,18 +989,6 @@ class ChessMenuView(
                 rect.right,
                 rect.bottom + if (pressed) 2f * unit else 0f,
             )
-            if (pressed) {
-                val style = PlainGameButtonAssets.styleFor(rect)
-                val borderRect = style?.let {
-                    PlainGameButtonAssets.visibleRect(
-                        rect,
-                        it,
-                        pressed = true,
-                        pressedOffset = drawnTop - rect.top,
-                    )
-                } ?: drawnRect
-                drawPressedButtonBorder(canvas, borderRect)
-            }
             drawPlainButtonLabel(canvas, drawnRect, action.label)
             return
         }
@@ -1071,18 +1030,6 @@ class ChessMenuView(
         val metrics = plainButtonLabelPaint.fontMetrics
         val baseline = rect.centerY() - (metrics.ascent + metrics.descent) / 2f
         canvas.drawText(label, rect.centerX(), baseline, plainButtonLabelPaint)
-    }
-
-    private fun drawPressedButtonBorder(canvas: Canvas, rect: RectF) {
-        val inset = pressedButtonBorderPaint.strokeWidth / 2f
-        val borderRect = RectF(
-            rect.left + inset,
-            rect.top + inset,
-            rect.right - inset,
-            rect.bottom - inset,
-        )
-        val radius = min(borderRect.height() * 0.2f, 12f * unit)
-        canvas.drawRoundRect(borderRect, radius, radius, pressedButtonBorderPaint)
     }
 
     private fun loadAssetBitmap(ctx: Context, assetName: String): Bitmap? =
@@ -1168,18 +1115,6 @@ class ChessMenuView(
             resumeRect.right,
             resumeRect.bottom + if (resumePressed) 2f * unit else 0f,
         )
-        if (resumePressed) {
-            val style = PlainGameButtonAssets.styleFor(resumeRect)
-            val borderRect = style?.let {
-                PlainGameButtonAssets.visibleRect(
-                    resumeRect,
-                    it,
-                    pressed = true,
-                    pressedOffset = drawnTop - resumeRect.top,
-                )
-            } ?: drawnRect
-            drawPressedButtonBorder(canvas, borderRect)
-        }
         drawPlainButtonLabel(canvas, drawnRect, "RESUME SAVED MATCH")
     }
 
