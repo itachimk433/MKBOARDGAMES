@@ -14,6 +14,7 @@ import com.mkdev.mkboardgames.SettingsManager
 import com.mkdev.mkboardgames.engine.Position
 import com.mkdev.mkboardgames.games.foxandgeese.FoxAndGeeseSetup
 import com.mkdev.mkboardgames.games.go.GoSetup
+import kotlin.math.roundToInt
 
 class MenuView(
     context: Context,
@@ -62,16 +63,9 @@ class MenuView(
     }
 
     private data class Card(val type: GameType, var rect: RectF = RectF())
-    private val cards = listOf(
-        Card(GameType.CHESS), Card(GameType.AMAZONS), Card(GameType.CHECKERS),
-        Card(GameType.INTERNATIONAL_DRAUGHTS),
-        Card(GameType.OTHELLO), Card(GameType.MORABARABA),
-        Card(GameType.TICTACTOE), Card(GameType.CONNECT_FOUR),
-         Card(GameType.FOX_AND_GEESE), Card(GameType.LUDO), Card(GameType.SNAKES_LADDERS),
-        Card(GameType.XIANGQI), Card(GameType.SHOGI), Card(GameType.GO),
-        Card(GameType.MANCALA), Card(GameType.YOTE), Card(GameType.ONITAMA),
-        Card(GameType.FIVE_FIELD_KONO)
-    )
+    private val cardOrderPreferences =
+        context.getSharedPreferences("game_catalogue_layout", Context.MODE_PRIVATE)
+    private val cards = mutableListOf<Card>()
 
     private val dp = context.resources.displayMetrics.density
     private val sp = context.resources.displayMetrics.scaledDensity
@@ -248,8 +242,51 @@ class MenuView(
     private var velocityTracker: VelocityTracker? = null
     private val scrollScroller = OverScroller(context, DecelerateInterpolator(1.5f))
     private var headerH    = 0f   // Y where cards begin (below the compact header)
+    private var lastTouchX = 0f
+    private var arrangingCard: GameType? = null
+    private var dragOffsetX = 0f
+    private var dragOffsetY = 0f
+    private var dragCenterX = 0f
+    private var dragCenterY = 0f
+    private var arrangeMode = false
+
+    private val longPressToArrange = Runnable {
+        val card = pressedCard ?: return@Runnable
+        if (!isDragging && !pressedBack && !pressedGear && !isChallengeLocked(card)) {
+            arrangingCard = card
+            arrangeMode = true
+            cardScales[card] = 1f
+            dragCenterX = lastTouchX
+            dragCenterY = lastTouchY + scrollY
+            cards.firstOrNull { it.type == card }?.let {
+                dragOffsetX = lastTouchX - it.rect.centerX()
+                dragOffsetY = dragCenterY - it.rect.centerY()
+                dragCenterX = lastTouchX - dragOffsetX
+                dragCenterY -= dragOffsetY
+            }
+            pressedCard = null
+            performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+            com.mkdev.mkboardgames.SoundPlayer.play("ui_click")
+            invalidate()
+        }
+    }
 
     init {
+        val defaultOrder = listOf(
+            GameType.CHESS, GameType.AMAZONS, GameType.CHECKERS,
+            GameType.INTERNATIONAL_DRAUGHTS, GameType.OTHELLO, GameType.MORABARABA,
+            GameType.TICTACTOE, GameType.CONNECT_FOUR, GameType.FOX_AND_GEESE,
+            GameType.LUDO, GameType.SNAKES_LADDERS, GameType.XIANGQI,
+            GameType.SHOGI, GameType.GO, GameType.MANCALA, GameType.YOTE,
+            GameType.ONITAMA, GameType.FIVE_FIELD_KONO,
+        )
+        val savedOrder = cardOrderPreferences.getString("order", null)
+            ?.split(",")
+            ?.mapNotNull { value -> runCatching { GameType.valueOf(value) }.getOrNull() }
+            ?.distinct()
+            .orEmpty()
+        val order = (savedOrder + defaultOrder).distinct()
+        cards.addAll(order.map(::Card))
         touchSlop = ViewConfiguration.get(context).scaledTouchSlop.toFloat()
         isClickable = true
     }
@@ -287,6 +324,44 @@ class MenuView(
         scrollY = scrollY.coerceIn(0f, maxScrollY)
     }
 
+    private fun saveCardOrder() {
+        cardOrderPreferences.edit()
+            .putString("order", cards.joinToString(",") { it.type.name })
+            .apply()
+    }
+
+    private fun cancelLongPressToArrange() {
+        removeCallbacks(longPressToArrange)
+    }
+
+    private fun finishArranging(dropX: Float, dropY: Float) {
+        val draggedType = arrangingCard ?: return
+        val fromIndex = cards.indexOfFirst { it.type == draggedType }
+        if (fromIndex < 0) {
+            arrangingCard = null
+            arrangeMode = false
+            return
+        }
+        val targetIndex = nearestCardSlot(dropX, dropY)
+        val movedCard = cards.removeAt(fromIndex)
+        val adjustedTarget = if (targetIndex > fromIndex) targetIndex - 1 else targetIndex
+        cards.add(adjustedTarget.coerceIn(0, cards.size), movedCard)
+        saveCardOrder()
+        arrangingCard = null
+        arrangeMode = false
+        updateCardLayout()
+        invalidate()
+    }
+
+    private fun nearestCardSlot(x: Float, contentY: Float): Int {
+        if (cards.isEmpty()) return 0
+        val row = ((contentY - headerH) / (cardH + gridSpacing)).roundToInt()
+            .coerceAtLeast(0)
+        val column = ((x - gridPadding) / (cardW + gridSpacing)).roundToInt()
+            .coerceIn(0, gridColumns - 1)
+        return (row * gridColumns + column).coerceIn(0, cards.lastIndex)
+    }
+
     // ── Touch ─────────────────────────────────────────────────────────────────
     override fun onTouchEvent(event: MotionEvent): Boolean {
         // Content Y = screen Y shifted by current scroll offset. The complete
@@ -296,10 +371,12 @@ class MenuView(
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
                 scrollScroller.forceFinished(true)
+                cancelLongPressToArrange()
                 velocityTracker?.recycle()
                 velocityTracker = VelocityTracker.obtain()
                 velocityTracker?.addMovement(event)
                 downTouchY = event.y
+                lastTouchX = event.x
                 isDragging = false
                 lastTouchY  = event.y
                 pressedBack = backTouch.contains(event.x, event.y)
@@ -310,12 +387,21 @@ class MenuView(
                     }?.type
                     else null
                 pressedCard?.let { animateCardScale(it, 0.96f) }
+                if (pressedCard != null) postDelayed(longPressToArrange, 5_000L)
                 invalidate()
             }
             MotionEvent.ACTION_MOVE -> {
                 velocityTracker?.addMovement(event)
+                lastTouchX = event.x
+                if (arrangingCard != null) {
+                    dragCenterX = event.x - dragOffsetX
+                    dragCenterY = event.y + scrollY - dragOffsetY
+                    postInvalidateOnAnimation()
+                    return true
+                }
                 if (!isDragging && kotlin.math.abs(event.y - downTouchY) > touchSlop) {
                     isDragging = true
+                    cancelLongPressToArrange()
                 }
                 if (pressedBack && !backTouch.contains(event.x, event.y)) {
                     pressedBack = false
@@ -333,6 +419,16 @@ class MenuView(
             }
             MotionEvent.ACTION_UP -> {
                 velocityTracker?.addMovement(event)
+                cancelLongPressToArrange()
+                if (arrangingCard != null) {
+                    finishArranging(event.x, event.y + scrollY)
+                    velocityTracker?.recycle()
+                    velocityTracker = null
+                    pressedCard = null
+                    pressedGear = false
+                    pressedBack = false
+                    return true
+                }
                 if (isDragging) {
                     velocityTracker?.computeCurrentVelocity(1000)
                     val velocityY = velocityTracker?.yVelocity ?: 0f
@@ -384,9 +480,12 @@ class MenuView(
                 pressedCard = null; pressedGear = false; invalidate()
             }
             MotionEvent.ACTION_CANCEL -> {
+                cancelLongPressToArrange()
                 velocityTracker?.recycle()
                 velocityTracker = null
                 scrollScroller.forceFinished(true)
+                arrangingCard = null
+                arrangeMode = false
                 pressedCard?.let { animateCardScale(it, 1f) }
                 pressedCard = null; pressedGear = false; pressedBack = false; invalidate()
             }
@@ -402,6 +501,7 @@ class MenuView(
     }
 
     override fun onDetachedFromWindow() {
+        cancelLongPressToArrange()
         velocityTracker?.recycle()
         velocityTracker = null
         scrollScroller.forceFinished(true)
@@ -422,10 +522,43 @@ class MenuView(
         if (currentGameMode == GameMode.IRREGULAR) {
             canvas.drawText("IRREGULAR MODE", width / 2f, headerH - 18f * dp, irregularModePaint)
         }
-        cards.forEach { drawCard(canvas, it) }
+        cards.forEach { card ->
+            if (card.type != arrangingCard) drawCard(canvas, card)
+        }
         drawFooter(canvas)
+        arrangingCard?.let { type ->
+            cards.firstOrNull { it.type == type }?.let { card ->
+                canvas.save()
+                canvas.translate(
+                    dragCenterX - card.rect.centerX(),
+                    dragCenterY - card.rect.centerY(),
+                )
+                canvas.scale(1.04f, 1.04f, card.rect.centerX(), card.rect.centerY())
+                drawCard(canvas, card)
+                canvas.restore()
+            }
+        }
         canvas.restore()
         drawBackArrow(canvas)
+        if (arrangeMode) drawArrangeHint(canvas)
+    }
+
+    private fun drawArrangeHint(canvas: Canvas) {
+        val hintPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(220, 35, 22, 15)
+            textAlign = Paint.Align.CENTER
+            typeface = Typeface.DEFAULT_BOLD
+            textSize = 11f * sp.coerceAtMost(2f)
+        }
+        val hintRect = RectF(
+            width / 2f - 105f * dp,
+            8f * dp,
+            width / 2f + 105f * dp,
+            36f * dp,
+        )
+        canvas.drawRoundRect(hintRect, 14f * dp, 14f * dp, hintPaint)
+        hintPaint.color = Color.parseColor("#F7D99B")
+        canvas.drawText("Release to place game", hintRect.centerX(), hintRect.centerY() + 4f * dp, hintPaint)
     }
 
     private fun drawBackArrow(canvas: Canvas) {
