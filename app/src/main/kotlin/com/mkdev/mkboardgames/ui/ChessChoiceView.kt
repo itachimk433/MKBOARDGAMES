@@ -9,6 +9,7 @@ import android.view.View
 import android.view.animation.DecelerateInterpolator
 import android.view.animation.LinearInterpolator
 import com.mkdev.mkboardgames.SoundPlayer
+import kotlin.math.min
 
 internal fun isFullScreenStyledGameLabel(gameLabel: String): Boolean =
     gameLabel.replace(" ", "").replace("·", "").uppercase() in setOf(
@@ -101,6 +102,7 @@ class ChessChoiceView(
         isChess || isAmazons || isDraughts || isOthello || isFoxAndGeese || isGo || isShogi ||
             isXiangqi || isTicTacToe || isConnectFour || isLudo || isSnakesLadders ||
             isMancala || isYote || isOnitama || isFiveFieldKono
+    private val useLabelOnlyChoices = isChess || isDraughts || isOthello || isMorabaraba
     private val gameIconBitmap = run {
         val assetName = when {
             isChess -> "chess_home_icon.webp"
@@ -170,6 +172,17 @@ class ChessChoiceView(
         textAlign = Paint.Align.CENTER
         isFakeBoldText = true
         textSize = 16f * textScale
+    }
+    private val plainChoiceLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
+        textAlign = Paint.Align.CENTER
+        typeface = Typeface.create("serif", Typeface.BOLD_ITALIC)
+        setShadowLayer(2f * unit, 0f, 2f * unit, Color.argb(210, 0, 0, 0))
+    }
+    private val pressedChoiceBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#F6D78F")
+        style = Paint.Style.STROKE
+        strokeWidth = 3f * unit
     }
     private val detailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#9FB5B8")
@@ -785,6 +798,10 @@ class ChessChoiceView(
         val pressed = pressedIndex == hit.index
         drawDraughtsButton(canvas, rect, pressed, unit)
         val top = rect.top + if (pressed) 2f * unit else 0f
+        if (useLabelOnlyChoices) {
+            drawLabelOnlyChoice(canvas, rect, top, hit.choice, pressed)
+            return
+        }
 
         if (hit.choice.symbol.isNotBlank()) {
             iconPaint.color = Color.parseColor("#4B211F")
@@ -810,6 +827,10 @@ class ChessChoiceView(
         val pressed = pressedIndex == hit.index
         drawOthelloButton(canvas, rect, pressed, unit)
         val top = rect.top + if (pressed) 2f * unit else 0f
+        if (useLabelOnlyChoices) {
+            drawLabelOnlyChoice(canvas, rect, top, hit.choice, pressed)
+            return
+        }
 
         if (hit.choice.symbol.isNotBlank()) {
             iconPaint.color = Color.parseColor("#4B211F")
@@ -835,6 +856,10 @@ class ChessChoiceView(
         val pressed = pressedIndex == hit.index
         drawChessWoodButton(canvas, rect, pressed, unit)
         val top = rect.top + if (pressed) 2f * unit else 0f
+        if (useLabelOnlyChoices) {
+            drawLabelOnlyChoice(canvas, rect, top, hit.choice, pressed)
+            return
+        }
 
         if (hit.choice.symbol.isNotBlank()) {
             iconPaint.color = Color.parseColor("#63301F")
@@ -853,6 +878,44 @@ class ChessChoiceView(
                 hit.choice,
             )
         }
+    }
+
+    private fun drawLabelOnlyChoice(
+        canvas: Canvas,
+        rect: RectF,
+        top: Float,
+        choice: Choice,
+        pressed: Boolean,
+    ) {
+        val drawnRect = RectF(
+            rect.left,
+            top,
+            rect.right,
+            rect.bottom + (top - rect.top),
+        )
+        if (pressed) {
+            val inset = pressedChoiceBorderPaint.strokeWidth / 2f
+            val borderRect = RectF(
+                drawnRect.left + inset,
+                drawnRect.top + inset,
+                drawnRect.right - inset,
+                drawnRect.bottom - inset,
+            )
+            val radius = min(borderRect.height() * 0.2f, 12f * unit)
+            canvas.drawRoundRect(borderRect, radius, radius, pressedChoiceBorderPaint)
+        }
+
+        plainChoiceLabelPaint.textSize = min(21f * textScale, drawnRect.height() * 0.28f)
+        val maxTextWidth = (drawnRect.width() - 24f * unit).coerceAtLeast(1f)
+        while (
+            plainChoiceLabelPaint.textSize > 12f * textScale &&
+            plainChoiceLabelPaint.measureText(choice.label) > maxTextWidth
+        ) {
+            plainChoiceLabelPaint.textSize *= 0.94f
+        }
+        val metrics = plainChoiceLabelPaint.fontMetrics
+        val baseline = drawnRect.centerY() - (metrics.ascent + metrics.descent) / 2f
+        canvas.drawText(choice.label, drawnRect.centerX(), baseline, plainChoiceLabelPaint)
     }
 
     private fun drawCenteredChoiceText(canvas: Canvas, rect: RectF, choice: Choice) {

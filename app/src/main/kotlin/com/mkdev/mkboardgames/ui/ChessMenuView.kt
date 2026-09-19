@@ -52,6 +52,7 @@ class ChessMenuView(
     private val isDraughts = isDraughtsStyledLabel(gameLabel)
     private val isOthello = isOthelloStyledLabel(gameLabel)
     private val isMorabaraba = isMorabarabaStyledLabel(gameLabel)
+    private val useLabelOnlyActions = isChess || isDraughts || isOthello || isMorabaraba
     private val isFoxAndGeese = gameLabel.replace(" ", "").replace("·", "").equals("FOX&GEESE", ignoreCase = true)
     private val isGo = gameLabel.replace(" ", "").equals("GO", ignoreCase = true)
     private val isShogi = gameLabel.replace(" ", "").equals("SHOGI", ignoreCase = true)
@@ -121,6 +122,11 @@ class ChessMenuView(
         textAlign = Paint.Align.CENTER
         typeface = Typeface.create("serif", Typeface.BOLD_ITALIC)
         setShadowLayer(2f * unit, 0f, 2f * unit, Color.argb(210, 0, 0, 0))
+    }
+    private val pressedButtonBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#F6D78F")
+        style = Paint.Style.STROKE
+        strokeWidth = 3f * unit
     }
     private val surfacePaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val panelPaint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -297,8 +303,8 @@ class ChessMenuView(
             add(
                 MenuAction(
                     label = "vs CPU",
-                    detail = "Challenge the board",
-                    symbol = when {
+                    detail = if (useLabelOnlyActions) "" else "Challenge the board",
+                    symbol = if (useLabelOnlyActions) "" else when {
                         isChess -> "♞"
                         isChessFamily || isMorabaraba -> "●"
                         else -> ""
@@ -310,8 +316,8 @@ class ChessMenuView(
             add(
                 MenuAction(
                     label = if (isLudo) "4 Players" else "2 Players",
-                    detail = "Play on one board",
-                    symbol = when {
+                    detail = if (useLabelOnlyActions) "" else "Play on one board",
+                    symbol = if (useLabelOnlyActions) "" else when {
                         isChess -> "♙"
                         isChessFamily || isMorabaraba -> "○"
                         else -> ""
@@ -334,8 +340,8 @@ class ChessMenuView(
             add(
                 MenuAction(
                     label = "How To Play",
-                    detail = "Learn the essentials",
-                    symbol = "?",
+                    detail = if (useLabelOnlyActions) "" else "Learn the essentials",
+                    symbol = if (useLabelOnlyActions) "" else "?",
                     accent = Color.parseColor("#A9B6E8"),
                     action = { onHowToPlay?.invoke() },
                 ),
@@ -953,11 +959,25 @@ class ChessMenuView(
                 drawnRect,
                 gameButtonPaint,
             )
+            if (useLabelOnlyActions && pressed) {
+                drawPressedButtonBorder(canvas, drawnRect)
+            }
             drawPlainButtonLabel(canvas, drawnRect, action.label)
             return
         }
         drawChessWoodButton(canvas, rect, pressed, unit)
         val drawnTop = rect.top + if (pressed) 2f * unit else 0f
+        if (useLabelOnlyActions) {
+            val drawnRect = RectF(
+                rect.left,
+                drawnTop,
+                rect.right,
+                rect.bottom + if (pressed) 2f * unit else 0f,
+            )
+            if (pressed) drawPressedButtonBorder(canvas, drawnRect)
+            drawPlainButtonLabel(canvas, drawnRect, action.label)
+            return
+        }
         actionSymbolPaint.color = Color.parseColor("#63301F")
         actionSymbolPaint.textSize = 23f * textScale
         canvas.drawText(action.symbol, rect.centerX(), drawnTop + 28f * unit, actionSymbolPaint)
@@ -982,9 +1002,28 @@ class ChessMenuView(
 
     private fun drawPlainButtonLabel(canvas: Canvas, rect: RectF, label: String) {
         plainButtonLabelPaint.textSize = min(21f * textScale, rect.height() * 0.28f)
+        val maxTextWidth = (rect.width() - 24f * unit).coerceAtLeast(1f)
+        while (
+            plainButtonLabelPaint.textSize > 12f * textScale &&
+            plainButtonLabelPaint.measureText(label) > maxTextWidth
+        ) {
+            plainButtonLabelPaint.textSize *= 0.94f
+        }
         val metrics = plainButtonLabelPaint.fontMetrics
         val baseline = rect.centerY() - (metrics.ascent + metrics.descent) / 2f
         canvas.drawText(label, rect.centerX(), baseline, plainButtonLabelPaint)
+    }
+
+    private fun drawPressedButtonBorder(canvas: Canvas, rect: RectF) {
+        val inset = pressedButtonBorderPaint.strokeWidth / 2f
+        val borderRect = RectF(
+            rect.left + inset,
+            rect.top + inset,
+            rect.right - inset,
+            rect.bottom - inset,
+        )
+        val radius = min(borderRect.height() * 0.2f, 12f * unit)
+        canvas.drawRoundRect(borderRect, radius, radius, pressedButtonBorderPaint)
     }
 
     private fun loadAssetBitmap(ctx: Context, assetName: String): Bitmap? =
@@ -1032,6 +1071,10 @@ class ChessMenuView(
     }
 
     private fun drawOthelloResumeAction(canvas: Canvas, width: Float) {
+        if (useLabelOnlyActions) {
+            drawLabelOnlyResumeAction(canvas)
+            return
+        }
         drawOthelloButton(canvas, resumeRect, resumePressed, unit)
         val drawnTop = resumeRect.top + if (resumePressed) 2f * unit else 0f
         resumePaint.color = Color.parseColor("#321718")
@@ -1041,12 +1084,29 @@ class ChessMenuView(
     }
 
     private fun drawChessResumeAction(canvas: Canvas, width: Float) {
+        if (useLabelOnlyActions) {
+            drawLabelOnlyResumeAction(canvas)
+            return
+        }
         drawChessWoodButton(canvas, resumeRect, resumePressed, unit)
         val drawnTop = resumeRect.top + if (resumePressed) 2f * unit else 0f
         resumePaint.color = Color.parseColor("#4A1714")
         canvas.drawText("RESUME SAVED MATCH", width / 2f, drawnTop + 20f * unit, resumePaint)
         footerPaint.color = Color.parseColor("#6A2D1B")
         canvas.drawText("Tap here to continue your last game", width / 2f, drawnTop + 38f * unit, footerPaint)
+    }
+
+    private fun drawLabelOnlyResumeAction(canvas: Canvas) {
+        drawChessWoodButton(canvas, resumeRect, resumePressed, unit)
+        val drawnTop = resumeRect.top + if (resumePressed) 2f * unit else 0f
+        val drawnRect = RectF(
+            resumeRect.left,
+            drawnTop,
+            resumeRect.right,
+            resumeRect.bottom + if (resumePressed) 2f * unit else 0f,
+        )
+        if (resumePressed) drawPressedButtonBorder(canvas, drawnRect)
+        drawPlainButtonLabel(canvas, drawnRect, "RESUME SAVED MATCH")
     }
 
     private fun drawBackButton(canvas: Canvas) {
