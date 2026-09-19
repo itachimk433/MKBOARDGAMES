@@ -50,6 +50,17 @@ class BoardSelectionView(
     private val options: List<BoardSelectionOption>,
 ) : View(context) {
 
+    // The supplied frame has transparent padding around the visible wood and
+    // the board opening. Align the artwork to that opening instead of scaling
+    // the complete 600dp source image to the card.
+    private companion object {
+        const val FRAME_INNER_LEFT = 104f
+        const val FRAME_INNER_TOP = 114f
+        const val FRAME_INNER_RIGHT = 498f
+        const val FRAME_INNER_BOTTOM = 398f
+        const val FRAME_SOURCE_SIZE = 600f
+    }
+
     var onSelectionConfirmed: ((Int) -> Unit)? = null
     var onBackClicked: (() -> Unit)? = null
 
@@ -177,11 +188,15 @@ class BoardSelectionView(
             val left = (width - rowWidth) / 2f + column * (cardWidth + gap)
             val rowTop = top + row * (cardHeight + rowGap)
             cardRects[index].set(left, rowTop, left + cardWidth, rowTop + cardHeight)
+            val imageWidth = cardWidth - dp(34f)
+            val imageHeight = imageWidth *
+                (FRAME_INNER_BOTTOM - FRAME_INNER_TOP) /
+                (FRAME_INNER_RIGHT - FRAME_INNER_LEFT)
             imageRects[index].set(
-                left + dp(8f),
-                rowTop + dp(8f),
-                left + cardWidth - dp(8f),
-                rowTop + cardHeight - dp(42f),
+                left + dp(17f),
+                rowTop + dp(18f),
+                left + dp(17f) + imageWidth,
+                rowTop + dp(18f) + imageHeight,
             )
         }
 
@@ -267,7 +282,7 @@ class BoardSelectionView(
             ?: drawGeneratedPreview(canvas, option.preview, drawnImage)
         canvas.drawRect(drawnImage, scrimPaint)
         canvas.restore()
-        frameBitmap?.let { drawBitmapCover(canvas, it, drawnCard) }
+        frameBitmap?.let { drawFrameAlignedToImage(canvas, it, drawnImage, drawnCard) }
         canvas.drawText(option.title, drawnCard.centerX(), drawnCard.bottom - dp(25f), boardTitlePaint)
         canvas.drawText(option.detail, drawnCard.centerX(), drawnCard.bottom - dp(10f), boardDetailPaint)
 
@@ -408,6 +423,29 @@ class BoardSelectionView(
     private fun drawCardBase(canvas: Canvas, rect: RectF) {
         cardPaint.color = Color.parseColor("#17262D")
         canvas.drawRoundRect(rect, dp(8f), dp(8f), cardPaint)
+    }
+
+    private fun drawFrameAlignedToImage(
+        canvas: Canvas,
+        frame: Bitmap,
+        image: RectF,
+        card: RectF,
+    ) {
+        val innerWidth = FRAME_INNER_RIGHT - FRAME_INNER_LEFT
+        val innerHeight = FRAME_INNER_BOTTOM - FRAME_INNER_TOP
+        val scale = min(image.width() / innerWidth, image.height() / innerHeight)
+        val frameSize = FRAME_SOURCE_SIZE * scale
+        val destination = RectF(
+            image.left - FRAME_INNER_LEFT * scale,
+            image.top - FRAME_INNER_TOP * scale,
+            image.left - FRAME_INNER_LEFT * scale + frameSize,
+            image.top - FRAME_INNER_TOP * scale + frameSize,
+        )
+
+        canvas.save()
+        canvas.clipRect(card)
+        canvas.drawBitmap(frame, null, destination, imagePaint)
+        canvas.restore()
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
