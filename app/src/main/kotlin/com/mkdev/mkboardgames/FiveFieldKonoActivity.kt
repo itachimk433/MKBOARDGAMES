@@ -7,11 +7,11 @@ import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import androidx.appcompat.app.AppCompatActivity
-import com.mkdev.mkboardgames.engine.AIPlayer
 import com.mkdev.mkboardgames.engine.GameState
 import com.mkdev.mkboardgames.engine.GameStatus
 import com.mkdev.mkboardgames.engine.Move
 import com.mkdev.mkboardgames.engine.PieceColor
+import com.mkdev.mkboardgames.games.fivefieldkono.FiveFieldKonoAIPlayer
 import com.mkdev.mkboardgames.games.fivefieldkono.FiveFieldKonoRuleEngine
 import com.mkdev.mkboardgames.ui.BoardSelectionOption
 import com.mkdev.mkboardgames.ui.BoardSelectionPreview
@@ -39,16 +39,18 @@ class FiveFieldKonoActivity : AppCompatActivity() {
         private const val GAME_LABEL = "F I V E · F I E L D · K O N O"
         private const val KONO_RULES = """
             Setup
-            Five Field Kono uses a 5 × 5 board. Each player has five pieces on their home row. White moves first.
+            Five Field Kono uses a 5 × 5 board. Each player has seven pieces:
+            five on their home row and one on each end of the adjacent row.
+            White moves first.
 
             Move
-            Move one of your pieces diagonally to a neighbouring empty point.
-
-            Jump
-            A piece may also jump diagonally over one occupied point into the empty point beyond it. The jumped piece stays on the board.
+            Move one of your pieces exactly one point diagonally to a neighbouring empty point.
+            Pieces cannot jump and no pieces are captured.
 
             Winning
-            Move all five of your pieces onto the opponent's starting row. White aims for the top row; Black aims for the bottom row.
+            Move all seven of your pieces onto the opponent's seven starting points.
+            White aims for the top row and its two adjacent corner points;
+            Black aims for the bottom row and its two adjacent corner points.
 
             The Boards
             Choose between the supplied warm wood board and the clean black-and-white board before the match.
@@ -392,12 +394,14 @@ class FiveFieldKonoActivity : AppCompatActivity() {
         aiJob = scope.launch {
             val move = withContext(Dispatchers.Default) {
                 runCatching {
-                    val difficulty = SettingsManager.getYoteDifficulty(this@FiveFieldKonoActivity)
-                    AIPlayer(
-                        engine,
-                        maxDepth = 2 + difficulty,
-                        timeLimitMs = 1800L,
-                        varietyWindowOverride = if (difficulty == 2) 0 else -1,
+                    val profile = SettingsManager.fiveFieldKonoAiProfileForLevel(
+                        SettingsManager.getFiveFieldKonoDifficulty(this@FiveFieldKonoActivity),
+                    )
+                    FiveFieldKonoAIPlayer(
+                        engine = engine,
+                        maxDepth = profile.depth,
+                        timeLimitMs = profile.timeLimitMs,
+                        choiceWindow = profile.choiceWindow,
                     ).bestMove(snapshot)
                 }.getOrNull() ?: engine.allLegalMoves(snapshot, snapshot.currentTurn).firstOrNull()
             }
@@ -450,7 +454,7 @@ class FiveFieldKonoActivity : AppCompatActivity() {
     }
 
     private fun showDifficultyMenu() {
-        val current = SettingsManager.getYoteDifficulty(this)
+        val current = SettingsManager.getFiveFieldKonoDifficulty(this)
         showChoiceOverlay(
             "CPU Difficulty",
             "Choose the computer's strength.",
@@ -461,7 +465,7 @@ class FiveFieldKonoActivity : AppCompatActivity() {
             ),
             onCancel = { showMenu() },
         ) {
-            SettingsManager.setYoteDifficulty(this, it)
+            SettingsManager.setFiveFieldKonoDifficulty(this, it)
             showMenu()
         }
     }

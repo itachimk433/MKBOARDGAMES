@@ -20,6 +20,7 @@ object SettingsManager {
     private const val KEY_GO_DIFFICULTY = "go_ai_difficulty"
     private const val KEY_MANCALA_DIFFICULTY = "mancala_ai_difficulty"
     private const val KEY_YOTE_DIFFICULTY = "yote_ai_difficulty"
+    private const val KEY_FIVE_FIELD_KONO_DIFFICULTY = "five_field_kono_ai_difficulty"
     private const val KEY_ONITAMA_DIFFICULTY = "onitama_ai_difficulty"
     private const val KEY_AMAZONS_DIFFICULTY = "amazons_ai_difficulty"
     private const val KEY_MANCALA_MOVEMENT_SPEED = "mancala_movement_speed"
@@ -220,6 +221,32 @@ object SettingsManager {
         2 -> 4
         else -> 3
     }
+
+    // ── Five Field Kono ──────────────────────────────────────────────────────
+    data class FiveFieldKonoAiProfile(
+        val depth: Int,
+        val timeLimitMs: Long,
+        val choiceWindow: Int,
+    )
+
+    fun fiveFieldKonoAiProfileForLevel(level: Int): FiveFieldKonoAiProfile =
+        when (level.coerceIn(0, 2)) {
+            0 -> FiveFieldKonoAiProfile(depth = 1, timeLimitMs = 300L, choiceWindow = 120)
+            1 -> FiveFieldKonoAiProfile(depth = 3, timeLimitMs = 900L, choiceWindow = 35)
+            else -> FiveFieldKonoAiProfile(depth = 5, timeLimitMs = 2200L, choiceWindow = 0)
+        }
+
+    fun getFiveFieldKonoDifficulty(ctx: Context) =
+        prefs(ctx).getInt(KEY_FIVE_FIELD_KONO_DIFFICULTY, 1).coerceIn(0, 2)
+
+    fun setFiveFieldKonoDifficulty(ctx: Context, v: Int) =
+        prefs(ctx).edit().putInt(KEY_FIVE_FIELD_KONO_DIFFICULTY, v.coerceIn(0, 2)).apply()
+
+    fun fiveFieldKonoAiDepth(ctx: Context) =
+        fiveFieldKonoAiProfileForLevel(getFiveFieldKonoDifficulty(ctx)).depth
+
+    fun fiveFieldKonoAiTimeLimitMs(ctx: Context): Long =
+        fiveFieldKonoAiProfileForLevel(getFiveFieldKonoDifficulty(ctx)).timeLimitMs
 
     // ── Onitama ──────────────────────────────────────────────────────────────
     fun getOnitamaDifficulty(ctx: Context) =
