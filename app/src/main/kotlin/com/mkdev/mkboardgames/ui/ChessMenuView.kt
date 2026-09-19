@@ -111,14 +111,17 @@ class ChessMenuView(
             }
         }
     }
-    private val vsCpuButtonBitmap: Bitmap? = loadAssetBitmap(context, "game_button_vs_cpu.webp")
-    private val twoPlayersButtonBitmap: Bitmap? =
-        loadAssetBitmap(context, "game_button_two_players.webp")
-    private val fourPlayersButtonBitmap: Bitmap? =
-        loadAssetBitmap(context, "game_button_four_players.webp")
-    private val howToPlayButtonBitmap: Bitmap? =
-        loadAssetBitmap(context, "game_button_how_to_play.webp")
+    private val shortButtonBitmap: Bitmap? =
+        loadAssetBitmap(context, "game_button_short.webp")
+    private val longButtonBitmap: Bitmap? =
+        loadAssetBitmap(context, "game_button_long.webp")
     private val gameButtonPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+    private val plainButtonLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
+        textAlign = Paint.Align.CENTER
+        typeface = Typeface.create("serif", Typeface.BOLD_ITALIC)
+        setShadowLayer(2f * unit, 0f, 2f * unit, Color.argb(210, 0, 0, 0))
+    }
     private val surfacePaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val panelPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val panelBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -864,7 +867,7 @@ class ChessMenuView(
 
     private fun drawAction(canvas: Canvas, action: MenuAction) {
         if (isChessFamily || isMorabaraba) {
-            if (isOthello) drawOthelloAction(canvas, action) else drawChessAction(canvas, action)
+            drawChessAction(canvas, action)
             return
         }
         val scale = actionScale[action.label] ?: 1f
@@ -928,25 +931,17 @@ class ChessMenuView(
     private fun drawChessAction(canvas: Canvas, action: MenuAction) {
         val rect = action.rect
         val pressed = pressedAction == action
-        val image = when (action.label) {
-            "vs CPU" -> vsCpuButtonBitmap
-            "2 Players" -> twoPlayersButtonBitmap
-            "4 Players" -> fourPlayersButtonBitmap
-            "How To Play" -> howToPlayButtonBitmap
-            else -> null
-        }
+        val image = buttonBitmapFor(action.label)
         if (image != null) {
+            val drawnTop = rect.top + if (pressed) 2f * unit else 0f
+            val drawnRect = RectF(rect.left, drawnTop, rect.right, rect.bottom + if (pressed) 2f * unit else 0f)
             canvas.drawBitmap(
                 image,
                 null,
-                RectF(
-                    rect.left,
-                    rect.top + if (pressed) 2f * unit else 0f,
-                    rect.right,
-                    rect.bottom + if (pressed) 2f * unit else 0f,
-                ),
+                drawnRect,
                 gameButtonPaint,
             )
+            drawPlainButtonLabel(canvas, drawnRect, action.label)
             return
         }
         drawChessWoodButton(canvas, rect, pressed, unit)
@@ -961,16 +956,23 @@ class ChessMenuView(
     }
 
     private fun actionHeightFor(label: String, actionWidth: Float): Float {
-        val image = when (label) {
-            "vs CPU" -> vsCpuButtonBitmap
-            "2 Players" -> twoPlayersButtonBitmap
-            "4 Players" -> fourPlayersButtonBitmap
-            "How To Play" -> howToPlayButtonBitmap
-            else -> null
-        }
+        val image = buttonBitmapFor(label)
         return image?.let {
             actionWidth * it.height.toFloat() / it.width.toFloat()
         } ?: 82f * unit
+    }
+
+    private fun buttonBitmapFor(label: String): Bitmap? = when (label) {
+        "How To Play" -> longButtonBitmap
+        "vs CPU", "2 Players", "4 Players" -> shortButtonBitmap
+        else -> null
+    }
+
+    private fun drawPlainButtonLabel(canvas: Canvas, rect: RectF, label: String) {
+        plainButtonLabelPaint.textSize = min(21f * textScale, rect.height() * 0.28f)
+        val metrics = plainButtonLabelPaint.fontMetrics
+        val baseline = rect.centerY() - (metrics.ascent + metrics.descent) / 2f
+        canvas.drawText(label, rect.centerX(), baseline, plainButtonLabelPaint)
     }
 
     private fun loadAssetBitmap(ctx: Context, assetName: String): Bitmap? =

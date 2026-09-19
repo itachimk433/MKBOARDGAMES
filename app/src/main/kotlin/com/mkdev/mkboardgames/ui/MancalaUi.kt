@@ -175,6 +175,18 @@ class MancalaHomeView(context: Context) : View(context) {
     } catch (_: Throwable) {
         null
     }
+    private val longButtonBitmap = try {
+        context.assets.open("game_button_long.webp").use { BitmapFactory.decodeStream(it) }
+    } catch (_: Throwable) {
+        null
+    }
+    private val buttonBitmapPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+    private val buttonLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
+        textAlign = Paint.Align.CENTER
+        typeface = Typeface.create("serif", Typeface.BOLD_ITALIC)
+        setShadowLayer(dp(context, 2f), 0f, dp(context, 2f), Color.argb(210, 0, 0, 0))
+    }
     private val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.CENTER
         typeface = Typeface.create("sans-serif-condensed", Typeface.BOLD_ITALIC)
@@ -217,7 +229,9 @@ class MancalaHomeView(context: Context) : View(context) {
             "⌂",
         )
         val mainWidth = min(w * 0.42f, dp(context, 250f))
-        val mainHeight = min(dp(context, 58f), h * 0.13f)
+        val mainHeight = longButtonBitmap?.let {
+            mainWidth * it.height.toFloat() / it.width.toFloat()
+        } ?: min(dp(context, 58f), h * 0.13f)
         val mainLeft = (w - mainWidth) / 2f
         val playTop = h * 0.46f
         drawWoodButton(canvas, "play", RectF(mainLeft, playTop, mainLeft + mainWidth, playTop + mainHeight), "Play")
@@ -395,6 +409,14 @@ class MancalaHomeView(context: Context) : View(context) {
         val isPressed = pressedKey == key
         val offset = if (isPressed) dp(context, 2f) else 0f
         val drawn = RectF(rect.left, rect.top + offset, rect.right, rect.bottom + offset)
+        longButtonBitmap?.let { bitmap ->
+            canvas.drawBitmap(bitmap, null, drawn, buttonBitmapPaint)
+            buttonLabelPaint.textSize = min(drawn.height() * 0.28f, dp(context, 24f))
+            val metrics = buttonLabelPaint.fontMetrics
+            val baseline = drawn.centerY() - (metrics.ascent + metrics.descent) / 2f
+            canvas.drawText(label, drawn.centerX(), baseline, buttonLabelPaint)
+            return
+        }
         val radius = drawn.height() * 0.2f
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = LinearGradient(

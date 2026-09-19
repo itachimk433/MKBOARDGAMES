@@ -59,11 +59,17 @@ class ModeSelectionView(context: Context) : View(context) {
         color = Color.argb(58, 0, 0, 0)
     }
     private val playButtonBitmap: Bitmap? = try {
-        context.assets.open("mode_play_button.webp").use { BitmapFactory.decodeStream(it) }
+        context.assets.open("game_button_long.webp").use { BitmapFactory.decodeStream(it) }
     } catch (_: Exception) {
         null
     }
     private val buttonBitmapPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+    private val playButtonLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
+        textAlign = Paint.Align.CENTER
+        typeface = Typeface.create("serif", Typeface.BOLD_ITALIC)
+        setShadowLayer(2f * unit, 0f, 2f * unit, Color.argb(210, 0, 0, 0))
+    }
     private val modeIconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
         textAlign = Paint.Align.CENTER
@@ -255,6 +261,10 @@ class ModeSelectionView(context: Context) : View(context) {
         canvas.scale(scale, scale, rect.centerX(), rect.centerY())
         if (mode == GameMode.NORMAL && playButtonBitmap != null) {
             canvas.drawBitmap(playButtonBitmap, null, rect, buttonBitmapPaint)
+            playButtonLabelPaint.textSize = min(rect.height() * 0.28f, 24f * textScale)
+            val metrics = playButtonLabelPaint.fontMetrics
+            val baseline = rect.centerY() - (metrics.ascent + metrics.descent) / 2f
+            canvas.drawText(label, rect.centerX(), baseline, playButtonLabelPaint)
         } else {
             brownWoodCardRenderer.draw(canvas, rect, pressedMode == mode)
             val iconCenterX = rect.left + 32f * unit
