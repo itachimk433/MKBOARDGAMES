@@ -10,6 +10,7 @@ import android.graphics.RadialGradient
 import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Shader
+import android.graphics.Typeface
 import android.animation.ValueAnimator
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
@@ -96,7 +97,7 @@ class SnakesLaddersBoardSelectionView(
     private val boardTitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
         textAlign = Paint.Align.CENTER
-        isFakeBoldText = true
+        typeface = Typeface.create("serif", Typeface.BOLD_ITALIC)
         textSize = sp(15f)
     }
     private val footerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -204,15 +205,15 @@ class SnakesLaddersBoardSelectionView(
             val left = (width - rowWidth) / 2f + column * (cardWidth + gap)
             val rowTop = top + row * (cardHeight + rowGap)
             cardRects[index].set(left, rowTop, left + cardWidth, rowTop + cardHeight)
-            val imageWidth = cardWidth - dp(34f)
+            val imageWidth = cardWidth - dp(24f)
             val imageHeight = imageWidth *
                 (FRAME_INNER_BOTTOM - FRAME_INNER_TOP) /
                 (FRAME_INNER_RIGHT - FRAME_INNER_LEFT)
             imageRects[index].set(
-                left + dp(17f),
-                rowTop + dp(18f),
-                left + dp(17f) + imageWidth,
-                rowTop + dp(18f) + imageHeight,
+                left + dp(12f),
+                rowTop + dp(14f),
+                left + dp(12f) + imageWidth,
+                rowTop + dp(14f) + imageHeight,
             )
         }
 
