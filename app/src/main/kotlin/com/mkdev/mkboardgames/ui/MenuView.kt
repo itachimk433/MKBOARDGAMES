@@ -14,7 +14,6 @@ import com.mkdev.mkboardgames.SettingsManager
 import com.mkdev.mkboardgames.engine.Position
 import com.mkdev.mkboardgames.games.foxandgeese.FoxAndGeeseSetup
 import com.mkdev.mkboardgames.games.go.GoSetup
-import kotlin.math.roundToInt
 
 class MenuView(
     context: Context,
@@ -355,11 +354,24 @@ class MenuView(
 
     private fun nearestCardSlot(x: Float, contentY: Float): Int {
         if (cards.isEmpty()) return 0
-        val row = ((contentY - headerH) / (cardH + gridSpacing)).roundToInt()
-            .coerceAtLeast(0)
-        val column = ((x - gridPadding) / (cardW + gridSpacing)).roundToInt()
-            .coerceIn(0, gridColumns - 1)
-        return (row * gridColumns + column).coerceIn(0, cards.lastIndex)
+        return cards.indices.minByOrNull { index ->
+            val rect = cards[index].rect
+            val dx = x - rect.centerX()
+            val dy = contentY - rect.centerY()
+            dx * dx + dy * dy
+        } ?: 0
+    }
+
+    private fun updateArrangePosition(x: Float, screenY: Float) {
+        val edgeSize = 56f * dp
+        val scrollStep = 14f * dp
+        scrollY = when {
+            screenY < edgeSize -> (scrollY - scrollStep).coerceAtLeast(0f)
+            screenY > height - edgeSize -> (scrollY + scrollStep).coerceAtMost(maxScrollY)
+            else -> scrollY
+        }
+        dragCenterX = x - dragOffsetX
+        dragCenterY = screenY + scrollY - dragOffsetY
     }
 
     // ── Touch ─────────────────────────────────────────────────────────────────
@@ -394,8 +406,7 @@ class MenuView(
                 velocityTracker?.addMovement(event)
                 lastTouchX = event.x
                 if (arrangingCard != null) {
-                    dragCenterX = event.x - dragOffsetX
-                    dragCenterY = event.y + scrollY - dragOffsetY
+                    updateArrangePosition(event.x, event.y)
                     postInvalidateOnAnimation()
                     return true
                 }
@@ -505,6 +516,8 @@ class MenuView(
         velocityTracker?.recycle()
         velocityTracker = null
         scrollScroller.forceFinished(true)
+        arrangingCard = null
+        arrangeMode = false
         super.onDetachedFromWindow()
     }
 
