@@ -687,6 +687,32 @@ open class MancalaChoiceOverlayView(
                 pressed,
             )
         ) {
+            val borderSource = PlainGameButtonAssets.visibleRect(
+                rect,
+                PlainGameButtonAssets.Style.LONG,
+                pressed = pressed,
+                pressedOffset = if (pressed) dp(context, 2f) else 0f,
+            )
+            if (pressed) {
+                val inset = dp(context, 1.5f)
+                val border = RectF(
+                    borderSource.left + inset,
+                    borderSource.top + inset,
+                    borderSource.right - inset,
+                    borderSource.bottom - inset,
+                )
+                val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = Color.parseColor("#F6D78F")
+                    style = Paint.Style.STROKE
+                    strokeWidth = dp(context, 3f)
+                }
+                canvas.drawRoundRect(
+                    border,
+                    min(border.height() * 0.2f, dp(context, 12f)),
+                    min(border.height() * 0.2f, dp(context, 12f)),
+                    borderPaint,
+                )
+            }
             textPaint.color = Color.WHITE
             textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             textPaint.textSize = min(dp(context, 20f), rect.height() * 0.28f)

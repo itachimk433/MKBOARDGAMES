@@ -908,7 +908,12 @@ class ChessChoiceView(
         if (pressed) {
             val style = PlainGameButtonAssets.styleFor(rect)
             val borderTarget = style?.let {
-                PlainGameButtonAssets.visibleRect(rect, it, pressed = true)
+                PlainGameButtonAssets.visibleRect(
+                    rect,
+                    it,
+                    pressed = true,
+                    pressedOffset = top - rect.top,
+                )
             } ?: drawnRect
             val inset = pressedChoiceBorderPaint.strokeWidth / 2f
             val borderRect = RectF(

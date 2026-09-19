@@ -895,7 +895,12 @@ class ChessMenuView(
             if (pressed) {
                 val style = PlainGameButtonAssets.styleFor(rect)
                 val borderRect = style?.let {
-                    PlainGameButtonAssets.visibleRect(rect, it, pressed = true)
+                    PlainGameButtonAssets.visibleRect(
+                        rect,
+                        it,
+                        pressed = true,
+                        pressedOffset = drawnTop - rect.top,
+                    )
                 } ?: drawnRect
                 drawPressedButtonBorder(canvas, borderRect)
             }
@@ -1006,7 +1011,12 @@ class ChessMenuView(
             if (pressed) {
                 val style = PlainGameButtonAssets.styleFor(rect)
                 val borderRect = style?.let {
-                    PlainGameButtonAssets.visibleRect(rect, it, pressed = true)
+                    PlainGameButtonAssets.visibleRect(
+                        rect,
+                        it,
+                        pressed = true,
+                        pressedOffset = drawnTop - rect.top,
+                    )
                 } ?: drawnRect
                 drawPressedButtonBorder(canvas, borderRect)
             }
@@ -1151,7 +1161,12 @@ class ChessMenuView(
         if (resumePressed) {
             val style = PlainGameButtonAssets.styleFor(resumeRect)
             val borderRect = style?.let {
-                PlainGameButtonAssets.visibleRect(resumeRect, it, pressed = true)
+                PlainGameButtonAssets.visibleRect(
+                    resumeRect,
+                    it,
+                    pressed = true,
+                    pressedOffset = drawnTop - resumeRect.top,
+                )
             } ?: drawnRect
             drawPressedButtonBorder(canvas, borderRect)
         }

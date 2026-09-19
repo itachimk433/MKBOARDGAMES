@@ -63,8 +63,12 @@ internal object PlainGameButtonAssets {
     }
 
     /**
-     * Returns the bounds of the visible wood, excluding the transparent
-     * padding included in the source artwork.
+     * Returns the bounds of the physical wood frame in the source artwork.
+     *
+     * The assets include a soft, partially transparent shadow/glow around the
+     * plate. That footprint is intentionally not used for pressed-state
+     * outlines: the outline should sit on the wood rim, like the board-choice
+     * selection frame does.
      */
     fun visibleRect(
         rect: RectF,
@@ -74,8 +78,9 @@ internal object PlainGameButtonAssets {
     ): RectF {
         val bitmap = bitmap(style) ?: return RectF(rect)
         val source = when (style) {
-            Style.SHORT -> RectF(0f, 37f, 1586f, 982f)
-            Style.LONG -> RectF(15f, 47f, 2156f, 708f)
+            // Opaque wood-rim bounds (alpha >= 128), not the soft outer glow.
+            Style.SHORT -> RectF(25f, 86f, 1576f, 893f)
+            Style.LONG -> RectF(24f, 110f, 2150f, 618f)
         }
         val scaleX = rect.width() / bitmap.width.toFloat()
         val scaleY = rect.height() / bitmap.height.toFloat()
