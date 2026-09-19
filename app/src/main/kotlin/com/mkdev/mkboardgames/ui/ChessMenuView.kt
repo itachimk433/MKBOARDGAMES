@@ -82,6 +82,7 @@ class ChessMenuView(
         hasResumeMatch -> 462f
         else -> 414f
     }
+    private val menuButtonScale = 0.6f
     private val gameHomeIconBitmap = run {
         val assetName = when {
             isChess -> "chess_home_icon.webp"
@@ -296,7 +297,8 @@ class ChessMenuView(
         }
         val sidePadding = 18f * unit
         val gap = 10f * unit
-        val actionWidth = (width - sidePadding * 2f - gap) / 2f
+        val availableActionWidth = (width - sidePadding * 2f - gap) / 2f
+        val actionWidth = availableActionWidth * menuButtonScale
         val actionTop = contentOffset +
             (if (isChessFamily || isMorabaraba) 244f else 164f) * unit
         actions = buildList {
@@ -348,27 +350,31 @@ class ChessMenuView(
             )
         }
 
-        val firstRowHeight = actions
+        val firstRowSlotHeight = actions
             .take(2)
-            .maxOfOrNull { actionHeightFor(it.label, actionWidth) }
+            .maxOfOrNull { actionHeightFor(it.label, availableActionWidth) }
             ?: 82f * unit
+        val firstRowLeft = (width - (actionWidth * 2f + gap)) / 2f
         actions.take(2).forEachIndexed { index, action ->
-            val left = sidePadding + index * (actionWidth + gap)
+            val left = firstRowLeft + index * (actionWidth + gap)
             val actionHeight = actionHeightFor(action.label, actionWidth)
-            val top = actionTop + (firstRowHeight - actionHeight) / 2f
+            val top = actionTop + (firstRowSlotHeight - actionHeight) / 2f
             action.rect = RectF(left, top, left + actionWidth, top + actionHeight)
         }
-        var nextRowTop = actionTop + firstRowHeight + gap
+        var nextRowTop = actionTop + firstRowSlotHeight + gap
         actions.drop(2).forEach { action ->
-            val rowWidth = if (isSnakesLadders && action.label == "4 Players") {
-                actionWidth
+            val availableRowWidth = if (isSnakesLadders && action.label == "4 Players") {
+                availableActionWidth
             } else {
                 width - sidePadding * 2f
             }
+            val rowWidth = availableRowWidth * menuButtonScale
+            val rowSlotHeight = actionHeightFor(action.label, availableRowWidth)
             val actionHeight = actionHeightFor(action.label, rowWidth)
             val rowLeft = (width - rowWidth) / 2f
-            action.rect = RectF(rowLeft, nextRowTop, rowLeft + rowWidth, nextRowTop + actionHeight)
-            nextRowTop = action.rect.bottom + gap
+            val rowTop = nextRowTop + (rowSlotHeight - actionHeight) / 2f
+            action.rect = RectF(rowLeft, rowTop, rowLeft + rowWidth, rowTop + actionHeight)
+            nextRowTop += rowSlotHeight + gap
         }
         actions.forEach {
             actionScale[it.label] = 1f
