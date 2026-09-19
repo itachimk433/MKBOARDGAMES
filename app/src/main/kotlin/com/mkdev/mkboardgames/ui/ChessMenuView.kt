@@ -52,7 +52,7 @@ class ChessMenuView(
     private val isDraughts = isDraughtsStyledLabel(gameLabel)
     private val isOthello = isOthelloStyledLabel(gameLabel)
     private val isMorabaraba = isMorabarabaStyledLabel(gameLabel)
-    private val useLabelOnlyActions = isChess || isDraughts || isOthello || isMorabaraba
+    private val useLabelOnlyActions = true
     private val isFoxAndGeese = gameLabel.replace(" ", "").replace("·", "").equals("FOX&GEESE", ignoreCase = true)
     private val isGo = gameLabel.replace(" ", "").equals("GO", ignoreCase = true)
     private val isShogi = gameLabel.replace(" ", "").equals("SHOGI", ignoreCase = true)
@@ -330,8 +330,8 @@ class ChessMenuView(
                 add(
                     MenuAction(
                         label = "4 Players",
-                        detail = "Four players, one board",
-                        symbol = "◇",
+                        detail = if (useLabelOnlyActions) "" else "Four players, one board",
+                        symbol = if (useLabelOnlyActions) "" else "◇",
                         accent = Color.parseColor("#D88EAD"),
                         action = { onFourPlayers?.invoke() },
                     ),
@@ -883,6 +883,20 @@ class ChessMenuView(
 
         canvas.save()
         canvas.scale(scale, scale, rect.centerX(), rect.centerY())
+        if (useLabelOnlyActions) {
+            drawChessWoodButton(canvas, rect, pressed, unit)
+            val drawnTop = rect.top + if (pressed) 2f else 0f
+            val drawnRect = RectF(
+                rect.left,
+                drawnTop,
+                rect.right,
+                rect.bottom + if (pressed) 2f else 0f,
+            )
+            if (pressed) drawPressedButtonBorder(canvas, drawnRect)
+            drawPlainButtonLabel(canvas, drawnRect, action.label)
+            canvas.restore()
+            return
+        }
 
         val usesPlainPlate = PlainGameButtonAssets.styleFor(rect)?.let { style ->
             PlainGameButtonAssets.draw(canvas, rect, style, pressed)
@@ -959,7 +973,7 @@ class ChessMenuView(
                 drawnRect,
                 gameButtonPaint,
             )
-            if (useLabelOnlyActions && pressed) {
+            if (pressed) {
                 drawPressedButtonBorder(canvas, drawnRect)
             }
             drawPlainButtonLabel(canvas, drawnRect, action.label)
@@ -1009,6 +1023,10 @@ class ChessMenuView(
         ) {
             plainButtonLabelPaint.textSize *= 0.94f
         }
+        val measuredWidth = plainButtonLabelPaint.measureText(label)
+        if (measuredWidth > maxTextWidth && measuredWidth > 0f) {
+            plainButtonLabelPaint.textSize *= maxTextWidth / measuredWidth
+        }
         val metrics = plainButtonLabelPaint.fontMetrics
         val baseline = rect.centerY() - (metrics.ascent + metrics.descent) / 2f
         canvas.drawText(label, rect.centerX(), baseline, plainButtonLabelPaint)
@@ -1049,6 +1067,10 @@ class ChessMenuView(
     }
 
     private fun drawResumeAction(canvas: Canvas, width: Float) {
+        if (useLabelOnlyActions) {
+            drawLabelOnlyResumeAction(canvas)
+            return
+        }
         if (isChessFamily || isMorabaraba) {
             if (isOthello) drawOthelloResumeAction(canvas, width) else drawChessResumeAction(canvas, width)
             return

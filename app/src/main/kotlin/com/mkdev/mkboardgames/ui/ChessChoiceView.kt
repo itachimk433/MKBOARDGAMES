@@ -102,7 +102,7 @@ class ChessChoiceView(
         isChess || isAmazons || isDraughts || isOthello || isFoxAndGeese || isGo || isShogi ||
             isXiangqi || isTicTacToe || isConnectFour || isLudo || isSnakesLadders ||
             isMancala || isYote || isOnitama || isFiveFieldKono
-    private val useLabelOnlyChoices = isChess || isDraughts || isOthello || isMorabaraba
+    private val useLabelOnlyChoices = true
     private val gameIconBitmap = run {
         val assetName = when {
             isChess -> "chess_home_icon.webp"
@@ -667,6 +667,14 @@ class ChessChoiceView(
             drawGridChoice(canvas, hit)
             return
         }
+        if (useLabelOnlyChoices) {
+            val rect = hit.rect
+            val pressed = pressedIndex == hit.index
+            drawChessWoodButton(canvas, rect, pressed, unit)
+            val top = rect.top + if (pressed) 2f * unit else 0f
+            drawLabelOnlyChoice(canvas, rect, top, hit.choice, pressed)
+            return
+        }
         if (isChessFamily || isMorabaraba) {
             if (isMorabaraba) drawOthelloChoice(canvas, hit) else drawChessChoice(canvas, hit)
             return
@@ -703,6 +711,10 @@ class ChessChoiceView(
         drawChessWoodButton(canvas, rect, pressed, unit)
         val top = rect.top + if (pressed) 2f * unit else 0f
 
+        if (useLabelOnlyChoices) {
+            drawLabelOnlyChoice(canvas, rect, top, hit.choice, pressed)
+            return
+        }
         if (hit.assetBitmap != null) {
             val tokenHeight = if (compactGrid) 18f else 34f
             val tokenWidth = tokenHeight * hit.assetBitmap.width.toFloat() /
@@ -912,6 +924,10 @@ class ChessChoiceView(
             plainChoiceLabelPaint.measureText(choice.label) > maxTextWidth
         ) {
             plainChoiceLabelPaint.textSize *= 0.94f
+        }
+        val measuredWidth = plainChoiceLabelPaint.measureText(choice.label)
+        if (measuredWidth > maxTextWidth && measuredWidth > 0f) {
+            plainChoiceLabelPaint.textSize *= maxTextWidth / measuredWidth
         }
         val metrics = plainChoiceLabelPaint.fontMetrics
         val baseline = drawnRect.centerY() - (metrics.ascent + metrics.descent) / 2f
