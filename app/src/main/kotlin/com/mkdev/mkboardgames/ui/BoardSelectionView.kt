@@ -38,6 +38,12 @@ data class BoardSelectionOption(
     val detail: String,
     val assetName: String? = null,
     val preview: BoardSelectionPreview = BoardSelectionPreview.GRID,
+    /**
+     * Optional picker-only artwork. When supplied, the regular preview is
+     * drawn underneath it so transparent frame assets can decorate a preview
+     * without changing the board artwork used in the game.
+     */
+    val previewAssetName: String? = null,
 )
 
 /**
@@ -57,7 +63,7 @@ class BoardSelectionView(
     private val scaledDensity = resources.displayMetrics.scaledDensity
     private val textScale = scaledDensity.coerceAtMost(2f)
     private val bitmaps = options.map { option ->
-        option.assetName?.let { name ->
+        (option.previewAssetName ?: option.assetName)?.let { name ->
             runCatching {
                 context.assets.open(name).use { BitmapFactory.decodeStream(it) }
             }.getOrNull()
@@ -260,11 +266,11 @@ class BoardSelectionView(
         canvas.clipPath(Path().apply {
             addRoundRect(drawnImage, dp(8f), dp(8f), Path.Direction.CW)
         })
-        bitmaps[index]?.let { drawBitmapCover(canvas, it, drawnImage) } ?: drawGeneratedPreview(
-            canvas,
-            option.preview,
-            drawnImage,
-        )
+        if (bitmaps[index] != null && option.previewAssetName != null) {
+            drawGeneratedPreview(canvas, option.preview, drawnImage)
+        }
+        bitmaps[index]?.let { drawBitmapCover(canvas, it, drawnImage) }
+            ?: drawGeneratedPreview(canvas, option.preview, drawnImage)
         canvas.drawRect(drawnImage, scrimPaint)
         canvas.restore()
         canvas.drawText(option.title, drawnCard.centerX(), drawnCard.bottom - dp(25f), boardTitlePaint)
