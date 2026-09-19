@@ -7,7 +7,6 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
 import android.graphics.Paint
-import android.graphics.Path
 import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Shader
@@ -49,11 +48,11 @@ class ChessBoardSelectionView(
     private val textScale = scaledDensity.coerceAtMost(2f)
     private val styles = ChessBoardStyle.entries.toList()
     private val styleNames = listOf(
-        "Canvas board" to "Clean and modern",
-        "Classic wood" to "Warm tournament feel",
-        "Supplied wood" to "Rich natural grain",
-        "Realistic dark" to "High-contrast frame",
-        "Black & white" to "Bold monochrome",
+        "Canvas Board" to "Clean and modern",
+        "Classic Wood" to "Warm tournament feel",
+        "Supplied Wood" to "Rich natural grain",
+        "Realistic Dark" to "High-contrast frame",
+        "Black & White" to "Bold monochrome",
     )
     private val boardBitmaps = mapOf(
         ChessBoardStyle.CLASSIC_WOOD to loadBitmap("chess_board.jpg"),
@@ -86,15 +85,10 @@ class ChessBoardSelectionView(
         textSize = sp(12f)
     }
     private val boardTitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#4A1714")
+        color = Color.WHITE
         textAlign = Paint.Align.CENTER
         isFakeBoldText = true
         textSize = sp(14f)
-    }
-    private val boardDetailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#6A2D1B")
-        textAlign = Paint.Align.CENTER
-        textSize = sp(9f)
     }
     private val footerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#71898D")
@@ -277,17 +271,14 @@ class ChessBoardSelectionView(
 
         drawCardBase(canvas, drawnCard)
         canvas.save()
-        canvas.clipPath(Path().apply {
-            addRoundRect(drawnImage, dp(8f), dp(8f), Path.Direction.CW)
-        })
+        canvas.clipRect(drawnImage)
         drawPreview(canvas, style, drawnImage)
         canvas.drawRect(drawnImage, scrimPaint)
         canvas.restore()
         frameBitmap?.let { drawFrameAlignedToImage(canvas, it, drawnImage, drawnCard) }
 
-        val (name, detail) = styleNames[index]
+        val name = styleNames[index].first
         canvas.drawText(name, drawnCard.centerX(), drawnCard.bottom - dp(26f), boardTitlePaint)
-        canvas.drawText(detail, drawnCard.centerX(), drawnCard.bottom - dp(11f), boardDetailPaint)
 
         if (selectedStyle != null && !selected) {
             canvas.drawRoundRect(drawnCard, dp(10f), dp(10f), dimPaint)

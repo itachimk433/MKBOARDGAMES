@@ -7,7 +7,6 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
 import android.graphics.Paint
-import android.graphics.Path
 import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Shader
@@ -103,15 +102,10 @@ class BoardSelectionView(
         textSize = sp(12f)
     }
     private val boardTitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#4A1714")
+        color = Color.WHITE
         textAlign = Paint.Align.CENTER
         typeface = Typeface.DEFAULT_BOLD
         textSize = sp(14f)
-    }
-    private val boardDetailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#6A2D1B")
-        textAlign = Paint.Align.CENTER
-        textSize = sp(9f)
     }
     private val footerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#71898D")
@@ -275,16 +269,13 @@ class BoardSelectionView(
 
         drawCardBase(canvas, drawnCard)
         canvas.save()
-        canvas.clipPath(Path().apply {
-            addRoundRect(drawnImage, dp(8f), dp(8f), Path.Direction.CW)
-        })
+        canvas.clipRect(drawnImage)
         bitmaps[index]?.let { drawBitmapCover(canvas, it, drawnImage) }
             ?: drawGeneratedPreview(canvas, option.preview, drawnImage)
         canvas.drawRect(drawnImage, scrimPaint)
         canvas.restore()
         frameBitmap?.let { drawFrameAlignedToImage(canvas, it, drawnImage, drawnCard) }
         canvas.drawText(option.title, drawnCard.centerX(), drawnCard.bottom - dp(25f), boardTitlePaint)
-        canvas.drawText(option.detail, drawnCard.centerX(), drawnCard.bottom - dp(10f), boardDetailPaint)
 
         if (selectedOption != null && !selected) {
             canvas.drawRoundRect(drawnCard, dp(10f), dp(10f), dimPaint)

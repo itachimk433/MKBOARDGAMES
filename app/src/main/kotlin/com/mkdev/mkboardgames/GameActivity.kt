@@ -793,40 +793,40 @@ class GameActivity : AppCompatActivity() {
     private fun boardSelectionOptions(): List<BoardSelectionOption>? = when (gameType) {
         "AMAZONS" -> if (amazonsBoardSize == 8) {
             listOf(
-                BoardSelectionOption("Canvas board", "Clean and modern"),
-                BoardSelectionOption("Classic wood", "Warm tournament feel", "chess_board.jpg"),
-                BoardSelectionOption("Supplied wood", "Rich natural grain", "chess_board_wood.jpg"),
-                BoardSelectionOption("Realistic dark", "High-contrast frame"),
-                BoardSelectionOption("Black & white", "Bold monochrome", "chess_board_black_white.png"),
+                BoardSelectionOption("Canvas Board", "Clean and modern"),
+                BoardSelectionOption("Classic Wood", "Warm tournament feel", "chess_board.jpg"),
+                BoardSelectionOption("Supplied Wood", "Rich natural grain", "chess_board_wood.jpg"),
+                BoardSelectionOption("Realistic Dark", "High-contrast frame"),
+                BoardSelectionOption("Black & White", "Bold monochrome", "chess_board_black_white.png"),
             )
         } else {
             listOf(
-                BoardSelectionOption("Canvas board", "Clean and modern", preview = BoardSelectionPreview.CHECKERS),
-                BoardSelectionOption("Dark wood", "Deep natural grain", "international_draughts_board_dark.jpg", BoardSelectionPreview.CHECKERS),
-                BoardSelectionOption("Light wood", "Bright natural grain", "international_draughts_board_light.jpg", BoardSelectionPreview.CHECKERS),
+                BoardSelectionOption("Canvas Board", "Clean and modern", preview = BoardSelectionPreview.CHECKERS),
+                BoardSelectionOption("Dark Wood", "Deep natural grain", "international_draughts_board_dark.jpg", BoardSelectionPreview.CHECKERS),
+                BoardSelectionOption("Light Wood", "Bright natural grain", "international_draughts_board_light.jpg", BoardSelectionPreview.CHECKERS),
             )
         }
         "CHECKERS" -> listOf(
-            BoardSelectionOption("Canvas board", "Clean and modern", preview = BoardSelectionPreview.CHECKERS),
-            BoardSelectionOption("Red & black", "Bold contrast", "draughts_board_red_black.png", BoardSelectionPreview.CHECKERS),
-            BoardSelectionOption("Classic wood", "Warm tournament feel", "chess_board.jpg", BoardSelectionPreview.CHECKERS),
-            BoardSelectionOption("Supplied wood", "Rich natural grain", "chess_board_wood.jpg", BoardSelectionPreview.CHECKERS),
-            BoardSelectionOption("Realistic dark", "High-contrast frame", preview = BoardSelectionPreview.CHECKERS),
-            BoardSelectionOption("Black & white", "Bold monochrome", "chess_board_black_white.png", BoardSelectionPreview.CHECKERS),
+            BoardSelectionOption("Canvas Board", "Clean and modern", preview = BoardSelectionPreview.CHECKERS),
+            BoardSelectionOption("Red & Black", "Bold contrast", "draughts_board_red_black.png", BoardSelectionPreview.CHECKERS),
+            BoardSelectionOption("Classic Wood", "Warm tournament feel", "chess_board.jpg", BoardSelectionPreview.CHECKERS),
+            BoardSelectionOption("Supplied Wood", "Rich natural grain", "chess_board_wood.jpg", BoardSelectionPreview.CHECKERS),
+            BoardSelectionOption("Realistic Dark", "High-contrast frame", preview = BoardSelectionPreview.CHECKERS),
+            BoardSelectionOption("Black & White", "Bold monochrome", "chess_board_black_white.png", BoardSelectionPreview.CHECKERS),
         )
         "INTERNATIONAL_DRAUGHTS" -> listOf(
-            BoardSelectionOption("Canvas board", "Clean and modern", preview = BoardSelectionPreview.CHECKERS),
-            BoardSelectionOption("Dark wood", "Deep natural grain", "international_draughts_board_dark.jpg", BoardSelectionPreview.CHECKERS),
-            BoardSelectionOption("Light wood", "Bright natural grain", "international_draughts_board_light.jpg", BoardSelectionPreview.CHECKERS),
+            BoardSelectionOption("Canvas Board", "Clean and modern", preview = BoardSelectionPreview.CHECKERS),
+            BoardSelectionOption("Dark Wood", "Deep natural grain", "international_draughts_board_dark.jpg", BoardSelectionPreview.CHECKERS),
+            BoardSelectionOption("Light Wood", "Bright natural grain", "international_draughts_board_light.jpg", BoardSelectionPreview.CHECKERS),
         )
         "OTHELLO" -> listOf(
-            BoardSelectionOption("Canvas board", "Clean and modern", preview = BoardSelectionPreview.OTHELLO),
-            BoardSelectionOption("Green felt", "Classic table feel", "othello_board_green.webp", BoardSelectionPreview.OTHELLO),
+            BoardSelectionOption("Canvas Board", "Clean and modern", preview = BoardSelectionPreview.OTHELLO),
+            BoardSelectionOption("Green Felt", "Classic table feel", "othello_board_green.webp", BoardSelectionPreview.OTHELLO),
         )
         "FOX_AND_GEESE" -> listOf(
-            BoardSelectionOption("Canvas board", "Clean and modern", preview = BoardSelectionPreview.FOX_AND_GEESE),
-            BoardSelectionOption("Light wood", "Warm natural grain", "fox_and_geese_board_light.webp", BoardSelectionPreview.FOX_AND_GEESE),
-            BoardSelectionOption("Cross wood", "Rich crafted frame", "fox_and_geese_board_cross.webp", BoardSelectionPreview.FOX_AND_GEESE),
+            BoardSelectionOption("Canvas Board", "Clean and modern", preview = BoardSelectionPreview.FOX_AND_GEESE),
+            BoardSelectionOption("Light Wood", "Warm natural grain", "fox_and_geese_board_light.webp", BoardSelectionPreview.FOX_AND_GEESE),
+            BoardSelectionOption("Cross Wood", "Rich crafted frame", "fox_and_geese_board_cross.webp", BoardSelectionPreview.FOX_AND_GEESE),
         )
         "XIANGQI" -> listOf(
             BoardSelectionOption("Classic", "Traditional lines", "xiangqi_board.webp", BoardSelectionPreview.XIANGQI),

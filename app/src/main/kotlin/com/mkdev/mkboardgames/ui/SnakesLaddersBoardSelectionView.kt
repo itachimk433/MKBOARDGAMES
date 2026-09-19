@@ -6,7 +6,6 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
 import android.graphics.Paint
-import android.graphics.Path
 import android.graphics.RadialGradient
 import android.graphics.Rect
 import android.graphics.RectF
@@ -95,15 +94,10 @@ class SnakesLaddersBoardSelectionView(
         textSize = sp(12f)
     }
     private val boardTitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#4A1714")
+        color = Color.WHITE
         textAlign = Paint.Align.CENTER
         isFakeBoldText = true
         textSize = sp(15f)
-    }
-    private val boardDetailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#6A2D1B")
-        textAlign = Paint.Align.CENTER
-        textSize = sp(10f)
     }
     private val footerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#71898D")
@@ -326,11 +320,8 @@ class SnakesLaddersBoardSelectionView(
 
         drawCardBase(canvas, drawnCard)
 
-        val clipPath = Path().apply {
-            addRoundRect(drawnImage, dp(9f), dp(9f), Path.Direction.CW)
-        }
         canvas.save()
-        canvas.clipPath(clipPath)
+        canvas.clipRect(drawnImage)
         bitmaps[index]?.let { bitmap ->
             drawBitmapCover(canvas, bitmap, drawnImage)
         } ?: run {
@@ -342,17 +333,6 @@ class SnakesLaddersBoardSelectionView(
         frameBitmap?.let { drawFrameAlignedToImage(canvas, it, drawnImage, drawnCard) }
 
         canvas.drawText(board.displayName, drawnCard.centerX(), drawnCard.bottom - dp(31f), boardTitlePaint)
-        canvas.drawText(
-            when (board) {
-                SnakesLaddersBoardView.Board.ONE -> "Classic board"
-                SnakesLaddersBoardView.Board.TWO -> "Winter board"
-                SnakesLaddersBoardView.Board.THREE -> "Haunted board"
-                SnakesLaddersBoardView.Board.FOUR -> "Forest board"
-            },
-            drawnCard.centerX(),
-            drawnCard.bottom - dp(14f),
-            boardDetailPaint,
-        )
         if (selectedBoard != null && !selected) {
             canvas.drawRoundRect(drawnCard, dp(10f), dp(10f), dimPaint)
         }
