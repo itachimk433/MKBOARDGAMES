@@ -62,6 +62,31 @@ internal object PlainGameButtonAssets {
         return true
     }
 
+    /**
+     * Returns the bounds of the visible wood, excluding the transparent
+     * padding included in the source artwork.
+     */
+    fun visibleRect(
+        rect: RectF,
+        style: Style,
+        pressed: Boolean,
+        pressedOffset: Float = if (pressed) 2f else 0f,
+    ): RectF {
+        val bitmap = bitmap(style) ?: return RectF(rect)
+        val source = when (style) {
+            Style.SHORT -> RectF(0f, 37f, 1586f, 982f)
+            Style.LONG -> RectF(15f, 47f, 2156f, 708f)
+        }
+        val scaleX = rect.width() / bitmap.width.toFloat()
+        val scaleY = rect.height() / bitmap.height.toFloat()
+        return RectF(
+            rect.left + source.left * scaleX,
+            rect.top + pressedOffset + source.top * scaleY,
+            rect.left + source.right * scaleX,
+            rect.top + pressedOffset + source.bottom * scaleY,
+        )
+    }
+
     private fun bitmap(style: Style): Bitmap? = when (style) {
         Style.SHORT -> shortBitmap
         Style.LONG -> longBitmap
