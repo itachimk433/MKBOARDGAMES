@@ -38,12 +38,6 @@ data class BoardSelectionOption(
     val detail: String,
     val assetName: String? = null,
     val preview: BoardSelectionPreview = BoardSelectionPreview.GRID,
-    /**
-     * Optional picker-only artwork. When supplied, the regular preview is
-     * drawn underneath it so transparent frame assets can decorate a preview
-     * without changing the board artwork used in the game.
-     */
-    val previewAssetName: String? = null,
 )
 
 /**
@@ -63,12 +57,15 @@ class BoardSelectionView(
     private val scaledDensity = resources.displayMetrics.scaledDensity
     private val textScale = scaledDensity.coerceAtMost(2f)
     private val bitmaps = options.map { option ->
-        (option.previewAssetName ?: option.assetName)?.let { name ->
+        option.assetName?.let { name ->
             runCatching {
                 context.assets.open(name).use { BitmapFactory.decodeStream(it) }
             }.getOrNull()
         }
     }
+    private val frameBitmap = runCatching {
+        context.assets.open("board_selection_frame.webp").use { BitmapFactory.decodeStream(it) }
+    }.getOrNull()
     private val cardRects = options.map { RectF() }
     private val imageRects = options.map { RectF() }
     private val backRect = RectF()
@@ -261,18 +258,16 @@ class BoardSelectionView(
         val drawnCard = RectF(card.left, card.top + offset, card.right, card.bottom + offset)
         val drawnImage = RectF(image.left, image.top + offset, image.right, image.bottom + offset)
 
-        drawWoodButton(canvas, drawnCard, pressed)
+        drawCardBase(canvas, drawnCard)
         canvas.save()
         canvas.clipPath(Path().apply {
             addRoundRect(drawnImage, dp(8f), dp(8f), Path.Direction.CW)
         })
-        if (bitmaps[index] != null && option.previewAssetName != null) {
-            drawGeneratedPreview(canvas, option.preview, drawnImage)
-        }
         bitmaps[index]?.let { drawBitmapCover(canvas, it, drawnImage) }
             ?: drawGeneratedPreview(canvas, option.preview, drawnImage)
         canvas.drawRect(drawnImage, scrimPaint)
         canvas.restore()
+        frameBitmap?.let { drawBitmapCover(canvas, it, drawnCard) }
         canvas.drawText(option.title, drawnCard.centerX(), drawnCard.bottom - dp(25f), boardTitlePaint)
         canvas.drawText(option.detail, drawnCard.centerX(), drawnCard.bottom - dp(10f), boardDetailPaint)
 
@@ -410,22 +405,9 @@ class BoardSelectionView(
         GamesSelectionBackButton.draw(canvas, backRect, density)
     }
 
-    private fun drawWoodButton(canvas: Canvas, rect: RectF, pressed: Boolean) {
-        val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            shader = LinearGradient(
-                rect.left, rect.top, rect.right, rect.bottom,
-                Color.parseColor(if (pressed) "#D9A96D" else "#E9C38B"),
-                Color.parseColor(if (pressed) "#A8683E" else "#B8784B"),
-                Shader.TileMode.CLAMP,
-            )
-        }
-        canvas.drawRoundRect(rect, dp(10f), dp(10f), fill)
-        val edge = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE
-            strokeWidth = dp(1f)
-            color = Color.argb(185, 255, 235, 182)
-        }
-        canvas.drawRoundRect(rect, dp(10f), dp(10f), edge)
+    private fun drawCardBase(canvas: Canvas, rect: RectF) {
+        cardPaint.color = Color.parseColor("#17262D")
+        canvas.drawRoundRect(rect, dp(8f), dp(8f), cardPaint)
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {

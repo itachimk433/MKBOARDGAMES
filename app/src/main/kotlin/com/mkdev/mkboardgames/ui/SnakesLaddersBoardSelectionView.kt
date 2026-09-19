@@ -63,6 +63,9 @@ class SnakesLaddersBoardSelectionView(
             context.assets.open(board.assetName).use { BitmapFactory.decodeStream(it) }
         }.getOrNull()
     }
+    private val frameBitmap: Bitmap? = runCatching {
+        context.assets.open("board_selection_frame.webp").use { BitmapFactory.decodeStream(it) }
+    }.getOrNull()
     private val cardRects = boards.map { RectF() }
     private val imageRects = boards.map { RectF() }
     private val ruleRects = rules.map { RectF() }
@@ -306,7 +309,7 @@ class SnakesLaddersBoardSelectionView(
         val drawnCard = RectF(card.left, card.top + offset, card.right, card.bottom + offset)
         val drawnImage = RectF(image.left, image.top + offset, image.right, image.bottom + offset)
 
-        drawChessWoodButton(canvas, card, pressed, density, maxCornerRadius = dp(10f))
+        drawCardBase(canvas, drawnCard)
 
         val clipPath = Path().apply {
             addRoundRect(drawnImage, dp(9f), dp(9f), Path.Direction.CW)
@@ -321,6 +324,7 @@ class SnakesLaddersBoardSelectionView(
         }
         canvas.drawRect(drawnImage, scrimPaint)
         canvas.restore()
+        frameBitmap?.let { drawBitmapCover(canvas, it, drawnCard) }
 
         canvas.drawText(board.displayName, drawnCard.centerX(), drawnCard.bottom - dp(31f), boardTitlePaint)
         canvas.drawText(
@@ -392,6 +396,11 @@ class SnakesLaddersBoardSelectionView(
         canvas.restore()
         continueLabelPaint.color = if (enabled) Color.parseColor("#F6D78F") else Color.argb(120, 191, 210, 212)
         canvas.drawText("START", centerX, continueRect.bottom + dp(13f), continueLabelPaint)
+    }
+
+    private fun drawCardBase(canvas: Canvas, rect: RectF) {
+        cardPaint.color = Color.parseColor("#17262D")
+        canvas.drawRoundRect(rect, dp(8f), dp(8f), cardPaint)
     }
 
     private fun drawBitmapCover(canvas: Canvas, bitmap: Bitmap, destination: RectF) {

@@ -49,6 +49,7 @@ class ChessBoardSelectionView(
         ChessBoardStyle.SUPPLIED_WOOD to loadBitmap("chess_board_wood.jpg"),
         ChessBoardStyle.BLACK_WHITE to loadBitmap("chess_board_black_white.png"),
     )
+    private val frameBitmap = loadBitmap("board_selection_frame.webp")
     private val realisticBitmap = createRealisticPreview()
     private val cardRects = styles.map { RectF() }
     private val imageRects = styles.map { RectF() }
@@ -259,7 +260,7 @@ class ChessBoardSelectionView(
         val drawnCard = RectF(card.left, card.top + offset, card.right, card.bottom + offset)
         val drawnImage = RectF(image.left, image.top + offset, image.right, image.bottom + offset)
 
-        drawChessWoodButton(canvas, drawnCard, pressed)
+        drawCardBase(canvas, drawnCard)
         canvas.save()
         canvas.clipPath(Path().apply {
             addRoundRect(drawnImage, dp(8f), dp(8f), Path.Direction.CW)
@@ -267,6 +268,7 @@ class ChessBoardSelectionView(
         drawPreview(canvas, style, drawnImage)
         canvas.drawRect(drawnImage, scrimPaint)
         canvas.restore()
+        frameBitmap?.let { drawBitmapCover(canvas, it, drawnCard) }
 
         val (name, detail) = styleNames[index]
         canvas.drawText(name, drawnCard.centerX(), drawnCard.bottom - dp(26f), boardTitlePaint)
@@ -363,25 +365,9 @@ class ChessBoardSelectionView(
         GamesSelectionBackButton.draw(canvas, backRect, density)
     }
 
-    private fun drawChessWoodButton(canvas: Canvas, rect: RectF, pressed: Boolean) {
-        val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            shader = LinearGradient(
-                rect.left,
-                rect.top,
-                rect.right,
-                rect.bottom,
-                Color.parseColor(if (pressed) "#D9A96D" else "#E9C38B"),
-                Color.parseColor(if (pressed) "#A8683E" else "#B8784B"),
-                Shader.TileMode.CLAMP,
-            )
-        }
-        canvas.drawRoundRect(rect, dp(10f), dp(10f), fill)
-        val edge = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE
-            strokeWidth = dp(1f)
-            color = Color.argb(185, 255, 235, 182)
-        }
-        canvas.drawRoundRect(rect, dp(10f), dp(10f), edge)
+    private fun drawCardBase(canvas: Canvas, rect: RectF) {
+        cardPaint.color = Color.parseColor("#17262D")
+        canvas.drawRoundRect(rect, dp(8f), dp(8f), cardPaint)
     }
 
     private fun drawBitmapCover(canvas: Canvas, bitmap: Bitmap, destination: RectF) {

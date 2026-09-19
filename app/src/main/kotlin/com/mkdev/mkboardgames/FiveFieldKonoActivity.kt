@@ -206,11 +206,6 @@ class FiveFieldKonoActivity : AppCompatActivity() {
                 title = it.title,
                 detail = it.detail,
                 assetName = it.assetName,
-                previewAssetName = if (it == FiveFieldKonoBoardStyle.WOOD) {
-                    "five_field_kono_board_wood_preview.webp"
-                } else {
-                    null
-                },
                 preview = BoardSelectionPreview.GRID,
             )
         }
