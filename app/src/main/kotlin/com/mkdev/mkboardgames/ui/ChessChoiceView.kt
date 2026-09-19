@@ -95,10 +95,12 @@ class ChessChoiceView(
     private val isMancala = gameLabel.replace(" ", "").equals("MANCALA", ignoreCase = true)
     private val isYote = gameLabel.replace(" ", "").replace("É", "E").equals("YOTE", ignoreCase = true)
     private val isOnitama = gameLabel.replace(" ", "").equals("ONITAMA", ignoreCase = true)
+    private val isFiveFieldKono =
+        gameLabel.replace(" ", "").replace("·", "").equals("FIVEFIELDKONO", ignoreCase = true)
     private val isChessFamily =
         isChess || isAmazons || isDraughts || isOthello || isFoxAndGeese || isGo || isShogi ||
             isXiangqi || isTicTacToe || isConnectFour || isLudo || isSnakesLadders ||
-            isMancala || isYote || isOnitama
+            isMancala || isYote || isOnitama || isFiveFieldKono
     private val gameIconBitmap = run {
         val assetName = when {
             isChess -> "chess_home_icon.webp"
@@ -117,6 +119,7 @@ class ChessChoiceView(
             isMancala -> "mancala_home_icon.webp"
             isYote -> "yote_home_icon.webp"
             isOnitama -> "onitama_home_icon.webp"
+            isFiveFieldKono -> "five_field_kono_home_icon.webp"
             else -> null
         }
         assetName?.let {
