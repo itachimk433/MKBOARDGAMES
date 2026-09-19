@@ -53,7 +53,8 @@ class MenuView(
 
     enum class GameType {
         CHESS, AMAZONS, CHECKERS, INTERNATIONAL_DRAUGHTS, OTHELLO, MORABARABA, TICTACTOE, CONNECT_FOUR,
-        FOX_AND_GEESE, LUDO, SNAKES_LADDERS, XIANGQI, SHOGI, GO, MANCALA, YOTE, ONITAMA
+        FOX_AND_GEESE, LUDO, SNAKES_LADDERS, XIANGQI, SHOGI, GO, MANCALA, YOTE, ONITAMA,
+        FIVE_FIELD_KONO
     }
 
     private data class Card(val type: GameType, var rect: RectF = RectF())
@@ -64,7 +65,8 @@ class MenuView(
         Card(GameType.TICTACTOE), Card(GameType.CONNECT_FOUR),
          Card(GameType.FOX_AND_GEESE), Card(GameType.LUDO), Card(GameType.SNAKES_LADDERS),
         Card(GameType.XIANGQI), Card(GameType.SHOGI), Card(GameType.GO),
-        Card(GameType.MANCALA), Card(GameType.YOTE), Card(GameType.ONITAMA)
+        Card(GameType.MANCALA), Card(GameType.YOTE), Card(GameType.ONITAMA),
+        Card(GameType.FIVE_FIELD_KONO)
     )
 
     private val dp = context.resources.displayMetrics.density
@@ -441,6 +443,7 @@ class MenuView(
             GameType.MANCALA      -> "Mancala"       to "vs CPU  •  2 Players"
             GameType.YOTE         -> "Yoté"          to "vs CPU  •  2 Players"
             GameType.ONITAMA      -> "Onitama"       to "vs CPU  •  2 Players"
+            GameType.FIVE_FIELD_KONO -> "Five Field Kono" to "vs CPU  •  2 Players"
         }
 
         val titleLines = when (title) {
@@ -554,6 +557,38 @@ class MenuView(
             GameType.MANCALA -> drawMancalaMini(canvas, left, top, size)
             GameType.YOTE -> drawYoteMini(canvas, left, top, size)
             GameType.ONITAMA -> drawOnitamaMini(canvas, left, top, size)
+            GameType.FIVE_FIELD_KONO -> drawFiveFieldKonoMini(canvas, left, top, size)
+        }
+    }
+
+    private fun drawFiveFieldKonoMini(canvas: Canvas, left: Float, top: Float, size: Float) {
+        val board = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#A8653B") }
+        val line = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#3A1E14")
+            style = Paint.Style.STROKE
+            strokeWidth = maxOf(1f, size * 0.022f)
+        }
+        canvas.drawRoundRect(
+            RectF(left, top, left + size, top + size),
+            size * 0.05f, size * 0.05f, board,
+        )
+        val cell = size * 0.17f
+        val gridLeft = left + size * 0.16f
+        val gridTop = top + size * 0.16f
+        for (row in 0..4) {
+            val y = gridTop + row * cell
+            canvas.drawLine(gridLeft, y, gridLeft + 4 * cell, y, line)
+        }
+        for (col in 0..4) {
+            val x = gridLeft + col * cell
+            canvas.drawLine(x, gridTop, x, gridTop + 4 * cell, line)
+        }
+        val black = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#171B20") }
+        val white = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#F3E2BB") }
+        val radius = size * 0.055f
+        for (col in 0..4) {
+            canvas.drawCircle(gridLeft + col * cell, gridTop, radius, black)
+            canvas.drawCircle(gridLeft + col * cell, gridTop + 4 * cell, radius, white)
         }
     }
 

@@ -109,6 +109,8 @@ class MainActivity : AppCompatActivity() {
                 startActivity(Intent(this, YoteActivity::class.java).withGameMode(modeExtra))
             MenuView.GameType.ONITAMA ->
                 startActivity(Intent(this, OnitamaActivity::class.java).withGameMode(modeExtra))
+            MenuView.GameType.FIVE_FIELD_KONO ->
+                startActivity(Intent(this, FiveFieldKonoActivity::class.java).withGameMode(modeExtra))
             else ->
                 startActivity(Intent(this, GameActivity::class.java).apply {
                     putExtra(GameActivity.EXTRA_GAME, type.name)
