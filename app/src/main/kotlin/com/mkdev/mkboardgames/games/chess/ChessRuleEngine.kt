@@ -278,97 +278,223 @@ class ChessRuleEngine : RuleEngine {
     // ─── Evaluation ──────────────────────────────────────────────────────────
 
     override fun evaluate(state: GameState): Int {
-        if (state.status == GameStatus.WHITE_WINS) return  100_000
-        if (state.status == GameStatus.BLACK_WINS) return -100_000
-        if (state.status == GameStatus.DRAW)       return 0
-
-        // ── 3-fold repetition: 4-move cycle in history → treat as draw ─────────
-        val hist = state.moveHistory
-        if (hist.size >= 8) {
-            if ((0..3).all { i ->
-                hist[hist.size - 8 + i].from == hist[hist.size - 4 + i].from &&
-                hist[hist.size - 8 + i].to   == hist[hist.size - 4 + i].to
-            }) return 0
+        when (state.status) {
+            GameStatus.WHITE_WINS -> return 100_000
+            GameStatus.BLACK_WINS -> return -100_000
+            GameStatus.DRAW -> return 0
+            else -> Unit
         }
 
         // ── Pre-collect pawn files so the rook open-file bonus is always correct ─
         // (Board is indexed 0..63 top-to-bottom; without pre-collection, black rooks
         //  at row 0 are evaluated before black pawns at row 1 are added, giving every
         //  black rook a spurious +20 "open file" bonus at the start of the game.)
-        val wPawnFiles = mutableSetOf<Int>()
-        val bPawnFiles = mutableSetOf<Int>()
-        val wPawnCols  = IntArray(8)
-        val bPawnCols  = IntArray(8)
-        for (idx in 0 until 64) {
-            val p = state.board[idx] as? ChessPiece ?: continue
-            if (p.type == ChessPieceType.PAWN) {
-                val c = idx % 8
-                if (p.color == PieceColor.WHITE) { wPawnFiles.add(c); wPawnCols[c]++ }
-                else                             { bPawnFiles.add(c); bPawnCols[c]++ }
-            }
-        }
+        val board = state.board
+        val whitePawnsOnFile = IntArray(8)
+        val blackPawnsOnFile = IntArray(8)
+        val whitePawnRows = Array(8) { mutableListOf<Int>() }
+        val blackPawnRows = Array(8) { mutableListOf<Int>() }
 
-        var score        = 0
-        var whiteBishops = 0; var blackBishops = 0
-        var whiteQueens  = 0; var blackQueens  = 0
+        var whiteBishops = 0
+        var blackBishops = 0
+        var phase = 0
+        var whiteKingIndex = -1
+        var blackKingIndex = -1
+        var whiteMaterial = 0
+        var blackMaterial = 0
 
-        // ── Material + piece-square tables ────────────────────────────────────────
-        for (idx in 0 until 64) {
-            val p = state.board[idx] as? ChessPiece ?: continue
-            val logicRow = idx / 8
-            val col      = idx % 8
-            val pstRow   = if (p.color == PieceColor.WHITE) logicRow else 7 - logicRow
-            val pstCol   = col
-
-            val bonus = when (p.type) {
-                ChessPieceType.PAWN   -> PAWN_PST[pstRow][pstCol]
-                ChessPieceType.KNIGHT -> KNIGHT_PST[pstRow][pstCol]
-                ChessPieceType.BISHOP -> {
-                    if (p.color == PieceColor.WHITE) whiteBishops++ else blackBishops++
-                    BISHOP_PST[pstRow][pstCol]
-                }
-                ChessPieceType.ROOK   -> {
-                    val ownPawns = if (p.color == PieceColor.WHITE) wPawnFiles else bPawnFiles
-                    val oppPawns = if (p.color == PieceColor.WHITE) bPawnFiles else wPawnFiles
-                    val openBonus = when {
-                        col !in ownPawns && col !in oppPawns -> 20
-                        col !in ownPawns                     -> 10
-                        else                                 ->  0
+        for (index in 0 until minOf(64, board.size)) {
+            val piece = board[index] as? ChessPiece ?: continue
+            val row = index / 8
+            val col = index % 8
+            val isWhite = piece.color == PieceColor.WHITE
+            when (piece.type) {
+                ChessPieceType.PAWN -> {
+                    if (isWhite) {
+                        whitePawnsOnFile[col]++
+                        whitePawnRows[col].add(row)
+                    } else {
+                        blackPawnsOnFile[col]++
+                        blackPawnRows[col].add(row)
                     }
-                    ROOK_PST[pstRow][pstCol] + openBonus
                 }
-                ChessPieceType.QUEEN  -> {
-                    if (p.color == PieceColor.WHITE) whiteQueens++ else blackQueens++
-                    QUEEN_PST[pstRow][pstCol]
+                ChessPieceType.KNIGHT -> phase += 1
+                ChessPieceType.BISHOP -> {
+                    phase += 1
+                    if (isWhite) whiteBishops++ else blackBishops++
                 }
-                ChessPieceType.KING   -> {
-                    val endgame = whiteQueens == 0 && blackQueens == 0
-                    if (endgame) KING_END_PST[pstRow][pstCol] else KING_MID_PST[pstRow][pstCol]
+                ChessPieceType.ROOK -> phase += 2
+                ChessPieceType.QUEEN -> phase += 4
+                ChessPieceType.KING -> {
+                    if (isWhite) whiteKingIndex = index else blackKingIndex = index
                 }
             }
-            val v = p.type.points + bonus
-            score += if (p.color == PieceColor.WHITE) v else -v
+            if (piece.type != ChessPieceType.KING) {
+                if (isWhite) whiteMaterial += piece.type.points
+                else blackMaterial += piece.type.points
+            }
+        }
+        phase = phase.coerceIn(0, 24)
+
+        var middlegame = 0
+        var endgame = 0
+
+        for (index in 0 until minOf(64, board.size)) {
+            val piece = board[index] as? ChessPiece ?: continue
+            val row = index / 8
+            val col = index % 8
+            val isWhite = piece.color == PieceColor.WHITE
+            val sign = if (isWhite) 1 else -1
+            val pstRow = if (isWhite) row else 7 - row
+
+            var middleValue = piece.type.points
+            var endValue = piece.type.points
+
+            when (piece.type) {
+                ChessPieceType.PAWN -> {
+                    middleValue += PAWN_PST[pstRow][col]
+                    endValue += PAWN_PST[pstRow][col]
+                    val ownPawns = if (isWhite) whitePawnsOnFile else blackPawnsOnFile
+                    val enemyRows = if (isWhite) blackPawnRows else whitePawnRows
+                    val hasLeftPawn = col > 0 && ownPawns[col - 1] > 0
+                    val hasRightPawn = col < 7 && ownPawns[col + 1] > 0
+                    if (!hasLeftPawn && !hasRightPawn) {
+                        middleValue -= 15
+                        endValue -= 20
+                    }
+
+                    var passed = true
+                    for (file in maxOf(0, col - 1)..minOf(7, col + 1)) {
+                        for (enemyRow in enemyRows[file]) {
+                            val ahead = if (isWhite) enemyRow < row else enemyRow > row
+                            if (ahead) {
+                                passed = false
+                                break
+                            }
+                        }
+                        if (!passed) break
+                    }
+                    if (passed) {
+                        val rank = if (isWhite) 7 - row else row
+                        val bonus = PASSED_BONUS[rank.coerceIn(0, 7)]
+                        middleValue += bonus / 2
+                        endValue += bonus
+                    }
+                }
+                ChessPieceType.KNIGHT -> {
+                    middleValue += KNIGHT_PST[pstRow][col]
+                    endValue += KNIGHT_PST[pstRow][col]
+                }
+                ChessPieceType.BISHOP -> {
+                    middleValue += BISHOP_PST[pstRow][col]
+                    endValue += BISHOP_PST[pstRow][col]
+                }
+                ChessPieceType.ROOK -> {
+                    val rookPst = ROOK_PST[pstRow][col]
+                    middleValue += rookPst
+                    endValue += rookPst
+                    val ownPawns = if (isWhite) whitePawnsOnFile[col] else blackPawnsOnFile[col]
+                    val enemyPawns = if (isWhite) blackPawnsOnFile[col] else whitePawnsOnFile[col]
+                    if (ownPawns == 0 && enemyPawns == 0) {
+                        middleValue += 22
+                        endValue += 12
+                    } else if (ownPawns == 0) {
+                        middleValue += 10
+                        endValue += 6
+                    }
+                    if (pstRow == 1) {
+                        middleValue += 15
+                        endValue += 25
+                    }
+                }
+                ChessPieceType.QUEEN -> {
+                    middleValue += QUEEN_PST[pstRow][col]
+                    endValue += QUEEN_PST[pstRow][col]
+                }
+                ChessPieceType.KING -> {
+                    middleValue += KING_MID_PST[pstRow][col]
+                    endValue += KING_END_PST[pstRow][col]
+                    val forward = if (isWhite) -1 else 1
+                    var shield = 0
+                    for (file in maxOf(0, col - 1)..minOf(7, col + 1)) {
+                        for (distance in 1..2) {
+                            val shieldRow = row + forward * distance
+                            if (shieldRow !in 0..7) continue
+                            val shieldPiece = board[shieldRow * 8 + file] as? ChessPiece
+                            if (shieldPiece?.type == ChessPieceType.PAWN &&
+                                shieldPiece.color == piece.color
+                            ) {
+                                shield += if (distance == 1) 10 else 5
+                                break
+                            }
+                        }
+                    }
+                    middleValue += shield
+                    for (file in maxOf(0, col - 1)..minOf(7, col + 1)) {
+                        val ownPawns = if (isWhite) {
+                            whitePawnsOnFile[file]
+                        } else {
+                            blackPawnsOnFile[file]
+                        }
+                        if (ownPawns == 0) middleValue -= 12
+                    }
+                }
+            }
+
+            middlegame += sign * middleValue
+            endgame += sign * endValue
         }
 
-        // ── Structural bonuses ────────────────────────────────────────────────────
-        if (whiteBishops >= 2) score += 30
-        if (blackBishops >= 2) score -= 30
-
-        // Doubled pawn penalty — O(8) using pre-collected column counts
-        for (c in 0..7) {
-            if (wPawnCols[c] > 1) score -= (wPawnCols[c] - 1) * 20
-            if (bPawnCols[c] > 1) score += (bPawnCols[c] - 1) * 20
+        if (whiteBishops >= 2) {
+            middlegame += 30
+            endgame += 45
+        }
+        if (blackBishops >= 2) {
+            middlegame -= 30
+            endgame -= 45
         }
 
-        if (state.metadata["castleWK"] == true || state.metadata["castleWQ"] == true) score += 15
-        if (state.metadata["castleBK"] == true || state.metadata["castleBQ"] == true) score -= 15
+        for (file in 0..7) {
+            if (whitePawnsOnFile[file] > 1) {
+                val doubled = whitePawnsOnFile[file] - 1
+                middlegame -= 12 * doubled
+                endgame -= 20 * doubled
+            }
+            if (blackPawnsOnFile[file] > 1) {
+                val doubled = blackPawnsOnFile[file] - 1
+                middlegame += 12 * doubled
+                endgame += 20 * doubled
+            }
+        }
 
-        return score
+        if (whiteKingIndex >= 0 && blackKingIndex >= 0) {
+            val materialDifference = whiteMaterial - blackMaterial
+            if (kotlin.math.abs(materialDifference) >= 300 && phase <= 8) {
+                val winningKing = if (materialDifference > 0) whiteKingIndex else blackKingIndex
+                val losingKing = if (materialDifference > 0) blackKingIndex else whiteKingIndex
+                val losingRow = losingKing / 8
+                val losingCol = losingKing % 8
+                val winningRow = winningKing / 8
+                val winningCol = winningKing % 8
+                val centreDistance =
+                    maxOf(3 - minOf(losingRow, 7 - losingRow), 0) +
+                        maxOf(3 - minOf(losingCol, 7 - losingCol), 0)
+                val kingDistance =
+                    kotlin.math.abs(losingRow - winningRow) +
+                        kotlin.math.abs(losingCol - winningCol)
+                val mopUp = centreDistance * 12 + (14 - kingDistance) * 6
+                endgame += if (materialDifference > 0) mopUp else -mopUp
+            }
+        }
+
+        return (middlegame * phase + endgame * (24 - phase)) / 24
     }
 
     // ─── Constants ───────────────────────────────────────────────────────────
 
     companion object {
+        private val PASSED_BONUS = intArrayOf(0, 5, 10, 20, 35, 60, 100, 0)
+
         val DIAGONALS   = listOf(Position(-1,-1), Position(-1,1), Position(1,-1), Position(1,1))
         val ORTHOGONALS = listOf(Position(-1,0), Position(1,0), Position(0,-1), Position(0,1))
         val ALL_DIRS    = DIAGONALS + ORTHOGONALS
