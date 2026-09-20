@@ -178,18 +178,21 @@ object SettingsManager {
         prefs(ctx).edit().putInt(KEY_LUDO_DIFFICULTY, v.coerceIn(0, 2)).apply()
 
     // ── Shogi ─────────────────────────────────────────────────────────────────
-    fun getShogiDifficulty(ctx: Context) = prefs(ctx).getInt(KEY_SHOGI_DIFFICULTY, 0)
+    fun getShogiDifficulty(ctx: Context) =
+        prefs(ctx).getInt(KEY_SHOGI_DIFFICULTY, 0).coerceIn(0, 3)
     fun setShogiDifficulty(ctx: Context, v: Int) =
-        prefs(ctx).edit().putInt(KEY_SHOGI_DIFFICULTY, v.coerceIn(0, 2)).apply()
+        prefs(ctx).edit().putInt(KEY_SHOGI_DIFFICULTY, v.coerceIn(0, 3)).apply()
     fun shogiAiDepth(ctx: Context) = when (getShogiDifficulty(ctx)) {
         0 -> 1
+        1 -> 2
         2 -> 3
-        else -> 2
+        else -> 4
     }
     fun shogiAiTimeLimitMs(ctx: Context): Long = when (getShogiDifficulty(ctx)) {
         0 -> 700L
+        1 -> 1200L
         2 -> 2200L
-        else -> 1200L
+        else -> 4200L
     }
 
     // ── Go ────────────────────────────────────────────────────────────────────

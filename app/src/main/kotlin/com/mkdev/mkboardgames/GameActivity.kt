@@ -1678,11 +1678,17 @@ Checkmate your opponent's King.
                             ).bestMove(thinkingState)
                         }
                         "SHOGI" -> {
+                            val shogiDifficulty =
+                                SettingsManager.getShogiDifficulty(this@GameActivity)
                             AIPlayer(
                                 engine,
                                 maxDepth = SettingsManager.shogiAiDepth(this@GameActivity),
                                 timeLimitMs = SettingsManager.shogiAiTimeLimitMs(this@GameActivity),
                                 quiesceDepth = 1,
+                                // Easy through Hard retain a little move variety;
+                                // Master must always choose the strongest completed
+                                // search result rather than a near-best alternative.
+                                varietyWindowOverride = if (shogiDifficulty >= 3) 0 else -1,
                             ).bestMove(thinkingState)
                         }
                         "OTHELLO"  -> {
