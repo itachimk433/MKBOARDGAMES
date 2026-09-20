@@ -86,15 +86,20 @@ object SettingsManager {
         prefs(ctx).getString(KEY_ACTIVE_GAME, "overall") ?: "overall"
 
     // ── Chess ────────────────────────────────────────────────────────────────
-    data class ChessAiProfile(val depth: Int, val timeLimitMs: Long, val quiesceDepth: Int)
+    data class ChessAiProfile(
+        val depth: Int,
+        val timeLimitMs: Long,
+        val quiesceDepth: Int,
+        val varietyWindowOverride: Int = -1,
+    )
 
     fun chessDifficultyLabels() = arrayOf("Easy", "Medium", "Hard", "Master")
 
     fun chessAiProfileForLevel(level: Int): ChessAiProfile = when (level.coerceIn(0, 3)) {
         0 -> ChessAiProfile(2, 600L, 0)  // Easy
         1 -> ChessAiProfile(5, 1200L, 2) // Medium — stronger but still snappy
-        2 -> ChessAiProfile(7, 2200L, 4) // Hard — deeper tactical search
-        3 -> ChessAiProfile(9, 5000L, 5) // Master — elite-level strength with a fast enough response
+        2 -> ChessAiProfile(8, 2600L, 5, 0) // Hard — deterministic tactical search
+        3 -> ChessAiProfile(10, 6000L, 6, 0) // Master — deepest deterministic search
         else -> ChessAiProfile(5, 1200L, 2)
     }
 

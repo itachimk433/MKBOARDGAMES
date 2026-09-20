@@ -20,5 +20,9 @@ class SettingsManagerChessDifficultyTest {
         assertTrue(easyProfile.timeLimitMs < mediumProfile.timeLimitMs)
         assertTrue(mediumProfile.timeLimitMs < hardProfile.timeLimitMs)
         assertTrue(hardProfile.timeLimitMs < masterProfile.timeLimitMs)
+        assertEquals(-1, easyProfile.varietyWindowOverride)
+        assertEquals(-1, mediumProfile.varietyWindowOverride)
+        assertEquals(0, hardProfile.varietyWindowOverride)
+        assertEquals(0, masterProfile.varietyWindowOverride)
     }
 }

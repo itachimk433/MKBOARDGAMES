@@ -1,6 +1,7 @@
 package com.mkdev.mkboardgames.engine
 
 import com.mkdev.mkboardgames.games.amazons.AmazonsRuleEngine
+import com.mkdev.mkboardgames.games.chess.ChessRuleEngine
 
 /**
  * Minimax AI with alpha-beta pruning, iterative deepening, Zobrist hashing,
@@ -8,7 +9,7 @@ import com.mkdev.mkboardgames.games.amazons.AmazonsRuleEngine
  *
  * [maxDepth]       — main search depth ceiling
  * [timeLimitMs]    — wall-clock budget; search aborts gracefully when exceeded
- * [quiesceDepth]   — extra plies of capture-only search after depth 0
+ * [quiesceDepth]   — extra plies of tactical search after depth 0
  *                    (set > 0 for Chess to avoid horizon effect)
  */
 class AIPlayer(
@@ -28,6 +29,8 @@ class AIPlayer(
     private data class TTEntry(val depth: Int, val score: Int, val flag: TTFlag)
 
     private val tt = HashMap<Long, TTEntry>(1 shl 16)
+    private val historyScores = HashMap<String, Int>()
+    private val killerMoves = HashMap<Int, MutableList<String>>()
 
     /** Simple Zobrist key: XOR of random longs indexed by (cell, pieceType). */
     private val zobristTable: Array<LongArray> = Array(100 * 8) { LongArray(16) { java.util.Random().nextLong() } }
@@ -52,6 +55,15 @@ class AIPlayer(
                 }
             key = key xor handKey
         }
+
+        // Chess positions with the same pieces can still have different legal
+        // moves when castling rights or the en-passant file differs.
+        if (state.metadata["castleWK"] == true) key = key xor 0x51A3D29BL
+        if (state.metadata["castleWQ"] == true) key = key xor 0x8F12C4D6L
+        if (state.metadata["castleBK"] == true) key = key xor 0x2D7E91A4L
+        if (state.metadata["castleBQ"] == true) key = key xor 0xB6043FA1L
+        val enPassant = (state.metadata["enPassant"] as? Int)?.coerceIn(-1, 7) ?: -1
+        key = key xor ((enPassant + 1).toLong() * 0x9E3779B9L)
         return key
     }
 
@@ -61,7 +73,9 @@ class AIPlayer(
         deadline = System.currentTimeMillis() + timeLimitMs
         searchAborted = false
         tt.clear()
-        val moves = orderedMoves(state, state.currentTurn)
+        historyScores.clear()
+        killerMoves.clear()
+        val moves = orderedMoves(state, state.currentTurn, 0)
         if (moves.isEmpty()) return null
 
         // Tactical moves must never be lost to search depth or a short time
@@ -94,7 +108,7 @@ class AIPlayer(
                     break
                 }
                 val next  = applyForSearch(state, move)
-                val score = minimax(next, depth - 1, Int.MIN_VALUE, Int.MAX_VALUE, !maximising)
+                val score = minimax(next, depth - 1, Int.MIN_VALUE, Int.MAX_VALUE, !maximising, 1)
                 if (searchAborted) break
                 depthScored.add(move to score)
                 when {
@@ -179,7 +193,12 @@ class AIPlayer(
     // ─── Main search ──────────────────────────────────────────────────────────
 
     private fun minimax(
-        state: GameState, depth: Int, alpha: Int, beta: Int, maximising: Boolean
+        state: GameState,
+        depth: Int,
+        alpha: Int,
+        beta: Int,
+        maximising: Boolean,
+        ply: Int,
     ): Int {
         if (System.currentTimeMillis() > deadline) {
             searchAborted = true
@@ -206,7 +225,7 @@ class AIPlayer(
         }
 
         val color = if (maximising) PieceColor.WHITE else PieceColor.BLACK
-        val moves = orderedMoves(state, color)
+        val moves = orderedMoves(state, color, ply)
         if (moves.isEmpty()) return evaluateState(state)
 
         var a = alpha; var b = beta
@@ -214,21 +233,27 @@ class AIPlayer(
         if (maximising) {
             var best = Int.MIN_VALUE
             for (move in moves) {
-                val childScore = minimax(applyForSearch(state, move), depth - 1, a, b, false)
+                val childScore = minimax(applyForSearch(state, move), depth - 1, a, b, false, ply + 1)
                 if (searchAborted) return evaluateState(state)
                 best = maxOf(best, childScore)
                 a = maxOf(a, best)
-                if (b <= a) break
+                if (b <= a) {
+                    recordCutoff(move, ply, depth)
+                    break
+                }
             }
             score = best
         } else {
             var best = Int.MAX_VALUE
             for (move in moves) {
-                val childScore = minimax(applyForSearch(state, move), depth - 1, a, b, true)
+                val childScore = minimax(applyForSearch(state, move), depth - 1, a, b, true, ply + 1)
                 if (searchAborted) return evaluateState(state)
                 best = minOf(best, childScore)
                 b = minOf(b, best)
-                if (b <= a) break
+                if (b <= a) {
+                    recordCutoff(move, ply, depth)
+                    break
+                }
             }
             score = best
         }
@@ -255,21 +280,22 @@ class AIPlayer(
         if (state.status != GameStatus.IN_PROGRESS)  return evaluateState(state)
 
         val standPat = evaluateState(state)
+        val sideToMove = if (maximising) PieceColor.WHITE else PieceColor.BLACK
+        val inCheck = engine is ChessRuleEngine && engine.isInCheck(state, sideToMove)
 
         if (maximising) {
-            if (standPat >= beta) return standPat
-            if (depthLeft == 0)  return standPat
-            var best = standPat
-            var a    = maxOf(alpha, standPat)
-            val captures = engine.allLegalMoves(state, PieceColor.WHITE)
-                .filter { it.isCapture }
-                .sortedByDescending { mvvLva(state, it) }
-            for (move in captures) {
+            if (!inCheck && standPat >= beta) return standPat
+            if (depthLeft == 0 && !inCheck) return standPat
+            var best = if (inCheck) Int.MIN_VALUE else standPat
+            var a    = if (inCheck) alpha else maxOf(alpha, standPat)
+            for (move in tacticalMoves(state, PieceColor.WHITE)) {
                 if (System.currentTimeMillis() > deadline) {
                     searchAborted = true
                     break
                 }
-                val score = quiescence(applyForSearch(state, move), a, beta, false, depthLeft - 1)
+                val score = quiescence(
+                    applyForSearch(state, move), a, beta, false, (depthLeft - 1).coerceAtLeast(0)
+                )
                 if (searchAborted) return evaluateState(state)
                 best = maxOf(best, score)
                 a    = maxOf(a, best)
@@ -277,19 +303,18 @@ class AIPlayer(
             }
             return best
         } else {
-            if (standPat <= alpha) return standPat
-            if (depthLeft == 0)   return standPat
-            var best = standPat
-            var b    = minOf(beta, standPat)
-            val captures = engine.allLegalMoves(state, PieceColor.BLACK)
-                .filter { it.isCapture }
-                .sortedByDescending { mvvLva(state, it) }
-            for (move in captures) {
+            if (!inCheck && standPat <= alpha) return standPat
+            if (depthLeft == 0 && !inCheck) return standPat
+            var best = if (inCheck) Int.MAX_VALUE else standPat
+            var b    = if (inCheck) beta else minOf(beta, standPat)
+            for (move in tacticalMoves(state, PieceColor.BLACK)) {
                 if (System.currentTimeMillis() > deadline) {
                     searchAborted = true
                     break
                 }
-                val score = quiescence(applyForSearch(state, move), alpha, b, true, depthLeft - 1)
+                val score = quiescence(
+                    applyForSearch(state, move), alpha, b, true, (depthLeft - 1).coerceAtLeast(0)
+                )
                 if (searchAborted) return evaluateState(state)
                 best = minOf(best, score)
                 b    = minOf(b, best)
@@ -334,9 +359,52 @@ class AIPlayer(
         return captureBonus + promotionBonus + centerBonus + pieceSquareBonus
     }
 
-    private fun orderedMoves(state: GameState, color: PieceColor): List<Move> {
+    private fun orderedMoves(state: GameState, color: PieceColor, ply: Int): List<Move> {
         return engine.allLegalMoves(state, color)
-            .sortedByDescending { orderingScore(state, it) }
+            .sortedByDescending { move ->
+                val key = moveKey(move)
+                val killerBonus = when {
+                    killerMoves[ply]?.firstOrNull() == key -> 18_000
+                    killerMoves[ply]?.getOrNull(1) == key -> 12_000
+                    else -> 0
+                }
+                orderingScore(state, move) + killerBonus + (historyScores[key] ?: 0)
+            }
+    }
+
+    private fun recordCutoff(move: Move, ply: Int, depth: Int) {
+        val key = moveKey(move)
+        val killers = killerMoves.getOrPut(ply) { mutableListOf() }
+        if (key !in killers) {
+            killers.add(0, key)
+            if (killers.size > 2) killers.removeAt(2)
+        }
+        historyScores[key] = ((historyScores[key] ?: 0) + depth * depth).coerceAtMost(100_000)
+    }
+
+    private fun moveKey(move: Move): String =
+        "${move.from.row},${move.from.col}-${move.to.row},${move.to.col}-${move.promotionType.orEmpty()}"
+
+    /**
+     * Captures alone are not enough for chess quiescence: a checking move can
+     * change the evaluation dramatically without taking material. When the
+     * side to move is in check, all evasions must remain searchable.
+     */
+    private fun tacticalMoves(state: GameState, color: PieceColor): List<Move> {
+        val legal = engine.allLegalMoves(state, color)
+        if (engine !is ChessRuleEngine) {
+            return legal.filter { it.isCapture }.sortedByDescending { mvvLva(state, it) }
+        }
+
+        if (engine.isInCheck(state, color)) return legal
+
+        return legal
+            .filter { move ->
+                move.isCapture ||
+                    move.promotionType != null ||
+                    engine.isInCheck(applyForSearch(state, move), color.opponent())
+            }
+            .sortedByDescending { mvvLva(state, it) + if (it.promotionType != null) 600 else 0 }
     }
 
     private fun evaluateState(state: GameState): Int =

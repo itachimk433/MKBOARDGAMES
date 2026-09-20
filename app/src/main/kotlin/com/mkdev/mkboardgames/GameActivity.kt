@@ -1727,10 +1727,16 @@ Checkmate your opponent's King.
                         }
                         else -> {
                             // Chess — deeper search with quiescence and time limit
-                            val depth    = SettingsManager.chessAiDepth(this@GameActivity)
-                            val timeMs   = SettingsManager.chessAiTimeLimitMs(this@GameActivity)
-                            val quiesce  = SettingsManager.chessAiQuiesceDepth(this@GameActivity)
-                            val ai = AIPlayer(engine, maxDepth = depth, timeLimitMs = timeMs, quiesceDepth = quiesce)
+                            val profile = SettingsManager.chessAiProfileForLevel(
+                                SettingsManager.getChessDifficulty(this@GameActivity),
+                            )
+                            val ai = AIPlayer(
+                                engine,
+                                maxDepth = profile.depth,
+                                timeLimitMs = profile.timeLimitMs,
+                                quiesceDepth = profile.quiesceDepth,
+                                varietyWindowOverride = profile.varietyWindowOverride,
+                            )
                             ai.bestMove(thinkingState)
                         }
                     }
