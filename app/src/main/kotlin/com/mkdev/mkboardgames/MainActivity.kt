@@ -61,7 +61,7 @@ class MainActivity : AppCompatActivity() {
                 MusicPlayer.playForMode(this@MainActivity, mode)
                 showGameMenu()
             }
-            onSettingsClicked = { showGeneralSettings() }
+            onAboutClicked = { showAbout() }
             onStatsClicked = { showStatsDialog() }
         }
         screenRoot.removeAllViews()
@@ -150,9 +150,9 @@ class MainActivity : AppCompatActivity() {
         if (hasFocus) makeFullscreen()
     }
 
-    // ─── Settings ─────────────────────────────────────────────────────────────
+    // ─── About ────────────────────────────────────────────────────────────────
 
-    private fun showGeneralSettings() {
+    private fun showAbout() {
         activeSettingsDialog?.dismiss()
         activeSettingsDialog = null
 
@@ -187,7 +187,7 @@ class MainActivity : AppCompatActivity() {
             setPadding((18 * dp).toInt(), (15 * dp).toInt(), (18 * dp).toInt(), (13 * dp).toInt())
         }
         header.addView(TextView(ctx).apply {
-            text = "Legal"
+            text = "About"
             setTextColor(Color.parseColor("#F7D99B"))
             setTypeface(typeface, Typeface.BOLD)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
@@ -195,7 +195,7 @@ class MainActivity : AppCompatActivity() {
             setShadowLayer(2f * dp, 0f, 1f * dp, Color.argb(180, 20, 4, 3))
         })
         header.addView(TextView(ctx).apply {
-            text = "Privacy, terms and support"
+            text = "MK BOARD GAMES · Privacy, terms and support"
             setTextColor(Color.parseColor("#F5DCC0"))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
             setPadding(0, (4 * dp).toInt(), 0, 0)
