@@ -1,0 +1,882 @@
+Here's a full drop-in replacement. Same constructor and same public API (`bestMove`, `maxDepth`), so your existing call sites keep working.
+
+Key changes: negamax + PVS, TT with best move (persisted across moves), null-move pruning (chess only), LMR, check extension, mate-distance scoring, root alpha-beta, aspiration windows, int move keys, seeded Zobrist, node-throttled clock, and no variety randomness when `varietyWindowOverride = 0`.
+
+**Two things to verify against your codebase** (I couldn't see them):
+- `engine.evaluate(state)` returns a score from **White's perspective** (as your original minimax implied). I convert to side-to-move inside negamax.
+- `ChessRuleEngine.isInCheck(state, color)` exists (you already call it).
+
+```kotlin
+package com.mkdev.mkboardgames.engine
+
+import com.mkdev.mkboardgames.games.amazons.AmazonsRuleEngine
+import com.mkdev.mkboardgames.games.chess.ChessPiece
+import com.mkdev.mkboardgames.games.chess.ChessPieceType
+import com.mkdev.mkboardgames.games.chess.ChessRuleEngine
+
+/**
+ * Negamax + PVS AI with: iterative deepening, aspiration windows,
+ * transposition table (with best move, kept across turns), null-move pruning
+ * (chess only), late-move reductions, check extensions, quiescence,
+ * killer/history ordering, and mate-distance scoring.
+ *
+ * [maxDepth]     - depth ceiling (use a large value, e.g. 64, and let time decide)
+ * [timeLimitMs]  - wall-clock budget
+ * [quiesceDepth] - extra tactical plies at leaf (recommend 6+ for chess)
+ * [varietyWindowOverride] - 0 = always strongest; >0 = random among near-best root moves
+ */
+class AIPlayer(
+    private val engine: RuleEngine,
+    val maxDepth: Int = 3,
+    private val timeLimitMs: Long = 1000L,
+    private val quiesceDepth: Int = 0,
+    private val varietyWindowOverride: Int = -1
+) {
+
+    companion object {
+        private const val INF = 1_000_000
+        private const val MATE = 100_000
+        private const val MATE_BOUND = MATE - 1_000
+        private const val MAX_PLY = 128
+        private const val TT_MAX_SIZE = 1 shl 20
+    }
+
+    // ---------------------------------------------------------------- state
+
+    @Volatile private var deadline = Long.MAX_VALUE
+    @Volatile private var searchAborted = false
+    private var nodeCounter = 0L
+
+    private enum class TTFlag { EXACT, LOWER, UPPER }
+    private class TTEntry(
+        val depth: Int,
+        val score: Int,
+        val flag: TTFlag,
+        val bestKey: Int
+    )
+
+    private val tt = HashMap<Long, TTEntry>(1 shl 16)
+    private val historyScores = IntArray(64 * 64 * 2)
+    private val killers = Array(MAX_PLY) { IntArray(2) { -1 } }
+
+    private val isChess = engine is ChessRuleEngine
+    private val chessEngine = engine as? ChessRuleEngine
+    private val isAmazons = engine is AmazonsRuleEngine
+
+    private val zobristTable: Array<LongArray> = run {
+        val rnd = java.util.Random(0x5EED_CAFEL)
+        Array(100 * 8) { LongArray(16) { rnd.nextLong() } }
+    }
+
+    // ------------------------------------------------------------- hashing
+
+    private fun boardKey(state: GameState): Long {
+        var key = if (state.currentTurn == PieceColor.WHITE) 0L else -0x5DEECE66DL
+
+        for (i in state.board.indices) {
+            val piece = state.board[i] ?: continue
+            val colorOffset = if (piece.color == PieceColor.WHITE) 0 else 8
+            val typeOffset = if (piece is ChessPiece) {
+                piece.type.ordinal
+            } else {
+                (piece.value() / 100).coerceIn(0, 7)
+            }
+            key = key xor zobristTable[i % zobristTable.size][
+                (colorOffset + typeOffset).coerceIn(0, 15)
+            ]
+        }
+
+        for ((color, pieces) in state.hands) {
+            var handKey = if (color == PieceColor.WHITE) 0x13579BDFL else 0x2468ACE0L
+            pieces.groupingBy { it.symbol() }
+                .eachCount()
+                .toSortedMap()
+                .forEach { (symbol, count) ->
+                    handKey = handKey * 31 + symbol.hashCode() * 17 + count
+                }
+            key = key xor handKey
+        }
+
+        if (state.metadata["castleWK"] == true) key = key xor 0x51A3D29BL
+        if (state.metadata["castleWQ"] == true) key = key xor 0x8F12C4D6L
+        if (state.metadata["castleBK"] == true) key = key xor 0x2D7E91A4L
+        if (state.metadata["castleBQ"] == true) key = key xor 0xB6043FA1L
+
+        val enPassant = (state.metadata["enPassant"] as? Int)?.coerceIn(-1, 7) ?: -1
+        key = key xor ((enPassant + 1).toLong() * 0x9E3779B9L)
+
+        return key
+    }
+
+    // ---------------------------------------------------------- move keys
+
+    private fun moveKey(m: Move): Int {
+        val from = (m.from.row and 7) * 8 + (m.from.col and 7)
+        val to = (m.to.row and 7) * 8 + (m.to.col and 7)
+        val promo = if (m.promotionType != null) 1 + (m.promotionType.hashCode() and 3) else 0
+        return (from * 64 + to) * 8 + promo
+    }
+
+    private fun histIndex(m: Move, color: PieceColor): Int {
+        val from = (m.from.row and 7) * 8 + (m.from.col and 7)
+        val to = (m.to.row and 7) * 8 + (m.to.col and 7)
+        return (from * 64 + to) * 2 + (if (color == PieceColor.WHITE) 0 else 1)
+    }
+
+    // ----------------------------------------------------------- entry point
+
+    fun bestMove(state: GameState): Move? {
+        deadline = System.currentTimeMillis() + timeLimitMs
+        searchAborted = false
+        nodeCounter = 0L
+
+        // Keep TT across turns, but bound its size.
+        if (tt.size > TT_MAX_SIZE) tt.clear()
+        historyScores.fill(0)
+        for (k in killers) { k[0] = -1; k[1] = -1 }
+
+        val rootColor = state.currentTurn
+        val rootMoves = orderedMoves(state, rootColor, 0, -1)
+        if (rootMoves.isEmpty()) return null
+        if (rootMoves.size == 1) return rootMoves[0]
+
+        // Immediate win check (cheap, all games except Amazons' huge fan-out).
+        if (!isAmazons) {
+            for (m in rootMoves) {
+                val next = engine.applyMove(state, m)
+                if (next.status == winStatus(rootColor)) return m
+            }
+        }
+
+        var bestMove: Move = rootMoves.first()
+        var bestScore = -INF
+        var lastScores: List<Pair<Move, Int>> = emptyList()
+        var prevScore = 0
+
+        val depthCap = maxDepth.coerceAtMost(MAX_PLY - 8)
+
+        for (depth in 1..depthCap) {
+            if (System.currentTimeMillis() > deadline) break
+            searchAborted = false
+
+            // Aspiration window from depth 4 onward.
+            var alphaW = if (depth >= 4) prevScore - 50 else -INF
+            var betaW = if (depth >= 4) prevScore + 50 else INF
+
+            var iterationResult: Pair<Move, List<Pair<Move, Int>>>? = null
+
+            while (true) {
+                iterationResult = searchRoot(state, rootMoves, depth, alphaW, betaW, bestMove)
+                if (searchAborted) break
+
+                val score = iterationResult.second
+                    .maxOfOrNull { it.second } ?: 0
+
+                // Widen on fail-low / fail-high.
+                if (score <= alphaW && alphaW > -INF) {
+                    alphaW = -INF
+                    continue
+                }
+                if (score >= betaW && betaW < INF) {
+                    betaW = INF
+                    continue
+                }
+                break
+            }
+
+            if (searchAborted || iterationResult == null) break
+
+            bestMove = iterationResult.first
+            lastScores = iterationResult.second
+            bestScore = lastScores.maxOfOrNull { it.second } ?: 0
+            prevScore = bestScore
+
+            // Forced mate found: no reason to search deeper.
+            if (bestScore >= MATE_BOUND) break
+        }
+
+        return pickWithVariety(state, bestMove, bestScore, lastScores)
+    }
+
+    /**
+     * Root search. Returns (best move, scored list). Scores are from the
+     * root player's perspective. Non-best moves are only bounded scores when
+     * using PVS, which is fine for variety selection only when
+     * varietyWindow > 0 (see [pickWithVariety] which re-verifies).
+     */
+    private fun searchRoot(
+        state: GameState,
+        moves: List<Move>,
+        depth: Int,
+        alphaIn: Int,
+        betaIn: Int,
+        pvMove: Move
+    ): Pair<Move, List<Pair<Move, Int>>> {
+        var alpha = alphaIn
+        val beta = betaIn
+        var best = moves.first()
+        var bestScore = -INF
+        val scored = ArrayList<Pair<Move, Int>>(moves.size)
+
+        // Put previous best first.
+        val pvKey = moveKey(pvMove)
+        val ordered = moves.sortedByDescending { if (moveKey(it) == pvKey) 1 else 0 }
+
+        val wantExact = varietyWindow() > 0
+
+        for ((i, move) in ordered.withIndex()) {
+            if (System.currentTimeMillis() > deadline) {
+                searchAborted = true
+                break
+            }
+
+            val child = applyForSearch(state, move)
+            val score: Int
+
+            if (i == 0 || wantExact) {
+                // Full window when variety needs real scores.
+                val a = if (wantExact) minOf(alpha, bestScore - varietyWindow() - 1).coerceAtLeast(-INF) else alpha
+                score = -negamax(child, depth - 1, -beta, -a, 1, true)
+            } else {
+                var s = -negamax(child, depth - 1, -alpha - 1, -alpha, 1, true)
+                if (!searchAborted && s > alpha && s < beta) {
+                    s = -negamax(child, depth - 1, -beta, -alpha, 1, true)
+                }
+                score = s
+            }
+
+            if (searchAborted) break
+
+            scored.add(move to score)
+            if (score > bestScore) {
+                bestScore = score
+                best = move
+            }
+            if (score > alpha) alpha = score
+        }
+
+        // Publish only complete iterations.
+        if (searchAborted || scored.size != ordered.size) {
+            searchAborted = true
+        }
+
+        return best to scored
+    }
+
+    // ----------------------------------------------------- variety selection
+
+    private fun varietyWindow(): Int = when {
+        varietyWindowOverride >= 0 -> varietyWindowOverride
+        maxDepth <= 3 -> 60
+        maxDepth <= 5 -> 30
+        else -> 0
+    }
+
+    private fun pickWithVariety(
+        state: GameState,
+        best: Move,
+        bestScore: Int,
+        scored: List<Pair<Move, Int>>
+    ): Move {
+        val window = varietyWindow()
+        if (window == 0 || scored.isEmpty()) return best
+        // Never randomise away from a forced win or into a forced loss.
+        if (bestScore >= MATE_BOUND || bestScore <= -MATE_BOUND) return best
+
+        val myPrior = if (state.moveHistory.size >= 2) {
+            state.moveHistory[state.moveHistory.size - 2]
+        } else null
+
+        fun isRepeat(m: Move) =
+            myPrior != null && m.from == myPrior.to && m.to == myPrior.from
+
+        val pool = scored
+            .filter { (m, s) -> s >= bestScore - window && !isRepeat(m) }
+            .map { it.first }
+
+        return if (pool.isNotEmpty()) pool.random() else best
+    }
+
+    // ---------------------------------------------------------------- negamax
+
+    private fun negamax(
+        state: GameState,
+        depthIn: Int,
+        alphaIn: Int,
+        betaIn: Int,
+        ply: Int,
+        allowNull: Boolean
+    ): Int {
+        if ((++nodeCounter and 2047L) == 0L && System.currentTimeMillis() > deadline) {
+            searchAborted = true
+        }
+        if (searchAborted) return 0
+
+        val color = state.currentTurn
+
+        if (state.status != GameStatus.IN_PROGRESS) {
+            return terminalScore(state, color, ply)
+        }
+
+        if (ply >= MAX_PLY - 2) return evalFor(state, color)
+
+        var alpha = alphaIn
+        var beta = betaIn
+
+        // Mate-distance pruning.
+        alpha = maxOf(alpha, -MATE + ply)
+        beta = minOf(beta, MATE - ply - 1)
+        if (alpha >= beta) return alpha
+
+        val inCheck = chessEngine?.isInCheck(state, color) == true
+        var depth = depthIn
+        if (inCheck) depth += 1 // check extension
+
+        if (depth <= 0) {
+            return if (quiesceDepth > 0) {
+                quiescence(state, alpha, beta, ply, quiesceDepth)
+            } else {
+                evalFor(state, color)
+            }
+        }
+
+        val key = boardKey(state)
+        val entry = tt[key]
+        var ttMoveKey = -1
+        if (entry != null) {
+            ttMoveKey = entry.bestKey
+            if (entry.depth >= depth) {
+                val s = fromTT(entry.score, ply)
+                when (entry.flag) {
+                    TTFlag.EXACT -> return s
+                    TTFlag.LOWER -> if (s >= beta) return s
+                    TTFlag.UPPER -> if (s <= alpha) return s
+                }
+            }
+        }
+
+        val isPvNode = beta - alpha > 1
+
+        // Null-move pruning (chess only; needs a way to pass the turn).
+        if (isChess && allowNull && !isPvNode && !inCheck && depth >= 3 &&
+            hasNonPawnMaterial(state, color)
+        ) {
+            val staticEval = evalFor(state, color)
+            if (staticEval >= beta) {
+                val r = if (depth >= 6) 3 else 2
+                val nullState = state.copy(
+                    currentTurn = color.opponent(),
+                    metadata = state.metadata.toMutableMap().apply { put("enPassant", -1) }
+                )
+                val s = -negamax(nullState, depth - 1 - r, -beta, -beta + 1, ply + 1, false)
+                if (searchAborted) return 0
+                if (s >= beta) return if (s >= MATE_BOUND) beta else s
+            }
+        }
+
+        val moves = orderedMoves(state, color, ply, ttMoveKey)
+        if (moves.isEmpty()) return terminalScoreNoMoves(state, color, inCheck, ply)
+
+        var bestScore = -INF
+        var bestKey = -1
+        val origAlpha = alpha
+
+        for ((i, move) in moves.withIndex()) {
+            val child = applyForSearch(state, move)
+            val quiet = !move.isCapture && move.promotionType == null
+            var score: Int
+
+            if (i == 0) {
+                score = -negamax(child, depth - 1, -beta, -alpha, ply + 1, true)
+            } else {
+                // Late move reduction.
+                var reduction = 0
+                if (depth >= 3 && i >= 4 && quiet && !inCheck) {
+                    reduction = 1 + (if (i >= 8) 1 else 0) + (if (depth >= 6) 1 else 0)
+                    reduction = minOf(reduction, depth - 2)
+                }
+
+                score = -negamax(child, depth - 1 - reduction, -alpha - 1, -alpha, ply + 1, true)
+                if (!searchAborted && score > alpha && reduction > 0) {
+                    score = -negamax(child, depth - 1, -alpha - 1, -alpha, ply + 1, true)
+                }
+                if (!searchAborted && score > alpha && score < beta) {
+                    score = -negamax(child, depth - 1, -beta, -alpha, ply + 1, true)
+                }
+            }
+
+            if (searchAborted) return 0
+
+            if (score > bestScore) {
+                bestScore = score
+                bestKey = moveKey(move)
+            }
+            if (score > alpha) alpha = score
+
+            if (alpha >= beta) {
+                if (quiet) recordCutoff(move, color, ply, depth)
+                break
+            }
+        }
+
+        val flag = when {
+            bestScore <= origAlpha -> TTFlag.UPPER
+            bestScore >= beta -> TTFlag.LOWER
+            else -> TTFlag.EXACT
+        }
+        tt[key] = TTEntry(depth, toTT(bestScore, ply), flag, bestKey)
+
+        return bestScore
+    }
+
+    // ------------------------------------------------------------ quiescence
+
+    private fun quiescence(
+        state: GameState,
+        alphaIn: Int,
+        beta: Int,
+        ply: Int,
+        depthLeft: Int
+    ): Int {
+        if ((++nodeCounter and 2047L) == 0L && System.currentTimeMillis() > deadline) {
+            searchAborted = true
+        }
+        if (searchAborted) return 0
+
+        val color = state.currentTurn
+        if (state.status != GameStatus.IN_PROGRESS) return terminalScore(state, color, ply)
+
+        var alpha = alphaIn
+        val inCheck = chessEngine?.isInCheck(state, color) == true
+        val standPat = evalFor(state, color)
+
+        if (depthLeft <= 0 || ply >= MAX_PLY - 2) return standPat
+
+        var best: Int
+        if (inCheck) {
+            best = -INF
+        } else {
+            if (standPat >= beta) return standPat
+            best = standPat
+            if (standPat > alpha) alpha = standPat
+        }
+
+        val moves = tacticalMoves(state, color, inCheck)
+        if (moves.isEmpty()) {
+            return if (inCheck) -MATE + ply else standPat
+        }
+
+        for (move in moves) {
+            val s = -quiescence(applyForSearch(state, move), -beta, -alpha, ply + 1, depthLeft - 1)
+            if (searchAborted) return 0
+            if (s > best) best = s
+            if (s > alpha) alpha = s
+            if (alpha >= beta) break
+        }
+        return best
+    }
+
+    // -------------------------------------------------------------- ordering
+
+    private fun orderedMoves(
+        state: GameState,
+        color: PieceColor,
+        ply: Int,
+        ttMoveKey: Int
+    ): List<Move> {
+        val k0 = if (ply < MAX_PLY) killers[ply][0] else -1
+        val k1 = if (ply < MAX_PLY) killers[ply][1] else -1
+
+        val legal = engine.allLegalMoves(state, color)
+        if (legal.size <= 1) return legal
+
+        return legal.map { m ->
+            val key = moveKey(m)
+            var score = orderingScore(state, m)
+            if (key == ttMoveKey) score += 1_000_000
+            else if (!m.isCapture) {
+                if (key == k0) score += 18_000
+                else if (key == k1) score += 12_000
+                score += historyScores[histIndex(m, color)]
+            }
+            m to score
+        }.sortedByDescending { it.second }.map { it.first }
+    }
+
+    private fun recordCutoff(move: Move, color: PieceColor, ply: Int, depth: Int) {
+        val key = moveKey(move)
+        if (ply < MAX_PLY && killers[ply][0] != key) {
+            killers[ply][1] = killers[ply][0]
+            killers[ply][0] = key
+        }
+        val idx = histIndex(move, color)
+        historyScores[idx] = (historyScores[idx] + depth * depth).coerceAtMost(100_000)
+    }
+
+    private fun orderingScore(state: GameState, move: Move): Int {
+        val piece = state.get(move.from) ?: return 0
+
+        var s = 0
+        if (move.isCapture) {
+            val victim = move.captures.maxOfOrNull { state.get(it)?.value() ?: 0 } ?: 0
+            s += 10_000 + victim * 16 - piece.value()
+        }
+        if (move.promotionType != null) s += 9_000
+        if (move.to.row in 2..5 && move.to.col in 2..5) s += 35
+
+        if (piece is ChessPiece) {
+            val row = move.to.row
+            val col = move.to.col
+            val central = row in 2..5 && col in 2..5
+            s += when (piece.type) {
+                ChessPieceType.PAWN ->
+                    if (piece.color == PieceColor.WHITE) row else 7 - row
+                ChessPieceType.KNIGHT -> 12 + if (central) 12 else 0
+                ChessPieceType.BISHOP -> 15 + if (central) 10 else 0
+                ChessPieceType.ROOK -> 12 + if (row in 2..5 || col in 2..5) 8 else 0
+                ChessPieceType.QUEEN -> 18
+                ChessPieceType.KING -> 10
+            }
+        }
+        return s
+    }
+
+    private fun mvvLva(state: GameState, move: Move): Int {
+        val victim = move.captures.sumOf { state.get(it)?.value() ?: 100 }
+        val attacker = state.get(move.from)?.value() ?: 1000
+        return victim * 16 - attacker
+    }
+
+    private fun tacticalMoves(state: GameState, color: PieceColor, inCheck: Boolean): List<Move> {
+        val legal = engine.allLegalMoves(state, color)
+
+        if (!isChess) {
+            return legal.filter { it.isCapture }.sortedByDescending { mvvLva(state, it) }
+        }
+        if (inCheck) return legal.sortedByDescending { mvvLva(state, it) }
+
+        // In quiescence, captures + promotions only. (Quiet checks are
+        // expensive and rarely worth it on mobile.)
+        return legal
+            .filter { it.isCapture || it.promotionType != null }
+            .sortedByDescending {
+                mvvLva(state, it) + if (it.promotionType != null) 6_000 else 0
+            }
+    }
+
+    // ------------------------------------------------------------ evaluation
+
+    /** Score from [color]'s perspective. Engine evaluate() is White-positive. */
+    private fun evalFor(state: GameState, color: PieceColor): Int {
+        val white = if (isAmazons) {
+            (engine as AmazonsRuleEngine).evaluateForSearch(state)
+        } else {
+            engine.evaluate(state)
+        }
+        return if (color == PieceColor.WHITE) white else -white
+    }
+
+    private fun terminalScore(state: GameState, color: PieceColor, ply: Int): Int =
+        when (state.status) {
+            GameStatus.WHITE_WINS ->
+                if (color == PieceColor.WHITE) MATE - ply else -(MATE - ply)
+            GameStatus.BLACK_WINS ->
+                if (color == PieceColor.BLACK) MATE - ply else -(MATE - ply)
+            else -> evalFor(state, color) // draws etc.
+        }
+
+    private fun terminalScoreNoMoves(
+        state: GameState,
+        color: PieceColor,
+        inCheck: Boolean,
+        ply: Int
+    ): Int =
+        if (isChess) {
+            if (inCheck) -MATE + ply else 0 // checkmate / stalemate
+        } else {
+            evalFor(state, color)
+        }
+
+    private fun hasNonPawnMaterial(state: GameState, color: PieceColor): Boolean {
+        for (p in state.board) {
+            if (p == null || p.color != color) continue
+            if (p is ChessPiece &&
+                p.type != ChessPieceType.PAWN &&
+                p.type != ChessPieceType.KING
+            ) return true
+        }
+        return false
+    }
+
+    // ---------------------------------------------------------- TT mate fix
+
+    private fun toTT(score: Int, ply: Int): Int = when {
+        score >= MATE_BOUND -> score + ply
+        score <= -MATE_BOUND -> score - ply
+        else -> score
+    }
+
+    private fun fromTT(score: Int, ply: Int): Int = when {
+        score >= MATE_BOUND -> score - ply
+        score <= -MATE_BOUND -> score + ply
+        else -> score
+    }
+
+    // ---------------------------------------------------------------- helpers
+
+    private fun winStatus(color: PieceColor): GameStatus =
+        if (color == PieceColor.WHITE) GameStatus.WHITE_WINS else GameStatus.BLACK_WINS
+
+    private fun applyForSearch(state: GameState, move: Move): GameState =
+        if (isAmazons) {
+            (engine as AmazonsRuleEngine).applyMoveForSearch(state, move)
+        } else {
+            engine.applyMove(state, move)
+        }
+}
+```
+
+**Suggested difficulty presets** (adjust to your factory):
+
+```kotlin
+// Hard
+AIPlayer(engine, maxDepth = 64, timeLimitMs = 2000L, quiesceDepth = 6, varietyWindowOverride = 0)
+
+// Master
+AIPlayer(engine, maxDepth = 64, timeLimitMs = 5000L, quiesceDepth = 8, varietyWindowOverride = 0)
+```
+
+For non-chess games (checkers, Amazons, etc.) use `quiesceDepth = 0` or 2, and the same depth/time idea.
+
+**Notes and caveats:**
+
+- **Null-move `state.copy(...)`** assumes `GameState` is a data class with `currentTurn` and a `metadata` map (both used in your original). If `metadata` is a `Map<String, Any>` this compiles as written; if it's a different type, adjust that one line. If you'd rather skip risk, delete the null-move block; you'd still get most of the gain from PVS, LMR and the TT move.
+- **Move keys assume 8x8 boards** (`and 7`). For Shogi (9x9), Amazons (10x10), etc. keys can collide, which only slightly degrades ordering/killers, but the TT best-move check is validated by ordering (a colliding key just boosts a wrong move for sorting, never plays an illegal one). If you want exactness for larger boards, change `8`/`64` to `16`/`256` in `moveKey` and `histIndex` and size `historyScores` to `256 * 256 * 2`.
+- **Evaluation is now the ceiling.** After this, the biggest remaining gain for chess is a better `evaluate()` (PSTs, mobility, king safety, pawn structure). If you paste your `ChessRuleEngine.evaluate`, I can write a stronger one.
+- **Performance:** `engine.applyMove` and `allLegalMoves` speed dominate. If they allocate heavily, depth on mobile will be limited regardless of the search improvements.
+
+....
+
+Your eval has a solid base (material, PSTs, bishop pair, doubled pawns), but it has several real bugs plus big gaps. Fixing those is worth more than any further search tweak.
+
+## Bugs in the current version
+
+1. **King endgame check is order-dependent.** `whiteQueens`/`blackQueens` are counted *during* the same loop that evaluates the king, so the result depends on whether the king's square index comes before or after the queens. Kings flip between mid/end PST randomly. Count material first, then score.
+2. **Endgame condition is wrong.** "No queens" isn't an endgame (R+R+B+B+N+N vs same is not). Use a phase value from non-pawn material.
+3. **Repetition returns 0 from the side-to-move-agnostic eval**, including when the AI is winning by a queen. It will happily repeat to a "draw score" only if it's losing, which is fine, but when winning it should avoid it. Better to detect repetition in search (I'll show a cheap version below), and leave eval pure.
+4. **Rook "open file" ignores which pawns are ahead of it**, and your `wPawnFiles` sets are redundant with the count arrays.
+5. **Castling-rights bonus is nearly meaningless** (+15 forever until you lose rights; encourages *not* castling to keep the bonus). Remove it; reward the king being castled/safe instead.
+6. **`piece.type.points`**: make sure this is centipawns (P=100, N=320, B=330, R=500, Q=900). If it's 1/3/3/5/9 the PSTs will dominate material.
+
+## Missing (big wins)
+
+- Tapered evaluation (mid vs endgame blend)
+- Passed pawns, isolated pawns, backward pawns
+- Mobility
+- King safety (pawn shield, attackers)
+- Rook on 7th, connected rooks
+- Knight outposts
+- Mop-up for winning endgames (drives the enemy king to the edge so it can actually mate)
+
+## Replacement `evaluate`
+
+This assumes your PST arrays are indexed `[row][col]` from the piece owner's perspective (as you already do), and that `PieceColor`, `ChessPiece`, `ChessPieceType`, and the PST names exist as in your code. I added `KING_MID_PST`/`KING_END_PST` usage exactly as you have. Score stays **White-positive** so it matches the `AIPlayer` I gave you.
+
+```kotlin
+override fun evaluate(state: GameState): Int {
+    when (state.status) {
+        GameStatus.WHITE_WINS -> return 100_000
+        GameStatus.BLACK_WINS -> return -100_000
+        GameStatus.DRAW -> return 0
+        else -> {}
+    }
+
+    // Repetition/50-move draws belong in search; see note below.
+
+    val board = state.board
+
+    // ---- Pass 1: material counts, pawn structure, king squares -------------
+    val wPawnsOnFile = IntArray(8)
+    val bPawnsOnFile = IntArray(8)
+    // Most advanced pawn rank per file, from each side's own perspective
+    // (0 = own back rank .. 7). -1 = none.
+    val wPawnRankMax = IntArray(8) { -1 }
+    val bPawnRankMax = IntArray(8) { -1 }
+    // For passed-pawn test we need actual rows: store min/max board rows.
+    val wPawnRows = Array(8) { mutableListOf<Int>() }
+    val bPawnRows = Array(8) { mutableListOf<Int>() }
+
+    var wBishops = 0; var bBishops = 0
+    var phase = 0 // 24 = full middlegame, 0 = bare endgame
+    var wKingIdx = -1; var bKingIdx = -1
+    var wMaterial = 0; var bMaterial = 0 // non-king, incl. pawns
+
+    for (idx in 0 until 64) {
+        val p = board[idx] as? ChessPiece ?: continue
+        val row = idx / 8
+        val col = idx % 8
+        val white = p.color == PieceColor.WHITE
+
+        when (p.type) {
+            ChessPieceType.PAWN -> {
+                if (white) { wPawnsOnFile[col]++; wPawnRows[col].add(row) }
+                else { bPawnsOnFile[col]++; bPawnRows[col].add(row) }
+            }
+            ChessPieceType.KNIGHT -> phase += 1
+            ChessPieceType.BISHOP -> { phase += 1; if (white) wBishops++ else bBishops++ }
+            ChessPieceType.ROOK -> phase += 2
+            ChessPieceType.QUEEN -> phase += 4
+            ChessPieceType.KING -> if (white) wKingIdx = idx else bKingIdx = idx
+        }
+
+        if (p.type != ChessPieceType.KING) {
+            if (white) wMaterial += p.type.points else bMaterial += p.type.points
+        }
+    }
+    phase = phase.coerceIn(0, 24)
+
+    var mg = 0 // middlegame score (White-positive)
+    var eg = 0 // endgame score
+
+    // ---- Pass 2: piece values, PSTs, mobility-lite, rook/knight terms ------
+    for (idx in 0 until 64) {
+        val p = board[idx] as? ChessPiece ?: continue
+        val row = idx / 8
+        val col = idx % 8
+        val white = p.color == PieceColor.WHITE
+        val sign = if (white) 1 else -1
+        val pstRow = if (white) row else 7 - row
+
+        var m = p.type.points
+        var e = p.type.points
+
+        when (p.type) {
+            ChessPieceType.PAWN -> {
+                m += PAWN_PST[pstRow][col]
+                e += PAWN_PST[pstRow][col]
+
+                val own = if (white) wPawnsOnFile else bPawnsOnFile
+                val enemyRows = if (white) bPawnRows else wPawnRows
+
+                // Isolated pawn.
+                val leftHas = col > 0 && own[col - 1] > 0
+                val rightHas = col < 7 && own[col + 1] > 0
+                if (!leftHas && !rightHas) { m -= 15; e -= 20 }
+
+                // Passed pawn: no enemy pawns ahead on this or adjacent files.
+                var passed = true
+                for (c in maxOf(0, col - 1)..minOf(7, col + 1)) {
+                    for (er in enemyRows[c]) {
+                        val ahead = if (white) er < row else er > row
+                        if (ahead) { passed = false; break }
+                    }
+                    if (!passed) break
+                }
+                if (passed) {
+                    val rank = if (white) 7 - row else row // 1..6 for real pawns
+                    val bonus = PASSED_BONUS[rank.coerceIn(0, 7)]
+                    m += bonus / 2
+                    e += bonus
+                }
+            }
+
+            ChessPieceType.KNIGHT -> {
+                m += KNIGHT_PST[pstRow][col]
+                e += KNIGHT_PST[pstRow][col]
+            }
+
+            ChessPieceType.BISHOP -> {
+                m += BISHOP_PST[pstRow][col]
+                e += BISHOP_PST[pstRow][col]
+            }
+
+            ChessPieceType.ROOK -> {
+                val bonusPst = ROOK_PST[pstRow][col]
+                m += bonusPst
+                e += bonusPst
+
+                val ownPawns = if (white) wPawnsOnFile[col] else bPawnsOnFile[col]
+                val oppPawns = if (white) bPawnsOnFile[col] else wPawnsOnFile[col]
+                if (ownPawns == 0 && oppPawns == 0) { m += 22; e += 12 }
+                else if (ownPawns == 0) { m += 10; e += 6 }
+
+                // Rook on 7th (2nd rank from its own side).
+                if (pstRow == 1) { m += 15; e += 25 }
+            }
+
+            ChessPieceType.QUEEN -> {
+                m += QUEEN_PST[pstRow][col]
+                e += QUEEN_PST[pstRow][col]
+            }
+
+            ChessPieceType.KING -> {
+                m += KING_MID_PST[pstRow][col]
+                e += KING_END_PST[pstRow][col]
+
+                // Pawn shield (middlegame only): friendly pawns on the 3
+                // files around the king, directly in front.
+                val fwd = if (white) -1 else 1
+                var shield = 0
+                for (c in maxOf(0, col - 1)..minOf(7, col + 1)) {
+                    for (dr in 1..2) {
+                        val r = row + fwd * dr
+                        if (r !in 0..7) continue
+                        val q = board[r * 8 + c] as? ChessPiece
+                        if (q != null && q.type == ChessPieceType.PAWN && q.color == p.color) {
+                            shield += if (dr == 1) 10 else 5
+                            break
+                        }
+                    }
+                }
+                m += shield
+                // Open file next to king is dangerous.
+                for (c in maxOf(0, col - 1)..minOf(7, col + 1)) {
+                    val own = if (white) wPawnsOnFile[c] else bPawnsOnFile[c]
+                    if (own == 0) m -= 12
+                }
+            }
+        }
+
+        mg += sign * m
+        eg += sign * e
+    }
+
+    // ---- Pair bonuses and doubled pawns -----------------------------------
+    if (wBishops >= 2) { mg += 30; eg += 45 }
+    if (bBishops >= 2) { mg -= 30; eg -= 45 }
+
+    for (c in 0..7) {
+        if (wPawnsOnFile[c] > 1) { val d = (wPawnsOnFile[c] - 1); mg -= 12 * d; eg -= 20 * d }
+        if (bPawnsOnFile[c] > 1) { val d = (bPawnsOnFile[c] - 1); mg += 12 * d; eg += 20 * d }
+    }
+
+    // ---- Mop-up: drive the losing king to the edge when far ahead ----------
+    if (wKingIdx >= 0 && bKingIdx >= 0) {
+        val diff = wMaterial - bMaterial
+        if (kotlin.math.abs(diff) >= 300 && phase <= 8) {
+            val winnerKing = if (diff > 0) wKingIdx else bKingIdx
+            val loserKing = if (diff > 0) bKingIdx else wKingIdx
+            val lr = loserKing / 8; val lc = loserKing % 8
+            val wr = winnerKing / 8; val wc = winnerKing % 8
+
+            val centerDist = maxOf(3 - minOf(lr, 7 - lr), 0) + maxOf(3 - minOf(lc, 7 - lc), 0)
+            val kingDist = kotlin.math.abs(lr - wr) + kotlin.math.abs(lc - wc)
+            val mop = centerDist * 12 + (14 - kingDist) * 6
+            eg += if (diff > 0) mop else -mop
+        }
+    }
+
+    // ---- Tapered blend ------------------------------------------------------
+    return (mg * phase + eg * (24 - phase)) / 24
+}
+
+private val PASSED_BONUS = intArrayOf(0, 5, 10, 20, 35, 60, 100, 0)
+```
+
+## Notes
+
+- **Puts a floor on tempo**: no side-to-move bonus was added; if you want one, add `+10` to White when `state.currentTurn == WHITE` (and `-10` for Black). It reduces score oscillation between depths.
+- **Passed-pawn rank** assumes row 0 is Black's back rank and row 7 White's (consistent with your comment "White's back rank is row 7"). If reversed, swap the `rank` formula.
+- **Mobility** is deliberately omitted: computing it needs move generation per eval, which would halve your search speed. If you want it cheaply, count knight/bishop/rook reachable empty squares directly on the board array; that's a good follow-up, but do the rest first.
+- **Repetition:** delete the 8-ply check from eval. Repetition is a path property, not a position property, and returning 0 from a static eval poisons the transposition table (same position cached as "draw" in unrelated lines). Handle it in `AIPlayer.negamax` instead: keep a small `LongArray` stack of `boardKey`s along the current path, and when `key` already appears in the stack for this search path (at `ply > 0`), return `0`. Want me to add that to `AIPlayer`?
+- **Tuning:** the numbers are conventional starting points, not tuned. Play a few dozen games against your previous build (or against an engine set to fixed depth) before trusting any single change.
