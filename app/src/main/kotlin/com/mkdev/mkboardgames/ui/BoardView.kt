@@ -1393,6 +1393,12 @@ class BoardView(context: Context) : View(context) {
     }
 
     private fun drawShogiCell(canvas: Canvas, position: Position, paint: Paint) {
+        // Hand drops use a synthetic origin (row -1, column = piece type)
+        // because they do not start on a board square. Never try to index the
+        // Shogi grid with that origin while highlighting the last move.
+        if (position.row !in 0 until ShogiSetup.SIZE ||
+            position.col !in 0 until ShogiSetup.SIZE
+        ) return
         val col = if (isFlipped) 8 - position.col else position.col
         val row = if (isFlipped) 8 - position.row else position.row
         canvas.drawRect(
