@@ -283,9 +283,26 @@ class AIPlayer(
         val sideToMove = if (maximising) PieceColor.WHITE else PieceColor.BLACK
         val inCheck = engine is ChessRuleEngine && engine.isInCheck(state, sideToMove)
 
+        // A checked position cannot use stand-pat, but it must still have a
+        // hard stop. Previously a checked node at depth 0 kept recursing
+        // because the recursive depth was clamped back to 0. Hard/master
+        // searches therefore spent their whole time budget in quiescence and
+        // returned the first statically ordered move instead of a searched
+        // result. Search one final set of evasions, then evaluate their child
+        // positions without recursing again.
+        if (depthLeft <= 0) {
+            if (!inCheck) return standPat
+            val evasions = tacticalMoves(state, sideToMove)
+            if (evasions.isEmpty()) return standPat
+            return if (maximising) {
+                evasions.maxOf { evaluateState(applyForSearch(state, it)) }
+            } else {
+                evasions.minOf { evaluateState(applyForSearch(state, it)) }
+            }
+        }
+
         if (maximising) {
             if (!inCheck && standPat >= beta) return standPat
-            if (depthLeft == 0 && !inCheck) return standPat
             var best = if (inCheck) Int.MIN_VALUE else standPat
             var a    = if (inCheck) alpha else maxOf(alpha, standPat)
             for (move in tacticalMoves(state, PieceColor.WHITE)) {
@@ -294,7 +311,7 @@ class AIPlayer(
                     break
                 }
                 val score = quiescence(
-                    applyForSearch(state, move), a, beta, false, (depthLeft - 1).coerceAtLeast(0)
+                    applyForSearch(state, move), a, beta, false, depthLeft - 1
                 )
                 if (searchAborted) return evaluateState(state)
                 best = maxOf(best, score)
@@ -304,7 +321,6 @@ class AIPlayer(
             return best
         } else {
             if (!inCheck && standPat <= alpha) return standPat
-            if (depthLeft == 0 && !inCheck) return standPat
             var best = if (inCheck) Int.MAX_VALUE else standPat
             var b    = if (inCheck) beta else minOf(beta, standPat)
             for (move in tacticalMoves(state, PieceColor.BLACK)) {
@@ -313,7 +329,7 @@ class AIPlayer(
                     break
                 }
                 val score = quiescence(
-                    applyForSearch(state, move), alpha, b, true, (depthLeft - 1).coerceAtLeast(0)
+                    applyForSearch(state, move), alpha, b, true, depthLeft - 1
                 )
                 if (searchAborted) return evaluateState(state)
                 best = minOf(best, score)
