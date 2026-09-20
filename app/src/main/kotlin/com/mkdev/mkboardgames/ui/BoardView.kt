@@ -1069,8 +1069,11 @@ class BoardView(context: Context) : View(context) {
         shogiDropBannerAlpha = 1f
         shogiDropBannerAnimator?.cancel()
         shogiDropBannerAnimator = ValueAnimator.ofFloat(1f, 0f).apply {
-            startDelay = 520L
-            duration = 720L
+            // Keep the notification readable long enough to notice. Starting
+            // another drop cancels this animator and starts the two-second
+            // display window again.
+            startDelay = 2_000L
+            duration = 600L
             addUpdateListener {
                 shogiDropBannerAlpha = it.animatedValue as Float
                 invalidate()
@@ -1528,11 +1531,12 @@ class BoardView(context: Context) : View(context) {
         if (shogiDropBannerAlpha <= 0f || shogiDropBannerText.isEmpty()) return
         val alpha = (shogiDropBannerAlpha * 255f).toInt().coerceIn(0, 255)
         val centerX = width / 2f
-        val centerY = maxOf(cellSize * 0.72f, shogiGridTop - cellSize * 0.34f)
-        shogiDropBannerTextPaint.textSize = maxOf(12f, cellSize * 0.23f)
+        val centerY = maxOf(cellSize * 1.05f, shogiGridTop - cellSize * 0.62f)
+        val bannerScale = 3f
+        shogiDropBannerTextPaint.textSize = maxOf(12f, cellSize * 0.23f) * bannerScale
         val textWidth = shogiDropBannerTextPaint.measureText(shogiDropBannerText)
-        val padX = cellSize * 0.32f
-        val padY = cellSize * 0.18f
+        val padX = cellSize * 0.32f * bannerScale
+        val padY = cellSize * 0.18f * bannerScale
         val metrics = shogiDropBannerTextPaint.fontMetrics
         val textHeight = metrics.descent - metrics.ascent
         val bounds = RectF(
@@ -1542,10 +1546,11 @@ class BoardView(context: Context) : View(context) {
             centerY + textHeight / 2f + padY,
         )
         shogiDropBannerBgPaint.color = Color.argb(alpha * 9 / 10, 22, 42, 48)
-        canvas.drawRoundRect(bounds, cellSize * 0.16f, cellSize * 0.16f, shogiDropBannerBgPaint)
+        val cornerRadius = cellSize * 0.16f * bannerScale
+        canvas.drawRoundRect(bounds, cornerRadius, cornerRadius, shogiDropBannerBgPaint)
         shogiDropBannerEdgePaint.color = Color.argb(alpha, 227, 184, 106)
-        shogiDropBannerEdgePaint.strokeWidth = maxOf(1f, cellSize * 0.025f)
-        canvas.drawRoundRect(bounds, cellSize * 0.16f, cellSize * 0.16f, shogiDropBannerEdgePaint)
+        shogiDropBannerEdgePaint.strokeWidth = maxOf(1f, cellSize * 0.025f * bannerScale)
+        canvas.drawRoundRect(bounds, cornerRadius, cornerRadius, shogiDropBannerEdgePaint)
         shogiDropBannerTextPaint.color = Color.argb(alpha, 255, 231, 174)
         canvas.drawText(
             shogiDropBannerText,
