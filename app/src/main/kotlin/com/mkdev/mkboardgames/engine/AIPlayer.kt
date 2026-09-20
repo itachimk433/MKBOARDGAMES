@@ -1,6 +1,7 @@
 package com.mkdev.mkboardgames.engine
 
 import com.mkdev.mkboardgames.games.amazons.AmazonsRuleEngine
+import com.mkdev.mkboardgames.games.chess.ChessPiece
 import com.mkdev.mkboardgames.games.chess.ChessRuleEngine
 
 /**
@@ -40,7 +41,15 @@ class AIPlayer(
         for (i in state.board.indices) {
             val p = state.board[i] ?: continue
             val colorOff = if (p.color == PieceColor.WHITE) 0 else 8
-            val typeOff  = (p.value() / 100).coerceIn(0, 7)
+            // Chess piece values are not type ids: bishop and knight both
+            // round to 3, while queen and king both clamp to 7. Reusing those
+            // buckets creates false transposition-table hits between positions
+            // with different material. Use the actual chess type ordinal.
+            val typeOff = if (p is ChessPiece) {
+                p.type.ordinal
+            } else {
+                (p.value() / 100).coerceIn(0, 7)
+            }
             key = key xor zobristTable[i][(colorOff + typeOff).coerceIn(0, 15)]
         }
         // A Shogi position is not defined by the board alone: the pieces in
