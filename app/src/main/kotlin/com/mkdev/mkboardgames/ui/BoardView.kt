@@ -1069,10 +1069,10 @@ class BoardView(context: Context) : View(context) {
         shogiDropBannerAlpha = 1f
         shogiDropBannerAnimator?.cancel()
         shogiDropBannerAnimator = ValueAnimator.ofFloat(1f, 0f).apply {
-            // Keep the notification readable long enough to notice. Starting
-            // another drop cancels this animator and starts the two-second
-            // display window again.
-            startDelay = 2_000L
+            // Keep the notification readable for 1.5 seconds. Starting
+            // another drop cancels this animator and starts the display
+            // window again.
+            startDelay = 1_500L
             duration = 600L
             addUpdateListener {
                 shogiDropBannerAlpha = it.animatedValue as Float
