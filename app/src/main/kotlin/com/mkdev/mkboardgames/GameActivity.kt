@@ -2118,7 +2118,16 @@ Checkmate your opponent's King.
                 Color.parseColor("#D8A7FF"),
             ),
         ).let { choices ->
-            if (gameType == "AMAZONS" || gameType == "XIANGQI") choices.take(3) else choices
+            if (
+                gameType == "AMAZONS" ||
+                gameType == "XIANGQI" ||
+                gameType == "CHECKERS" ||
+                gameType == "INTERNATIONAL_DRAUGHTS"
+            ) {
+                choices.take(3)
+            } else {
+                choices
+            }
         }
         val view = ChessChoiceView(
             this,

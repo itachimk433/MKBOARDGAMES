@@ -129,17 +129,38 @@ object SettingsManager {
     }
 
     // ── Checkers ─────────────────────────────────────────────────────────────
-    fun getCheckersDifficulty(ctx: Context) = prefs(ctx).getInt(KEY_CHECKERS_DIFFICULTY, 0)
-    fun setCheckersDifficulty(ctx: Context, v: Int) = prefs(ctx).edit().putInt(KEY_CHECKERS_DIFFICULTY, v).apply()
-    fun checkersAiDepth(ctx: Context) = when (getCheckersDifficulty(ctx)) { 0 -> 2; 2 -> 8; else -> 5 }
+    fun getCheckersDifficulty(ctx: Context) =
+        prefs(ctx).getInt(KEY_CHECKERS_DIFFICULTY, 0).coerceIn(0, 2)
+
+    fun setCheckersDifficulty(ctx: Context, v: Int) =
+        prefs(ctx).edit().putInt(KEY_CHECKERS_DIFFICULTY, v.coerceIn(0, 2)).apply()
+
+    fun checkersAiDepthForLevel(level: Int) = when (level.coerceIn(0, 2)) {
+        0 -> 2
+        2 -> 8
+        else -> 5
+    }
+
+    fun checkersAiDepth(ctx: Context) =
+        checkersAiDepthForLevel(getCheckersDifficulty(ctx))
 
     // ── International Draughts ──────────────────────────────────────────────
     fun getInternationalDraughtsDifficulty(ctx: Context) =
-        prefs(ctx).getInt(KEY_INTERNATIONAL_DRAUGHTS_DIFFICULTY, 0)
+        prefs(ctx).getInt(KEY_INTERNATIONAL_DRAUGHTS_DIFFICULTY, 0).coerceIn(0, 2)
+
     fun setInternationalDraughtsDifficulty(ctx: Context, v: Int) =
-        prefs(ctx).edit().putInt(KEY_INTERNATIONAL_DRAUGHTS_DIFFICULTY, v).apply()
+        prefs(ctx).edit()
+            .putInt(KEY_INTERNATIONAL_DRAUGHTS_DIFFICULTY, v.coerceIn(0, 2))
+            .apply()
+
+    fun internationalDraughtsAiDepthForLevel(level: Int) = when (level.coerceIn(0, 2)) {
+        0 -> 2
+        2 -> 8
+        else -> 5
+    }
+
     fun internationalDraughtsAiDepth(ctx: Context) =
-        when (getInternationalDraughtsDifficulty(ctx)) { 0 -> 2; 2 -> 8; else -> 5 }
+        internationalDraughtsAiDepthForLevel(getInternationalDraughtsDifficulty(ctx))
 
     // ── Othello — always hard (no user-facing difficulty) ────────────────────
     fun othelloAiDepth(@Suppress("UNUSED_PARAMETER") ctx: Context) = 7
