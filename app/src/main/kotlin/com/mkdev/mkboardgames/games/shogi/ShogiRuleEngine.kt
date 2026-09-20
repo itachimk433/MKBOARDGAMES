@@ -70,21 +70,43 @@ class ShogiRuleEngine : com.mkdev.mkboardgames.engine.RuleEngine {
         return winnerFor(state.currentTurn.opponent())
     }
 
-    override fun evaluate(state: GameState): Int {
-        var score = 0
-        for (row in 0 until ShogiSetup.SIZE) {
-            for (col in 0 until ShogiSetup.SIZE) {
-                val piece = pieceAt(state, Position(row, col)) ?: continue
-                val advance = if (piece.color == PieceColor.WHITE) 8 - row else row
-                val positional = advance * 3
-                score += if (piece.color == PieceColor.WHITE) {
-                    piece.value() + positional
-                } else {
-                    -piece.value() - positional
-                }
-            }
-        }
-        return score
+    /** Static evaluation from WHITE's perspective (used by generic callers). */
+    override fun evaluate(state: GameState): Int = ShogiEvaluator.evaluate(state)
+
+    // ------------------------------------------------------------------
+    // Fast search-only API (used by ShogiSearch). These never mutate state
+    // and are behaviorally equivalent to the public API, minus validation.
+    // ------------------------------------------------------------------
+
+    /**
+     * Apply a move that is already known to be legal. No legality check,
+     * no status computation. The caller (search) detects terminal states by
+     * an empty legal-move list at the node.
+     */
+    fun applyForSearch(state: GameState, move: Move): GameState =
+        applyMoveInternal(state, move).copy(moveHistory = emptyList())
+
+    /** Full legal move list for the side to move, without Move-list validation. */
+    fun searchMoves(state: GameState): List<Move> =
+        allLegalMoves(state, state.currentTurn)
+
+    /** True if [color]'s king is currently attacked. */
+    fun inCheck(state: GameState, color: PieceColor): Boolean = isKingInCheck(state, color)
+
+    /** Does this move give check to the opponent of the mover? */
+    fun givesCheck(stateBefore: GameState, move: Move): Boolean {
+        val after = applyMoveInternal(stateBefore, move)
+        return isKingInCheck(after, stateBefore.currentTurn.opponent())
+    }
+
+    /** Does the board of [state] still contain both kings? */
+    fun bothKingsPresent(state: GameState): Boolean =
+        findKing(state, PieceColor.WHITE) != null && findKing(state, PieceColor.BLACK) != null
+
+    fun winnerStatusIfKingMissing(state: GameState): GameStatus? {
+        if (findKing(state, PieceColor.WHITE) == null) return GameStatus.BLACK_WINS
+        if (findKing(state, PieceColor.BLACK) == null) return GameStatus.WHITE_WINS
+        return null
     }
 
     private fun rawMovesFrom(
@@ -339,12 +361,87 @@ class ShogiRuleEngine : com.mkdev.mkboardgames.engine.RuleEngine {
 
     private fun isKingInCheck(state: GameState, color: PieceColor): Boolean {
         val king = findKing(state, color) ?: return true
-        for (row in 0 until ShogiSetup.SIZE) {
-            for (col in 0 until ShogiSetup.SIZE) {
-                val from = Position(row, col)
-                val piece = pieceAt(state, from) as? ShogiPiece ?: continue
-                if (piece.color == color) continue
-                if (rawMovesFrom(state, from, piece).any { it.to == king }) return true
+        return isSquareAttackedBy(state, king, color.opponent())
+    }
+
+    /**
+     * Reverse attack test: is [target] attacked by any piece of [attacker]?
+     * Walking outward from the target avoids generating every enemy move.
+     */
+    private fun isSquareAttackedBy(
+        state: GameState,
+        target: Position,
+        attacker: PieceColor,
+    ): Boolean {
+        val fwd = if (attacker == PieceColor.WHITE) -1 else 1
+
+        fun stepAttacker(dr: Int, dc: Int, matches: (ShogiPiece) -> Boolean): Boolean {
+            val p = pieceAt(state, Position(target.row - dr, target.col - dc)) ?: return false
+            return p.color == attacker && matches(p)
+        }
+
+        fun goldLike(p: ShogiPiece) = p.type == ShogiPieceType.GOLD ||
+            (p.promoted && (p.type == ShogiPieceType.PAWN || p.type == ShogiPieceType.LANCE ||
+                p.type == ShogiPieceType.KNIGHT || p.type == ShogiPieceType.SILVER))
+
+        // Gold-like steps: forward, forward-left, forward-right, left, right, back.
+        val goldSteps = arrayOf(fwd to 0, fwd to -1, fwd to 1, 0 to -1, 0 to 1, -fwd to 0)
+        for ((dr, dc) in goldSteps) {
+            if (stepAttacker(dr, dc) { goldLike(it) }) return true
+        }
+        // Pawn (unpromoted): forward one.
+        if (stepAttacker(fwd, 0) { it.type == ShogiPieceType.PAWN && !it.promoted }) return true
+        // Silver (unpromoted): forward 3, back diagonals.
+        for ((dr, dc) in arrayOf(fwd to 0, fwd to -1, fwd to 1, -fwd to -1, -fwd to 1)) {
+            if (stepAttacker(dr, dc) { it.type == ShogiPieceType.SILVER && !it.promoted }) return true
+        }
+        // Knight (unpromoted).
+        for (dc in intArrayOf(-1, 1)) {
+            if (stepAttacker(fwd * 2, dc) { it.type == ShogiPieceType.KNIGHT && !it.promoted }) return true
+        }
+        // King steps.
+        for (dr in -1..1) for (dc in -1..1) {
+            if (dr == 0 && dc == 0) continue
+            if (stepAttacker(dr, dc) { it.type == ShogiPieceType.KING }) return true
+        }
+        // Promoted rook: diagonal one-steps; promoted bishop: orthogonal one-steps.
+        for ((dr, dc) in diagonalDirections) {
+            if (stepAttacker(dr, dc) { it.type == ShogiPieceType.ROOK && it.promoted }) return true
+        }
+        for ((dr, dc) in orthogonalDirections) {
+            if (stepAttacker(dr, dc) { it.type == ShogiPieceType.BISHOP && it.promoted }) return true
+        }
+
+        // Sliders: walk each ray from the target until a piece is hit.
+        for ((dr, dc) in orthogonalDirections) {
+            var r = target.row + dr
+            var c = target.col + dc
+            while (r in 0 until ShogiSetup.SIZE && c in 0 until ShogiSetup.SIZE) {
+                val p = state.board[r * ShogiSetup.SIZE + c] as? ShogiPiece
+                if (p != null) {
+                    if (p.color == attacker) {
+                        if (p.type == ShogiPieceType.ROOK) return true
+                        if (p.type == ShogiPieceType.LANCE && !p.promoted &&
+                            dc == 0 && dr == -fwd
+                        ) return true
+                    }
+                    break
+                }
+                r += dr
+                c += dc
+            }
+        }
+        for ((dr, dc) in diagonalDirections) {
+            var r = target.row + dr
+            var c = target.col + dc
+            while (r in 0 until ShogiSetup.SIZE && c in 0 until ShogiSetup.SIZE) {
+                val p = state.board[r * ShogiSetup.SIZE + c] as? ShogiPiece
+                if (p != null) {
+                    if (p.color == attacker && p.type == ShogiPieceType.BISHOP) return true
+                    break
+                }
+                r += dr
+                c += dc
             }
         }
         return false

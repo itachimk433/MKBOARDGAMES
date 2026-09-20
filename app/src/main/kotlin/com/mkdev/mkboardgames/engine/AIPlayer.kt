@@ -4,6 +4,8 @@ import com.mkdev.mkboardgames.games.amazons.AmazonsRuleEngine
 import com.mkdev.mkboardgames.games.chess.ChessPiece
 import com.mkdev.mkboardgames.games.chess.ChessPieceType
 import com.mkdev.mkboardgames.games.chess.ChessRuleEngine
+import com.mkdev.mkboardgames.games.shogi.ShogiRuleEngine
+import com.mkdev.mkboardgames.games.shogi.ShogiSearch
 
 /**
  * Negamax + PVS AI with iterative deepening, aspiration windows, a
@@ -58,6 +60,20 @@ class AIPlayer(
     private val isChess = engine is ChessRuleEngine
     private val chessEngine = engine as? ChessRuleEngine
     private val isAmazons = engine is AmazonsRuleEngine
+    private val shogiSearch = (engine as? ShogiRuleEngine)?.let {
+        ShogiSearch(
+            engine = it,
+            maxDepth = maxDepth,
+            timeLimitMs = timeLimitMs,
+            quiesceDepth = quiesceDepth,
+            varietyWindow = when {
+                varietyWindowOverride >= 0 -> varietyWindowOverride
+                maxDepth <= 3 -> 60
+                maxDepth <= 5 -> 30
+                else -> 0
+            },
+        )
+    }
 
     // A fixed seed makes ordering and search behaviour reproducible between turns.
     private val zobristTable: Array<LongArray> = run {
@@ -125,6 +141,10 @@ class AIPlayer(
     }
 
     fun bestMove(state: GameState): Move? {
+        if (engine is ShogiRuleEngine) {
+            return shogiSearch?.bestMove(state)
+        }
+
         deadline = System.currentTimeMillis() + timeLimitMs.coerceAtLeast(1L)
         searchAborted = false
         nodeCounter = 0L
