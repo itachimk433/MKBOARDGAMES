@@ -142,6 +142,9 @@ class MenuView(
     private val onitamaHomeIconBitmap: Bitmap? = try {
         context.assets.open("onitama_home_icon.webp").use { BitmapFactory.decodeStream(it) }
     } catch (e: Exception) { null }
+    private val fiveFieldKonoHomeIconBitmap: Bitmap? = try {
+        context.assets.open("five_field_kono_home_icon.webp").use { BitmapFactory.decodeStream(it) }
+    } catch (e: Exception) { null }
     private val snakesLaddersIconBitmap: Bitmap? = try {
         context.assets.open("snakes_ladders_icon.webp").use { BitmapFactory.decodeStream(it) }
     } catch (e: Exception) { null }
@@ -802,12 +805,13 @@ class MenuView(
             GameType.MANCALA      -> "Mancala"       to "vs CPU  •  2 Players"
             GameType.YOTE         -> "Yoté"          to "vs CPU  •  2 Players"
             GameType.ONITAMA      -> "Onitama"       to "vs CPU  •  2 Players"
-            GameType.FIVE_FIELD_KONO -> "Five Field Kono" to "vs CPU  •  2 Players"
+            GameType.FIVE_FIELD_KONO -> "Five-Field Kono" to "vs CPU  •  2 Players"
         }
 
         val titleLines = when (title) {
             "International Draughts" -> listOf("International", "Draughts")
             "Snakes & Ladders" -> listOf("Snakes &", "Ladders")
+            "Five-Field Kono" -> listOf("Five-Field", "Kono")
             else -> listOf(title)
         }
         val titlePaint = cardTitlePaint
@@ -921,6 +925,10 @@ class MenuView(
     }
 
     private fun drawFiveFieldKonoMini(canvas: Canvas, left: Float, top: Float, size: Float) {
+        fiveFieldKonoHomeIconBitmap?.let {
+            canvas.drawBitmap(it, null, RectF(left, top, left + size, top + size), bitmapPaint)
+            return
+        }
         val board = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#A8653B") }
         val line = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.parseColor("#3A1E14")

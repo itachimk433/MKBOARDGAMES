@@ -178,7 +178,7 @@ class ChessChoiceView(
     private val plainChoiceLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
         textAlign = Paint.Align.CENTER
-        typeface = Typeface.create("serif", Typeface.BOLD_ITALIC)
+        typeface = Typeface.DEFAULT
         setShadowLayer(2f * unit, 0f, 2f * unit, Color.argb(210, 0, 0, 0))
     }
     private val detailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -903,6 +903,7 @@ class ChessChoiceView(
         top: Float,
         choice: Choice,
     ) {
+        val displayLabel = choice.label.asOptionItalicText()
         val drawnRect = RectF(
             rect.left,
             top,
@@ -913,17 +914,22 @@ class ChessChoiceView(
         val maxTextWidth = (drawnRect.width() - 24f * unit).coerceAtLeast(1f)
         while (
             plainChoiceLabelPaint.textSize > 12f * textScale &&
-            plainChoiceLabelPaint.measureText(choice.label) > maxTextWidth
+            plainChoiceLabelPaint.measureText(displayLabel) > maxTextWidth
         ) {
             plainChoiceLabelPaint.textSize *= 0.94f
         }
-        val measuredWidth = plainChoiceLabelPaint.measureText(choice.label)
+        val measuredWidth = plainChoiceLabelPaint.measureText(displayLabel)
         if (measuredWidth > maxTextWidth && measuredWidth > 0f) {
             plainChoiceLabelPaint.textSize *= maxTextWidth / measuredWidth
         }
         val metrics = plainChoiceLabelPaint.fontMetrics
         val baseline = drawnRect.centerY() - (metrics.ascent + metrics.descent) / 2f
-        canvas.drawText(choice.label, drawnRect.centerX(), baseline, plainChoiceLabelPaint)
+        canvas.drawText(
+            displayLabel,
+            drawnRect.centerX(),
+            baseline,
+            plainChoiceLabelPaint,
+        )
     }
 
     private fun drawCenteredChoiceText(canvas: Canvas, rect: RectF, choice: Choice) {

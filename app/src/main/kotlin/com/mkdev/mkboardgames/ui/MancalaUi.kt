@@ -194,7 +194,7 @@ class MancalaHomeView(context: Context) : View(context) {
     private val buttonLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
         textAlign = Paint.Align.CENTER
-        typeface = Typeface.create("serif", Typeface.BOLD_ITALIC)
+        typeface = Typeface.DEFAULT
         setShadowLayer(dp(context, 2f), 0f, dp(context, 2f), Color.argb(210, 0, 0, 0))
     }
     private val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -425,7 +425,7 @@ class MancalaHomeView(context: Context) : View(context) {
             buttonLabelPaint.textSize = min(drawn.height() * 0.28f, dp(context, 24f))
             val metrics = buttonLabelPaint.fontMetrics
             val baseline = drawn.centerY() - (metrics.ascent + metrics.descent) / 2f
-            canvas.drawText(label, drawn.centerX(), baseline, buttonLabelPaint)
+            canvas.drawText(label.asOptionItalicText(), drawn.centerX(), baseline, buttonLabelPaint)
             return
         }
         val radius = drawn.height() * 0.2f

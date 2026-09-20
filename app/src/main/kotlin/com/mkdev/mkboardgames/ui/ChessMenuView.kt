@@ -122,7 +122,7 @@ class ChessMenuView(
     private val plainButtonLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
         textAlign = Paint.Align.CENTER
-        typeface = Typeface.create("serif", Typeface.BOLD_ITALIC)
+        typeface = Typeface.DEFAULT
         setShadowLayer(2f * unit, 0f, 2f * unit, Color.argb(210, 0, 0, 0))
     }
     private val surfacePaint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -1015,21 +1015,22 @@ class ChessMenuView(
     }
 
     private fun drawPlainButtonLabel(canvas: Canvas, rect: RectF, label: String) {
+        val displayLabel = label.asOptionItalicText()
         plainButtonLabelPaint.textSize = min(21f * textScale, rect.height() * 0.28f)
         val maxTextWidth = (rect.width() - 24f * unit).coerceAtLeast(1f)
         while (
             plainButtonLabelPaint.textSize > 12f * textScale &&
-            plainButtonLabelPaint.measureText(label) > maxTextWidth
+            plainButtonLabelPaint.measureText(displayLabel) > maxTextWidth
         ) {
             plainButtonLabelPaint.textSize *= 0.94f
         }
-        val measuredWidth = plainButtonLabelPaint.measureText(label)
+        val measuredWidth = plainButtonLabelPaint.measureText(displayLabel)
         if (measuredWidth > maxTextWidth && measuredWidth > 0f) {
             plainButtonLabelPaint.textSize *= maxTextWidth / measuredWidth
         }
         val metrics = plainButtonLabelPaint.fontMetrics
         val baseline = rect.centerY() - (metrics.ascent + metrics.descent) / 2f
-        canvas.drawText(label, rect.centerX(), baseline, plainButtonLabelPaint)
+        canvas.drawText(displayLabel, rect.centerX(), baseline, plainButtonLabelPaint)
     }
 
     private fun loadAssetBitmap(ctx: Context, assetName: String): Bitmap? =
