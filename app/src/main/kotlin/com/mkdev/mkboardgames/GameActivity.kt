@@ -1670,11 +1670,15 @@ Checkmate your opponent's King.
                 try {
                     val preferredMove = when (gameType) {
                         "XIANGQI" -> {
+                            val profile = SettingsManager.xiangqiAiProfileForLevel(
+                                SettingsManager.getXiangqiDifficulty(this@GameActivity),
+                            )
                             AIPlayer(
-                                engine,
-                                maxDepth = 2,
-                                timeLimitMs = 1800L,
-                                quiesceDepth = 1,
+                                engine = engine,
+                                maxDepth = profile.depth,
+                                timeLimitMs = profile.timeLimitMs,
+                                quiesceDepth = profile.quiesceDepth,
+                                varietyWindowOverride = profile.varietyWindow,
                             ).bestMove(thinkingState)
                         }
                         "SHOGI" -> {
@@ -2077,6 +2081,10 @@ Checkmate your opponent's King.
                 getDiff = { SettingsManager.getAmazonsDifficulty(this) }
                 setDiff = { v -> SettingsManager.setAmazonsDifficulty(this, v) }
             }
+            "XIANGQI" -> {
+                getDiff = { SettingsManager.getXiangqiDifficulty(this) }
+                setDiff = { v -> SettingsManager.setXiangqiDifficulty(this, v) }
+            }
             else       -> { getDiff = { SettingsManager.getChessDifficulty(this) };    setDiff = { v -> SettingsManager.setChessDifficulty(this, v) } }
         }
         val current = getDiff()
@@ -2110,7 +2118,7 @@ Checkmate your opponent's King.
                 Color.parseColor("#D8A7FF"),
             ),
         ).let { choices ->
-            if (gameType == "AMAZONS") choices.take(3) else choices
+            if (gameType == "AMAZONS" || gameType == "XIANGQI") choices.take(3) else choices
         }
         val view = ChessChoiceView(
             this,

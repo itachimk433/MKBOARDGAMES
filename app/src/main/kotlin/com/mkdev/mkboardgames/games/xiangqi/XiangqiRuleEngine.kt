@@ -69,16 +69,27 @@ class XiangqiRuleEngine : com.mkdev.mkboardgames.engine.RuleEngine {
 
     override fun evaluate(state: GameState): Int {
         var score = 0
-        for (row in 0 until rows) for (col in 0 until columns) {
-            val piece = pieceAt(state, Position(row, col)) as? XiangqiPiece ?: continue
-            val mobility = pseudoMovesFrom(state, Position(row, col), piece)
-                .count { !capturesGeneral(state, it) }
-            score += if (piece.color == PieceColor.WHITE) {
-                piece.value() + mobility * 3
-            } else {
-                -piece.value() - mobility * 3
+
+        for (row in 0 until rows) {
+            for (col in 0 until columns) {
+                val piece = pieceAt(state, Position(row, col)) as? XiangqiPiece
+                    ?: continue
+
+                score += if (piece.color == PieceColor.WHITE) {
+                    piece.value()
+                } else {
+                    -piece.value()
+                }
             }
         }
+
+        val redMobility = allLegalMoves(state, PieceColor.WHITE).size
+        val blackMobility = allLegalMoves(state, PieceColor.BLACK).size
+        score += (redMobility - blackMobility) * 3
+
+        if (isInCheck(state, PieceColor.WHITE)) score -= 120
+        if (isInCheck(state, PieceColor.BLACK)) score += 120
+
         return score
     }
 
@@ -213,7 +224,7 @@ class XiangqiRuleEngine : com.mkdev.mkboardgames.engine.RuleEngine {
         else if (target.color != source.color) moves += Move(from, to, listOf(to))
     }
 
-    private fun isInCheck(state: GameState, color: PieceColor): Boolean {
+    fun isInCheck(state: GameState, color: PieceColor): Boolean {
         val king = findPiece(state, color, XiangqiPieceType.GENERAL) ?: return true
         for (row in 0 until rows) for (col in 0 until columns) {
             val from = Position(row, col)
@@ -407,6 +418,8 @@ class XiangqiRuleEngine : com.mkdev.mkboardgames.engine.RuleEngine {
         if (color == PieceColor.WHITE) position.row >= 5 else position.row <= 4
 
     private fun clearBetween(state: GameState, a: Position, b: Position): Boolean {
+        if (a.col != b.col || a.row == b.row) return false
+
         val step = if (a.row < b.row) 1 else -1
         var row = a.row + step
         while (row != b.row) {

@@ -23,6 +23,7 @@ object SettingsManager {
     private const val KEY_FIVE_FIELD_KONO_DIFFICULTY = "five_field_kono_ai_difficulty"
     private const val KEY_ONITAMA_DIFFICULTY = "onitama_ai_difficulty"
     private const val KEY_AMAZONS_DIFFICULTY = "amazons_ai_difficulty"
+    private const val KEY_XIANGQI_DIFFICULTY = "xiangqi_ai_difficulty"
     private const val KEY_MANCALA_MOVEMENT_SPEED = "mancala_movement_speed"
 
     // ── Hints keys ───────────────────────────────────────────────────────────
@@ -176,6 +177,44 @@ object SettingsManager {
     fun getLudoDifficulty(ctx: Context) = prefs(ctx).getInt(KEY_LUDO_DIFFICULTY, 0)
     fun setLudoDifficulty(ctx: Context, v: Int) =
         prefs(ctx).edit().putInt(KEY_LUDO_DIFFICULTY, v.coerceIn(0, 2)).apply()
+
+    // ── Xiangqi ───────────────────────────────────────────────────────────────
+    data class XiangqiAiProfile(
+        val depth: Int,
+        val timeLimitMs: Long,
+        val quiesceDepth: Int,
+        val varietyWindow: Int,
+    )
+
+    fun getXiangqiDifficulty(ctx: Context) =
+        prefs(ctx).getInt(KEY_XIANGQI_DIFFICULTY, 1).coerceIn(0, 2)
+
+    fun setXiangqiDifficulty(ctx: Context, v: Int) =
+        prefs(ctx).edit()
+            .putInt(KEY_XIANGQI_DIFFICULTY, v.coerceIn(0, 2))
+            .apply()
+
+    fun xiangqiAiProfileForLevel(level: Int): XiangqiAiProfile =
+        when (level.coerceIn(0, 2)) {
+            0 -> XiangqiAiProfile(
+                depth = 1,
+                timeLimitMs = 600L,
+                quiesceDepth = 0,
+                varietyWindow = 100,
+            )
+            1 -> XiangqiAiProfile(
+                depth = 2,
+                timeLimitMs = 1400L,
+                quiesceDepth = 1,
+                varietyWindow = 50,
+            )
+            else -> XiangqiAiProfile(
+                depth = 4,
+                timeLimitMs = 3200L,
+                quiesceDepth = 2,
+                varietyWindow = 0,
+            )
+        }
 
     // ── Shogi ─────────────────────────────────────────────────────────────────
     fun getShogiDifficulty(ctx: Context) =

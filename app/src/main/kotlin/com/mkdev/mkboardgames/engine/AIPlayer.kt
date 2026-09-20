@@ -6,6 +6,8 @@ import com.mkdev.mkboardgames.games.chess.ChessPieceType
 import com.mkdev.mkboardgames.games.chess.ChessRuleEngine
 import com.mkdev.mkboardgames.games.shogi.ShogiRuleEngine
 import com.mkdev.mkboardgames.games.shogi.ShogiSearch
+import com.mkdev.mkboardgames.games.xiangqi.XiangqiPiece
+import com.mkdev.mkboardgames.games.xiangqi.XiangqiRuleEngine
 
 /**
  * Negamax + PVS AI with iterative deepening, aspiration windows, a
@@ -59,6 +61,8 @@ class AIPlayer(
 
     private val isChess = engine is ChessRuleEngine
     private val chessEngine = engine as? ChessRuleEngine
+    private val xiangqiEngine = engine as? XiangqiRuleEngine
+    private val isXiangqi = xiangqiEngine != null
     private val isAmazons = engine is AmazonsRuleEngine
     private val shogiSearch = (engine as? ShogiRuleEngine)?.let {
         ShogiSearch(
@@ -87,10 +91,10 @@ class AIPlayer(
         for (i in state.board.indices) {
             val piece = state.board[i] ?: continue
             val colorOffset = if (piece.color == PieceColor.WHITE) 0 else 8
-            val typeOffset = if (piece is ChessPiece) {
-                piece.type.ordinal
-            } else {
-                (piece.value() / 100).coerceIn(0, 7)
+            val typeOffset = when (piece) {
+                is ChessPiece -> piece.type.ordinal
+                is XiangqiPiece -> piece.type.ordinal
+                else -> (piece.value() / 100).coerceIn(0, 7)
             }
             key = key xor zobristTable[i % zobristTable.size][
                 (colorOffset + typeOffset).coerceIn(0, 15)
@@ -357,7 +361,11 @@ class AIPlayer(
         var beta = minOf(betaIn, MATE - ply - 1)
         if (alpha >= beta) return alpha
 
-        val inCheck = chessEngine?.isInCheck(state, color) == true
+        val inCheck = when {
+            chessEngine != null -> chessEngine.isInCheck(state, color)
+            xiangqiEngine != null -> xiangqiEngine.isInCheck(state, color)
+            else -> false
+        }
         var depth = depthIn
         if (inCheck) depth += 1
 
@@ -486,7 +494,11 @@ class AIPlayer(
         if (state.status != GameStatus.IN_PROGRESS) return terminalScore(state, color, ply)
 
         var alpha = alphaIn
-        val inCheck = chessEngine?.isInCheck(state, color) == true
+        val inCheck = when {
+            chessEngine != null -> chessEngine.isInCheck(state, color)
+            xiangqiEngine != null -> xiangqiEngine.isInCheck(state, color)
+            else -> false
+        }
         val standPat = evalFor(state, color)
         if (depthLeft <= 0 || ply >= MAX_PLY - 2) {
             if (!inCheck) return standPat
@@ -598,10 +610,12 @@ class AIPlayer(
         inCheck: Boolean
     ): List<Move> {
         val legal = engine.allLegalMoves(state, color)
+        if (inCheck) {
+            return legal.sortedByDescending { mvvLva(state, it) }
+        }
         if (!isChess) {
             return legal.filter { it.isCapture }.sortedByDescending { mvvLva(state, it) }
         }
-        if (inCheck) return legal.sortedByDescending { mvvLva(state, it) }
         return legal
             .filter { it.isCapture || it.promotionType != null }
             .sortedByDescending {
@@ -624,6 +638,7 @@ class AIPlayer(
                 if (color == PieceColor.WHITE) MATE - ply else -(MATE - ply)
             GameStatus.BLACK_WINS ->
                 if (color == PieceColor.BLACK) MATE - ply else -(MATE - ply)
+            GameStatus.DRAW -> 0
             else -> evalFor(state, color)
         }
 
@@ -632,10 +647,10 @@ class AIPlayer(
         color: PieceColor,
         inCheck: Boolean,
         ply: Int
-    ): Int = if (isChess) {
-        if (inCheck) -MATE + ply else 0
-    } else {
-        evalFor(state, color)
+    ): Int = when {
+        isChess -> if (inCheck) -MATE + ply else 0
+        isXiangqi -> -MATE + ply
+        else -> evalFor(state, color)
     }
 
     private fun hasNonPawnMaterial(state: GameState, color: PieceColor): Boolean =
