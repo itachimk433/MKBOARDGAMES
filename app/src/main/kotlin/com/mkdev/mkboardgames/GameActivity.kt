@@ -17,6 +17,7 @@ import com.mkdev.mkboardgames.games.checkers.InternationalDraughtsRuleEngine
 import com.mkdev.mkboardgames.games.chess.ChessPiece
 import com.mkdev.mkboardgames.games.chess.ChessRuleEngine
 import com.mkdev.mkboardgames.games.chess.EtherealPlayer
+import com.mkdev.mkboardgames.games.chess.StockfishPlayer
 import com.mkdev.mkboardgames.games.foxandgeese.FoxAndGeeseRuleEngine
 import com.mkdev.mkboardgames.games.go.GoRuleEngine
 import com.mkdev.mkboardgames.games.go.GoAIPlayer
@@ -1728,7 +1729,33 @@ Checkmate your opponent's King.
                         }
                         "CHESS" -> {
                             val level = SettingsManager.getChessDifficulty(this@GameActivity)
-                            if (level >= 2) {
+                            if (level == 3) {
+                                val stockfishProfile =
+                                    SettingsManager.chessStockfishProfileForLevel(level)
+                                StockfishPlayer(
+                                    context = this@GameActivity,
+                                    profile = stockfishProfile,
+                                ).bestMove(thinkingState)
+                                    ?: run {
+                                        val etherealProfile =
+                                            SettingsManager.chessEtherealProfileForLevel(level)
+                                        EtherealPlayer(
+                                            context = this@GameActivity,
+                                            profile = etherealProfile,
+                                        ).bestMove(thinkingState)
+                                    }
+                                    ?: run {
+                                        val fallback =
+                                            SettingsManager.chessAiProfileForLevel(level)
+                                        AIPlayer(
+                                            engine,
+                                            maxDepth = fallback.depth,
+                                            timeLimitMs = fallback.timeLimitMs,
+                                            quiesceDepth = fallback.quiesceDepth,
+                                            varietyWindowOverride = fallback.varietyWindowOverride,
+                                        ).bestMove(thinkingState)
+                                    }
+                            } else if (level == 2) {
                                 val profile = SettingsManager.chessEtherealProfileForLevel(level)
                                 EtherealPlayer(
                                     context = this@GameActivity,

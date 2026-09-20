@@ -29,5 +29,9 @@ class SettingsManagerChessDifficultyTest {
         val masterEthereal = SettingsManager.chessEtherealProfileForLevel(3)
         assertTrue(hardEthereal.timeLimitMs < masterEthereal.timeLimitMs)
         assertTrue(hardEthereal.hashMb < masterEthereal.hashMb)
+
+        val masterStockfish = SettingsManager.chessStockfishProfileForLevel(3)
+        assertEquals(5_000L, masterStockfish.timeLimitMs)
+        assertEquals(64, masterStockfish.hashMb)
     }
 }

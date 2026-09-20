@@ -95,6 +95,91 @@ jobs:
           build_engine arm64-v8a aarch64-linux-android24-clang
           build_engine armeabi-v7a armv7a-linux-androideabi24-clang "-mthumb -march=armv7-a -mfpu=neon -mfloat-abi=softfp"
 
+      - name: Build compact Stockfish small-NNUE engines
+        env:
+          STOCKFISH_COMMIT: cb4a62311985f685ba6f5457851527a3289073e6
+          STOCKFISH_NETWORK: nn-37f18f62d772.nnue
+          STOCKFISH_NETWORK_SHA256: 37f18f62d772f3107e1d6aaca3898c130c3c86f2ab63e6555fbbca20635a899d
+          NDK_VERSION: 27.2.12479018
+        run: |
+          set -euo pipefail
+
+          sdkmanager "ndk;${NDK_VERSION}"
+          SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME}}"
+          NDK="${SDK_ROOT}/ndk/${NDK_VERSION}"
+          TOOLCHAIN="${NDK}/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          SOURCE="${RUNNER_TEMP}/stockfish"
+          ASSET_ROOT="app/src/main/assets/stockfish"
+          NETWORK_URL="https://raw.githubusercontent.com/official-stockfish/networks/master/${STOCKFISH_NETWORK}"
+
+          git clone --depth 1 https://github.com/official-stockfish/Stockfish.git "$SOURCE"
+          git -C "$SOURCE" fetch --depth 1 origin "$STOCKFISH_COMMIT"
+          git -C "$SOURCE" checkout --detach "$STOCKFISH_COMMIT"
+
+          # This revision has both Stockfish's large and small NNUE paths.
+          # Use the compact small network for both paths and disable embedded
+          # network data, so the 3.5 MB asset is shared by both ABIs instead
+          # of embedding a second, unused network in each executable.
+          python3 - "$SOURCE/src/evaluate.h" "$SOURCE/src/nnue/nnue_architecture.h" <<'PY'
+          from pathlib import Path
+          import sys
+
+          evaluate = Path(sys.argv[1])
+          text = evaluate.read_text()
+          old = '#define EvalFileDefaultNameBig "nn-ddcfb9224cdb.nnue"'
+          if old not in text:
+              raise SystemExit("unexpected Stockfish default big-network name")
+          text = text.replace(old, '#define EvalFileDefaultNameBig "nn-37f18f62d772.nnue"')
+          evaluate.write_text(text)
+
+          architecture = Path(sys.argv[2])
+          text = architecture.read_text()
+          old = 'constexpr IndexType TransformedFeatureDimensionsBig = 3072;'
+          if old not in text:
+              raise SystemExit("unexpected Stockfish big-network dimensions")
+          text = text.replace(old, 'constexpr IndexType TransformedFeatureDimensionsBig = 128;')
+          architecture.write_text(text)
+          PY
+
+          curl --fail --silent --show-error --location --retry 3 \
+            "$NETWORK_URL" \
+            --output "$SOURCE/src/$STOCKFISH_NETWORK"
+          echo "${STOCKFISH_NETWORK_SHA256}  $SOURCE/src/$STOCKFISH_NETWORK" \
+            | sha256sum --check --status
+
+          build_stockfish() {
+            local abi="$1"
+            local arch="$2"
+            local compiler="$3"
+            local output="${RUNNER_TEMP}/stockfish-${abi}"
+
+            make -C "$SOURCE/src" clean >/dev/null
+            make -C "$SOURCE/src" -j2 build \
+              ARCH="$arch" \
+              COMP=ndk \
+              CXX="$TOOLCHAIN/$compiler" \
+              EXTRACXXFLAGS="-DNNUE_EMBEDDING_OFF"
+
+            install -m 0755 "$SOURCE/src/stockfish" "$output"
+            mkdir -p "$ASSET_ROOT/$abi"
+            install -m 0755 "$output" "$ASSET_ROOT/$abi/stockfish"
+            echo "$abi Stockfish engine: $(du -h "$output" | cut -f1)"
+          }
+
+          build_stockfish arm64-v8a armv8 aarch64-linux-android24-clang++
+          build_stockfish armeabi-v7a armv7-neon armv7a-linux-androideabi24-clang++
+
+          install -m 0644 "$SOURCE/src/$STOCKFISH_NETWORK" \
+            "$ASSET_ROOT/$STOCKFISH_NETWORK"
+          echo "shared Stockfish network: $(du -h "$ASSET_ROOT/$STOCKFISH_NETWORK" | cut -f1)"
+
+          total_bytes="$(du -cb \
+            "$ASSET_ROOT/$STOCKFISH_NETWORK" \
+            "$ASSET_ROOT/arm64-v8a/stockfish" \
+            "$ASSET_ROOT/armeabi-v7a/stockfish" | tail -1 | cut -f1)"
+          test "$total_bytes" -lt 10000000
+          echo "Stockfish assets total: ${total_bytes} bytes (< 10 MB)"
+
       - name: Build debug APK
         run: |
           ./gradlew assembleDebug \

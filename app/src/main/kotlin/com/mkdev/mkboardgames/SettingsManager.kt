@@ -93,6 +93,7 @@ object SettingsManager {
         val varietyWindowOverride: Int = -1,
     )
     data class ChessEtherealProfile(val timeLimitMs: Long, val hashMb: Int)
+    data class ChessStockfishProfile(val timeLimitMs: Long, val hashMb: Int)
 
     fun chessDifficultyLabels() = arrayOf("Easy", "Medium", "Hard", "Master")
 
@@ -111,14 +112,19 @@ object SettingsManager {
     fun chessAiQuiesceDepth(ctx: Context): Int = chessAiProfileForLevel(getChessDifficulty(ctx)).quiesceDepth
 
     /**
-     * Ethereal is used for the two upper levels. The native engine gets a
-     * larger time and hash budget at Master while Easy/Medium stay on the
-     * lightweight Kotlin player for quick, intentionally fallible moves.
+     * Ethereal is used for Hard. Master uses Stockfish and keeps Ethereal as
+     * its native fallback, while Easy/Medium stay on the lightweight Kotlin
+     * player for quick, intentionally fallible moves.
      */
     fun chessEtherealProfileForLevel(level: Int): ChessEtherealProfile = when (level.coerceIn(0, 3)) {
         2 -> ChessEtherealProfile(timeLimitMs = 2_000L, hashMb = 32)
         3 -> ChessEtherealProfile(timeLimitMs = 5_000L, hashMb = 64)
         else -> ChessEtherealProfile(timeLimitMs = 1_200L, hashMb = 16)
+    }
+
+    fun chessStockfishProfileForLevel(level: Int): ChessStockfishProfile = when (level.coerceIn(0, 3)) {
+        3 -> ChessStockfishProfile(timeLimitMs = 5_000L, hashMb = 64)
+        else -> ChessStockfishProfile(timeLimitMs = 1_200L, hashMb = 16)
     }
 
     // ── Checkers ─────────────────────────────────────────────────────────────
