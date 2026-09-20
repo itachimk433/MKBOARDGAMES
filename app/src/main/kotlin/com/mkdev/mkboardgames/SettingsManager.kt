@@ -92,6 +92,7 @@ object SettingsManager {
         val quiesceDepth: Int,
         val varietyWindowOverride: Int = -1,
     )
+    data class ChessEtherealProfile(val timeLimitMs: Long, val hashMb: Int)
 
     fun chessDifficultyLabels() = arrayOf("Easy", "Medium", "Hard", "Master")
 
@@ -108,6 +109,17 @@ object SettingsManager {
     fun chessAiDepth(ctx: Context) = chessAiProfileForLevel(getChessDifficulty(ctx)).depth
     fun chessAiTimeLimitMs(ctx: Context): Long = chessAiProfileForLevel(getChessDifficulty(ctx)).timeLimitMs
     fun chessAiQuiesceDepth(ctx: Context): Int = chessAiProfileForLevel(getChessDifficulty(ctx)).quiesceDepth
+
+    /**
+     * Ethereal is used for the two upper levels. The native engine gets a
+     * larger time and hash budget at Master while Easy/Medium stay on the
+     * lightweight Kotlin player for quick, intentionally fallible moves.
+     */
+    fun chessEtherealProfileForLevel(level: Int): ChessEtherealProfile = when (level.coerceIn(0, 3)) {
+        2 -> ChessEtherealProfile(timeLimitMs = 2_000L, hashMb = 32)
+        3 -> ChessEtherealProfile(timeLimitMs = 5_000L, hashMb = 64)
+        else -> ChessEtherealProfile(timeLimitMs = 1_200L, hashMb = 16)
+    }
 
     // ── Checkers ─────────────────────────────────────────────────────────────
     fun getCheckersDifficulty(ctx: Context) = prefs(ctx).getInt(KEY_CHECKERS_DIFFICULTY, 0)

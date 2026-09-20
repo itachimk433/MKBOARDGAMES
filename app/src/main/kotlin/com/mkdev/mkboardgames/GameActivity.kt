@@ -16,6 +16,7 @@ import com.mkdev.mkboardgames.games.checkers.CheckersRuleEngine
 import com.mkdev.mkboardgames.games.checkers.InternationalDraughtsRuleEngine
 import com.mkdev.mkboardgames.games.chess.ChessPiece
 import com.mkdev.mkboardgames.games.chess.ChessRuleEngine
+import com.mkdev.mkboardgames.games.chess.EtherealPlayer
 import com.mkdev.mkboardgames.games.foxandgeese.FoxAndGeeseRuleEngine
 import com.mkdev.mkboardgames.games.go.GoRuleEngine
 import com.mkdev.mkboardgames.games.go.GoAIPlayer
@@ -1724,6 +1725,35 @@ Checkmate your opponent's King.
                                 maxDepth = profile.depth,
                                 timeLimitMs = profile.timeLimitMs,
                             ).bestMove(thinkingState)
+                        }
+                        "CHESS" -> {
+                            val level = SettingsManager.getChessDifficulty(this@GameActivity)
+                            if (level >= 2) {
+                                val profile = SettingsManager.chessEtherealProfileForLevel(level)
+                                EtherealPlayer(
+                                    context = this@GameActivity,
+                                    profile = profile,
+                                ).bestMove(thinkingState)
+                                    ?: run {
+                                        val fallback = SettingsManager.chessAiProfileForLevel(level)
+                                        AIPlayer(
+                                            engine,
+                                            maxDepth = fallback.depth,
+                                            timeLimitMs = fallback.timeLimitMs,
+                                            quiesceDepth = fallback.quiesceDepth,
+                                            varietyWindowOverride = fallback.varietyWindowOverride,
+                                        ).bestMove(thinkingState)
+                                    }
+                            } else {
+                                val profile = SettingsManager.chessAiProfileForLevel(level)
+                                AIPlayer(
+                                    engine,
+                                    maxDepth = profile.depth,
+                                    timeLimitMs = profile.timeLimitMs,
+                                    quiesceDepth = profile.quiesceDepth,
+                                    varietyWindowOverride = profile.varietyWindowOverride,
+                                ).bestMove(thinkingState)
+                            }
                         }
                         else -> {
                             // Chess — deeper search with quiescence and time limit

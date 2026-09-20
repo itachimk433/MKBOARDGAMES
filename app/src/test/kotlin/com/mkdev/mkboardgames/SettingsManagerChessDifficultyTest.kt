@@ -24,5 +24,10 @@ class SettingsManagerChessDifficultyTest {
         assertEquals(-1, mediumProfile.varietyWindowOverride)
         assertEquals(0, hardProfile.varietyWindowOverride)
         assertEquals(0, masterProfile.varietyWindowOverride)
+
+        val hardEthereal = SettingsManager.chessEtherealProfileForLevel(2)
+        val masterEthereal = SettingsManager.chessEtherealProfileForLevel(3)
+        assertTrue(hardEthereal.timeLimitMs < masterEthereal.timeLimitMs)
+        assertTrue(hardEthereal.hashMb < masterEthereal.hashMb)
     }
 }

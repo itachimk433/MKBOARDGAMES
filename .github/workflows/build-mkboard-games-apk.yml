@@ -31,6 +31,65 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x gradlew
 
+      - name: Set up Android NDK
+        uses: android-actions/setup-android@v3
+
+      - name: Build compact Ethereal chess engines
+        env:
+          ETHEREAL_COMMIT: 0e47e9b67f345c75eb965d9fb3e2493b6a11d09a
+          NDK_VERSION: 27.2.12479018
+        run: |
+          set -euo pipefail
+
+          sdkmanager "ndk;${NDK_VERSION}"
+          SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME}}"
+          NDK="${SDK_ROOT}/ndk/${NDK_VERSION}"
+          TOOLCHAIN="${NDK}/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          SOURCE="${RUNNER_TEMP}/ethereal"
+          ASSET_ROOT="app/src/main/assets/ethereal"
+
+          git clone --depth 1 https://github.com/AndyGrant/Ethereal.git "$SOURCE"
+          git -C "$SOURCE" fetch --depth 1 origin "$ETHEREAL_COMMIT"
+          git -C "$SOURCE" checkout --detach "$ETHEREAL_COMMIT"
+
+          build_engine() {
+            local abi="$1"
+            local compiler="$2"
+            local extra_flags="${3:-}"
+            local output="${RUNNER_TEMP}/ethereal-${abi}"
+
+            # Ethereal's default build uses its compact public PK network,
+            # compiled into network.c, so no separate model asset ships.
+            # Keep this a plain NDK clang invocation instead of using
+            # -march=native, which would target the GitHub runner.
+            "$TOOLCHAIN/${compiler}" \
+              -std=gnu11 \
+              -O3 \
+              -DNDEBUG \
+              -DUSE_NNUE=0 \
+              -ffunction-sections \
+              -fdata-sections \
+              -flto \
+              -fuse-ld=lld \
+              -Wl,--gc-sections \
+              -Wl,--strip-all \
+              ${extra_flags} \
+              -I"$SOURCE/src" \
+              -I"$SOURCE/src/pyrrhic" \
+              "$SOURCE"/src/*.c \
+              "$SOURCE"/src/pyrrhic/tbprobe.c \
+              -lm \
+              -pthread \
+              -o "$output"
+
+            mkdir -p "$ASSET_ROOT/$abi"
+            install -m 0755 "$output" "$ASSET_ROOT/$abi/ethereal"
+            echo "$abi engine: $(du -h "$output" | cut -f1)"
+          }
+
+          build_engine arm64-v8a aarch64-linux-android24-clang
+          build_engine armeabi-v7a armv7a-linux-androideabi24-clang "-mthumb -march=armv7-a -mfpu=neon -mfloat-abi=softfp"
+
       - name: Build debug APK
         run: |
           ./gradlew assembleDebug \
