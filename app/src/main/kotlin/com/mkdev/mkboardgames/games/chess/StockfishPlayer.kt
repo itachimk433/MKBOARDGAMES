@@ -2,6 +2,7 @@ package com.mkdev.mkboardgames.games.chess
 
 import android.content.Context
 import android.os.Build
+import android.util.Log
 import com.mkdev.mkboardgames.SettingsManager
 import com.mkdev.mkboardgames.engine.GameState
 import com.mkdev.mkboardgames.engine.GameStatus
@@ -33,13 +34,19 @@ class StockfishPlayer(
         val legalMoves = chessEngine.allLegalMoves(state, state.currentTurn)
         if (legalMoves.isEmpty()) return null
 
-        val executable = StockfishBinary.resolve(context) ?: return null
+        val executable = try {
+            StockfishBinary.resolve(context)
+        } catch (error: Throwable) {
+            Log.e(TAG, "Unable to extract Stockfish", error)
+            null
+        } ?: return null
         val process = try {
             ProcessBuilder(executable.absolutePath)
                 .directory(executable.parentFile)
                 .redirectErrorStream(true)
                 .start()
-        } catch (_: Throwable) {
+        } catch (error: Throwable) {
+            Log.e(TAG, "Unable to start Stockfish at ${executable.absolutePath}", error)
             return null
         }
 
@@ -48,7 +55,10 @@ class StockfishPlayer(
             val reader = BufferedReader(InputStreamReader(process.inputStream))
 
             send(writer, "uci")
-            if (!readUntil(reader, "uciok", STARTUP_TIMEOUT_MS)) return null
+            if (!readUntil(reader, "uciok", STARTUP_TIMEOUT_MS)) {
+                Log.e(TAG, "Stockfish did not answer uci before timeout")
+                return null
+            }
 
             send(writer, "setoption name Threads value 1")
             send(writer, "setoption name Hash value ${profile.hashMb}")
@@ -56,15 +66,26 @@ class StockfishPlayer(
             send(writer, "setoption name EvalFile value $NETWORK_NAME")
             send(writer, "setoption name EvalFileSmall value $NETWORK_NAME")
             send(writer, "isready")
-            if (!readUntil(reader, "readyok", STARTUP_TIMEOUT_MS)) return null
+            if (!readUntil(reader, "readyok", STARTUP_TIMEOUT_MS)) {
+                Log.e(TAG, "Stockfish did not become ready before timeout")
+                return null
+            }
 
             send(writer, "position fen ${ChessFen.fromState(state)}")
             send(writer, "go movetime ${profile.timeLimitMs}")
 
             val uciMove = readBestMove(reader, profile.timeLimitMs + RESULT_GRACE_MS)
-                ?: return null
-            legalMoves.firstOrNull { it.toUci() == uciMove }
-        } catch (_: Throwable) {
+                ?: run {
+                    Log.e(TAG, "Stockfish did not return a bestmove")
+                    return null
+                }
+            val move = legalMoves.firstOrNull { it.toUci() == uciMove }
+            if (move == null) {
+                Log.e(TAG, "Stockfish returned illegal move '$uciMove'")
+            }
+            move
+        } catch (error: Throwable) {
+            Log.e(TAG, "Stockfish search failed", error)
             null
         } finally {
             try {
@@ -157,6 +178,10 @@ class StockfishPlayer(
         private const val ASSET_ROOT = "stockfish"
         private const val ENGINE_NAME = "stockfish"
         private val lock = Any()
+    }
+
+    private companion object {
+        const val TAG = "StockfishPlayer"
     }
 }
 

@@ -2,6 +2,7 @@ package com.mkdev.mkboardgames.games.chess
 
 import android.content.Context
 import android.os.Build
+import android.util.Log
 import com.mkdev.mkboardgames.SettingsManager
 import com.mkdev.mkboardgames.engine.GameState
 import com.mkdev.mkboardgames.engine.GameStatus
@@ -32,12 +33,19 @@ class EtherealPlayer(
         val legalMoves = chessEngine.allLegalMoves(state, state.currentTurn)
         if (legalMoves.isEmpty()) return null
 
-        val executable = EtherealBinary.resolve(context) ?: return null
+        val executable = try {
+            EtherealBinary.resolve(context)
+        } catch (error: Throwable) {
+            Log.e(TAG, "Unable to extract Ethereal", error)
+            null
+        } ?: return null
         val process = try {
             ProcessBuilder(executable.absolutePath)
+                .directory(executable.parentFile)
                 .redirectErrorStream(true)
                 .start()
-        } catch (_: Throwable) {
+        } catch (error: Throwable) {
+            Log.e(TAG, "Unable to start Ethereal at ${executable.absolutePath}", error)
             return null
         }
 
@@ -46,20 +54,34 @@ class EtherealPlayer(
             val reader = BufferedReader(InputStreamReader(process.inputStream))
 
             send(writer, "uci")
-            if (!readUntil(reader, "uciok", STARTUP_TIMEOUT_MS)) return null
+            if (!readUntil(reader, "uciok", STARTUP_TIMEOUT_MS)) {
+                Log.e(TAG, "Ethereal did not answer uci before timeout")
+                return null
+            }
 
             send(writer, "setoption name Threads value 1")
             send(writer, "setoption name Hash value ${profile.hashMb}")
             send(writer, "isready")
-            if (!readUntil(reader, "readyok", STARTUP_TIMEOUT_MS)) return null
+            if (!readUntil(reader, "readyok", STARTUP_TIMEOUT_MS)) {
+                Log.e(TAG, "Ethereal did not become ready before timeout")
+                return null
+            }
 
             send(writer, "position fen ${ChessFen.fromState(state)}")
             send(writer, "go movetime ${profile.timeLimitMs}")
 
             val uciMove = readBestMove(reader, profile.timeLimitMs + RESULT_GRACE_MS)
-                ?: return null
-            legalMoves.firstOrNull { it.toUci() == uciMove }
-        } catch (_: Throwable) {
+                ?: run {
+                    Log.e(TAG, "Ethereal did not return a bestmove")
+                    return null
+                }
+            val move = legalMoves.firstOrNull { it.toUci() == uciMove }
+            if (move == null) {
+                Log.e(TAG, "Ethereal returned illegal move '$uciMove'")
+            }
+            move
+        } catch (error: Throwable) {
+            Log.e(TAG, "Ethereal search failed", error)
             null
         } finally {
             try {
@@ -110,6 +132,7 @@ class EtherealPlayer(
     }
 
     private companion object {
+        const val TAG = "EtherealPlayer"
         const val STARTUP_TIMEOUT_MS = 2_000L
         const val RESULT_GRACE_MS = 1_500L
     }
