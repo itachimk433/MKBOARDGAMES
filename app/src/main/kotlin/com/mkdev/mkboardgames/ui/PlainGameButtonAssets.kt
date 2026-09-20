@@ -62,6 +62,31 @@ internal object PlainGameButtonAssets {
         return true
     }
 
+    /**
+     * Returns the bounds of the opaque wood rim, excluding the transparent
+     * padding and soft shadow in the source artwork.
+     */
+    fun visibleRect(
+        rect: RectF,
+        style: Style,
+        pressed: Boolean,
+    ): RectF {
+        val bitmap = bitmap(style) ?: return RectF(rect)
+        val source = when (style) {
+            Style.SHORT -> RectF(25f, 86f, 1576f, 893f)
+            Style.LONG -> RectF(24f, 110f, 2150f, 618f)
+        }
+        val scaleX = rect.width() / bitmap.width.toFloat()
+        val scaleY = rect.height() / bitmap.height.toFloat()
+        val pressedOffset = if (pressed) 2f else 0f
+        return RectF(
+            rect.left + source.left * scaleX,
+            rect.top + pressedOffset + source.top * scaleY,
+            rect.left + source.right * scaleX,
+            rect.top + pressedOffset + source.bottom * scaleY,
+        )
+    }
+
     private fun bitmap(style: Style): Bitmap? = when (style) {
         Style.SHORT -> shortBitmap
         Style.LONG -> longBitmap

@@ -23,15 +23,12 @@ import kotlin.math.sin
 
 enum class SnakesLaddersEntryRule(
     val title: String,
-    val detail: String,
 ) {
     REQUIRE_SIX(
         title = "Roll a 6 to enter",
-        detail = "Classic start rule",
     ),
     ANY_ROLL(
         title = "Enter on any roll",
-        detail = "First roll counts",
     ),
 }
 
@@ -126,11 +123,6 @@ class SnakesLaddersBoardSelectionView(
         textAlign = Paint.Align.CENTER
         isFakeBoldText = true
         textSize = sp(13f)
-    }
-    private val ruleDetailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#BFD2D4")
-        textAlign = Paint.Align.CENTER
-        textSize = sp(10f)
     }
     private val continuePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
@@ -361,17 +353,21 @@ class SnakesLaddersBoardSelectionView(
             val selected = selectedRule == index
             val pressed = pressedRule == index
             drawChessWoodButton(canvas, rect, pressed, density, maxCornerRadius = dp(10f))
+            val buttonBounds = PlainGameButtonAssets.styleFor(rect)?.let { style ->
+                PlainGameButtonAssets.visibleRect(rect, style, pressed)
+            } ?: RectF(rect)
+            val buttonRadius = min(buttonBounds.height() * 0.2f, dp(10f))
             if (selected) {
                 selectionBorderPaint.color = Color.parseColor("#F6D78F")
                 selectionBorderPaint.strokeWidth = dp(3f)
-                canvas.drawRoundRect(rect, dp(10f), dp(10f), selectionBorderPaint)
+                canvas.drawRoundRect(buttonBounds, buttonRadius, buttonRadius, selectionBorderPaint)
             } else if (selectedRule != null) {
-                canvas.drawRoundRect(rect, dp(10f), dp(10f), dimPaint)
+                canvas.drawRoundRect(buttonBounds, buttonRadius, buttonRadius, dimPaint)
             }
             val textColor = if (selected) Color.WHITE else Color.parseColor("#E6D6C0")
             ruleTitlePaint.color = textColor
-            canvas.drawText(rule.title, rect.centerX(), rect.centerY() - dp(3f), ruleTitlePaint)
-            canvas.drawText(rule.detail, rect.centerX(), rect.centerY() + dp(14f), ruleDetailPaint)
+            val titleBaseline = rect.centerY() - (ruleTitlePaint.ascent() + ruleTitlePaint.descent()) / 2f
+            canvas.drawText(rule.title, rect.centerX(), titleBaseline, ruleTitlePaint)
         }
 
         val enabled = selectedBoard != null && selectedRule != null

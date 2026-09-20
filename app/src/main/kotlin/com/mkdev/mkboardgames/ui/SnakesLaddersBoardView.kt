@@ -49,7 +49,7 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
         val dieScale: Float = 1f,
     ) {
         ONE(
-            displayName = "Board One",
+            displayName = "Classic Board",
             assetName = "snakes_ladders_board.jpg",
             gridInset = 15f / 740f,
             gridSize = 710f / 740f,
@@ -77,7 +77,7 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
             dieScale = 0.7f,
         ),
         TWO(
-            displayName = "Board Two",
+            displayName = "Snow Board",
             assetName = "snakes_ladders_board_two.jpg",
             gridInset = 0f,
             gridSize = 1f,
@@ -109,7 +109,7 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
             profileScale = 0.9f,
         ),
         THREE(
-            displayName = "Board Three",
+            displayName = "Halloween Board",
             assetName = "snakes_ladders_board_three.webp",
             // The Halloween artwork has a 10px frame around its 700px play grid.
             gridInset = 10f / 720f,
@@ -144,7 +144,7 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
             dieScale = 0.7f,
         ),
         FOUR(
-            displayName = "Board Four",
+            displayName = "Forest Board",
             assetName = "snakes_ladders_board_four.webp",
             // The forest artwork also reserves a 10px frame outside the 700px grid.
             gridInset = 10f / 720f,
