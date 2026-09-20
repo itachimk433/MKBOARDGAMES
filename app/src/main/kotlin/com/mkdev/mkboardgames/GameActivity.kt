@@ -836,8 +836,8 @@ class GameActivity : AppCompatActivity() {
             BoardSelectionOption("English", "English labels", "xiangqi_board_english.webp", BoardSelectionPreview.XIANGQI),
         )
         "SHOGI" -> listOf(
-            BoardSelectionOption("Classic", "Traditional board", "shogi_board.webp", BoardSelectionPreview.SHOGI),
-            BoardSelectionOption("Wood", "Warm natural grain", "shogi_board_wood.webp", BoardSelectionPreview.SHOGI),
+            BoardSelectionOption("Wood Board", "Traditional board", "shogi_board.webp", BoardSelectionPreview.SHOGI),
+            BoardSelectionOption("Polished Wood", "Warm natural grain", "shogi_board_wood.webp", BoardSelectionPreview.SHOGI),
         )
         else -> null
     }
