@@ -1,0 +1,2123 @@
+package com.mkdev.mkboardgames.games.shogi
+
+import com.mkdev.mkboardgames.engine.GameState
+import com.mkdev.mkboardgames.engine.GameStatus
+import com.mkdev.mkboardgames.engine.Move
+import com.mkdev.mkboardgames.engine.PieceColor
+
+/**
+ * Dedicated Shogi search. Used by AIPlayer when the engine is a
+ * [ShogiRuleEngine]; all other games keep the generic search.
+ *
+ * Features: iterative deepening, PVS, aspiration windows, transposition
+ * table with correct Zobrist hashing (board + hands), killer/history move
+ * ordering, check extension, late-move reductions, mate-distance scoring,
+ * path-based repetition detection, and a capture/promotion/check quiescence.
+ */
+class ShogiSearch(
+    private val engine: ShogiRuleEngine,
+    private val maxDepth: Int,
+    private val timeLimitMs: Long,
+    private val quiesceDepth: Int,
+    private val varietyWindow: Int,
+) {
+    companion object {
+        private const val INF = 1_000_000
+        private const val MATE = 100_000
+        private const val MATE_BOUND = MATE - 1_000
+        private const val MAX_PLY = 96
+        private const val TT_MAX_SIZE = 1 shl 20
+    }
+
+    private enum class Flag { EXACT, LOWER, UPPER }
+    private class Entry(val depth: Int, val score: Int, val flag: Flag, val bestKey: Int)
+
+    private val tt = HashMap<Long, Entry>(1 shl 16)
+    private val killers = Array(MAX_PLY) { IntArray(2) { -1 } }
+    private val history = IntArray(2 * 82 * 82)
+    private val pathKeys = LongArray(MAX_PLY + 2)
+
+    private var deadline = Long.MAX_VALUE
+    private var aborted = false
+    private var nodes = 0L
+
+    // ------------------------------------------------------------------
+    // Zobrist
+    // ------------------------------------------------------------------
+
+    private val rnd = java.util.Random(0x5EEDBEEFL)
+    // [square][color(2)][type(8)][promoted(2)]
+    private val pieceKeys = Array(81) { Array(2) { Array(8) { LongArray(2) { rnd.nextLong() } } } }
+    // [color][type][count 0..18]
+    private val handKeys = Array(2) { Array(8) { LongArray(19) { rnd.nextLong() } } }
+    private val sideKey = rnd.nextLong()
+
+    private fun hash(state: GameState): Long {
+        var h = if (state.currentTurn == PieceColor.BLACK) sideKey else 0L
+        for (i in 0 until 81) {
+            val p = state.board[i] as? ShogiPiece ?: continue
+            h = h xor pieceKeys[i][p.color.ordinal][p.type.ordinal][if (p.promoted) 1 else 0]
+        }
+        for (color in PieceColor.entries) {
+            val counts = IntArray(8)
+            for (piece in state.hands[color].orEmpty()) {
+                val sp = piece as? ShogiPiece ?: continue
+                counts[sp.type.ordinal]++
+            }
+            for (t in 0 until 8) {
+                val n = counts[t].coerceAtMost(18)
+                if (n > 0) h = h xor handKeys[color.ordinal][t][n]
+            }
+        }
+        return h
+    }
+
+    // ------------------------------------------------------------------
+    // Move keys
+    // ------------------------------------------------------------------
+
+    private fun sq(r: Int, c: Int): Int = if (r < 0) 81 else r * 9 + c
+
+    private fun moveKey(m: Move): Int {
+        val from = if (m.metadata["drop"] != null) 81 + (m.from.col.coerceIn(0, 7)) else sq(m.from.row, m.from.col)
+        val to = sq(m.to.row, m.to.col)
+        val promo = if (m.promotionType != null || m.metadata["promote"] == true) 1 else 0
+        return (from * 81 + to) * 2 + promo
+    }
+
+    private fun histIndex(m: Move, color: PieceColor): Int {
+        val from = if (m.metadata["drop"] != null) 81 else sq(m.from.row, m.from.col)
+        val to = sq(m.to.row, m.to.col)
+        return color.ordinal * 82 * 82 + from.coerceAtMost(81) * 82 + to
+    }
+
+    // ------------------------------------------------------------------
+    // Entry point
+    // ------------------------------------------------------------------
+
+    fun bestMove(state: GameState): Move? {
+        deadline = System.currentTimeMillis() + timeLimitMs.coerceAtLeast(1L)
+        aborted = false
+        nodes = 0L
+        if (tt.size > TT_MAX_SIZE) tt.clear()
+        history.fill(0)
+        for (k in killers) { k[0] = -1; k[1] = -1 }
+
+        val root = state.copy(moveHistory = emptyList())
+        val rootColor = root.currentTurn
+        val rootMoves = orderMoves(root, engine.searchMoves(root), 0, -1)
+        if (rootMoves.isEmpty()) return null
+        if (rootMoves.size == 1) return rootMoves[0]
+
+        // Immediate mate / king capture.
+        for (m in rootMoves) {
+            val child = engine.applyForSearch(root, m)
+            if (engine.winnerStatusIfKingMissing(child) != null) return m
+            if (engine.searchMoves(child).isEmpty()) return m // checkmate
+        }
+
+        pathKeys[0] = hash(root)
+        var best = rootMoves.first()
+        var bestScore = -INF
+        var lastScores: List<Pair<Move, Int>> = emptyList()
+        var prev = 0
+        val cap = maxDepth.coerceIn(1, MAX_PLY - 8)
+
+        for (depth in 1..cap) {
+            if (System.currentTimeMillis() > deadline) break
+            aborted = false
+            var a = if (depth >= 4) prev - 60 else -INF
+            var b = if (depth >= 4) prev + 60 else INF
+            var res: Pair<Move, List<Pair<Move, Int>>>
+            while (true) {
+                res = searchRoot(root, rootMoves, depth, a, b, best)
+                if (aborted) break
+                val s = res.second.maxOfOrNull { it.second } ?: 0
+                if (s <= a && a > -INF) { a = -INF; continue }
+                if (s >= b && b < INF) { b = INF; continue }
+                break
+            }
+            if (aborted) break
+            best = res.first
+            lastScores = res.second
+            bestScore = lastScores.maxOfOrNull { it.second } ?: 0
+            prev = bestScore
+            if (bestScore >= MATE_BOUND) break
+        }
+
+        return pickWithVariety(root, best, bestScore, lastScores)
+    }
+
+    private fun searchRoot(
+        state: GameState,
+        moves: List<Move>,
+        depth: Int,
+        alphaIn: Int,
+        beta: Int,
+        prevBest: Move,
+    ): Pair<Move, List<Pair<Move, Int>>> {
+        var alpha = alphaIn
+        var best = moves.first()
+        var bestScore = -INF
+        val scored = ArrayList<Pair<Move, Int>>(moves.size)
+        val prevKey = moveKey(prevBest)
+        val ordered = moves.sortedByDescending { if (moveKey(it) == prevKey) 1 else 0 }
+        val wantExact = varietyWindow > 0
+
+        for ((i, m) in ordered.withIndex()) {
+            if (System.currentTimeMillis() > deadline) { aborted = true; break }
+            val child = engine.applyForSearch(state, m)
+            val score: Int
+            if (i == 0 || wantExact) {
+                val lo = if (wantExact) minOf(alpha, bestScore - varietyWindow - 1).coerceAtLeast(-INF) else alpha
+                score = -negamax(child, depth - 1, -beta, -lo, 1, true)
+            } else {
+                var s = -negamax(child, depth - 1, -alpha - 1, -alpha, 1, true)
+                if (!aborted && s > alpha && s < beta) {
+                    s = -negamax(child, depth - 1, -beta, -alpha, 1, true)
+                }
+                score = s
+            }
+            if (aborted) break
+            scored += m to score
+            if (score > bestScore) { bestScore = score; best = m }
+            if (score > alpha) alpha = score
+        }
+        if (aborted || scored.size != ordered.size) aborted = true
+        return best to scored
+    }
+
+    private fun pickWithVariety(
+        state: GameState,
+        best: Move,
+        bestScore: Int,
+        scored: List<Pair<Move, Int>>,
+    ): Move {
+        if (varietyWindow == 0 || scored.isEmpty()) return best
+        if (bestScore >= MATE_BOUND || bestScore <= -MATE_BOUND) return best
+        val pool = scored.filter { it.second >= bestScore - varietyWindow }.map { it.first }
+        return if (pool.isNotEmpty()) pool.random() else best
+    }
+
+    // ------------------------------------------------------------------
+    // Core search
+    // ------------------------------------------------------------------
+
+    private fun evalFor(state: GameState, color: PieceColor): Int {
+        val w = ShogiEvaluator.evaluate(state)
+        return if (color == PieceColor.WHITE) w else -w
+    }
+
+    private fun negamax(
+        state: GameState,
+        depthIn: Int,
+        alphaIn: Int,
+        betaIn: Int,
+        ply: Int,
+        allowExt: Boolean,
+    ): Int {
+        if ((++nodes and 511L) == 0L && System.currentTimeMillis() > deadline) aborted = true
+        if (aborted) return 0
+
+        val color = state.currentTurn
+        if (ply >= MAX_PLY - 2) return evalFor(state, color)
+
+        // A missing king means the previous mover captured it (pseudo-terminal).
+        engine.winnerStatusIfKingMissing(state)?.let { st ->
+            val won = (st == GameStatus.WHITE_WINS && color == PieceColor.WHITE) ||
+                (st == GameStatus.BLACK_WINS && color == PieceColor.BLACK)
+            return if (won) MATE - ply else -(MATE - ply)
+        }
+
+        val key = hash(state)
+        for (i in 0 until ply) if (pathKeys[i] == key) return 0 // repetition
+        pathKeys[ply] = key
+
+        var alpha = maxOf(alphaIn, -MATE + ply)
+        val beta = minOf(betaIn, MATE - ply - 1)
+        if (alpha >= beta) return alpha
+
+        val inCheck = engine.inCheck(state, color)
+        var depth = depthIn
+        if (inCheck && allowExt) depth += 1
+
+        if (depth <= 0) {
+            return if (quiesceDepth > 0) quiescence(state, alpha, beta, ply, quiesceDepth)
+            else evalFor(state, color)
+        }
+
+        val entry = tt[key]
+        var ttKey = -1
+        if (entry != null) {
+            ttKey = entry.bestKey
+            if (entry.depth >= depth) {
+                val s = fromTT(entry.score, ply)
+                when (entry.flag) {
+                    Flag.EXACT -> return s
+                    Flag.LOWER -> if (s >= beta) return s
+                    Flag.UPPER -> if (s <= alpha) return s
+                }
+            }
+        }
+
+        val moves = orderMoves(state, engine.searchMoves(state), ply, ttKey)
+        // Shogi: no legal moves means the side to move loses (checkmated or
+        // stalemated alike).
+        if (moves.isEmpty()) return -MATE + ply
+
+        var bestScore = -INF
+        var bestKey = -1
+        val origAlpha = alpha
+
+        for ((i, m) in moves.withIndex()) {
+            val child = engine.applyForSearch(state, m)
+            val quiet = !m.isCapture && m.promotionType == null && m.metadata["promote"] != true
+            var score: Int
+            if (i == 0) {
+                score = -negamax(child, depth - 1, -beta, -alpha, ply + 1, true)
+            } else {
+                var red = 0
+                if (depth >= 3 && i >= 5 && quiet && !inCheck) {
+                    red = 1 + (if (i >= 10) 1 else 0)
+                    red = minOf(red, depth - 2)
+                }
+                score = -negamax(child, depth - 1 - red, -alpha - 1, -alpha, ply + 1, true)
+                if (!aborted && score > alpha && red > 0) {
+                    score = -negamax(child, depth - 1, -alpha - 1, -alpha, ply + 1, true)
+                }
+                if (!aborted && score > alpha && score < beta) {
+                    score = -negamax(child, depth - 1, -beta, -alpha, ply + 1, true)
+                }
+            }
+            if (aborted) return 0
+            if (score > bestScore) { bestScore = score; bestKey = moveKey(m) }
+            if (score > alpha) alpha = score
+            if (alpha >= beta) {
+                if (quiet) recordCutoff(m, color, ply, depth)
+                break
+            }
+        }
+
+        val flag = when {
+            bestScore <= origAlpha -> Flag.UPPER
+            bestScore >= beta -> Flag.LOWER
+            else -> Flag.EXACT
+        }
+        tt[key] = Entry(depth, toTT(bestScore, ply), flag, bestKey)
+        return bestScore
+    }
+
+    private fun quiescence(state: GameState, alphaIn: Int, beta: Int, ply: Int, left: Int): Int {
+        if ((++nodes and 511L) == 0L && System.currentTimeMillis() > deadline) aborted = true
+        if (aborted) return 0
+
+        val color = state.currentTurn
+        engine.winnerStatusIfKingMissing(state)?.let { st ->
+            val won = (st == GameStatus.WHITE_WINS && color == PieceColor.WHITE) ||
+                (st == GameStatus.BLACK_WINS && color == PieceColor.BLACK)
+            return if (won) MATE - ply else -(MATE - ply)
+        }
+
+        var alpha = alphaIn
+        val inCheck = engine.inCheck(state, color)
+        val standPat = evalFor(state, color)
+        if (left <= 0 || ply >= MAX_PLY - 2) return standPat
+
+        var best: Int
+        if (inCheck) {
+            best = -INF
+        } else {
+            if (standPat >= beta) return standPat
+            best = standPat
+            if (standPat > alpha) alpha = standPat
+        }
+
+        val all = engine.searchMoves(state)
+        if (all.isEmpty()) return -MATE + ply
+
+        // In check: search all evasions. Otherwise: captures and promotions.
+        val tactical = if (inCheck) all else all.filter {
+            it.isCapture || it.promotionType != null || it.metadata["promote"] == true
+        }
+        if (tactical.isEmpty()) return standPat
+
+        val ordered = tactical.sortedByDescending { mvvLva(state, it) }
+        for (m in ordered) {
+            val s = -quiescence(engine.applyForSearch(state, m), -beta, -alpha, ply + 1, left - 1)
+            if (aborted) return 0
+            if (s > best) best = s
+            if (s > alpha) alpha = s
+            if (alpha >= beta) break
+        }
+        return best
+    }
+
+    // ------------------------------------------------------------------
+    // Ordering
+    // ------------------------------------------------------------------
+
+    private fun pieceScore(p: ShogiPiece?): Int = when {
+        p == null -> 0
+        p.promoted -> when (p.type) {
+            ShogiPieceType.ROOK -> 1300
+            ShogiPieceType.BISHOP -> 1150
+            else -> 500
+        }
+        else -> p.type.points
+    }
+
+    private fun mvvLva(state: GameState, m: Move): Int {
+        val victim = m.captures.sumOf { c -> pieceScore(state.get(c) as? ShogiPiece) }
+        val attacker = if (m.metadata["drop"] != null) 0
+        else pieceScore(state.get(m.from) as? ShogiPiece)
+        val promo = if (m.promotionType != null || m.metadata["promote"] == true) 400 else 0
+        return victim * 16 - attacker + promo
+    }
+
+    private fun orderMoves(state: GameState, legal: List<Move>, ply: Int, ttKey: Int): List<Move> {
+        if (legal.size <= 1) return legal
+        val color = state.currentTurn
+        val k0 = if (ply < MAX_PLY) killers[ply][0] else -1
+        val k1 = if (ply < MAX_PLY) killers[ply][1] else -1
+        val enemyKing = findKing(state, color.opponent())
+
+        return legal.map { m ->
+            val key = moveKey(m)
+            var s = 0
+            if (key == ttKey) s += 2_000_000
+            if (m.isCapture) s += 100_000 + mvvLva(state, m)
+            if (m.promotionType != null || m.metadata["promote"] == true) s += 60_000
+            if (!m.isCapture) {
+                if (key == k0) s += 30_000 else if (key == k1) s += 20_000
+                s += history[histIndex(m, color)]
+            }
+            // Cheap proximity-to-enemy-king bonus (helps checks and drops
+            // near the king surface early without a full givesCheck call).
+            if (enemyKing != null) {
+                val d = maxOf(kotlin.math.abs(m.to.row - enemyKing.first), kotlin.math.abs(m.to.col - enemyKing.second))
+                if (d <= 2) s += (3 - d) * 400
+            }
+            if (m.metadata["drop"] != null) s += 200
+            m to s
+        }.sortedByDescending { it.second }.map { it.first }
+    }
+
+    private fun findKing(state: GameState, color: PieceColor): Pair<Int, Int>? {
+        for (i in 0 until 81) {
+            val p = state.board[i] as? ShogiPiece ?: continue
+            if (p.type == ShogiPieceType.KING && p.color == color) return (i / 9) to (i % 9)
+        }
+        return null
+    }
+
+    private fun recordCutoff(m: Move, color: PieceColor, ply: Int, depth: Int) {
+        val key = moveKey(m)
+        if (ply < MAX_PLY && killers[ply][0] != key) {
+            killers[ply][1] = killers[ply][0]
+            killers[ply][0] = key
+        }
+        val idx = histIndex(m, color)
+        history[idx] = (history[idx] + depth * depth).coerceAtMost(50_000)
+    }
+
+    private fun toTT(s: Int, ply: Int) = when {
+        s >= MATE_BOUND -> s + ply
+        s <= -MATE_BOUND -> s - ply
+        else -> s
+    }
+
+    private fun fromTT(s: Int, ply: Int) = when {
+        s >= MATE_BOUND -> s - ply
+        s <= -MATE_BOUND -> s + ply
+        else -> s
+    }
+}
+
+
+package com.mkdev.mkboardgames.games.shogi
+
+import com.mkdev.mkboardgames.engine.GameState
+import com.mkdev.mkboardgames.engine.GameStatus
+import com.mkdev.mkboardgames.engine.Move
+import com.mkdev.mkboardgames.engine.Piece
+import com.mkdev.mkboardgames.engine.PieceColor
+import com.mkdev.mkboardgames.engine.Position
+
+/** Standard Shogi movement, promotion, capture, hand, and drop rules. */
+class ShogiRuleEngine : com.mkdev.mkboardgames.engine.RuleEngine {
+    override fun initialState() = ShogiSetup.initialState()
+
+    // ------------------------------------------------------------------
+    // Public API (behavior unchanged)
+    // ------------------------------------------------------------------
+
+    override fun legalMovesFrom(state: GameState, position: Position): List<Move> {
+        val piece = pieceAt(state, position) as? ShogiPiece ?: return emptyList()
+        if (piece.color != state.currentTurn) return emptyList()
+
+        return rawMovesFrom(state, position, piece)
+            .filter { (pieceAt(state, it.to) as? ShogiPiece)?.type != ShogiPieceType.KING }
+            .flatMap { move -> promotionVariants(piece, move) }
+            .filter { move ->
+                !isKingInCheck(applyMoveInternal(state, move), piece.color)
+            }
+    }
+
+    override fun allLegalMoves(state: GameState, color: PieceColor): List<Move> {
+        val turnState = state.copy(currentTurn = color)
+        return buildList {
+            for (row in 0 until ShogiSetup.SIZE) {
+                for (col in 0 until ShogiSetup.SIZE) {
+                    addAll(legalMovesFrom(turnState, Position(row, col)))
+                }
+            }
+            ShogiPieceType.entries.forEach { addAll(legalDropsFrom(turnState, it)) }
+        }
+    }
+
+    override fun applyMove(state: GameState, move: Move): GameState {
+        require(state.status == GameStatus.IN_PROGRESS) {
+            "Cannot apply a move after the game has ended"
+        }
+        require(move in allLegalMoves(state, state.currentTurn)) {
+            "Illegal Shogi move"
+        }
+        val applied = applyMoveInternal(state, move)
+        return applied.copy(
+            moveHistory = state.moveHistory + move,
+            status = gameStatus(applied.copy(moveHistory = state.moveHistory + move)),
+        )
+    }
+
+    override fun gameStatus(state: GameState): GameStatus {
+        val whiteKing = findKing(state, PieceColor.WHITE)
+        val blackKing = findKing(state, PieceColor.BLACK)
+        if (whiteKing == null) return GameStatus.BLACK_WINS
+        if (blackKing == null) return GameStatus.WHITE_WINS
+
+        if (hasAnyBoardLegalMove(state, state.currentTurn)) return GameStatus.IN_PROGRESS
+        val hasLegalDrop = ShogiPieceType.entries.any { type ->
+            legalDropsFrom(state.copy(currentTurn = state.currentTurn), type).isNotEmpty()
+        }
+        if (hasLegalDrop) return GameStatus.IN_PROGRESS
+
+        // Shogi has no stalemate: no legal move means the side to move loses.
+        return winnerFor(state.currentTurn.opponent())
+    }
+
+    /** Static evaluation from WHITE's perspective (used by generic callers). */
+    override fun evaluate(state: GameState): Int = ShogiEvaluator.evaluate(state)
+
+    // ------------------------------------------------------------------
+    // Fast search-only API (used by ShogiSearch). These never mutate state
+    // and are behaviorally equivalent to the public API, minus validation.
+    // ------------------------------------------------------------------
+
+    /**
+     * Apply a move that is already known to be legal. No legality check,
+     * no status computation. The caller (search) detects terminal states by
+     * an empty legal-move list at the node.
+     */
+    fun applyForSearch(state: GameState, move: Move): GameState =
+        applyMoveInternal(state, move).copy(moveHistory = emptyList())
+
+    /** Full legal move list for the side to move, without Move-list validation. */
+    fun searchMoves(state: GameState): List<Move> =
+        allLegalMoves(state, state.currentTurn)
+
+    /** True if [color]'s king is currently attacked. */
+    fun inCheck(state: GameState, color: PieceColor): Boolean = isKingInCheck(state, color)
+
+    /** Does this move give check to the opponent of the mover? */
+    fun givesCheck(stateBefore: GameState, move: Move): Boolean {
+        val after = applyMoveInternal(stateBefore, move)
+        return isKingInCheck(after, stateBefore.currentTurn.opponent())
+    }
+
+    /** Does the board of [state] still contain both kings? */
+    fun bothKingsPresent(state: GameState): Boolean =
+        findKing(state, PieceColor.WHITE) != null && findKing(state, PieceColor.BLACK) != null
+
+    fun winnerStatusIfKingMissing(state: GameState): GameStatus? {
+        if (findKing(state, PieceColor.WHITE) == null) return GameStatus.BLACK_WINS
+        if (findKing(state, PieceColor.BLACK) == null) return GameStatus.WHITE_WINS
+        return null
+    }
+
+    // ------------------------------------------------------------------
+    // Move generation internals
+    // ------------------------------------------------------------------
+
+    private fun rawMovesFrom(
+        state: GameState,
+        from: Position,
+        piece: ShogiPiece,
+    ): List<Move> {
+        val moves = mutableListOf<Move>()
+        fun add(to: Position) {
+            if (!onBoard(to)) return
+            val target = pieceAt(state, to)
+            if (target?.color == piece.color) return
+            moves += Move(
+                from = from,
+                to = to,
+                captures = if (target == null) emptyList() else listOf(to),
+            )
+        }
+        fun slide(directions: List<Pair<Int, Int>>) {
+            for ((dr, dc) in directions) {
+                var row = from.row + dr
+                var col = from.col + dc
+                while (onBoard(Position(row, col))) {
+                    val target = pieceAt(state, Position(row, col))
+                    if (target == null) {
+                        moves += Move(from, Position(row, col))
+                    } else {
+                        if (target.color != piece.color) moves += Move(from, Position(row, col), listOf(Position(row, col)))
+                        break
+                    }
+                    row += dr
+                    col += dc
+                }
+            }
+        }
+
+        val forward = if (piece.color == PieceColor.WHITE) -1 else 1
+        when (piece.type) {
+            ShogiPieceType.PAWN -> {
+                if (piece.promoted) goldSteps(forward, from, ::add)
+                else add(Position(from.row + forward, from.col))
+            }
+            ShogiPieceType.LANCE -> {
+                if (piece.promoted) goldSteps(forward, from, ::add)
+                else slide(listOf(forward to 0))
+            }
+            ShogiPieceType.KNIGHT -> {
+                if (piece.promoted) goldSteps(forward, from, ::add)
+                else {
+                    add(Position(from.row + forward * 2, from.col - 1))
+                    add(Position(from.row + forward * 2, from.col + 1))
+                }
+            }
+            ShogiPieceType.SILVER -> {
+                if (piece.promoted) goldSteps(forward, from, ::add)
+                else {
+                    add(Position(from.row + forward, from.col))
+                    add(Position(from.row + forward, from.col - 1))
+                    add(Position(from.row + forward, from.col + 1))
+                    add(Position(from.row - forward, from.col - 1))
+                    add(Position(from.row - forward, from.col + 1))
+                }
+            }
+            ShogiPieceType.GOLD -> goldSteps(forward, from, ::add)
+            ShogiPieceType.KING -> {
+                for (dr in -1..1) for (dc in -1..1) {
+                    if (dr != 0 || dc != 0) add(Position(from.row + dr, from.col + dc))
+                }
+            }
+            ShogiPieceType.BISHOP -> {
+                slide(diagonalDirections)
+                if (piece.promoted) orthogonalDirections.forEach { (dr, dc) ->
+                    add(Position(from.row + dr, from.col + dc))
+                }
+            }
+            ShogiPieceType.ROOK -> {
+                slide(orthogonalDirections)
+                if (piece.promoted) diagonalDirections.forEach { (dr, dc) ->
+                    add(Position(from.row + dr, from.col + dc))
+                }
+            }
+        }
+        return moves
+    }
+
+    private fun goldSteps(
+        forward: Int,
+        from: Position,
+        add: (Position) -> Unit,
+    ) {
+        listOf(
+            forward to 0,
+            forward to -1,
+            forward to 1,
+            0 to -1,
+            0 to 1,
+            -forward to 0,
+        ).forEach { (dr, dc) -> add(Position(from.row + dr, from.col + dc)) }
+    }
+
+    private fun promotionVariants(piece: ShogiPiece, move: Move): List<Move> {
+        if (piece.promoted || !canPromote(piece.type)) return listOf(move)
+        val forced = when (piece.type) {
+            ShogiPieceType.PAWN, ShogiPieceType.LANCE ->
+                move.to.row == promotionLastRank(piece.color)
+            ShogiPieceType.KNIGHT ->
+                move.to.row == promotionLastRank(piece.color) ||
+                    move.to.row == promotionLastRank(piece.color) + if (piece.color == PieceColor.WHITE) 1 else -1
+            else -> false
+        }
+        val mayPromote = inPromotionZone(move.from, piece.color) ||
+            inPromotionZone(move.to, piece.color)
+        if (forced) {
+            return listOf(move.copy(
+                promotionType = piece.type.name,
+                metadata = move.metadata + ("promote" to true),
+            ))
+        }
+        if (!mayPromote) return listOf(move)
+        return listOf(
+            move,
+            move.copy(
+                promotionType = piece.type.name,
+                metadata = move.metadata + ("promote" to true),
+            ),
+        )
+    }
+
+    private fun applyMoveInternal(state: GameState, move: Move): GameState {
+        val board = state.board.copyOf()
+        val hands = state.hands.mapValues { it.value.toMutableList() }.toMutableMap()
+        val dropType = dropType(move)
+        if (dropType != null) {
+            val hand = hands[state.currentTurn].orEmpty().toMutableList()
+            val handIndex = hand.indexOfFirst { it is ShogiPiece && it.type == dropType }
+            if (handIndex < 0 || pieceAt(state, move.to) != null) return state
+            hand.removeAt(handIndex)
+            hands[state.currentTurn] = hand
+            board[index(move.to)] = ShogiPiece(dropType, state.currentTurn)
+        } else {
+            val piece = board.getOrNull(index(move.from)) as? ShogiPiece ?: return state
+            move.captures.forEach { capture ->
+                val captured = board.getOrNull(index(capture)) as? ShogiPiece
+                board[index(capture)] = null
+                if (captured != null) {
+                    val hand = hands[state.currentTurn].orEmpty().toMutableList()
+                    hand += captured.copy(color = state.currentTurn, promoted = false)
+                    hands[state.currentTurn] = hand
+                }
+            }
+            val promoted = move.promotionType != null || move.metadata["promote"] == true
+            board[index(move.to)] = if (promoted) piece.copy(promoted = true) else piece
+            board[index(move.from)] = null
+        }
+        return state.copy(
+            board = board,
+            currentTurn = state.currentTurn.opponent(),
+            status = GameStatus.IN_PROGRESS,
+            hands = hands.mapValues { it.value.toList() },
+        )
+    }
+
+    /** Legal drops for a held piece type, exposed to the hand UI. */
+    fun legalDropsFrom(
+        state: GameState,
+        type: ShogiPieceType,
+        checkPawnDropMate: Boolean = true,
+    ): List<Move> {
+        val color = state.currentTurn
+        if (state.hands[color].orEmpty().none { it is ShogiPiece && it.type == type }) {
+            return emptyList()
+        }
+        val moves = mutableListOf<Move>()
+        for (row in 0 until ShogiSetup.SIZE) {
+            for (col in 0 until ShogiSetup.SIZE) {
+                val to = Position(row, col)
+                if (pieceAt(state, to) != null) continue
+                if (type == ShogiPieceType.PAWN && row == promotionLastRank(color)) continue
+                if (type == ShogiPieceType.LANCE && row == promotionLastRank(color)) continue
+                if (type == ShogiPieceType.KNIGHT &&
+                    (row == promotionLastRank(color) ||
+                        row == promotionLastRank(color) + if (color == PieceColor.WHITE) 1 else -1)
+                ) continue
+                if (type == ShogiPieceType.PAWN && hasUnpromotedPawnOnFile(state, color, col)) continue
+
+                val move = Move(
+                    from = dropPosition(type),
+                    to = to,
+                    metadata = mapOf("drop" to type.name),
+                )
+                val next = applyMoveInternal(state, move)
+                if (isKingInCheck(next, color)) continue
+                if (checkPawnDropMate && type == ShogiPieceType.PAWN &&
+                    isPawnDropMate(state, move)
+                ) continue
+                moves += move
+            }
+        }
+        return moves
+    }
+
+    private fun isPawnDropMate(state: GameState, move: Move): Boolean {
+        val next = applyMoveInternal(state, move)
+        val opponent = state.currentTurn.opponent()
+        return isKingInCheck(next, opponent) &&
+            boardLegalMoves(next, opponent).isEmpty() &&
+            ShogiPieceType.entries.all { type ->
+                legalDropsFrom(next.copy(currentTurn = opponent), type, checkPawnDropMate = false)
+                    .isEmpty()
+            }
+    }
+
+    private fun boardLegalMoves(state: GameState, color: PieceColor): List<Move> {
+        val turnState = state.copy(currentTurn = color)
+        return buildList {
+            for (row in 0 until ShogiSetup.SIZE) {
+                for (col in 0 until ShogiSetup.SIZE) {
+                    addAll(legalMovesFrom(turnState, Position(row, col)))
+                }
+            }
+        }
+    }
+
+    private fun hasAnyBoardLegalMove(state: GameState, color: PieceColor): Boolean {
+        val turnState = state.copy(currentTurn = color)
+        for (row in 0 until ShogiSetup.SIZE) {
+            for (col in 0 until ShogiSetup.SIZE) {
+                if (legalMovesFrom(turnState, Position(row, col)).isNotEmpty()) return true
+            }
+        }
+        return false
+    }
+
+    private fun hasUnpromotedPawnOnFile(state: GameState, color: PieceColor, col: Int): Boolean =
+        (0 until ShogiSetup.SIZE).any { row ->
+            val piece = pieceAt(state, Position(row, col))
+            piece is ShogiPiece &&
+                piece.color == color &&
+                piece.type == ShogiPieceType.PAWN &&
+                !piece.promoted
+        }
+
+    private fun dropPosition(type: ShogiPieceType) = Position(-1, type.ordinal)
+
+    private fun dropType(move: Move): ShogiPieceType? =
+        (move.metadata["drop"] as? String)?.let { name ->
+            runCatching { ShogiPieceType.valueOf(name) }.getOrNull()
+        }
+
+    private fun isKingInCheck(state: GameState, color: PieceColor): Boolean {
+        val king = findKing(state, color) ?: return true
+        return isSquareAttackedBy(state, king, color.opponent())
+    }
+
+    /**
+     * Reverse attack test: is [target] attacked by any piece of [attacker]?
+     * Walks outward from the target instead of generating every enemy move,
+     * which is far cheaper and allocation-free.
+     */
+    private fun isSquareAttackedBy(
+        state: GameState,
+        target: Position,
+        attacker: PieceColor,
+    ): Boolean {
+        val fwd = if (attacker == PieceColor.WHITE) -1 else 1
+
+        fun stepAttacker(dr: Int, dc: Int, matches: (ShogiPiece) -> Boolean): Boolean {
+            // A piece at (target - d) attacks target if it moves by +d.
+            val p = pieceAt(state, Position(target.row - dr, target.col - dc)) ?: return false
+            return p.color == attacker && matches(p)
+        }
+
+        fun goldLike(p: ShogiPiece) = p.type == ShogiPieceType.GOLD ||
+            (p.promoted && (p.type == ShogiPieceType.PAWN || p.type == ShogiPieceType.LANCE ||
+                p.type == ShogiPieceType.KNIGHT || p.type == ShogiPieceType.SILVER))
+
+        // Gold-like steps: forward, forward-left, forward-right, left, right, back.
+        val goldSteps = arrayOf(fwd to 0, fwd to -1, fwd to 1, 0 to -1, 0 to 1, -fwd to 0)
+        for ((dr, dc) in goldSteps) {
+            if (stepAttacker(dr, dc) { goldLike(it) }) return true
+        }
+        // Pawn (unpromoted): forward one.
+        if (stepAttacker(fwd, 0) { it.type == ShogiPieceType.PAWN && !it.promoted }) return true
+        // Silver (unpromoted): forward 3, back diagonals.
+        for ((dr, dc) in arrayOf(fwd to 0, fwd to -1, fwd to 1, -fwd to -1, -fwd to 1)) {
+            if (stepAttacker(dr, dc) { it.type == ShogiPieceType.SILVER && !it.promoted }) return true
+        }
+        // Knight (unpromoted).
+        for (dc in intArrayOf(-1, 1)) {
+            if (stepAttacker(fwd * 2, dc) { it.type == ShogiPieceType.KNIGHT && !it.promoted }) return true
+        }
+        // King steps.
+        for (dr in -1..1) for (dc in -1..1) {
+            if (dr == 0 && dc == 0) continue
+            if (stepAttacker(dr, dc) { it.type == ShogiPieceType.KING }) return true
+        }
+        // Promoted rook: diagonal one-steps; promoted bishop: orthogonal one-steps.
+        for ((dr, dc) in diagonalDirections) {
+            if (stepAttacker(dr, dc) { it.type == ShogiPieceType.ROOK && it.promoted }) return true
+        }
+        for ((dr, dc) in orthogonalDirections) {
+            if (stepAttacker(dr, dc) { it.type == ShogiPieceType.BISHOP && it.promoted }) return true
+        }
+
+        // Sliders: walk each ray from the target until a piece is hit.
+        for ((dr, dc) in orthogonalDirections) {
+            var r = target.row + dr
+            var c = target.col + dc
+            var dist = 0
+            while (r in 0 until ShogiSetup.SIZE && c in 0 until ShogiSetup.SIZE) {
+                dist++
+                val p = state.board[r * ShogiSetup.SIZE + c] as? ShogiPiece
+                if (p != null) {
+                    if (p.color == attacker) {
+                        if (p.type == ShogiPieceType.ROOK) return true
+                        // Lance attacks along its forward file only (unpromoted).
+                        if (p.type == ShogiPieceType.LANCE && !p.promoted &&
+                            dc == 0 && dr == -fwd
+                        ) return true
+                    }
+                    break
+                }
+                r += dr
+                c += dc
+            }
+        }
+        for ((dr, dc) in diagonalDirections) {
+            var r = target.row + dr
+            var c = target.col + dc
+            while (r in 0 until ShogiSetup.SIZE && c in 0 until ShogiSetup.SIZE) {
+                val p = state.board[r * ShogiSetup.SIZE + c] as? ShogiPiece
+                if (p != null) {
+                    if (p.color == attacker && p.type == ShogiPieceType.BISHOP) return true
+                    break
+                }
+                r += dr
+                c += dc
+            }
+        }
+        return false
+    }
+
+    private fun findKing(state: GameState, color: PieceColor): Position? {
+        for (row in 0 until ShogiSetup.SIZE) {
+            for (col in 0 until ShogiSetup.SIZE) {
+                val piece = pieceAt(state, Position(row, col)) as? ShogiPiece ?: continue
+                if (piece.color == color && piece.type == ShogiPieceType.KING) {
+                    return Position(row, col)
+                }
+            }
+        }
+        return null
+    }
+
+    private fun pieceAt(state: GameState, position: Position): ShogiPiece? =
+        if (onBoard(position)) state.board[index(position)] as? ShogiPiece else null
+
+    private fun index(position: Position) = position.row * ShogiSetup.SIZE + position.col
+    private fun onBoard(position: Position) =
+        position.row in 0 until ShogiSetup.SIZE && position.col in 0 until ShogiSetup.SIZE
+
+    private fun canPromote(type: ShogiPieceType) =
+        type != ShogiPieceType.KING && type != ShogiPieceType.GOLD
+
+    private fun promotionLastRank(color: PieceColor) =
+        if (color == PieceColor.WHITE) 0 else ShogiSetup.SIZE - 1
+
+    private fun inPromotionZone(position: Position, color: PieceColor) =
+        if (color == PieceColor.WHITE) position.row <= 2 else position.row >= 6
+
+    private fun winnerFor(color: PieceColor) =
+        if (color == PieceColor.WHITE) GameStatus.WHITE_WINS else GameStatus.BLACK_WINS
+
+    private val orthogonalDirections = listOf(
+        1 to 0, -1 to 0, 0 to 1, 0 to -1,
+    )
+    private val diagonalDirections = listOf(
+        1 to 1, 1 to -1, -1 to 1, -1 to -1,
+    )
+}
+
+
+package com.mkdev.mkboardgames.games.shogi
+
+import com.mkdev.mkboardgames.engine.GameState
+import com.mkdev.mkboardgames.engine.PieceColor
+
+/**
+ * Static Shogi evaluation, returned from WHITE's perspective.
+ *
+ * Terms (all in centipawn-like units where a pawn = 100):
+ *  - board material with promoted bonuses
+ *  - hand material (slightly above board value: drops are flexible)
+ *  - advancement / piece-square bonuses
+ *  - promotion-zone pressure and pawn advancement
+ *  - king safety (adjacent defenders, king exposure)
+ *  - cheap mobility for sliders
+ *  - penalty for pieces with no future moves (dead pawn/lance/knight)
+ */
+object ShogiEvaluator {
+    private const val SIZE = ShogiSetup.SIZE
+
+    // Values for pieces in hand. Drops are stronger than the same piece
+    // on the board for the minor pieces, so hands get a small bonus.
+    private fun handValue(type: ShogiPieceType): Int = when (type) {
+        ShogiPieceType.PAWN -> 115
+        ShogiPieceType.LANCE -> 330
+        ShogiPieceType.KNIGHT -> 340
+        ShogiPieceType.SILVER -> 460
+        ShogiPieceType.GOLD -> 560
+        ShogiPieceType.BISHOP -> 920
+        ShogiPieceType.ROOK -> 1_100
+        ShogiPieceType.KING -> 0
+    }
+
+    private fun boardValue(p: ShogiPiece): Int = when {
+        !p.promoted -> when (p.type) {
+            ShogiPieceType.PAWN -> 100
+            ShogiPieceType.LANCE -> 300
+            ShogiPieceType.KNIGHT -> 320
+            ShogiPieceType.SILVER -> 440
+            ShogiPieceType.GOLD -> 520
+            ShogiPieceType.BISHOP -> 830
+            ShogiPieceType.ROOK -> 1_000
+            ShogiPieceType.KING -> 0
+        }
+        else -> when (p.type) {
+            ShogiPieceType.PAWN -> 420      // tokin
+            ShogiPieceType.LANCE -> 500
+            ShogiPieceType.KNIGHT -> 510
+            ShogiPieceType.SILVER -> 520
+            ShogiPieceType.BISHOP -> 1_150  // horse
+            ShogiPieceType.ROOK -> 1_300    // dragon
+            else -> 0
+        }
+    }
+
+    fun evaluate(state: GameState): Int {
+        var white = 0
+        var black = 0
+
+        var whiteKingRow = -1; var whiteKingCol = -1
+        var blackKingRow = -1; var blackKingCol = -1
+
+        // First pass: locate kings.
+        for (r in 0 until SIZE) for (c in 0 until SIZE) {
+            val p = state.board[r * SIZE + c] as? ShogiPiece ?: continue
+            if (p.type == ShogiPieceType.KING) {
+                if (p.color == PieceColor.WHITE) { whiteKingRow = r; whiteKingCol = c }
+                else { blackKingRow = r; blackKingCol = c }
+            }
+        }
+
+        val whitePawnFiles = BooleanArray(SIZE)
+        val blackPawnFiles = BooleanArray(SIZE)
+
+        for (r in 0 until SIZE) for (c in 0 until SIZE) {
+            val p = state.board[r * SIZE + c] as? ShogiPiece ?: continue
+            if (p.type == ShogiPieceType.KING) continue
+            val isWhite = p.color == PieceColor.WHITE
+            // advance: 0 at own back rank, 8 at enemy back rank.
+            val advance = if (isWhite) 8 - r else r
+            val centerFile = 4 - kotlin.math.abs(c - 4) // 0..4
+
+            var s = boardValue(p)
+            s += positional(p, advance, centerFile)
+
+            // Dead-piece penalty: pieces that can never move again.
+            if (!p.promoted) {
+                if ((p.type == ShogiPieceType.PAWN || p.type == ShogiPieceType.LANCE) && advance == 8) s -= 200
+                if (p.type == ShogiPieceType.KNIGHT && advance >= 7) s -= 200
+            }
+
+            // Promotion-zone pressure: pieces that can promote and sit in the zone.
+            if (!p.promoted && advance >= 6) {
+                s += when (p.type) {
+                    ShogiPieceType.PAWN -> 25 + (advance - 6) * 15
+                    ShogiPieceType.SILVER, ShogiPieceType.KNIGHT, ShogiPieceType.LANCE -> 30
+                    ShogiPieceType.BISHOP, ShogiPieceType.ROOK -> 45
+                    else -> 0
+                }
+            }
+
+            // King attack pressure: friendly pieces near the enemy king.
+            val ekr = if (isWhite) blackKingRow else whiteKingRow
+            val ekc = if (isWhite) blackKingCol else whiteKingCol
+            if (ekr >= 0) {
+                val dist = maxOf(kotlin.math.abs(r - ekr), kotlin.math.abs(c - ekc))
+                if (dist <= 2) {
+                    s += when (p.type) {
+                        ShogiPieceType.ROOK, ShogiPieceType.BISHOP -> 40 - dist * 10
+                        ShogiPieceType.GOLD, ShogiPieceType.SILVER -> 30 - dist * 8
+                        ShogiPieceType.KNIGHT -> 25 - dist * 6
+                        else -> 12 - dist * 4
+                    }
+                }
+            }
+
+            if (p.type == ShogiPieceType.PAWN && !p.promoted) {
+                if (isWhite) whitePawnFiles[c] = true else blackPawnFiles[c] = true
+            }
+            if (isWhite) white += s else black += s
+        }
+
+        // Pieces in hand.
+        for ((color, pieces) in state.hands) {
+            var h = 0
+            for (piece in pieces) {
+                val sp = piece as? ShogiPiece ?: continue
+                h += handValue(sp.type)
+            }
+            if (color == PieceColor.WHITE) white += h else black += h
+        }
+
+        // King safety.
+        white += kingSafety(state, whiteKingRow, whiteKingCol, PieceColor.WHITE)
+        black += kingSafety(state, blackKingRow, blackKingCol, PieceColor.BLACK)
+
+        // Passed pawns: no enemy unpromoted pawn on the file ahead is not
+        // meaningful in shogi (drops), so reward open files for rooks instead.
+        for (c in 0 until SIZE) {
+            if (!whitePawnFiles[c] && !blackPawnFiles[c]) {
+                for (r in 0 until SIZE) {
+                    val p = state.board[r * SIZE + c] as? ShogiPiece ?: continue
+                    if (p.type == ShogiPieceType.ROOK) {
+                        if (p.color == PieceColor.WHITE) white += 30 else black += 30
+                    }
+                }
+            }
+        }
+
+        // Mobility (cheap): count slider reach for rooks/bishops/lances.
+        white += sliderMobility(state, PieceColor.WHITE)
+        black += sliderMobility(state, PieceColor.BLACK)
+
+        return white - black
+    }
+
+    private fun positional(p: ShogiPiece, advance: Int, centerFile: Int): Int = when {
+        p.promoted -> advance * 2 + centerFile * 2
+        else -> when (p.type) {
+            ShogiPieceType.PAWN -> advance * 6 + (if (advance in 3..5) centerFile * 2 else 0)
+            ShogiPieceType.LANCE -> advance * 3
+            ShogiPieceType.KNIGHT -> advance * 4 + centerFile * 2
+            ShogiPieceType.SILVER -> advance * 5 + centerFile * 3
+            ShogiPieceType.GOLD -> advance * 2 + centerFile
+            ShogiPieceType.BISHOP -> centerFile * 4 + advance
+            ShogiPieceType.ROOK -> advance * 3
+            ShogiPieceType.KING -> 0
+        }
+    }
+
+    private fun kingSafety(state: GameState, kr: Int, kc: Int, color: PieceColor): Int {
+        if (kr < 0) return 0
+        var s = 0
+        val ownHomeRow = if (color == PieceColor.WHITE) 8 else 0
+        val advanceFromHome = kotlin.math.abs(kr - ownHomeRow)
+
+        // King should stay near home early; heavy penalty for wandering out.
+        s -= advanceFromHome * 12
+        // Prefer flank (castled) over center file.
+        val distFromCenter = kotlin.math.abs(kc - 4)
+        s += minOf(distFromCenter, 3) * 6
+
+        // Defenders in the 3x3 around the king, weighted toward gold/silver.
+        var defenders = 0
+        for (dr in -1..1) for (dc in -1..1) {
+            if (dr == 0 && dc == 0) continue
+            val r = kr + dr
+            val c = kc + dc
+            if (r !in 0 until SIZE || c !in 0 until SIZE) continue
+            val p = state.board[r * SIZE + c] as? ShogiPiece ?: continue
+            if (p.color != color) {
+                // Enemy piece adjacent to our king is a threat.
+                s -= 25
+                continue
+            }
+            defenders += when (p.type) {
+                ShogiPieceType.GOLD -> 3
+                ShogiPieceType.SILVER -> 2
+                ShogiPieceType.KNIGHT, ShogiPieceType.LANCE -> 1
+                ShogiPieceType.PAWN -> 1
+                else -> if (p.promoted) 2 else 1
+            }
+        }
+        s += minOf(defenders, 8) * 14
+
+        // Enemy pieces in hand are a drop threat against a weakly defended king.
+        val enemy = color.opponent()
+        val enemyHand = state.hands[enemy].orEmpty()
+        if (enemyHand.isNotEmpty() && defenders < 4) {
+            s -= (4 - defenders) * enemyHand.size.coerceAtMost(4) * 4
+        }
+        return s
+    }
+
+    private fun sliderMobility(state: GameState, color: PieceColor): Int {
+        var total = 0
+        val forward = if (color == PieceColor.WHITE) -1 else 1
+        for (r in 0 until SIZE) for (c in 0 until SIZE) {
+            val p = state.board[r * SIZE + c] as? ShogiPiece ?: continue
+            if (p.color != color) continue
+            when {
+                p.type == ShogiPieceType.ROOK -> total += 3 * ray(state, r, c, 1, 0) +
+                    3 * ray(state, r, c, -1, 0) + 3 * ray(state, r, c, 0, 1) + 3 * ray(state, r, c, 0, -1)
+                p.type == ShogiPieceType.BISHOP -> total += 3 * ray(state, r, c, 1, 1) +
+                    3 * ray(state, r, c, 1, -1) + 3 * ray(state, r, c, -1, 1) + 3 * ray(state, r, c, -1, -1)
+                p.type == ShogiPieceType.LANCE && !p.promoted -> total += 2 * ray(state, r, c, forward, 0)
+            }
+        }
+        return total
+    }
+
+    private fun ray(state: GameState, r0: Int, c0: Int, dr: Int, dc: Int): Int {
+        var r = r0 + dr
+        var c = c0 + dc
+        var n = 0
+        while (r in 0 until SIZE && c in 0 until SIZE) {
+            n++
+            if (state.board[r * SIZE + c] != null) break
+            r += dr
+            c += dc
+        }
+        return n
+    }
+}
+
+
+package com.mkdev.mkboardgames.engine
+
+import com.mkdev.mkboardgames.games.amazons.AmazonsRuleEngine
+import com.mkdev.mkboardgames.games.chess.ChessPiece
+import com.mkdev.mkboardgames.games.chess.ChessPieceType
+import com.mkdev.mkboardgames.games.chess.ChessRuleEngine
+import com.mkdev.mkboardgames.games.shogi.ShogiRuleEngine
+import com.mkdev.mkboardgames.games.shogi.ShogiSearch
+
+/**
+ * Negamax + PVS AI with iterative deepening, aspiration windows, a
+ * transposition table, null-move pruning for chess, late-move reductions,
+ * check extensions, quiescence, killer/history ordering, and mate-distance
+ * scoring.
+ *
+ * Shogi is delegated to [ShogiSearch], a dedicated search with Shogi-correct
+ * hashing (board + hands), fast legality paths and tactical quiescence. All
+ * other games use the generic search below, unchanged.
+ *
+ * [maxDepth]     - depth ceiling; use a large value and let time decide
+ * [timeLimitMs]  - wall-clock budget
+ * [quiesceDepth] - extra tactical plies at a leaf
+ * [varietyWindowOverride] - 0 = deterministic strongest move
+ */
+class AIPlayer(
+    private val engine: RuleEngine,
+    val maxDepth: Int = 3,
+    private val timeLimitMs: Long = 1000L,
+    private val quiesceDepth: Int = 0,
+    private val varietyWindowOverride: Int = -1
+) {
+
+    companion object {
+        private const val INF = 1_000_000
+        private const val MATE = 100_000
+        private const val MATE_BOUND = MATE - 1_000
+        private const val MAX_PLY = 128
+        private const val TT_MAX_SIZE = 1 shl 20
+        private const val MOVE_COORDINATE_BITS = 4
+        private const val MOVE_COORDINATE_SIZE = 1 shl MOVE_COORDINATE_BITS
+        private const val MOVE_COORDINATE_MASK = MOVE_COORDINATE_SIZE - 1
+        private const val MOVE_SQUARE_COUNT = MOVE_COORDINATE_SIZE * MOVE_COORDINATE_SIZE
+        private const val MOVE_PROMOTION_BUCKETS = 16
+    }
+
+    @Volatile private var deadline = Long.MAX_VALUE
+    @Volatile private var searchAborted = false
+    private var nodeCounter = 0L
+
+    private enum class TTFlag { EXACT, LOWER, UPPER }
+
+    private class TTEntry(
+        val depth: Int,
+        val score: Int,
+        val flag: TTFlag,
+        val bestKey: Int
+    )
+
+    private val tt = HashMap<Long, TTEntry>(1 shl 16)
+    private val historyScores = IntArray(MOVE_SQUARE_COUNT * MOVE_SQUARE_COUNT * 2)
+    private val killers = Array(MAX_PLY) { IntArray(2) { -1 } }
+    private val pathKeys = LongArray(MAX_PLY)
+
+    private val isChess = engine is ChessRuleEngine
+    private val chessEngine = engine as? ChessRuleEngine
+    private val isAmazons = engine is AmazonsRuleEngine
+
+    // Dedicated Shogi search. Null for every other game.
+    private val shogiSearch: ShogiSearch? =
+        (engine as? ShogiRuleEngine)?.let {
+            ShogiSearch(
+                engine = it,
+                maxDepth = maxDepth,
+                timeLimitMs = timeLimitMs,
+                quiesceDepth = quiesceDepth,
+                varietyWindow = varietyWindow(),
+            )
+        }
+
+    // A fixed seed makes ordering and search behaviour reproducible between turns.
+    private val zobristTable: Array<LongArray> = run {
+        val random = java.util.Random(0x5EED_CAFEL)
+        Array(100 * 8) { LongArray(16) { random.nextLong() } }
+    }
+
+    private fun boardKey(state: GameState): Long {
+        var key = if (state.currentTurn == PieceColor.WHITE) 0L else -0x5DEECE66DL
+
+        for (i in state.board.indices) {
+            val piece = state.board[i] ?: continue
+            val colorOffset = if (piece.color == PieceColor.WHITE) 0 else 8
+            val typeOffset = if (piece is ChessPiece) {
+                piece.type.ordinal
+            } else {
+                (piece.value() / 100).coerceIn(0, 7)
+            }
+            key = key xor zobristTable[i % zobristTable.size][
+                (colorOffset + typeOffset).coerceIn(0, 15)
+            ]
+        }
+
+        for ((color, pieces) in state.hands) {
+            var handKey = if (color == PieceColor.WHITE) 0x13579BDFL else 0x2468ACE0L
+            pieces.groupingBy { it.symbol() }
+                .eachCount()
+                .toSortedMap()
+                .forEach { (symbol, count) ->
+                    handKey = handKey * 31 + symbol.hashCode() * 17 + count
+                }
+            key = key xor handKey
+        }
+
+        if (state.metadata["castleWK"] == true) key = key xor 0x51A3D29BL
+        if (state.metadata["castleWQ"] == true) key = key xor 0x8F12C4D6L
+        if (state.metadata["castleBK"] == true) key = key xor 0x2D7E91A4L
+        if (state.metadata["castleBQ"] == true) key = key xor 0xB6043FA1L
+
+        val enPassant = (state.metadata["enPassant"] as? Int)?.coerceIn(-1, 7) ?: -1
+        key = key xor ((enPassant + 1).toLong() * 0x9E3779B9L)
+        return key
+    }
+
+    private fun squareKey(row: Int, col: Int): Int =
+        ((row and MOVE_COORDINATE_MASK) * MOVE_COORDINATE_SIZE) +
+            (col and MOVE_COORDINATE_MASK)
+
+    private fun moveKey(move: Move): Int {
+        val from = squareKey(move.from.row, move.from.col)
+        val to = squareKey(move.to.row, move.to.col)
+        val promotion = if (move.promotionType != null) {
+            1 + (move.promotionType.hashCode() and (MOVE_PROMOTION_BUCKETS - 2))
+        } else {
+            0
+        }
+        return (from * MOVE_SQUARE_COUNT + to) * MOVE_PROMOTION_BUCKETS + promotion
+    }
+
+    private fun historyIndex(move: Move, color: PieceColor): Int {
+        val from = squareKey(move.from.row, move.from.col)
+        val to = squareKey(move.to.row, move.to.col)
+        return (from * MOVE_SQUARE_COUNT + to) * 2 +
+            if (color == PieceColor.WHITE) 0 else 1
+    }
+
+    fun bestMove(state: GameState): Move? {
+        // Shogi uses its own dedicated search.
+        shogiSearch?.let { return it.bestMove(state) }
+
+        deadline = System.currentTimeMillis() + timeLimitMs.coerceAtLeast(1L)
+        searchAborted = false
+        nodeCounter = 0L
+
+        if (tt.size > TT_MAX_SIZE) tt.clear()
+        historyScores.fill(0)
+        for (killer in killers) {
+            killer[0] = -1
+            killer[1] = -1
+        }
+
+        val rootColor = state.currentTurn
+        val rootMoves = orderedMoves(state, rootColor, 0, -1)
+        if (rootMoves.isEmpty()) return null
+        if (rootMoves.size == 1) return rootMoves[0]
+
+        // Resolve immediate wins before the timed search. Amazons is excluded
+        // because applying every candidate also has a large mobility cost there.
+        if (!isAmazons) {
+            for (move in rootMoves) {
+                if (engine.applyMove(state, move).status == winStatus(rootColor)) {
+                    return move
+                }
+            }
+        }
+
+        var bestMove = rootMoves.first()
+        var bestScore = -INF
+        var lastScores: List<Pair<Move, Int>> = emptyList()
+        var previousScore = 0
+        val depthCap = maxDepth.coerceAtMost(MAX_PLY - 8)
+        pathKeys[0] = boardKey(state)
+
+        // Preserve the generic-game safety net from the previous search:
+        // games with an immediate one-move threat should block it even when a
+        // short time budget prevents a deeper completed iteration.
+        if (!isChess) {
+            immediateBlockingMove(state)?.let { return it }
+        }
+
+        for (depth in 1..depthCap) {
+            if (System.currentTimeMillis() > deadline) break
+            searchAborted = false
+
+            var alphaWindow = if (depth >= 4) previousScore - 50 else -INF
+            var betaWindow = if (depth >= 4) previousScore + 50 else INF
+            var iterationResult: Pair<Move, List<Pair<Move, Int>>>? = null
+
+            while (true) {
+                iterationResult = searchRoot(
+                    state,
+                    rootMoves,
+                    depth,
+                    alphaWindow,
+                    betaWindow,
+                    bestMove
+                )
+                if (searchAborted) break
+
+                val score = iterationResult.second.maxOfOrNull { it.second } ?: 0
+                if (score <= alphaWindow && alphaWindow > -INF) {
+                    alphaWindow = -INF
+                    continue
+                }
+                if (score >= betaWindow && betaWindow < INF) {
+                    betaWindow = INF
+                    continue
+                }
+                break
+            }
+
+            if (searchAborted || iterationResult == null) break
+            bestMove = iterationResult.first
+            lastScores = iterationResult.second
+            bestScore = lastScores.maxOfOrNull { it.second } ?: 0
+            previousScore = bestScore
+
+            if (bestScore >= MATE_BOUND) break
+        }
+
+        return pickWithVariety(state, bestMove, bestScore, lastScores)
+    }
+
+    private fun immediateBlockingMove(state: GameState): Move? {
+        val player = state.currentTurn
+        val opponent = player.opponent()
+        val opponentState = state.copy(currentTurn = opponent)
+        val threats = engine.allLegalMoves(opponentState, opponent).filter { move ->
+            engine.applyMove(opponentState, move).status == winStatus(opponent)
+        }
+        if (threats.size != 1) return null
+
+        val threatenedSquare = threats.first().to
+        return engine.allLegalMoves(state, player).firstOrNull { move ->
+            move.to == threatenedSquare
+        }
+    }
+
+    private fun searchRoot(
+        state: GameState,
+        moves: List<Move>,
+        depth: Int,
+        alphaIn: Int,
+        betaIn: Int,
+        previousBest: Move
+    ): Pair<Move, List<Pair<Move, Int>>> {
+        var alpha = alphaIn
+        val beta = betaIn
+        var best = moves.first()
+        var bestScore = -INF
+        val scored = ArrayList<Pair<Move, Int>>(moves.size)
+        val previousKey = moveKey(previousBest)
+        val ordered = moves.sortedByDescending { if (moveKey(it) == previousKey) 1 else 0 }
+        val wantExactScores = varietyWindow() > 0
+
+        for ((index, move) in ordered.withIndex()) {
+            if (System.currentTimeMillis() > deadline) {
+                searchAborted = true
+                break
+            }
+
+            val child = applyForSearch(state, move)
+            val score = if (index == 0 || wantExactScores) {
+                val lowerBound = if (wantExactScores) {
+                    minOf(alpha, bestScore - varietyWindow() - 1).coerceAtLeast(-INF)
+                } else {
+                    alpha
+                }
+                -negamax(child, depth - 1, -beta, -lowerBound, 1, true)
+            } else {
+                var candidate = -negamax(child, depth - 1, -alpha - 1, -alpha, 1, true)
+                if (!searchAborted && candidate > alpha && candidate < beta) {
+                    candidate = -negamax(child, depth - 1, -beta, -alpha, 1, true)
+                }
+                candidate
+            }
+
+            if (searchAborted) break
+            scored += move to score
+            if (score > bestScore) {
+                bestScore = score
+                best = move
+            }
+            if (score > alpha) alpha = score
+        }
+
+        if (searchAborted || scored.size != ordered.size) searchAborted = true
+        return best to scored
+    }
+
+    private fun varietyWindow(): Int = when {
+        varietyWindowOverride >= 0 -> varietyWindowOverride
+        maxDepth <= 3 -> 60
+        maxDepth <= 5 -> 30
+        else -> 0
+    }
+
+    private fun pickWithVariety(
+        state: GameState,
+        best: Move,
+        bestScore: Int,
+        scored: List<Pair<Move, Int>>
+    ): Move {
+        val window = varietyWindow()
+        if (window == 0 || scored.isEmpty()) return best
+        if (bestScore >= MATE_BOUND || bestScore <= -MATE_BOUND) return best
+
+        val myPrior = if (state.moveHistory.size >= 2) {
+            state.moveHistory[state.moveHistory.size - 2]
+        } else {
+            null
+        }
+        fun isRepeat(move: Move) =
+            myPrior != null && move.from == myPrior.to && move.to == myPrior.from
+
+        val pool = scored
+            .filter { (move, score) -> score >= bestScore - window && !isRepeat(move) }
+            .map { it.first }
+        return if (pool.isNotEmpty()) pool.random() else best
+    }
+
+    private fun negamax(
+        state: GameState,
+        depthIn: Int,
+        alphaIn: Int,
+        betaIn: Int,
+        ply: Int,
+        allowNull: Boolean
+    ): Int {
+        if ((++nodeCounter and 2047L) == 0L &&
+            System.currentTimeMillis() > deadline
+        ) {
+            searchAborted = true
+        }
+        if (searchAborted) return 0
+
+        val color = state.currentTurn
+        if (state.status != GameStatus.IN_PROGRESS) {
+            return terminalScore(state, color, ply)
+        }
+        if (ply >= MAX_PLY - 2) return evalFor(state, color)
+
+        // Repetition is a path property. The fixed-depth stack avoids treating
+        // every position with old move history as a draw in the TT.
+        val key = boardKey(state)
+        if ((0 until ply).any { pathKeys[it] == key }) return 0
+        pathKeys[ply] = key
+
+        var alpha = maxOf(alphaIn, -MATE + ply)
+        var beta = minOf(betaIn, MATE - ply - 1)
+        if (alpha >= beta) return alpha
+
+        val inCheck = chessEngine?.isInCheck(state, color) == true
+        var depth = depthIn
+        if (inCheck) depth += 1
+
+        if (depth <= 0) {
+            return if (quiesceDepth > 0) {
+                quiescence(state, alpha, beta, ply, quiesceDepth)
+            } else {
+                evalFor(state, color)
+            }
+        }
+
+        val entry = tt[key]
+        var ttMoveKey = -1
+        if (entry != null) {
+            ttMoveKey = entry.bestKey
+            if (entry.depth >= depth) {
+                val score = fromTT(entry.score, ply)
+                when (entry.flag) {
+                    TTFlag.EXACT -> return score
+                    TTFlag.LOWER -> if (score >= beta) return score
+                    TTFlag.UPPER -> if (score <= alpha) return score
+                }
+            }
+        }
+
+        val isPvNode = beta - alpha > 1
+        if (isChess && allowNull && !isPvNode && !inCheck && depth >= 3 &&
+            hasNonPawnMaterial(state, color)
+        ) {
+            val staticEval = evalFor(state, color)
+            if (staticEval >= beta) {
+                val reduction = if (depth >= 6) 3 else 2
+                val nullState = state.copy(
+                    currentTurn = color.opponent(),
+                    metadata = state.metadata.toMutableMap().apply { put("enPassant", -1) }
+                )
+                val nullScore = -negamax(
+                    nullState,
+                    depth - 1 - reduction,
+                    -beta,
+                    -beta + 1,
+                    ply + 1,
+                    false
+                )
+                if (searchAborted) return 0
+                if (nullScore >= beta) return if (nullScore >= MATE_BOUND) beta else nullScore
+            }
+        }
+
+        val moves = orderedMoves(state, color, ply, ttMoveKey)
+        if (moves.isEmpty()) return terminalScoreNoMoves(state, color, inCheck, ply)
+
+        var bestScore = -INF
+        var bestKey = -1
+        val originalAlpha = alpha
+
+        for ((index, move) in moves.withIndex()) {
+            val child = applyForSearch(state, move)
+            val quiet = !move.isCapture && move.promotionType == null
+            var score: Int
+
+            if (index == 0) {
+                score = -negamax(child, depth - 1, -beta, -alpha, ply + 1, true)
+            } else {
+                var reduction = 0
+                if (depth >= 3 && index >= 4 && quiet && !inCheck) {
+                    reduction = 1 +
+                        (if (index >= 8) 1 else 0) +
+                        (if (depth >= 6) 1 else 0)
+                    reduction = minOf(reduction, depth - 2)
+                }
+
+                score = -negamax(
+                    child,
+                    depth - 1 - reduction,
+                    -alpha - 1,
+                    -alpha,
+                    ply + 1,
+                    true
+                )
+                if (!searchAborted && score > alpha && reduction > 0) {
+                    score = -negamax(child, depth - 1, -alpha - 1, -alpha, ply + 1, true)
+                }
+                if (!searchAborted && score > alpha && score < beta) {
+                    score = -negamax(child, depth - 1, -beta, -alpha, ply + 1, true)
+                }
+            }
+
+            if (searchAborted) return 0
+            if (score > bestScore) {
+                bestScore = score
+                bestKey = moveKey(move)
+            }
+            if (score > alpha) alpha = score
+
+            if (alpha >= beta) {
+                if (quiet) recordCutoff(move, color, ply, depth)
+                break
+            }
+        }
+
+        val flag = when {
+            bestScore <= originalAlpha -> TTFlag.UPPER
+            bestScore >= beta -> TTFlag.LOWER
+            else -> TTFlag.EXACT
+        }
+        tt[key] = TTEntry(depth, toTT(bestScore, ply), flag, bestKey)
+        return bestScore
+    }
+
+    private fun quiescence(
+        state: GameState,
+        alphaIn: Int,
+        beta: Int,
+        ply: Int,
+        depthLeft: Int
+    ): Int {
+        if ((++nodeCounter and 2047L) == 0L &&
+            System.currentTimeMillis() > deadline
+        ) {
+            searchAborted = true
+        }
+        if (searchAborted) return 0
+
+        val color = state.currentTurn
+        if (state.status != GameStatus.IN_PROGRESS) return terminalScore(state, color, ply)
+
+        var alpha = alphaIn
+        val inCheck = chessEngine?.isInCheck(state, color) == true
+        val standPat = evalFor(state, color)
+        if (depthLeft <= 0 || ply >= MAX_PLY - 2) {
+            if (!inCheck) return standPat
+            val evasions = engine.allLegalMoves(state, color)
+            if (evasions.isEmpty()) return -MATE + ply
+            return evasions.maxOf { move ->
+                -evalFor(applyForSearch(state, move), color.opponent())
+            }
+        }
+
+        var best: Int
+        if (inCheck) {
+            best = -INF
+        } else {
+            if (standPat >= beta) return standPat
+            best = standPat
+            if (standPat > alpha) alpha = standPat
+        }
+
+        val moves = tacticalMoves(state, color, inCheck)
+        if (moves.isEmpty()) return if (inCheck) -MATE + ply else standPat
+
+        for (move in moves) {
+            val score = -quiescence(
+                applyForSearch(state, move),
+                -beta,
+                -alpha,
+                ply + 1,
+                depthLeft - 1
+            )
+            if (searchAborted) return 0
+            if (score > best) best = score
+            if (score > alpha) alpha = score
+            if (alpha >= beta) break
+        }
+        return best
+    }
+
+    private fun orderedMoves(
+        state: GameState,
+        color: PieceColor,
+        ply: Int,
+        ttMoveKey: Int = -1
+    ): List<Move> {
+        val killer0 = if (ply < MAX_PLY) killers[ply][0] else -1
+        val killer1 = if (ply < MAX_PLY) killers[ply][1] else -1
+        val legal = engine.allLegalMoves(state, color)
+        if (legal.size <= 1) return legal
+
+        return legal.map { move ->
+            val key = moveKey(move)
+            var score = orderingScore(state, move)
+            if (key == ttMoveKey) {
+                score += 1_000_000
+            } else if (!move.isCapture) {
+                if (key == killer0) score += 18_000
+                else if (key == killer1) score += 12_000
+                score += historyScores[historyIndex(move, color)]
+            }
+            move to score
+        }.sortedByDescending { it.second }.map { it.first }
+    }
+
+    private fun recordCutoff(move: Move, color: PieceColor, ply: Int, depth: Int) {
+        val key = moveKey(move)
+        if (ply < MAX_PLY && killers[ply][0] != key) {
+            killers[ply][1] = killers[ply][0]
+            killers[ply][0] = key
+        }
+        val index = historyIndex(move, color)
+        historyScores[index] =
+            (historyScores[index] + depth * depth).coerceAtMost(100_000)
+    }
+
+    private fun orderingScore(state: GameState, move: Move): Int {
+        val piece = state.get(move.from) ?: return 0
+        var score = 0
+        if (move.isCapture) {
+            val victim = move.captures.maxOfOrNull { state.get(it)?.value() ?: 0 } ?: 0
+            score += 10_000 + victim * 16 - piece.value()
+        }
+        if (move.promotionType != null) score += 9_000
+        if (move.to.row in 2..5 && move.to.col in 2..5) score += 35
+
+        if (piece is ChessPiece) {
+            val central = move.to.row in 2..5 && move.to.col in 2..5
+            score += when (piece.type) {
+                ChessPieceType.PAWN ->
+                    if (piece.color == PieceColor.WHITE) move.to.row else 7 - move.to.row
+                ChessPieceType.KNIGHT -> 12 + if (central) 12 else 0
+                ChessPieceType.BISHOP -> 15 + if (central) 10 else 0
+                ChessPieceType.ROOK -> 12 + if (move.to.row in 2..5 || move.to.col in 2..5) 8 else 0
+                ChessPieceType.QUEEN -> 18
+                ChessPieceType.KING -> 10
+            }
+        }
+        return score
+    }
+
+    private fun mvvLva(state: GameState, move: Move): Int {
+        val victim = move.captures.sumOf { state.get(it)?.value() ?: 100 }
+        val attacker = state.get(move.from)?.value() ?: 1000
+        return victim * 16 - attacker
+    }
+
+    private fun tacticalMoves(
+        state: GameState,
+        color: PieceColor,
+        inCheck: Boolean
+    ): List<Move> {
+        val legal = engine.allLegalMoves(state, color)
+        if (!isChess) {
+            return legal.filter { it.isCapture }.sortedByDescending { mvvLva(state, it) }
+        }
+        if (inCheck) return legal.sortedByDescending { mvvLva(state, it) }
+        return legal
+            .filter { it.isCapture || it.promotionType != null }
+            .sortedByDescending {
+                mvvLva(state, it) + if (it.promotionType != null) 6_000 else 0
+            }
+    }
+
+    private fun evalFor(state: GameState, color: PieceColor): Int {
+        val whiteScore = if (isAmazons) {
+            (engine as AmazonsRuleEngine).evaluateForSearch(state)
+        } else {
+            engine.evaluate(state)
+        }
+        return if (color == PieceColor.WHITE) whiteScore else -whiteScore
+    }
+
+    private fun terminalScore(state: GameState, color: PieceColor, ply: Int): Int =
+        when (state.status) {
+            GameStatus.WHITE_WINS ->
+                if (color == PieceColor.WHITE) MATE - ply else -(MATE - ply)
+            GameStatus.BLACK_WINS ->
+                if (color == PieceColor.BLACK) MATE - ply else -(MATE - ply)
+            else -> evalFor(state, color)
+        }
+
+    private fun terminalScoreNoMoves(
+        state: GameState,
+        color: PieceColor,
+        inCheck: Boolean,
+        ply: Int
+    ): Int = if (isChess) {
+        if (inCheck) -MATE + ply else 0
+    } else {
+        evalFor(state, color)
+    }
+
+    private fun hasNonPawnMaterial(state: GameState, color: PieceColor): Boolean =
+        state.board.any { piece ->
+            piece != null &&
+                piece.color == color &&
+                piece is ChessPiece &&
+                piece.type != ChessPieceType.PAWN &&
+                piece.type != ChessPieceType.KING
+        }
+
+    private fun toTT(score: Int, ply: Int): Int = when {
+        score >= MATE_BOUND -> score + ply
+        score <= -MATE_BOUND -> score - ply
+        else -> score
+    }
+
+    private fun fromTT(score: Int, ply: Int): Int = when {
+        score >= MATE_BOUND -> score - ply
+        score <= -MATE_BOUND -> score + ply
+        else -> score
+    }
+
+    private fun winStatus(color: PieceColor): GameStatus =
+        if (color == PieceColor.WHITE) GameStatus.WHITE_WINS else GameStatus.BLACK_WINS
+
+    private fun applyForSearch(state: GameState, move: Move): GameState =
+        if (isAmazons) {
+            (engine as AmazonsRuleEngine).applyMoveForSearch(state, move)
+        } else {
+            engine.applyMove(state, move)
+        }
+}
+
+
+package com.mkdev.mkboardgames.games.shogi
+
+import com.mkdev.mkboardgames.engine.AIPlayer
+import com.mkdev.mkboardgames.engine.GameState
+import com.mkdev.mkboardgames.engine.GameStatus
+import com.mkdev.mkboardgames.engine.Move
+import com.mkdev.mkboardgames.engine.Piece
+import com.mkdev.mkboardgames.engine.PieceColor
+import com.mkdev.mkboardgames.engine.Position
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class ShogiAiTest {
+    private val engine = ShogiRuleEngine()
+
+    private fun empty(turn: PieceColor): Array<Piece?> = arrayOfNulls(81)
+
+    private fun stateOf(
+        turn: PieceColor,
+        hands: Map<PieceColor, List<Piece>> = emptyMap(),
+        build: (Array<Piece?>) -> Unit,
+    ): GameState {
+        val b = arrayOfNulls<Piece>(81)
+        build(b)
+        return GameState(board = b, boardSize = 9, currentTurn = turn, hands = hands)
+    }
+
+    private fun put(b: Array<Piece?>, r: Int, c: Int, t: ShogiPieceType, col: PieceColor, promoted: Boolean = false) {
+        b[r * 9 + c] = ShogiPiece(t, col, promoted)
+    }
+
+    /** Perft: verifies move generation is unchanged and self-consistent. */
+    private fun perft(state: GameState, depth: Int): Long {
+        if (depth == 0) return 1
+        var n = 0L
+        for (m in engine.allLegalMoves(state, state.currentTurn)) {
+            n += perft(engine.applyForSearch(state, m), depth - 1)
+        }
+        return n
+    }
+
+    @Test fun perftStartPosition() {
+        val s = engine.initialState()
+        assertEquals(30L, perft(s, 1))
+        assertEquals(900L, perft(s, 2))
+        assertEquals(25_470L, perft(s, 3))
+    }
+
+    @Test fun fastCheckMatchesReferenceOnStart() {
+        val s = engine.initialState()
+        assertFalse(engine.inCheck(s, PieceColor.WHITE))
+        assertFalse(engine.inCheck(s, PieceColor.BLACK))
+    }
+
+    @Test fun detectsRookCheckAndLanceCheck() {
+        val rook = stateOf(PieceColor.WHITE) { b ->
+            put(b, 8, 4, ShogiPieceType.KING, PieceColor.WHITE)
+            put(b, 0, 4, ShogiPieceType.KING, PieceColor.BLACK)
+            put(b, 4, 4, ShogiPieceType.ROOK, PieceColor.BLACK)
+        }
+        assertTrue(engine.inCheck(rook, PieceColor.WHITE))
+
+        // Black lance faces down the file (forward = +1 row).
+        val lance = stateOf(PieceColor.WHITE) { b ->
+            put(b, 8, 4, ShogiPieceType.KING, PieceColor.WHITE)
+            put(b, 0, 0, ShogiPieceType.KING, PieceColor.BLACK)
+            put(b, 3, 4, ShogiPieceType.LANCE, PieceColor.BLACK)
+        }
+        assertTrue(engine.inCheck(lance, PieceColor.WHITE))
+
+        // A lance never attacks backwards: a white lance (moves toward row 0)
+        // placed on the black king's file but *below* it does not give check,
+        // while one placed above facing down would not either (wrong direction).
+        val behind = stateOf(PieceColor.BLACK) { b ->
+            put(b, 8, 8, ShogiPieceType.KING, PieceColor.WHITE)
+            put(b, 2, 4, ShogiPieceType.KING, PieceColor.BLACK)
+            put(b, 0, 4, ShogiPieceType.LANCE, PieceColor.WHITE) // above king, faces up (away)
+        }
+        assertFalse(engine.inCheck(behind, PieceColor.BLACK))
+    }
+
+    @Test fun knightAndSilverAttackDirections() {
+        // Black knight at (2,3) attacks (4,2) and (4,4).
+        val s = stateOf(PieceColor.WHITE) { b ->
+            put(b, 4, 4, ShogiPieceType.KING, PieceColor.WHITE)
+            put(b, 0, 8, ShogiPieceType.KING, PieceColor.BLACK)
+            put(b, 2, 3, ShogiPieceType.KNIGHT, PieceColor.BLACK)
+        }
+        assertTrue(engine.inCheck(s, PieceColor.WHITE))
+    }
+
+    @Test fun nifuIsRejected() {
+        val hands = mapOf(PieceColor.WHITE to listOf<Piece>(ShogiPiece(ShogiPieceType.PAWN, PieceColor.WHITE)))
+        val s = stateOf(PieceColor.WHITE, hands) { b ->
+            put(b, 8, 0, ShogiPieceType.KING, PieceColor.WHITE)
+            put(b, 0, 8, ShogiPieceType.KING, PieceColor.BLACK)
+            put(b, 6, 3, ShogiPieceType.PAWN, PieceColor.WHITE)
+        }
+        val drops = engine.legalDropsFrom(s, ShogiPieceType.PAWN)
+        assertTrue(drops.none { it.to.col == 3 })
+        assertTrue(drops.isNotEmpty())
+    }
+
+    @Test fun capturesGoToCapturersHandUnpromoted() {
+        val s = stateOf(PieceColor.WHITE) { b ->
+            put(b, 8, 0, ShogiPieceType.KING, PieceColor.WHITE)
+            put(b, 0, 8, ShogiPieceType.KING, PieceColor.BLACK)
+            put(b, 5, 4, ShogiPieceType.ROOK, PieceColor.WHITE)
+            put(b, 3, 4, ShogiPieceType.BISHOP, PieceColor.BLACK, promoted = true)
+        }
+        val m = engine.allLegalMoves(s, PieceColor.WHITE)
+            .first { it.to == Position(3, 4) && it.promotionType == null }
+        val after = engine.applyMove(s, m)
+        val hand = after.hands[PieceColor.WHITE].orEmpty().filterIsInstance<ShogiPiece>()
+        assertEquals(1, hand.size)
+        assertEquals(ShogiPieceType.BISHOP, hand[0].type)
+        assertFalse(hand[0].promoted)
+        assertEquals(PieceColor.WHITE, hand[0].color)
+    }
+
+    @Test fun forcedPromotionOfPawnOnLastRank() {
+        val s = stateOf(PieceColor.WHITE) { b ->
+            put(b, 8, 0, ShogiPieceType.KING, PieceColor.WHITE)
+            put(b, 0, 8, ShogiPieceType.KING, PieceColor.BLACK)
+            put(b, 1, 4, ShogiPieceType.PAWN, PieceColor.WHITE)
+        }
+        val moves = engine.legalMovesFrom(s, Position(1, 4))
+        assertEquals(1, moves.size)
+        assertNotNull(moves[0].promotionType)
+    }
+
+    @Test fun searchFindsMateInOne() {
+        // Black king boxed in the corner; white gold drop mates.
+        val hands = mapOf(PieceColor.WHITE to listOf<Piece>(ShogiPiece(ShogiPieceType.GOLD, PieceColor.WHITE)))
+        val s = stateOf(PieceColor.WHITE, hands) { b ->
+            put(b, 8, 8, ShogiPieceType.KING, PieceColor.WHITE)
+            put(b, 0, 0, ShogiPieceType.KING, PieceColor.BLACK)
+            put(b, 0, 2, ShogiPieceType.ROOK, PieceColor.WHITE) // covers file 2 / row 0 beyond
+            put(b, 2, 1, ShogiPieceType.GOLD, PieceColor.WHITE)
+        }
+        val move = AIPlayer(engine, maxDepth = 3, timeLimitMs = 1500, varietyWindowOverride = 0).bestMove(s)
+        assertNotNull(move)
+        val after = engine.applyMove(s, move!!)
+        assertTrue(after.status == GameStatus.WHITE_WINS || engine.allLegalMoves(after, PieceColor.BLACK).isNotEmpty())
+    }
+
+    @Test fun takesFreeHangingRook() {
+        val s = stateOf(PieceColor.WHITE) { b ->
+            put(b, 8, 0, ShogiPieceType.KING, PieceColor.WHITE)
+            put(b, 0, 8, ShogiPieceType.KING, PieceColor.BLACK)
+            put(b, 5, 4, ShogiPieceType.SILVER, PieceColor.WHITE)
+            put(b, 4, 4, ShogiPieceType.ROOK, PieceColor.BLACK)
+        }
+        val move = AIPlayer(engine, maxDepth = 2, timeLimitMs = 1000, varietyWindowOverride = 0).bestMove(s)!!
+        assertEquals(Position(4, 4), move.to)
+    }
+
+    @Test fun respectsTimeBudget() {
+        val start = System.currentTimeMillis()
+        AIPlayer(engine, maxDepth = 20, timeLimitMs = 700, quiesceDepth = 1).bestMove(engine.initialState())
+        val elapsed = System.currentTimeMillis() - start
+        assertTrue("took ${elapsed}ms", elapsed < 1_500)
+    }
+
+    @Test fun neverReturnsIllegalMove() {
+        var s = engine.initialState()
+        val ai = AIPlayer(engine, maxDepth = 2, timeLimitMs = 300, quiesceDepth = 1)
+        repeat(30) {
+            if (s.status != GameStatus.IN_PROGRESS) return
+            val m = ai.bestMove(s) ?: return
+            assertTrue(m in engine.allLegalMoves(s, s.currentTurn))
+            s = engine.applyMove(s, m)
+        }
+    }
+}
+
+
+Extra words from Claude:"Before I write anything, I want to flag what I found in the code, because a couple of these bugs will dominate any search improvements.
+
+## Bugs in the current code (highest impact first)
+
+1. **`boardKey` corrupts Shogi hashing.** It uses `piece.value() / 100` as the type index. In Shogi, GOLD=5 and PROMOTED PAWN(300)=3 collide with LANCE/KNIGHT(3), SILVER(4)/promoted-silver(6)... many distinct pieces share keys. The TT then returns wrong scores. Hands are hashed with `String.hashCode` arithmetic, which is weak.
+2. **`applyMove` in the search re-validates legality.** `applyMove` calls `allLegalMoves` (which includes pawn-drop-mate checks and a full board scan) *for every node*, then `gameStatus`, which again generates moves. That is the dominant cost: roughly 3 full legal-move generations per node. At depth 2-3 on a 700 ms budget, this is why the AI is weak.
+3. **`legalMovesFrom` does a full `isKingInCheck` per candidate**, and `isKingInCheck` regenerates every enemy piece's raw moves, including `rawMovesFrom` allocations. Very slow.
+4. **Repetition check `pathKeys`** only covers the search path, and the path array is keyed with a hash that collides (see 1).
+5. **`gameStatus` returns a loss on "no legal moves"**, correct for Shogi, but `terminalScoreNoMoves` for non-chess falls to `evalFor`, so mate in the tree isn't scored as mate unless `applyMove` produced the terminal status.
+6. **Evaluation ignores hands entirely**, so captures look like pure material gain only via board removal, and dropping a piece looks like it loses material (piece leaves the "hand" but the eval never counted it there). The search can't understand that a piece in hand ≈ a piece on board.
+7. **The immediate-win loop at the root** calls `applyMove` (full validation) on every root move.
+8. **Color mapping quirk:** BLACK starts at rows 0-2 (moves down, `forward = +1`), WHITE at rows 6-8. Evaluation's `advance` handles this correctly, but `orderingScore` in `AIPlayer` uses chess-specific central-square logic that means little here.
+
+## Design
+
+I'd keep `AIPlayer`'s public API and add a **dedicated `ShogiSearch`** class that `AIPlayer.bestMove` delegates to when `engine is ShogiRuleEngine`. This leaves Chess/Amazons/others byte-for-byte unchanged in behavior.
+
+The engine-level fixes are:
+
+- **`ShogiRuleEngine` gets fast internal paths**: a `applyMoveUnchecked` (no legality re-validation, no status computation), pseudo-legal generation plus a cheap attack test (`isSquareAttacked` that walks outward from the king rather than generating all enemy moves), and `legalMovesFast` used by search.
+- **Search-time terminal detection** is done by "no legal moves" in the node itself, not via `gameStatus`.
+- **Zobrist hashing** with proper per-(type, promoted, color, square) keys and per-(color, type, count) hand keys.
+
+The search itself is negamax/PVS with iterative deepening, a TT, killers/history, check extension, LMR, null-move (careful: disabled when the side has few pieces in hand or is in check, since zugzwang is rarer in shogi but drops make null-move risky), and a **check-and-capture quiescence** with a small depth cap.
+
+The evaluation is material (board + hand, hand slightly discounted), promoted-piece bonuses, piece-square tables, king safety (defenders adjacent to king, king depth), promotion-zone pressure, and a mobility term computed cheaply from raw move counts.
+
+## Important caveat
+
+I can't compile or run your project here, so treat the code below as carefully-reviewed but **untested**. Please run the tests I list at the end, especially the perft-style legality check, before shipping. I've kept everything in plain Kotlin stdlib.
+
+I'll write the files now.
+
+Next, the evaluator.
+
+Now the dedicated search.
+
+Now the minimal `AIPlayer` change: delegate to `ShogiSearch` when the engine is Shogi, leaving everything else untouched.
+
+The uploads folder is empty, so I'll write the full `AIPlayer.kt` directly from the source in my context, with only the Shogi delegation added.
+
+Now a test file, then I'll copy everything to outputs.
+
+I wrote one test sloppily (`.and(false)` makes the lance-behind assertion meaningless). Let me fix it and then copy the files out.
+
+I've written the changes below. **I couldn't compile or run any of it here, so treat it as untested until you run the tests.**
+
+## Files changed
+
+| File | Status |
+|---|---|
+| `ShogiSearch.kt` | **New**, dedicated Shogi search |
+| `ShogiEvaluator.kt` | **New**, Shogi evaluation |
+| `ShogiRuleEngine.kt` | Replaced: same public behavior, plus fast search-only methods |
+| `AIPlayer.kt` | Replaced: the Shogi path now delegates to `ShogiSearch`. The generic search is unchanged, so Chess, Amazons and Checkers behave as before. |
+| `ShogiAiTest.kt` | **New**, unit tests |
+
+The constructor and `bestMove(state)` signatures are unchanged, so `GameActivity` and `SettingsManager` need no edits.
+
+## What was wrong
+
+- **Hashing was broken for Shogi.** The generic `boardKey` used `piece.value() / 100` as the piece type, which made different pieces collide (e.g. a promoted pawn and a lance). The hands hash was also weak. That corrupts the transposition table, so it returned wrong scores.
+- **Search was very slow.** Every node called `engine.applyMove`, which regenerates all legal moves to validate, then computes `gameStatus`, which generates them again. That is about 3 full move generations per node.
+- **Check detection was expensive.** `isKingInCheck` generated every enemy piece's raw moves.
+- **The evaluation ignored hands.** A dropped piece looked like lost material, and a capture only counted the board-side gain.
+
+## What I changed
+
+- **Fast paths in the engine.** `applyForSearch` skips validation and status. `isSquareAttackedBy` walks outward from the king instead of generating enemy moves. `legalMovesFrom` and `legalDropsFrom` now use it too, but their legality logic, including nifu, pawn-drop mate, forced promotion and capture-to-hand, is unchanged.
+- **Terminal detection in the node.** No legal moves means the side to move loses, which is correct for Shogi. A missing king is also scored as a win or loss.
+- **`ShogiSearch`.** It uses iterative deepening, PVS with aspiration windows, and a transposition table with proper Zobrist keys over board, promotion and hand counts. Move ordering uses the TT move, captures, promotions, killers and history, plus a bonus for moves near the enemy king. It adds check extensions, late-move reductions and path-based repetition, and a quiescence search over captures, promotions and check evasions.
+- **`ShogiEvaluator`.** It covers board and hand material, promoted pieces, piece-square bonuses, promotion-zone pressure, king safety, drop threat against a weakly defended king, and slider mobility. It also penalizes pieces that can never move again.
+
+## Tradeoffs and limits
+
+- **Perpetual check and sennichite** are only handled as a repetition draw (score 0) along the current search path. Real Shogi rules make perpetual check a loss for the checker, and your engine doesn't model that either.
+- **No null-move pruning for Shogi.** Drops make zugzwang rare but null-move still risky, so I left it out.
+- **Quiescence doesn't search quiet checks.** That is a deliberate cost limit. Check evasions are covered.
+- **Pawn-drop mate is still expensive** because `legalDropsFrom` calls it for each pawn drop. I kept it exact rather than approximating.
+- **Weights are hand-tuned guesses.** Expect to adjust them after self-play.
+- **Difficulty levels:** depth 1/2/3 with 700/1200/2200 ms still applies. Because nodes are now much cheaper, you'll likely want to raise `shogiAiDepth` (for example 2/4/6) and let the time limit decide.
+
+## Tests
+
+`ShogiAiTest.kt` covers:
+- **Start-position perft** at depths 1 to 3. I wrote the expected values from memory (30 / 900 / 25,470). I believe those are the standard Shogi numbers, but verify them yourself.
+- **Attack detection** for rook, lance direction and knight.
+- **Rules:** nifu, capture-to-hand unpromoted, and forced promotion.
+- **AI behavior:** takes a hanging rook, respects the time budget, and never returns an illegal move over 30 plies.
+
+The mate-in-one test is loose and may need adjusting, since I built that position without checking it.
+
+Please run these first, especially perft. If perft disagrees with the old engine, the new attack test has a bug, and that would be the first thing to fix. "
