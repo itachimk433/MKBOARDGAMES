@@ -31,37 +31,6 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x gradlew
 
-      - name: Bundle Stockfish 19 Android engines
-        run: |
-          set -euo pipefail
-          VERSION="sf_19"
-          BASE_URL="https://github.com/official-stockfish/Stockfish/releases/download/${VERSION}"
-          ROOT="app/src/main/assets/stockfish"
-          TMP="${RUNNER_TEMP}/stockfish"
-          mkdir -p "$ROOT/arm64-v8a" "$ROOT/armeabi-v7a" "$TMP/arm64" "$TMP/armv7"
-
-          curl --fail --silent --show-error --location --retry 3 \
-            "$BASE_URL/stockfish-android-arm64-universal.tar.gz" \
-            --output "$TMP/stockfish-arm64.tar.gz"
-          echo "ebb24051aa4a222b4daaf049b882ecf1163d370c128fe02316602643f4d5e426  $TMP/stockfish-arm64.tar.gz" \
-            | sha256sum --check --status
-          tar --extract --gzip --file "$TMP/stockfish-arm64.tar.gz" --directory "$TMP/arm64"
-
-          curl --fail --silent --show-error --location --retry 3 \
-            "$BASE_URL/stockfish-android-armv7-neon.tar.gz" \
-            --output "$TMP/stockfish-armv7.tar.gz"
-          echo "47c34963f1cdf4a6af34c1b5294f7a4e2679b3eb52698c324855af2c6486024b  $TMP/stockfish-armv7.tar.gz" \
-            | sha256sum --check --status
-          tar --extract --gzip --file "$TMP/stockfish-armv7.tar.gz" --directory "$TMP/armv7"
-
-          install -m 0755 \
-            "$TMP/arm64/stockfish/stockfish-android-arm64-universal" \
-            "$ROOT/arm64-v8a/stockfish"
-          install -m 0755 \
-            "$TMP/armv7/stockfish/stockfish-android-armv7-neon" \
-            "$ROOT/armeabi-v7a/stockfish"
-          install -m 0644 "$TMP/arm64/stockfish/Copying.txt" "$ROOT/Copying.txt"
-
       - name: Build debug APK
         run: |
           ./gradlew assembleDebug \

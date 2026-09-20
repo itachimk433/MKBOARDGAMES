@@ -87,7 +87,6 @@ object SettingsManager {
 
     // ── Chess ────────────────────────────────────────────────────────────────
     data class ChessAiProfile(val depth: Int, val timeLimitMs: Long, val quiesceDepth: Int)
-    data class ChessStockfishProfile(val elo: Int, val timeLimitMs: Long)
 
     fun chessDifficultyLabels() = arrayOf("Easy", "Medium", "Hard", "Master")
 
@@ -104,19 +103,6 @@ object SettingsManager {
     fun chessAiDepth(ctx: Context) = chessAiProfileForLevel(getChessDifficulty(ctx)).depth
     fun chessAiTimeLimitMs(ctx: Context): Long = chessAiProfileForLevel(getChessDifficulty(ctx)).timeLimitMs
     fun chessAiQuiesceDepth(ctx: Context): Int = chessAiProfileForLevel(getChessDifficulty(ctx)).quiesceDepth
-
-    /**
-     * Stockfish's UCI_Elo values are calibrated engine-strength targets, not
-     * promises of an online player rating. They are deliberately spaced widely
-     * enough that the four visible levels feel distinct on mobile hardware.
-     */
-    fun chessStockfishProfileForLevel(level: Int): ChessStockfishProfile = when (level.coerceIn(0, 3)) {
-        0 -> ChessStockfishProfile(1320, 600L)  // Easy
-        1 -> ChessStockfishProfile(1700, 1200L) // Medium
-        2 -> ChessStockfishProfile(2200, 2200L) // Hard
-        3 -> ChessStockfishProfile(2800, 5000L) // Master
-        else -> ChessStockfishProfile(1700, 1200L)
-    }
 
     // ── Checkers ─────────────────────────────────────────────────────────────
     fun getCheckersDifficulty(ctx: Context) = prefs(ctx).getInt(KEY_CHECKERS_DIFFICULTY, 0)
