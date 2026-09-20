@@ -16,6 +16,7 @@ import com.mkdev.mkboardgames.games.checkers.CheckersRuleEngine
 import com.mkdev.mkboardgames.games.checkers.InternationalDraughtsRuleEngine
 import com.mkdev.mkboardgames.games.chess.ChessPiece
 import com.mkdev.mkboardgames.games.chess.ChessRuleEngine
+import com.mkdev.mkboardgames.games.chess.StockfishPlayer
 import com.mkdev.mkboardgames.games.foxandgeese.FoxAndGeeseRuleEngine
 import com.mkdev.mkboardgames.games.go.GoRuleEngine
 import com.mkdev.mkboardgames.games.go.GoAIPlayer
@@ -1725,8 +1726,29 @@ Checkmate your opponent's King.
                                 timeLimitMs = profile.timeLimitMs,
                             ).bestMove(thinkingState)
                         }
+                        "CHESS" -> {
+                            val level = SettingsManager.getChessDifficulty(this@GameActivity)
+                            val stockfishMove = StockfishPlayer(
+                                context = this@GameActivity,
+                                profile = SettingsManager.chessStockfishProfileForLevel(level),
+                            ).bestMove(thinkingState)
+
+                            // Keep local development builds and unsupported
+                            // ABIs playable when the workflow-provided binary
+                            // is not present.
+                            stockfishMove ?: run {
+                                val fallback = SettingsManager.chessAiProfileForLevel(level)
+                                AIPlayer(
+                                    engine,
+                                    maxDepth = fallback.depth,
+                                    timeLimitMs = fallback.timeLimitMs,
+                                    quiesceDepth = fallback.quiesceDepth,
+                                ).bestMove(thinkingState)
+                            }
+                        }
                         else -> {
-                            // Chess — deeper search with quiescence and time limit
+                            // Fallback for any future chess alias — deeper search
+                            // with quiescence and time limit.
                             val depth    = SettingsManager.chessAiDepth(this@GameActivity)
                             val timeMs   = SettingsManager.chessAiTimeLimitMs(this@GameActivity)
                             val quiesce  = SettingsManager.chessAiQuiesceDepth(this@GameActivity)
