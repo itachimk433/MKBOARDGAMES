@@ -33,6 +33,11 @@ jobs:
 
       - name: Set up Android NDK
         uses: android-actions/setup-android@v3
+        with:
+          # The action's historical default includes the removed SDK package
+          # named "tools", which makes current GitHub runners fail before the
+          # workflow reaches the NDK build.
+          packages: platform-tools
 
       - name: Build compact Ethereal chess engines
         env:
