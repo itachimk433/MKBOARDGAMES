@@ -165,6 +165,19 @@ class BoardView(context: Context) : View(context) {
     private var animator: ValueAnimator? = null
     private var pendingMove: Move? = null
 
+    // Shogi drop feedback
+    private var shogiDropBannerText = ""
+    private var shogiDropBannerAlpha = 0f
+    private var shogiDropBannerAnimator: ValueAnimator? = null
+    private val shogiDropBannerBgPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val shogiDropBannerEdgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+    }
+    private val shogiDropBannerTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textAlign = Paint.Align.CENTER
+        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+    }
+
     // Othello disc pop/flip animation
     private var recentOthelloPieces: Set<Position> = emptySet()
     private var othelloPopProgress: Float = 1f
@@ -936,6 +949,10 @@ class BoardView(context: Context) : View(context) {
         animator = null
         pendingMove = null
         activeAnimator?.cancel()
+        shogiDropBannerAnimator?.cancel()
+        shogiDropBannerAnimator = null
+        shogiDropBannerText = ""
+        shogiDropBannerAlpha = 0f
         animPiece = null
         animFromPos = null
         animToPos = null
@@ -980,9 +997,26 @@ class BoardView(context: Context) : View(context) {
             selectedPos = null
             legalMoves = emptyList()
             shogiDropPiece = null
+            val dropType = ShogiPieceType.entries.getOrNull(move.from.col)
+            if (isShogiBoard() && dropType != null) {
+                val dropColor = gameState.currentTurn
+                val handPiece = gameState.hands[dropColor]
+                    .orEmpty()
+                    .filterIsInstance<ShogiPiece>()
+                    .firstOrNull { it.type == dropType }
+                    ?: ShogiPiece(dropType, dropColor)
+                animPiece = handPiece
+                animFromPos = null
+                animToPos = move.to
+                animFromPx = shogiDropOrigin(handPiece.color)
+                animToPx = shogiPoint(move.to)
+                pendingMove = move
+                isLocked = true
+                showShogiDropBanner(handPiece)
+                startMoveAnimator(move, durationMs = 420L)
+                return
+            }
             isLocked = true
-            // Drops originate in the hand rather than from a board square, so
-            // use a short placement pause instead of a from-to animation.
             postDelayed({
                 isLocked = false
                 invalidate()
@@ -997,8 +1031,13 @@ class BoardView(context: Context) : View(context) {
         animFromPx  = cellCenter(move.from); animToPx = cellCenter(move.to)
         pendingMove = move; isLocked = true
 
+        startMoveAnimator(move, durationMs = 280L)
+    }
+
+    private fun startMoveAnimator(move: Move, durationMs: Long) {
         animator = ValueAnimator.ofFloat(0f, 1f).apply {
-            duration = 280L; interpolator = AccelerateDecelerateInterpolator()
+            duration = durationMs
+            interpolator = AccelerateDecelerateInterpolator()
             addUpdateListener { animProgress = it.animatedValue as Float; invalidate() }
             addListener(object : AnimatorListenerAdapter() {
                 override fun onAnimationEnd(animation: Animator) {
@@ -1013,6 +1052,42 @@ class BoardView(context: Context) : View(context) {
             })
             start()
         }
+    }
+
+    private fun shogiDropOrigin(color: PieceColor): PointF {
+        val x = shogiGridLeft + shogiCellWidth * 0.65f
+        val y = if (color == PieceColor.WHITE) {
+            shogiGridTop - cellSize * 0.90f
+        } else {
+            shogiGridBottom + cellSize * 0.90f
+        }
+        return PointF(x, y)
+    }
+
+    private fun showShogiDropBanner(piece: ShogiPiece) {
+        shogiDropBannerText = "◆  DROP  ·  ${piece.symbol()}"
+        shogiDropBannerAlpha = 1f
+        shogiDropBannerAnimator?.cancel()
+        shogiDropBannerAnimator = ValueAnimator.ofFloat(1f, 0f).apply {
+            startDelay = 520L
+            duration = 720L
+            addUpdateListener {
+                shogiDropBannerAlpha = it.animatedValue as Float
+                invalidate()
+            }
+            addListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    if (animation === shogiDropBannerAnimator) {
+                        shogiDropBannerAnimator = null
+                        shogiDropBannerText = ""
+                        shogiDropBannerAlpha = 0f
+                        invalidate()
+                    }
+                }
+            })
+            start()
+        }
+        invalidate()
     }
 
     private fun cellCenter(pos: Position): PointF {
@@ -1069,6 +1144,7 @@ class BoardView(context: Context) : View(context) {
             drawShogiBoard(canvas)
             drawShogiHighlights(canvas)
             drawShogiPieces(canvas)
+            drawShogiDropBanner(canvas)
             return
         }
         if (isXiangqiBoard()) {
@@ -1446,6 +1522,37 @@ class BoardView(context: Context) : View(context) {
                 lerp(animFromPx.y, animToPx.y, animProgress),
             )
         }
+    }
+
+    private fun drawShogiDropBanner(canvas: Canvas) {
+        if (shogiDropBannerAlpha <= 0f || shogiDropBannerText.isEmpty()) return
+        val alpha = (shogiDropBannerAlpha * 255f).toInt().coerceIn(0, 255)
+        val centerX = width / 2f
+        val centerY = maxOf(cellSize * 0.72f, shogiGridTop - cellSize * 0.34f)
+        shogiDropBannerTextPaint.textSize = maxOf(12f, cellSize * 0.23f)
+        val textWidth = shogiDropBannerTextPaint.measureText(shogiDropBannerText)
+        val padX = cellSize * 0.32f
+        val padY = cellSize * 0.18f
+        val metrics = shogiDropBannerTextPaint.fontMetrics
+        val textHeight = metrics.descent - metrics.ascent
+        val bounds = RectF(
+            centerX - textWidth / 2f - padX,
+            centerY - textHeight / 2f - padY,
+            centerX + textWidth / 2f + padX,
+            centerY + textHeight / 2f + padY,
+        )
+        shogiDropBannerBgPaint.color = Color.argb(alpha * 9 / 10, 22, 42, 48)
+        canvas.drawRoundRect(bounds, cellSize * 0.16f, cellSize * 0.16f, shogiDropBannerBgPaint)
+        shogiDropBannerEdgePaint.color = Color.argb(alpha, 227, 184, 106)
+        shogiDropBannerEdgePaint.strokeWidth = maxOf(1f, cellSize * 0.025f)
+        canvas.drawRoundRect(bounds, cellSize * 0.16f, cellSize * 0.16f, shogiDropBannerEdgePaint)
+        shogiDropBannerTextPaint.color = Color.argb(alpha, 255, 231, 174)
+        canvas.drawText(
+            shogiDropBannerText,
+            centerX,
+            centerY - (metrics.ascent + metrics.descent) / 2f,
+            shogiDropBannerTextPaint,
+        )
     }
 
     private fun drawXiangqiHighlights(canvas: Canvas) {
