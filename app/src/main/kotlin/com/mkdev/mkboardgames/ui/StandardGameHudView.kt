@@ -24,7 +24,7 @@ class StandardGameHudView(
     labelTextSizeSp: Float = 15f,
     private val labelOffsetDp: Float = 0f,
     private val backLabel: String = "← Back",
-    private val sideLabel: String = "",
+    sideLabel: String = "",
     private val menuLabel: String = "Menu",
     private val showHintControl: Boolean = false,
     private val showMenuControl: Boolean = true,
@@ -41,6 +41,7 @@ class StandardGameHudView(
     private var canRedo = false
     private var detail = ""
     private var labelColor = Color.WHITE
+    private var sideLabelText = sideLabel
     private var hintActive = false
     private var hintRotation = 0f
     private var hintAnimator: ValueAnimator? = null
@@ -126,6 +127,11 @@ class StandardGameHudView(
 
     fun setThinking(value: Boolean) {
         detail = if (value) "Thinking…" else ""
+        invalidate()
+    }
+
+    fun setSideLabel(value: String) {
+        sideLabelText = value
         invalidate()
     }
 
@@ -224,9 +230,9 @@ class StandardGameHudView(
             canvas.drawRoundRect(it, radius, radius, buttonBorderPaint)
         }
         canvas.drawText(backLabel, backRect.centerX(), backRect.centerY() + buttonPaint.textSize * 0.36f, buttonPaint)
-        if (sideLabel.isNotEmpty()) {
+        if (sideLabelText.isNotEmpty()) {
             canvas.drawText(
-                sideLabel,
+                sideLabelText,
                 backRect.right + 9f * dp,
                 backRect.centerY() + sideLabelPaint.textSize * 0.36f,
                 sideLabelPaint,

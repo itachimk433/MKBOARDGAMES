@@ -20,6 +20,7 @@ import com.mkdev.mkboardgames.ui.ChessMenuView
 import com.mkdev.mkboardgames.ui.MorabaraBoardView
 import com.mkdev.mkboardgames.ui.MorabarabaBoardStyle
 import com.mkdev.mkboardgames.ui.SnakesLaddersGameOverView
+import com.mkdev.mkboardgames.ui.StandardGameHudView
 import com.mkdev.mkboardgames.ui.StyledDialogs
 import kotlinx.coroutines.*
 
@@ -30,7 +31,7 @@ class MorabarabaActivity : AppCompatActivity() {
     }
 
     private lateinit var boardView:         MorabaraBoardView
-    private lateinit var hudView:           MorabarabaHudView
+    private lateinit var hudView:           StandardGameHudView
     private lateinit var topCaptureView:    CaptureStripView
     private lateinit var bottomCaptureView: CaptureStripView
     private lateinit var autoplayButton:    AutoplayButtonView
@@ -79,7 +80,12 @@ class MorabarabaActivity : AppCompatActivity() {
             setBackgroundColor(Color.parseColor("#0E0E0E"))
         }
 
-        hudView          = MorabarabaHudView(this)
+        hudView = StandardGameHudView(this, labelTextSizeSp = 13f).apply {
+            onBack = { onBack() }
+            onUndo = { onUndo() }
+            onRedo = { onRedo() }
+            onMenu = { onMenu() }
+        }
         topCaptureView   = CaptureStripView(this).also { it.dividerOnTop = false }
         boardView        = MorabaraBoardView(this)
         autoplayButton   = AutoplayButtonView(this)
@@ -641,7 +647,14 @@ class MorabarabaActivity : AppCompatActivity() {
 
         val label = if (vsAI && gameState.currentTurn == playerColor) "Your turn"
                     else "${if (gameState.currentTurn == PieceColor.WHITE) "White" else "Black"} to move"
-        hudView.update(label, sub1, sub2, canUndo = moveHistory.isNotEmpty(), canRedo = redoGameStates.isNotEmpty())
+        hudView.setSideLabel(sub1)
+        hudView.setInfo(
+            value = label,
+            undo = moveHistory.isNotEmpty(),
+            redo = redoGameStates.isNotEmpty(),
+            detail = sub2,
+            accentColor = Color.WHITE,
+        )
     }
 
     @Suppress("DEPRECATION")
@@ -893,94 +906,4 @@ You win by either:
         )
     }
 
-    // ─── HUD View ─────────────────────────────────────────────────────────────
-
-    inner class MorabarabaHudView(ctx: Context) : View(ctx) {
-        private val dp = resources.displayMetrics.density
-        private val sp = resources.displayMetrics.scaledDensity
-        private val bgP   = Paint().apply { color = Color.parseColor("#1A1A1A") }
-        private val divP  = Paint().apply { color = Color.parseColor("#2A2A2A") }
-        private val txtP  = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.WHITE; isFakeBoldText = true; textAlign = Paint.Align.CENTER
-            textSize = 13f * sp.coerceAtMost(3f)
-        }
-        private val subP  = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#7FC8F8"); textAlign = Paint.Align.CENTER
-            textSize = 10f * sp.coerceAtMost(3f)
-        }
-        private val sub2P = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#9E9E9E"); textAlign = Paint.Align.CENTER
-            textSize = 10f * sp.coerceAtMost(3f)
-        }
-        private val btnBgP = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#252525") }
-        private val btnP   = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#7FC8F8"); textAlign = Paint.Align.CENTER
-            textSize = 11f * sp.coerceAtMost(3f)
-        }
-        private val dimP = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#555555"); textAlign = Paint.Align.CENTER
-            textSize = 11f * sp.coerceAtMost(3f)
-        }
-
-        private var title    = "White to move"
-        private var sub1     = ""
-        private var sub2     = ""
-        private var canUndo  = false
-        private var canRedo  = false
-        private var thinking = false
-
-        private val backRect = RectF()
-        private val undoRect = RectF()
-        private val redoRect = RectF()
-        private val menuRect = RectF()
-
-        fun update(t: String, s1: String, s2: String = "", canUndo: Boolean, canRedo: Boolean) {
-            title = t; sub1 = s1; sub2 = s2; this.canUndo = canUndo; this.canRedo = canRedo; invalidate()
-        }
-        fun setThinking(t: Boolean) { thinking = t; invalidate() }
-
-        override fun onSizeChanged(w: Int, h: Int, ow: Int, oh: Int) {
-            val bw = 44f * dp; val bh = 28f * dp; val by = (h - bh) / 2f
-            backRect.set(6f * dp,        by, 6f * dp + bw,   by + bh)
-            undoRect.set(w - bw * 3.3f,  by, w - bw * 2.2f,  by + bh)
-            redoRect.set(w - bw * 2.15f, by, w - bw * 1.1f,  by + bh)
-            menuRect.set(w - bw * 1.05f, by, w - 4f * dp,    by + bh)
-        }
-
-        override fun onTouchEvent(e: MotionEvent): Boolean {
-            if (e.action == MotionEvent.ACTION_UP) {
-                when {
-                    backRect.contains(e.x, e.y) -> { SoundPlayer.play("ui_click"); onBack() }
-                    undoRect.contains(e.x, e.y) -> { SoundPlayer.play("ui_click"); onUndo() }
-                    redoRect.contains(e.x, e.y) -> { SoundPlayer.play("ui_click"); onRedo() }
-                    menuRect.contains(e.x, e.y) -> { SoundPlayer.play("ui_click"); onMenu() }
-                }
-            }
-            return true
-        }
-
-        override fun onDraw(canvas: Canvas) {
-            val w = width.toFloat(); val h = height.toFloat()
-            canvas.drawRect(0f, 0f, w, h, bgP)
-            canvas.drawRect(0f, h - dp, w, h, divP)
-
-            val rr = 5f * dp
-            canvas.drawRoundRect(backRect, rr, rr, btnBgP)
-            canvas.drawRoundRect(undoRect, rr, rr, btnBgP)
-            canvas.drawRoundRect(redoRect, rr, rr, btnBgP)
-            canvas.drawRoundRect(menuRect, rr, rr, btnBgP)
-            canvas.drawText("← Back", backRect.centerX(), backRect.centerY() + btnP.textSize * 0.36f, btnP)
-            canvas.drawText("Undo",   undoRect.centerX(), undoRect.centerY() + btnP.textSize * 0.36f,
-                if (canUndo) btnP else dimP)
-            canvas.drawText("Redo",   redoRect.centerX(), redoRect.centerY() + btnP.textSize * 0.36f,
-                if (canRedo) btnP else dimP)
-            canvas.drawText("Menu",   menuRect.centerX(), menuRect.centerY() + btnP.textSize * 0.36f, btnP)
-
-            val cx = w / 2f
-            val titleStr = if (thinking) "Thinking…" else title
-            canvas.drawText(titleStr, cx, h * 0.24f, txtP)
-            canvas.drawText(sub1, cx, h * 0.70f, subP)
-            if (sub2.isNotEmpty()) canvas.drawText(sub2, cx, h * 0.88f, sub2P)
-        }
-    }
 }
