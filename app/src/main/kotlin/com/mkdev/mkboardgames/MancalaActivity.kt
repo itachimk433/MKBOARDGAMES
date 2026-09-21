@@ -93,9 +93,9 @@ class MancalaActivity : AppCompatActivity() {
         } else {
             stagingTravelDuration + (movedStones.size - 1) * stagingGap
         }
-        // Slow the staging-to-pit flight by 40% while preserving the selected
-        // movement-speed setting's relative differences.
-        val placementDuration = 260f / (normalizedSpeed * 0.54f)
+        // Keep the selected movement-speed setting proportional to the actual
+        // pit-to-pit flight time.
+        val placementDuration = 260f / normalizedSpeed
         val settleDuration = 600f / normalizedSpeed
         val sowingDuration = stagingDuration + sowingRoutes.fold(0f) { total, route ->
             total + routeDuration(route)
@@ -1192,11 +1192,11 @@ class MancalaActivity : AppCompatActivity() {
                             stone = stone,
                             from = it,
                             to = MancalaRuleEngine.SOUTH_STORE,
-                            route = engine.forwardPath(
-                                it,
-                                MancalaRuleEngine.SOUTH_STORE,
-                                PieceColor.WHITE,
-                            ),
+                            // The final sweep is a visual cleanup, not another
+                            // turn. Move each remaining stone directly to the
+                            // store so the result is not held up by a full
+                            // board-length route for every stone.
+                            route = listOf(it, MancalaRuleEngine.SOUTH_STORE),
                         )
                     }
                     working[MancalaRuleEngine.SOUTH_STORE] += working[it]
@@ -1210,11 +1210,7 @@ class MancalaActivity : AppCompatActivity() {
                             stone = stone,
                             from = it,
                             to = MancalaRuleEngine.NORTH_STORE,
-                            route = engine.forwardPath(
-                                it,
-                                MancalaRuleEngine.NORTH_STORE,
-                                PieceColor.BLACK,
-                            ),
+                            route = listOf(it, MancalaRuleEngine.NORTH_STORE),
                         )
                     }
                     working[MancalaRuleEngine.NORTH_STORE] += working[it]
