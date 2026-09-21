@@ -223,14 +223,47 @@ object SettingsManager {
         when (getConnectFourDifficulty(ctx)) { 0 -> 700L; 2 -> 2500L; else -> 1400L }
 
     // ── Fox and Geese ────────────────────────────────────────────────────────
+    data class FoxAndGeeseAiProfile(
+        val depth: Int,
+        val timeLimitMs: Long,
+        val varietyWindow: Int,
+    )
+
     fun getFoxAndGeeseDifficulty(ctx: Context) =
-        prefs(ctx).getInt(KEY_FOX_AND_GEESE_DIFFICULTY, 0)
+        prefs(ctx).getInt(KEY_FOX_AND_GEESE_DIFFICULTY, 0).coerceIn(0, 2)
+
     fun setFoxAndGeeseDifficulty(ctx: Context, v: Int) =
-        prefs(ctx).edit().putInt(KEY_FOX_AND_GEESE_DIFFICULTY, v).apply()
-    fun foxAndGeeseAiDepth(ctx: Context) =
-        when (getFoxAndGeeseDifficulty(ctx)) { 0 -> 2; 2 -> 6; else -> 4 }
+        prefs(ctx).edit().putInt(KEY_FOX_AND_GEESE_DIFFICULTY, v.coerceIn(0, 2)).apply()
+
+    fun foxAndGeeseAiProfileForLevel(level: Int): FoxAndGeeseAiProfile =
+        when (level.coerceIn(0, 2)) {
+            0 -> FoxAndGeeseAiProfile(
+                depth = 2,
+                timeLimitMs = 700L,
+                varietyWindow = 60,
+            )
+            1 -> FoxAndGeeseAiProfile(
+                depth = 4,
+                timeLimitMs = 1300L,
+                varietyWindow = 30,
+            )
+            else -> FoxAndGeeseAiProfile(
+                depth = 6,
+                timeLimitMs = 2400L,
+                varietyWindow = 0,
+            )
+        }
+
+    fun foxAndGeeseAiProfile(ctx: Context) =
+        foxAndGeeseAiProfileForLevel(getFoxAndGeeseDifficulty(ctx))
+
+    fun foxAndGeeseAiDepth(ctx: Context) = foxAndGeeseAiProfile(ctx).depth
+
     fun foxAndGeeseAiTimeLimitMs(ctx: Context): Long =
-        when (getFoxAndGeeseDifficulty(ctx)) { 0 -> 700L; 2 -> 2400L; else -> 1300L }
+        foxAndGeeseAiProfile(ctx).timeLimitMs
+
+    fun foxAndGeeseAiVarietyWindow(ctx: Context): Int =
+        foxAndGeeseAiProfile(ctx).varietyWindow
 
     // ── Ludo ─────────────────────────────────────────────────────────────────
     fun getLudoDifficulty(ctx: Context) = prefs(ctx).getInt(KEY_LUDO_DIFFICULTY, 0)

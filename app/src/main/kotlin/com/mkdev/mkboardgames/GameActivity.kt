@@ -1728,7 +1728,9 @@ Checkmate your opponent's King.
                             val ai = AIPlayer(
                                 engine,
                                 maxDepth = SettingsManager.foxAndGeeseAiDepth(this@GameActivity),
-                                timeLimitMs = SettingsManager.foxAndGeeseAiTimeLimitMs(this@GameActivity)
+                                timeLimitMs = SettingsManager.foxAndGeeseAiTimeLimitMs(this@GameActivity),
+                                varietyWindowOverride =
+                                    SettingsManager.foxAndGeeseAiVarietyWindow(this@GameActivity),
                             )
                             ai.bestMove(thinkingState)
                         }
@@ -2132,6 +2134,7 @@ Checkmate your opponent's King.
                 gameType == "XIANGQI" ||
                 gameType == "CHECKERS" ||
                 gameType == "INTERNATIONAL_DRAUGHTS" ||
+                gameType == "FOX_AND_GEESE" ||
                 gameType == "OTHELLO"
             ) {
                 choices.take(3)
