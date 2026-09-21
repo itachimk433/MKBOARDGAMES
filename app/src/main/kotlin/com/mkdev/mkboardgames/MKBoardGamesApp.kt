@@ -7,6 +7,7 @@ import android.app.Application.ActivityLifecycleCallbacks
 class MKBoardGamesApp : Application() {
     override fun onCreate() {
         super.onCreate()
+        AdManager.initialize(this)
         var startedActivities = 0
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
             override fun onActivityStarted(activity: Activity) {

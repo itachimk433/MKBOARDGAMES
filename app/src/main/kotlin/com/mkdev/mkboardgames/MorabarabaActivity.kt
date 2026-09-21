@@ -52,6 +52,7 @@ class MorabarabaActivity : AppCompatActivity() {
     private var selectedBoardStyle          = MorabarabaBoardStyle.CANVAS
     private val scope                       = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private val moveHistory                 = ArrayDeque<GameState>()
+    private var undosRemaining              = 3
     private var aiJob: Job?                 = null
 
     /** Stats recorded once per game. */
@@ -387,7 +388,9 @@ class MorabarabaActivity : AppCompatActivity() {
         resultRecorded = false
         interstitialAd = null
         redoGameStates.clear(); redoCaptures.clear(); redoMoves.clear(); redoCapSnaps.clear()
+        undosRemaining = 3
         AdManager.loadInterstitial(this) { interstitialAd = it }
+        AdManager.loadRewarded(this)
         aiJob?.cancel(); aiJob = null
         autoplayEnabled = false
         autoplayMoveInProgress = false
@@ -655,6 +658,7 @@ class MorabarabaActivity : AppCompatActivity() {
         hudView.setInfo(
             value = label,
             undo = moveHistory.isNotEmpty(),
+            undoCount = undosRemaining,
             redo = redoGameStates.isNotEmpty(),
             detail = sub2,
             accentColor = Color.WHITE,
@@ -749,6 +753,13 @@ class MorabarabaActivity : AppCompatActivity() {
 
     private fun doUndo() {
         if (moveHistory.isEmpty()) return
+        if (undosRemaining == 0) {
+            UndoRewardDialog.show(this) {
+                undosRemaining++
+                updateHud()
+            }
+            return
+        }
         aiJob?.cancel(); aiJob = null
         boardView.cancelAnim()
         hudView.setThinking(false)
@@ -765,6 +776,7 @@ class MorabarabaActivity : AppCompatActivity() {
         capturedByWhite = cw.toMutableList(); capturedByBlack = cb.toMutableList()
         redoGameStates.add(prevState); redoCaptures.add(prevCap)
         redoMoves.add(rMoves);         redoCapSnaps.add(rSnaps)
+        undosRemaining--
         topCaptureView.update(capturedByBlack)
         bottomCaptureView.update(capturedByWhite)
         boardView.gameState = gameState

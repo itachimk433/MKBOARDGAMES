@@ -34,6 +34,7 @@ class ConnectFourActivity : AppCompatActivity() {
     private var matchStarted = false
     private var activityResumed = false
     private val moveHistory = ArrayDeque<GameState>()
+    private var undosRemaining = 3
     private val redoGameStates = ArrayDeque<GameState>()
     private val redoRemovedMoves = ArrayDeque<List<GameState>>()
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
@@ -374,7 +375,9 @@ Control the centre columns, build threats in more than one direction, and block 
         interstitialAd = null
         redoGameStates.clear()
         redoRemovedMoves.clear()
+        undosRemaining = 3
         AdManager.loadInterstitial(this) { interstitialAd = it }
+        AdManager.loadRewarded(this)
         if (restoring == null) clearPausedMatch()
         SettingsManager.activateGameTheme(this, "connect_four")
         if (vsAI) SettingsManager.setActiveGame(this, "connect_four")
@@ -543,6 +546,7 @@ Control the centre columns, build threats in more than one direction, and block 
         hudView.setInfo(
             value = label,
             undo = moveHistory.isNotEmpty(),
+            undoCount = undosRemaining,
             redo = redoGameStates.isNotEmpty(),
             accentColor = if (redTurn) Color.parseColor("#EF5350") else Color.parseColor("#FFD54F"),
         )
@@ -550,6 +554,13 @@ Control the centre columns, build threats in more than one direction, and block 
 
     fun onUndoClicked() {
         if (moveHistory.isEmpty() || boardView.isLocked) return
+        if (undosRemaining == 0) {
+            UndoRewardDialog.show(this) {
+                undosRemaining++
+                updateHud()
+            }
+            return
+        }
         scope.coroutineContext.cancelChildren()
         hudView.setThinking(false)
         val previous = gameState
@@ -560,6 +571,7 @@ Control the centre columns, build threats in more than one direction, and block 
         gameState = restored
         redoGameStates.add(previous)
         redoRemovedMoves.add(removed)
+        undosRemaining--
         boardView.reset(gameState)
         updateHud()
     }

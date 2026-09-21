@@ -46,6 +46,7 @@ class OnitamaActivity : AppCompatActivity() {
     private var aiRequestToken = 0
     private var aiJob: Job? = null
     private val previousStates = ArrayDeque<GameState>()
+    private var undosRemaining = 3
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     private lateinit var gameRoot: View
@@ -204,6 +205,8 @@ class OnitamaActivity : AppCompatActivity() {
         resultRecorded = false
         autoplayEnabled = false
         previousStates.clear()
+        undosRemaining = 3
+        AdManager.loadRewarded(this)
         whiteCardIndex = 0
         blackCardIndex = 0
         PausedMatchStore.clear(this, "ONITAMA")
@@ -350,6 +353,7 @@ class OnitamaActivity : AppCompatActivity() {
         hudView.setInfo(
             label,
             undo = previousStates.isNotEmpty(),
+            undoCount = undosRemaining,
             accentColor = if (gameState.currentTurn == PieceColor.WHITE) Color.WHITE else Color.parseColor("#FFD54F"),
         )
         hudView.setThinking(vsAI && gameState.status == GameStatus.IN_PROGRESS && gameState.currentTurn != playerColor)
@@ -357,6 +361,13 @@ class OnitamaActivity : AppCompatActivity() {
 
     private fun undoMove() {
         if (previousStates.isEmpty() || boardView.isLocked) return
+        if (undosRemaining == 0) {
+            UndoRewardDialog.show(this) {
+                undosRemaining++
+                updateHud()
+            }
+            return
+        }
         stopAutomatedGameplay()
         val steps = if (vsAI && gameState.currentTurn == playerColor && previousStates.size >= 2) 2 else 1
         repeat(steps) {
@@ -364,6 +375,7 @@ class OnitamaActivity : AppCompatActivity() {
         }
         boardView.gameState = gameState
         boardView.isLocked = false
+        undosRemaining--
         syncCards()
         updateHud()
         if (vsAI && aiControlsCurrentTurn()) triggerAI()

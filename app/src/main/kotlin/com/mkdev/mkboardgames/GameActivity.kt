@@ -89,6 +89,7 @@ class GameActivity : AppCompatActivity() {
     private val autoplayAllowed: Boolean
         get() = SettingsManager.currentMode(this) == GameMode.IRREGULAR
     private val moveHistory      = ArrayDeque<GameState>()
+    private var undosRemaining = 3
     private val scope            = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     // Result guard: stats recorded exactly once per game
@@ -1241,7 +1242,9 @@ Checkmate your opponent's King.
                 if (autoplayAllowed && gameType != "LUDO" && vsAI) View.VISIBLE else View.GONE
         }
         redoGameStates.clear(); redoCaptures.clear(); redoMoves.clear(); redoCapSnaps.clear()
+        undosRemaining = 3
         AdManager.loadInterstitial(this) { interstitialAd = it }
+        AdManager.loadRewarded(this)
         moveHistory.clear(); capturedByWhite.clear(); capturedByBlack.clear(); captureSnapshots.clear()
         if (restoring == null) clearPausedMatch()
         SettingsManager.activateGameTheme(this, gameType.lowercase())
@@ -1856,7 +1859,12 @@ Checkmate your opponent's King.
             if (gameState.currentTurn == PieceColor.WHITE) "White" else "Black"
         }
         val label = if (vsAI && gameState.currentTurn == playerColor) "Your turn" else "$turn to move"
-        hudView.setInfo(label, canUndo = moveHistory.isNotEmpty(), canRedo = redoGameStates.isNotEmpty())
+        hudView.setInfo(
+            label,
+            canUndo = moveHistory.isNotEmpty(),
+            canRedo = redoGameStates.isNotEmpty(),
+            undoCount = undosRemaining,
+        )
     }
 
     private fun showGoNotice(message: String) {
@@ -1874,6 +1882,13 @@ Checkmate your opponent's King.
 
     fun onUndoClicked() {
         if (moveHistory.isEmpty() || boardView.isLocked) return
+        if (undosRemaining == 0) {
+            UndoRewardDialog.show(this) {
+                undosRemaining++
+                updateHud()
+            }
+            return
+        }
         if (gameType == "GO") hideGoNotice()
         val prevState = gameState
         val prevCap   = capturedByWhite.toList() to capturedByBlack.toList()
@@ -1888,6 +1903,7 @@ Checkmate your opponent's King.
         capturedByWhite = cw.toMutableList(); capturedByBlack = cb.toMutableList()
         redoGameStates.add(prevState); redoCaptures.add(prevCap)
         redoMoves.add(rMoves);         redoCapSnaps.add(rSnaps)
+        undosRemaining--
         refreshCaptureViews()
         boardView.isLocked = false; boardView.gameState = gameState; updateHud()
     }
@@ -2402,6 +2418,7 @@ Checkmate your opponent's King.
     inner class HudView(ctx: Context) : View(ctx) {
         private var title    = "White to move"
         private var canUndo  = false
+        private var undoCount = 0
         private var canRedo  = false
         private var thinking = false
         private var goMode   = false
@@ -2450,9 +2467,16 @@ Checkmate your opponent's King.
         private val menuRect = RectF()
         private var gameOver = false
 
-        fun setInfo(label: String, canUndo: Boolean, canRedo: Boolean, detail: String = "") {
+        fun setInfo(
+            label: String,
+            canUndo: Boolean,
+            canRedo: Boolean,
+            detail: String = "",
+            undoCount: Int = 0,
+        ) {
             title = label
             this.canUndo = canUndo
+            this.undoCount = undoCount.coerceAtLeast(0)
             this.canRedo = canRedo
             this.detail = detail
             invalidate()
@@ -2472,7 +2496,7 @@ Checkmate your opponent's King.
             invalidate()
         }
         override fun onSizeChanged(w: Int, h: Int, ow: Int, oh: Int) {
-            val bw = 44f * dp; val bh = 28f * dp; val by = (h - bh) / 2f
+            val bw = 50f * dp; val bh = 28f * dp; val by = (h - bh) / 2f
             backRect.set(6f * dp,        by, 6f * dp + bw,   by + bh)
             if (goMode) {
                 passRect.set(w - bw * 4.4f, by, w - bw * 3.35f, by + bh)
@@ -2521,7 +2545,7 @@ Checkmate your opponent's King.
             canvas.drawRoundRect(menuRect, rr, rr, edgePaint)
             canvas.drawText("← Back", backRect.centerX(), backRect.centerY() + btnPaint.textSize * 0.36f, actionPaint)
             if (goMode) canvas.drawText("Pass", passRect.centerX(), passRect.centerY() + btnPaint.textSize * 0.36f, actionPaint)
-            canvas.drawText("Undo", undoRect.centerX(), undoRect.centerY() + btnPaint.textSize * 0.36f,
+            canvas.drawText(if (undoCount > 0) "Undo($undoCount)" else "Undo", undoRect.centerX(), undoRect.centerY() + btnPaint.textSize * 0.36f,
                 if (gameOver) dimPaint else if (canUndo) btnPaint else dimPaint)
             canvas.drawText("Redo", redoRect.centerX(), redoRect.centerY() + btnPaint.textSize * 0.36f,
                 if (gameOver) dimPaint else if (canRedo) btnPaint else dimPaint)

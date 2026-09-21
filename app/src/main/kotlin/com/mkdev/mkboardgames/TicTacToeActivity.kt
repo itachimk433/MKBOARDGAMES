@@ -31,6 +31,7 @@ class TicTacToeActivity : AppCompatActivity() {
     private var matchStarted = false
     private var activityResumed = false
     private val moveHistory = ArrayDeque<GameState>()
+    private var undosRemaining = 3
     private val scope       = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     private var scoreX     = 0
@@ -390,7 +391,9 @@ Strategy
         resultRecorded = false
         interstitialAd = null
         redoGameStates.clear(); redoRemovedMoves.clear()
+        undosRemaining = 3
         AdManager.loadInterstitial(this) { interstitialAd = it }
+        AdManager.loadRewarded(this)
         if (restoring == null) clearPausedMatch()
         SettingsManager.activateGameTheme(this, "ttt")
         if (vsAI) SettingsManager.setActiveGame(this, "ttt")
@@ -567,6 +570,7 @@ Strategy
         hudView.setInfo(
             value = label,
             undo = moveHistory.isNotEmpty(),
+            undoCount = undosRemaining,
             redo = redoGameStates.isNotEmpty(),
             accentColor = if (isX) Color.parseColor("#EF5350") else Color.parseColor("#7FC8F8"),
         )
@@ -574,6 +578,13 @@ Strategy
 
     fun onUndoClicked() {
         if (moveHistory.isEmpty() || boardView.isLocked) return
+        if (undosRemaining == 0) {
+            UndoRewardDialog.show(this) {
+                undosRemaining++
+                updateHud()
+            }
+            return
+        }
         scope.coroutineContext.cancelChildren()
         hudView.setThinking(false)
         val prevState = gameState
@@ -584,6 +595,7 @@ Strategy
         gameState = restored
         redoGameStates.add(prevState)
         redoRemovedMoves.add(removed)
+        undosRemaining--
         boardView.isLocked = false
         boardView.reset(gameState)
         updateHud()

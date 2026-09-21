@@ -49,6 +49,7 @@ class YoteActivity : AppCompatActivity() {
     private var aiJob: Job? = null
     private val autoplayLoopDetector = YoteAutoplayLoopDetector()
     private val previousStates = ArrayDeque<com.mkdev.mkboardgames.engine.GameState>()
+    private var undosRemaining = 3
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     private lateinit var gameRoot: View
@@ -430,6 +431,8 @@ class YoteActivity : AppCompatActivity() {
         autoplayEnabled = false
         autoplayMoveInProgress = false
         previousStates.clear()
+        undosRemaining = 3
+        AdManager.loadRewarded(this)
         capturedByWhite.clear()
         capturedByBlack.clear()
         pendingBonusCaptureMove = null
@@ -573,6 +576,13 @@ class YoteActivity : AppCompatActivity() {
 
     private fun undoMove() {
         if (previousStates.isEmpty() || boardView.isLocked) return
+        if (undosRemaining == 0) {
+            UndoRewardDialog.show(this) {
+                undosRemaining++
+                updateHud()
+            }
+            return
+        }
 
         stopAutomatedGameplay()
         val steps = if (vsAI && gameState.currentTurn == playerColor && previousStates.size >= 2) {
@@ -588,6 +598,7 @@ class YoteActivity : AppCompatActivity() {
         rebuildCapturedPieces()
         boardView.gameState = gameState
         boardView.isLocked = gameState.status != GameStatus.IN_PROGRESS
+        undosRemaining--
         updateHud()
         resumeComputerTurnIfNeeded()
     }
@@ -624,6 +635,7 @@ class YoteActivity : AppCompatActivity() {
         hudView.setInfo(
             displayTurn,
             undo = previousStates.isNotEmpty(),
+            undoCount = undosRemaining,
             accentColor = if (gameState.currentTurn == PieceColor.WHITE) {
                 Color.WHITE
             } else {

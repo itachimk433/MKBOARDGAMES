@@ -67,6 +67,7 @@ class FiveFieldKonoActivity : AppCompatActivity() {
     private var resultRecorded = false
     private var aiJob: Job? = null
     private val previousStates = ArrayDeque<GameState>()
+    private var undosRemaining = 3
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     private lateinit var gameRoot: View
@@ -281,6 +282,8 @@ class FiveFieldKonoActivity : AppCompatActivity() {
         matchStarted = true
         resultRecorded = false
         previousStates.clear()
+        undosRemaining = 3
+        AdManager.loadRewarded(this)
         if (restoring == null) PausedMatchStore.clear(this, GAME_KEY)
         if (vsAI) SettingsManager.setActiveGame(this, "five_field_kono")
 
@@ -357,6 +360,13 @@ class FiveFieldKonoActivity : AppCompatActivity() {
 
     private fun undoMove() {
         if (previousStates.isEmpty() || boardView.isLocked) return
+        if (undosRemaining == 0) {
+            UndoRewardDialog.show(this) {
+                undosRemaining++
+                updateHud()
+            }
+            return
+        }
         stopAutomatedGameplay()
         val steps = if (vsAI && gameState.currentTurn == playerColor && previousStates.size >= 2) 2 else 1
         repeat(steps) {
@@ -364,6 +374,7 @@ class FiveFieldKonoActivity : AppCompatActivity() {
         }
         boardView.gameState = gameState
         boardView.isLocked = false
+        undosRemaining--
         updateHud()
         resumeComputerTurnIfNeeded()
     }
@@ -379,6 +390,7 @@ class FiveFieldKonoActivity : AppCompatActivity() {
         hudView.setInfo(
             label,
             undo = previousStates.isNotEmpty(),
+            undoCount = undosRemaining,
             accentColor = if (gameState.currentTurn == PieceColor.WHITE) Color.WHITE else Color.parseColor("#FFD54F"),
         )
     }

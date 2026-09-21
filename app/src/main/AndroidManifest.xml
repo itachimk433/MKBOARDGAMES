@@ -3,16 +3,9 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.VIBRATE" />
-
-    <!--
-      MK BOARD GAMES does not show ads, use the Advertising ID, query installed
-      packages, or install packages from within the app. These permissions
-      are explicitly stripped from the merged manifest in case any library
-      (present now or added later) tries to pull them in transitively, so
-      the Play Console policy declarations for these permissions stay
-      accurate.
-    -->
-    <uses-permission android:name="com.google.android.gms.permission.AD_ID" tools:node="remove" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Ads currently use Google's official test application and ad unit IDs. -->
+    <uses-permission android:name="com.google.android.gms.permission.AD_ID" />
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" tools:node="remove" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" tools:node="remove" />
 
@@ -25,6 +18,9 @@
         android:theme="@style/Theme.MKBoardGames"
         android:supportsRtl="true"
         android:resizeableActivity="true">
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-3940256099942544~3347511713" />
 
         <!--
           Activities used to be locked to android:screenOrientation="portrait",

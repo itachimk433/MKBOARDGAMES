@@ -39,6 +39,7 @@ class StandardGameHudView(
 
     private var label = ""
     private var canUndo = false
+    private var undoCount = 0
     private var canRedo = false
     private var detail = ""
     private var labelColor = Color.WHITE
@@ -114,12 +115,14 @@ class StandardGameHudView(
     fun setInfo(
         value: String,
         undo: Boolean,
+        undoCount: Int = 0,
         redo: Boolean = false,
         detail: String = "",
         accentColor: Int = Color.WHITE,
     ) {
         label = value
         canUndo = undo
+        this.undoCount = undoCount.coerceAtLeast(0)
         canRedo = redo
         this.detail = detail
         labelColor = accentColor
@@ -137,7 +140,7 @@ class StandardGameHudView(
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldWidth: Int, oldHeight: Int) {
-        val buttonWidth = 44f * dp
+        val buttonWidth = 50f * dp
         val buttonHeight = 28f * dp
         val top = if (stackInfoBelowControls) 6f * dp else (h - buttonHeight) / 2f
         backRect.set(6f * dp, top, 6f * dp + buttonWidth, top + buttonHeight)
@@ -241,7 +244,7 @@ class StandardGameHudView(
         }
         if (showHistoryControls) {
             canvas.drawText(
-                "Undo",
+                if (undoCount > 0) "Undo($undoCount)" else "Undo",
                 undoRect.centerX(),
                 undoRect.centerY() + buttonPaint.textSize * 0.36f,
                 if (canUndo) buttonPaint else disabledButtonPaint,
