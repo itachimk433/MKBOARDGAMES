@@ -96,6 +96,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
             setBackgroundColor(android.graphics.Color.TRANSPARENT)
             addView(boardStage, LinearLayout.LayoutParams(-1, 0, 1f))
         }
+        AdManager.attachBanner(gameRoot)
         gameRoot.visibility = View.GONE
 
         screenRoot = FrameLayout(this).apply {

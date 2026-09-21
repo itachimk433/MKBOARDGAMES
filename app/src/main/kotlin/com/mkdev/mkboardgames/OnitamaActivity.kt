@@ -107,6 +107,7 @@ class OnitamaActivity : AppCompatActivity() {
             addView(topCards, LinearLayout.LayoutParams(-1, (98f * density).toInt()))
             addView(boardView, LinearLayout.LayoutParams(-1, 0).apply { weight = 1f })
             addView(bottomCards, LinearLayout.LayoutParams(-1, (98f * density).toInt()))
+            AdManager.attachBanner(this)
         }
         val gameFrame = FrameLayout(this).apply {
             addView(

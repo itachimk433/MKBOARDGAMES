@@ -130,6 +130,7 @@ class YoteActivity : AppCompatActivity() {
                 gravity = android.view.Gravity.CENTER_HORIZONTAL
             },
         )
+        AdManager.attachBanner(gameLayout)
         gameRoot = gameLayout
 
         screenRoot = FrameLayout(this)

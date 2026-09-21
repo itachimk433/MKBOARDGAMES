@@ -97,6 +97,7 @@ class FiveFieldKonoActivity : AppCompatActivity() {
         }
         layout.addView(hudView, LinearLayout.LayoutParams(-1, (56 * density).toInt()))
         layout.addView(boardView, LinearLayout.LayoutParams(-1, 0).apply { weight = 1f })
+        AdManager.attachBanner(layout)
         gameRoot = layout
 
         screenRoot = FrameLayout(this)

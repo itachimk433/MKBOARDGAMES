@@ -178,6 +178,7 @@ class MancalaActivity : AppCompatActivity() {
                 gravity = Gravity.CENTER_HORIZONTAL
             },
         )
+        AdManager.attachBanner(gameLayout)
         gameRoot = gameLayout
 
         screenRoot = FrameLayout(this)
