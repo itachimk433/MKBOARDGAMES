@@ -245,6 +245,17 @@ class MenuView(
         }
     }
 
+    /** Clears a launch indicator when the catalogue becomes active again. */
+    fun resetLoadingState() {
+        loadingAnimator?.cancel()
+        loadingAnimator = null
+        loadingCard = null
+        loadingAngle = 0f
+        pressedCard = null
+        pressedGear = false
+        invalidate()
+    }
+
     // ── Scroll state ─────────────────────────────────────────────────────────
     private var scrollY    = 0f
     private var maxScrollY = 0f
@@ -676,8 +687,7 @@ class MenuView(
         velocityTracker = null
         scrollScroller.forceFinished(true)
         clearArrangeState()
-        loadingAnimator?.cancel()
-        loadingAnimator = null
+        resetLoadingState()
         super.onDetachedFromWindow()
     }
 

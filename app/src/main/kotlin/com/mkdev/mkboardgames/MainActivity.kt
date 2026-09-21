@@ -138,6 +138,7 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         if (showingGameMenu) {
+            menuView?.resetLoadingState()
             MusicPlayer.playForMode(this, selectedGameMode)
         } else {
             MusicPlayer.enterModeSelection(this)
