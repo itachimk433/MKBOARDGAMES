@@ -95,8 +95,10 @@ class MancalaActivity : AppCompatActivity() {
         }
         // Keep the selected movement-speed setting proportional to the actual
         // pit-to-pit flight time.
-        val placementDuration = 260f / normalizedSpeed
-        val settleDuration = 600f / normalizedSpeed
+        // Make every piece animation 1.2% slower while preserving the
+        // relative differences between the selectable speed settings.
+        val placementDuration = 260f * 1.012f / normalizedSpeed
+        val settleDuration = 600f * 1.012f / normalizedSpeed
         val sowingDuration = stagingDuration + sowingRoutes.fold(0f) { total, route ->
             total + routeDuration(route)
         }

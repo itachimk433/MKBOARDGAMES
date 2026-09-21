@@ -66,7 +66,7 @@ class ModeSelectionView(context: Context) : View(context) {
     private val playButtonLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
         textAlign = Paint.Align.CENTER
-        typeface = Typeface.DEFAULT
+        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD_ITALIC)
         setShadowLayer(2f * unit, 0f, 2f * unit, Color.argb(210, 0, 0, 0))
     }
     private val modeIconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {

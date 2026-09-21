@@ -108,7 +108,7 @@ object SettingsManager {
         else -> ChessAiProfile(5, 1200L, 2)
     }
 
-    fun getChessDifficulty(ctx: Context) = prefs(ctx).getInt(KEY_CHESS_DIFFICULTY, 1).coerceIn(0, 3)
+    fun getChessDifficulty(ctx: Context) = prefs(ctx).getInt(KEY_CHESS_DIFFICULTY, 0).coerceIn(0, 3)
     fun setChessDifficulty(ctx: Context, v: Int) = prefs(ctx).edit().putInt(KEY_CHESS_DIFFICULTY, v.coerceIn(0, 3)).apply()
     fun chessAiDepth(ctx: Context) = chessAiProfileForLevel(getChessDifficulty(ctx)).depth
     fun chessAiTimeLimitMs(ctx: Context): Long = chessAiProfileForLevel(getChessDifficulty(ctx)).timeLimitMs
@@ -172,7 +172,7 @@ object SettingsManager {
     )
 
     fun getOthelloDifficulty(ctx: Context) =
-        prefs(ctx).getInt(KEY_OTHELLO_DIFFICULTY, 2).coerceIn(0, 2)
+        prefs(ctx).getInt(KEY_OTHELLO_DIFFICULTY, 0).coerceIn(0, 2)
 
     fun setOthelloDifficulty(ctx: Context, v: Int) =
         prefs(ctx).edit()
@@ -279,7 +279,7 @@ object SettingsManager {
     )
 
     fun getXiangqiDifficulty(ctx: Context) =
-        prefs(ctx).getInt(KEY_XIANGQI_DIFFICULTY, 1).coerceIn(0, 2)
+        prefs(ctx).getInt(KEY_XIANGQI_DIFFICULTY, 0).coerceIn(0, 2)
 
     fun setXiangqiDifficulty(ctx: Context, v: Int) =
         prefs(ctx).edit()
@@ -360,7 +360,7 @@ object SettingsManager {
     }
 
     fun getMancalaDifficulty(ctx: Context) =
-        prefs(ctx).getInt(KEY_MANCALA_DIFFICULTY, 1).coerceIn(0, 2)
+        prefs(ctx).getInt(KEY_MANCALA_DIFFICULTY, 0).coerceIn(0, 2)
 
     fun setMancalaDifficulty(ctx: Context, v: Int) =
         prefs(ctx).edit().putInt(KEY_MANCALA_DIFFICULTY, v.coerceIn(0, 2)).apply()
@@ -369,7 +369,7 @@ object SettingsManager {
 
     // ── Yoté ──────────────────────────────────────────────────────────────────
     fun getYoteDifficulty(ctx: Context) =
-        prefs(ctx).getInt(KEY_YOTE_DIFFICULTY, 1).coerceIn(0, 2)
+        prefs(ctx).getInt(KEY_YOTE_DIFFICULTY, 0).coerceIn(0, 2)
 
     fun setYoteDifficulty(ctx: Context, v: Int) =
         prefs(ctx).edit().putInt(KEY_YOTE_DIFFICULTY, v.coerceIn(0, 2)).apply()
@@ -395,7 +395,7 @@ object SettingsManager {
         }
 
     fun getFiveFieldKonoDifficulty(ctx: Context) =
-        prefs(ctx).getInt(KEY_FIVE_FIELD_KONO_DIFFICULTY, 1).coerceIn(0, 2)
+        prefs(ctx).getInt(KEY_FIVE_FIELD_KONO_DIFFICULTY, 0).coerceIn(0, 2)
 
     fun setFiveFieldKonoDifficulty(ctx: Context, v: Int) =
         prefs(ctx).edit().putInt(KEY_FIVE_FIELD_KONO_DIFFICULTY, v.coerceIn(0, 2)).apply()
@@ -408,7 +408,7 @@ object SettingsManager {
 
     // ── Onitama ──────────────────────────────────────────────────────────────
     fun getOnitamaDifficulty(ctx: Context) =
-        prefs(ctx).getInt(KEY_ONITAMA_DIFFICULTY, 1).coerceIn(0, 2)
+        prefs(ctx).getInt(KEY_ONITAMA_DIFFICULTY, 0).coerceIn(0, 2)
 
     fun setOnitamaDifficulty(ctx: Context, v: Int) =
         prefs(ctx).edit().putInt(KEY_ONITAMA_DIFFICULTY, v.coerceIn(0, 2)).apply()
@@ -430,7 +430,7 @@ object SettingsManager {
         }
 
     fun getAmazonsDifficulty(ctx: Context) =
-        prefs(ctx).getInt(KEY_AMAZONS_DIFFICULTY, 1).coerceIn(0, 2)
+        prefs(ctx).getInt(KEY_AMAZONS_DIFFICULTY, 0).coerceIn(0, 2)
 
     fun setAmazonsDifficulty(ctx: Context, v: Int) =
         prefs(ctx).edit().putInt(KEY_AMAZONS_DIFFICULTY, v.coerceIn(0, 2)).apply()
@@ -488,12 +488,6 @@ object SettingsManager {
 
     fun setMatchMusicVolume(ctx: Context, v: Int) =
         prefs(ctx).edit().putInt(KEY_MATCH_MUSIC_VOLUME, v.coerceIn(0, 100)).apply()
-
-    // ── Motion dice ───────────────────────────────────────────────────────────
-    private const val KEY_MOTION_DICE = "motion_dice"
-    fun isMotionDiceEnabled(ctx: Context) = prefs(ctx).getBoolean(KEY_MOTION_DICE, false)
-    fun setMotionDiceEnabled(ctx: Context, v: Boolean) =
-        prefs(ctx).edit().putBoolean(KEY_MOTION_DICE, v).apply()
 
     // ── Light mode ───────────────────────────────────────────────────────────
     private const val KEY_LIGHT_MODE = "light_mode"

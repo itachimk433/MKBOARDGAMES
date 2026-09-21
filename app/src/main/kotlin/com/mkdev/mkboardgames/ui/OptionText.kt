@@ -11,6 +11,7 @@ internal fun String.asOptionItalicText(): String = buildString(length) {
         when {
             character in 'A'..'Z' -> appendCodePoint(0x1D63C + (character - 'A'))
             character in 'a'..'z' -> appendCodePoint(0x1D656 + (character - 'a'))
+            character in '0'..'9' -> appendCodePoint(0x1D7EC + (character - '0'))
             else -> append(character)
         }
     }

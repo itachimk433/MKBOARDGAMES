@@ -2,6 +2,7 @@ package com.mkdev.mkboardgames.ui
 
 import android.content.Context
 import android.graphics.*
+import android.graphics.BitmapFactory
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
@@ -13,6 +14,9 @@ class YoteRulesView(context: Context) : View(context) {
     private val backRect = RectF()
     private val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val headingPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val gameIconBitmap = runCatching {
+        context.assets.open("yote_home_icon.webp").use { BitmapFactory.decodeStream(it) }
+    }.getOrNull()
 
     init {
         isClickable = true
@@ -45,18 +49,32 @@ class YoteRulesView(context: Context) : View(context) {
         canvas.drawRoundRect(panel, dp(26f), dp(26f), panelPaint)
         panelPaint.clearShadowLayer()
 
+        gameIconBitmap?.let { bitmap ->
+            val size = min(panel.width() * 0.16f, dp(58f))
+            canvas.drawBitmap(
+                bitmap,
+                null,
+                RectF(
+                    panel.centerX() - size / 2f,
+                    panel.top + dp(8f),
+                    panel.centerX() + size / 2f,
+                    panel.top + dp(8f) + size,
+                ),
+                Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG),
+            )
+        }
         bodyPaint.textAlign = Paint.Align.CENTER
         bodyPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         bodyPaint.color = Color.WHITE
         bodyPaint.textSize = min(dp(28f), panelWidth * 0.08f)
-        canvas.drawText("YOTÉ", panel.centerX(), panel.top + dp(52f), bodyPaint)
+        canvas.drawText("YOTÉ", panel.centerX(), panel.top + dp(76f), bodyPaint)
         bodyPaint.color = Color.parseColor("#FFE09C")
         bodyPaint.textSize = min(dp(22f), panelWidth * 0.065f)
-        canvas.drawText("HOW TO PLAY", panel.centerX(), panel.top + dp(84f), bodyPaint)
+        canvas.drawText("HOW TO PLAY", panel.centerX(), panel.top + dp(108f), bodyPaint)
 
         val contentLeft = panel.left + dp(28f)
         val contentWidth = panel.width() - dp(56f)
-        var y = panel.top + dp(122f)
+        var y = panel.top + dp(146f)
         val lineHeight = dp(18f)
         val sections = listOf(
             "SETUP" to "Yoté uses a 5 × 6 board. Each player has twelve stones in reserve. White moves first.",

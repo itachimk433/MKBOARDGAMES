@@ -44,13 +44,15 @@ class ChessRulesView(
     private val isLudo = gameLabel.replace(" ", "").equals("LUDO", ignoreCase = true)
     private val isSnakesLadders =
         gameLabel.replace(" ", "").replace("&", "").equals("SNAKESLADDERS", ignoreCase = true)
+    private val isMancala = gameLabel.replace(" ", "").equals("MANCALA", ignoreCase = true)
+    private val isYote = gameLabel.replace(" ", "").replace("É", "E").equals("YOTE", ignoreCase = true)
     private val isOnitama = gameLabel.replace(" ", "").equals("ONITAMA", ignoreCase = true)
     private val isFiveFieldKono =
         gameLabel.replace(" ", "").replace("·", "").equals("FIVEFIELDKONO", ignoreCase = true)
     private val isChessFamily =
         isChess || isAmazons || isDraughts || isOthello || isFoxAndGeese || isGo || isShogi ||
-            isXiangqi || isTicTacToe || isConnectFour || isLudo || isSnakesLadders || isOnitama ||
-            isFiveFieldKono
+            isXiangqi || isTicTacToe || isConnectFour || isLudo || isSnakesLadders ||
+            isMancala || isYote || isOnitama || isFiveFieldKono
 
     init {
         if (isChessFamily || isMorabaraba) {
@@ -203,13 +205,15 @@ private class ChessMancalaRulesView(
     private val isLudo = gameLabel.replace(" ", "").equals("LUDO", ignoreCase = true)
     private val isSnakesLadders =
         gameLabel.replace(" ", "").replace("&", "").equals("SNAKESLADDERS", ignoreCase = true)
+    private val isMancala = gameLabel.replace(" ", "").equals("MANCALA", ignoreCase = true)
+    private val isYote = gameLabel.replace(" ", "").replace("É", "E").equals("YOTE", ignoreCase = true)
     private val isOnitama = gameLabel.replace(" ", "").equals("ONITAMA", ignoreCase = true)
     private val isFiveFieldKono =
         gameLabel.replace(" ", "").replace("·", "").equals("FIVEFIELDKONO", ignoreCase = true)
     private val isChessFamily =
         isChess || isAmazons || isDraughts || isOthello || isFoxAndGeese || isGo || isShogi ||
-            isXiangqi || isTicTacToe || isConnectFour || isLudo || isSnakesLadders || isOnitama ||
-            isFiveFieldKono
+            isXiangqi || isTicTacToe || isConnectFour || isLudo || isSnakesLadders ||
+            isMancala || isYote || isOnitama || isFiveFieldKono
     private val gameIconBitmap = run {
         val assetName = when {
             isChess -> "chess_home_icon.webp"
@@ -218,6 +222,7 @@ private class ChessMancalaRulesView(
                 "international_draughts_home_icon.webp"
             isDraughts -> "draughts_home_icon.webp"
             isOthello -> "othello_home_icon.webp"
+            isMorabaraba -> "morabaraba_home_icon.webp"
             isFoxAndGeese -> "fox_and_geese_home_icon.webp"
             isGo -> "go_home_icon.webp"
             isShogi -> "shogi_home_icon.webp"
@@ -225,6 +230,8 @@ private class ChessMancalaRulesView(
             isConnectFour -> "connect_four_home_icon.webp"
             isLudo -> "ludo_home_icon.webp"
             isSnakesLadders -> "snakes_ladders_icon.webp"
+            isMancala -> "mancala_home_icon.webp"
+            isYote -> "yote_home_icon.webp"
             isOnitama -> "onitama_home_icon.webp"
             isFiveFieldKono -> "five_field_kono_home_icon.webp"
             else -> null
@@ -291,7 +298,7 @@ private class ChessMancalaRulesView(
                 rounded = false,
                 phase = atmospherePhase,
             )
-        } else if (isChessFamily) {
+        } else if (isChessFamily || isMorabaraba) {
             chessFamilyBackdrop.draw(
                 canvas,
                 width,
@@ -340,7 +347,7 @@ private class ChessMancalaRulesView(
             isFiveFieldKono -> "FIVE FIELD KONO"
             else -> gameLabel
         }
-        if (isChessFamily) {
+        if (isChessFamily || isMorabaraba) {
             val gameIcon = gameIconBitmap
             if (gameIcon != null) {
                 val size = minOf(panel.width() * 0.16f, dp(58f))

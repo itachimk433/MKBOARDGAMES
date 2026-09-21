@@ -7,10 +7,6 @@ import android.graphics.Color
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.hardware.Sensor
-import android.hardware.SensorEvent
-import android.hardware.SensorEventListener
-import android.hardware.SensorManager
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
@@ -49,9 +45,7 @@ import com.mkdev.mkboardgames.ui.BoardSelectionView
 import com.mkdev.mkboardgames.ui.ChessMenuView
 import com.mkdev.mkboardgames.ui.LudoMatchBackgroundView
 import com.mkdev.mkboardgames.ui.StyledDialogs
-import kotlin.math.abs
 import kotlin.math.roundToInt
-import kotlin.math.sqrt
 import kotlin.random.Random
 
 class LudoActivity : AppCompatActivity() {
@@ -92,11 +86,6 @@ class LudoActivity : AppCompatActivity() {
     private var celebrationMessage: String? = null
     private var celebrationGeneration = 0
     private var exitPosted = false
-    private lateinit var sensorManager: SensorManager
-    private var motionSensor: Sensor? = null
-    private var usingRawAccelerometer = false
-    private var lastMotionAt = 0L
-    private val gravity = FloatArray(3)
     private var selectedBoard = LudoBoardView.Board.ONE
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -304,11 +293,6 @@ class LudoActivity : AppCompatActivity() {
         }
         boardView.onTokenLongPressed = { piece -> showTokenAbilityDialog(piece) }
         boardView.onGameOverTapped = { showResultDialog() }
-        sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
-        motionSensor = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION)
-            ?: sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)?.also {
-                usingRawAccelerometer = true
-            }
         hideBoardUntilMatchStarts()
         showModeDialog()
     }
@@ -320,7 +304,6 @@ class LudoActivity : AppCompatActivity() {
         if (::boardView.isInitialized) boardView.resumeAnimations()
         if (::playerDiceViews.isInitialized && !dialogOpen) setPlayerDiceVisible(true)
         SoundPlayer.movementSoundsEnabled = SettingsManager.isMovementSoundsEnabled(this)
-        syncMotionSensor()
         recoverInterruptedGameplay()
     }
 
@@ -333,7 +316,6 @@ class LudoActivity : AppCompatActivity() {
         notificationHost.removeAllViews()
         celebrationGeneration++
         SoundPlayer.stop("ludo_dice", "ludo_move", "ludo_start", "ludo_star", "ludo_win")
-        sensorManager.unregisterListener(motionListener)
         super.onPause()
     }
 
@@ -348,7 +330,6 @@ class LudoActivity : AppCompatActivity() {
         cancelPlayerDiceRolls()
         setPlayerDiceVisible(false)
         boardView.cancelAnimations()
-        sensorManager.unregisterListener(motionListener)
         super.onDestroy()
     }
 
@@ -371,69 +352,6 @@ class LudoActivity : AppCompatActivity() {
         }, 16L)
     }
 
-    private val motionListener = object : SensorEventListener {
-        override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
-
-        override fun onSensorChanged(event: SensorEvent) {
-            val raw = event.values
-            val values = FloatArray(3)
-            if (usingRawAccelerometer) {
-                for (i in 0..2) {
-                    gravity[i] = 0.88f * gravity[i] + 0.12f * raw[i]
-                    values[i] = raw[i] - gravity[i]
-                }
-            } else {
-                for (i in 0..2) values[i] = raw[i]
-            }
-
-            val x = values[0]
-            val y = values[1]
-            val horizontal = abs(x)
-            val vertical = abs(y)
-            val magnitude = sqrt(x * x + y * y + values[2] * values[2])
-            if (magnitude < 3.0f || vertical < 1.8f && horizontal < 2.6f) return
-
-            val now = android.os.SystemClock.elapsedRealtime()
-            if (now - lastMotionAt < 900L) return
-            if (!matchStarted || !isHumanTurn() || state.status != GameStatus.IN_PROGRESS ||
-                rolledValue != 0 || boardView.isLocked
-            ) return
-
-            val direction = when {
-                vertical > 2.2f && horizontal > 1.8f ->
-                    if (x < 0f) MotionDiceDirection.TOP_LEFT
-                    else MotionDiceDirection.TOP_RIGHT
-                horizontal > vertical * 1.15f ->
-                    if (x < 0f) MotionDiceDirection.LEFT
-                    else MotionDiceDirection.RIGHT
-                vertical >= horizontal -> MotionDiceDirection.UP
-                else -> null
-            } ?: return
-
-            lastMotionAt = now
-            runOnUiThread {
-                if (gameplayActive() && matchStarted &&
-                    SettingsManager.isMotionDiceEnabled(this@LudoActivity)
-                ) {
-                    rollDice(direction, false)
-                }
-            }
-        }
-    }
-
-    private fun syncMotionSensor() {
-        sensorManager.unregisterListener(motionListener)
-        if (matchStarted && SettingsManager.isMotionDiceEnabled(this)) {
-            motionSensor?.let { sensor ->
-                sensorManager.registerListener(
-                    motionListener,
-                    sensor,
-                    SensorManager.SENSOR_DELAY_GAME,
-                )
-            }
-        }
-    }
-
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         if (StyledDialogs.handleBackPressed()) return
@@ -445,7 +363,7 @@ class LudoActivity : AppCompatActivity() {
             Toast.makeText(this, "Wait for the dice to stop rolling", Toast.LENGTH_SHORT).show()
             return
         }
-        if (state.status == GameStatus.IN_PROGRESS && moves.isNotEmpty()) {
+        if (state.status == GameStatus.IN_PROGRESS) {
             MusicPlayer.enterPausedMatch(this)
             hideBoardWhileDialogIsOpen()
             StyledDialogs.showChoices(this, "Leave Match?", "Leaving counts as a forfeit.",
@@ -588,7 +506,7 @@ class LudoActivity : AppCompatActivity() {
         MusicPlayer.enterMatch(this)
         if (gameplayActive()) SoundPlayer.playMovement("ludo_start")
         economyEnabled = irregularMode && vsAI
-        modeBar.visibility = if (vsAI) View.VISIBLE else View.GONE
+        modeBar.visibility = if (vsAI && economyEnabled) View.VISIBLE else View.GONE
         if (vsAI) SettingsManager.setActiveGame(this, "ludo")
         aiDifficulty = SettingsManager.getLudoDifficulty(this)
         val initialState = engine.initialState()
@@ -607,7 +525,6 @@ class LudoActivity : AppCompatActivity() {
         boardView.legalMoves = emptyList()
         boardView.isLocked = false
         playerDiceViews.forEach { it.value = 1 }
-        syncMotionSensor()
         updateHud()
         if (isAiTurn()) postGameplay(650L) { rollDice() }
     }
@@ -2078,9 +1995,9 @@ class LudoActivity : AppCompatActivity() {
             economyView.text = "IRREGULAR  •  COINS ${economy.coins}"
             storeView.visibility = View.VISIBLE
         } else {
-            economyView.text = "NORMAL  •  CLASSIC LUDO"
             storeView.visibility = View.GONE
         }
+        modeBar.visibility = if (vsAI && economyEnabled) View.VISIBLE else View.GONE
     }
 
     private fun showHudMessage(message: String) {

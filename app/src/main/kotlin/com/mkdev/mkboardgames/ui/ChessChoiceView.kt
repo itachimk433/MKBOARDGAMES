@@ -51,6 +51,7 @@ class ChessChoiceView(
     private val compactGrid: Boolean = false,
     private val showChoiceInfo: Boolean = true,
     private val dismissOnEmptyTap: Boolean = false,
+    private val showBackButton: Boolean = !title.equals("Leave Match?", ignoreCase = true),
 ) : View(context) {
 
     data class Choice(
@@ -113,6 +114,7 @@ class ChessChoiceView(
                 "international_draughts_home_icon.webp"
             isDraughts -> "draughts_home_icon.webp"
             isOthello -> "othello_home_icon.webp"
+            isMorabaraba -> "morabaraba_home_icon.webp"
             isFoxAndGeese -> "fox_and_geese_home_icon.webp"
             isGo -> "go_home_icon.webp"
             isShogi -> "shogi_home_icon.webp"
@@ -173,12 +175,13 @@ class ChessChoiceView(
         color = Color.WHITE
         textAlign = Paint.Align.CENTER
         isFakeBoldText = true
+        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD_ITALIC)
         textSize = 16f * textScale
     }
     private val plainChoiceLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
         textAlign = Paint.Align.CENTER
-        typeface = Typeface.DEFAULT
+        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD_ITALIC)
         setShadowLayer(2f * unit, 0f, 2f * unit, Color.argb(210, 0, 0, 0))
     }
     private val detailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -389,16 +392,21 @@ class ChessChoiceView(
         } else {
             closeRect.setEmpty()
         }
-        val backSize = 34f * unit
-        val backLeft = 14f * unit
-        val backTop = 14f * unit
-        backRect.set(backLeft, backTop, backLeft + backSize, backTop + backSize)
-        backTouchRect.set(
-            backLeft - 6f * unit,
-            backTop - 6f * unit,
-            backLeft + backSize + 6f * unit,
-            backTop + backSize + 6f * unit,
-        )
+        if (showBackButton) {
+            val backSize = 34f * unit
+            val backLeft = 14f * unit
+            val backTop = 14f * unit
+            backRect.set(backLeft, backTop, backLeft + backSize, backTop + backSize)
+            backTouchRect.set(
+                backLeft - 6f * unit,
+                backTop - 6f * unit,
+                backLeft + backSize + 6f * unit,
+                backTop + backSize + 6f * unit,
+            )
+        } else {
+            backRect.setEmpty()
+            backTouchRect.setEmpty()
+        }
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -441,7 +449,7 @@ class ChessChoiceView(
             surfacePaint.shader = null
         }
 
-        drawBackButton(canvas)
+        if (showBackButton) drawBackButton(canvas)
         when {
             compactGrid -> drawCompactGridHeader(canvas, width)
             isChessFamily -> drawChessFamilyHeader(canvas, width, contentOffset)
@@ -601,9 +609,24 @@ class ChessChoiceView(
             topOffset + 36f * unit,
             linePaint,
         )
-        crownPaint.color = Color.parseColor("#FFB45E")
-        crownPaint.textSize = 22f * textScale
-        canvas.drawText(headerSymbol, center, topOffset + 43f * unit, crownPaint)
+        gameIconBitmap?.let { bitmap ->
+            val size = minOf(width * 0.16f, 46f * unit)
+            canvas.drawBitmap(
+                bitmap,
+                null,
+                RectF(
+                    center - size / 2f,
+                    topOffset + 2f * unit,
+                    center + size / 2f,
+                    topOffset + 2f * unit + size,
+                ),
+                gameIconPaint,
+            )
+        } ?: run {
+            crownPaint.color = Color.parseColor("#FFB45E")
+            crownPaint.textSize = 22f * textScale
+            canvas.drawText(headerSymbol, center, topOffset + 43f * unit, crownPaint)
+        }
         // Keep the animated Morabaraba surface free of a second game-name
         // treatment; the circular pieces are its visual signature.
         titlePaint.color = Color.WHITE
@@ -702,7 +725,7 @@ class ChessChoiceView(
         if (hit.choice.symbol.isNotBlank()) {
             iconPaint.color = hit.choice.accent
             canvas.drawText(hit.choice.symbol, rect.centerX(), rect.top + 29f * unit, iconPaint)
-            canvas.drawText(hit.choice.label, rect.centerX(), rect.top + 56f * unit, labelPaint)
+            canvas.drawText(hit.choice.label.asOptionItalicText(), rect.centerX(), rect.top + 56f * unit, labelPaint)
             canvas.drawText(hit.choice.detail, rect.centerX(), rect.top + 74f * unit, detailPaint)
         } else {
             drawCenteredChoiceText(canvas, rect, hit.choice)
@@ -825,7 +848,7 @@ class ChessChoiceView(
             iconPaint.textSize = 23f * textScale
             canvas.drawText(hit.choice.symbol, rect.centerX(), top + 29f * unit, iconPaint)
             labelPaint.color = Color.parseColor("#321718")
-            canvas.drawText(hit.choice.label, rect.centerX(), top + 56f * unit, labelPaint)
+            canvas.drawText(hit.choice.label.asOptionItalicText(), rect.centerX(), top + 56f * unit, labelPaint)
             detailPaint.color = Color.parseColor("#5D2C27")
             canvas.drawText(hit.choice.detail, rect.centerX(), top + 74f * unit, detailPaint)
         } else {
@@ -854,7 +877,7 @@ class ChessChoiceView(
             iconPaint.textSize = 23f * textScale
             canvas.drawText(hit.choice.symbol, rect.centerX(), top + 29f * unit, iconPaint)
             labelPaint.color = Color.parseColor("#321718")
-            canvas.drawText(hit.choice.label, rect.centerX(), top + 56f * unit, labelPaint)
+            canvas.drawText(hit.choice.label.asOptionItalicText(), rect.centerX(), top + 56f * unit, labelPaint)
             detailPaint.color = Color.parseColor("#5D2C27")
             canvas.drawText(hit.choice.detail, rect.centerX(), top + 74f * unit, detailPaint)
         } else {
@@ -883,7 +906,7 @@ class ChessChoiceView(
             iconPaint.textSize = 23f * textScale
             canvas.drawText(hit.choice.symbol, rect.centerX(), top + 29f * unit, iconPaint)
             labelPaint.color = Color.parseColor("#4A1714")
-            canvas.drawText(hit.choice.label, rect.centerX(), top + 56f * unit, labelPaint)
+            canvas.drawText(hit.choice.label.asOptionItalicText(), rect.centerX(), top + 56f * unit, labelPaint)
             detailPaint.color = Color.parseColor("#6A2D1B")
             canvas.drawText(hit.choice.detail, rect.centerX(), top + 74f * unit, detailPaint)
         } else {
@@ -942,7 +965,7 @@ class ChessChoiceView(
         val groupTop = rect.centerY() - groupHeight / 2f
         val labelBaseline = groupTop - labelMetrics.ascent
         val detailBaseline = groupTop + labelHeight + gap - detailMetrics.ascent
-        canvas.drawText(choice.label, rect.centerX(), labelBaseline, labelPaint)
+        canvas.drawText(choice.label.asOptionItalicText(), rect.centerX(), labelBaseline, labelPaint)
         canvas.drawText(choice.detail, rect.centerX(), detailBaseline, detailPaint)
     }
 
@@ -958,7 +981,7 @@ class ChessChoiceView(
             MotionEvent.ACTION_DOWN -> {
                 downX = event.x
                 downY = event.y
-                pressedBack = backTouchRect.contains(event.x, event.y)
+                pressedBack = showBackButton && backTouchRect.contains(event.x, event.y)
                 if (pressedBack) {
                     performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
                     invalidate()

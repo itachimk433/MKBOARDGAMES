@@ -194,7 +194,7 @@ class MancalaHomeView(context: Context) : View(context) {
     private val buttonLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
         textAlign = Paint.Align.CENTER
-        typeface = Typeface.DEFAULT
+        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD_ITALIC)
         setShadowLayer(dp(context, 2f), 0f, dp(context, 2f), Color.argb(210, 0, 0, 0))
     }
     private val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {

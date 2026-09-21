@@ -122,7 +122,7 @@ class ChessMenuView(
     private val plainButtonLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
         textAlign = Paint.Align.CENTER
-        typeface = Typeface.DEFAULT
+        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD_ITALIC)
         setShadowLayer(2f * unit, 0f, 2f * unit, Color.argb(210, 0, 0, 0))
     }
     private val surfacePaint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -152,7 +152,7 @@ class ChessMenuView(
     private val actionLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
         textAlign = Paint.Align.CENTER
-        isFakeBoldText = true
+        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD_ITALIC)
         textSize = 14f * textScale
     }
     private val actionDetailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -928,7 +928,7 @@ class ChessMenuView(
             canvas.drawText(action.symbol, rect.centerX(), rect.top + 25f * unit, actionSymbolPaint)
             actionLabelPaint.color = Color.WHITE
             actionDetailPaint.color = if (usesPlainPlate) Color.WHITE else Color.parseColor("#9FB5B8")
-            canvas.drawText(action.label, rect.centerX(), rect.top + 52f * unit, actionLabelPaint)
+            canvas.drawText(action.label.asOptionItalicText(), rect.centerX(), rect.top + 52f * unit, actionLabelPaint)
             canvas.drawText(action.detail, rect.centerX(), rect.top + 69f * unit, actionDetailPaint)
         } else {
             drawCenteredActionText(canvas, rect, action)
@@ -945,7 +945,7 @@ class ChessMenuView(
         actionSymbolPaint.textSize = 23f * textScale
         canvas.drawText(action.symbol, rect.centerX(), drawnTop + 28f * unit, actionSymbolPaint)
         actionLabelPaint.color = Color.parseColor("#321718")
-        canvas.drawText(action.label, rect.centerX(), drawnTop + 55f * unit, actionLabelPaint)
+        canvas.drawText(action.label.asOptionItalicText(), rect.centerX(), drawnTop + 55f * unit, actionLabelPaint)
         actionDetailPaint.color = Color.parseColor("#5D2C27")
         canvas.drawText(action.detail, rect.centerX(), drawnTop + 72f * unit, actionDetailPaint)
     }
@@ -959,7 +959,7 @@ class ChessMenuView(
         actionSymbolPaint.textSize = 23f * textScale
         canvas.drawText(action.symbol, rect.centerX(), drawnTop + 28f * unit, actionSymbolPaint)
         actionLabelPaint.color = Color.parseColor("#321718")
-        canvas.drawText(action.label, rect.centerX(), drawnTop + 55f * unit, actionLabelPaint)
+        canvas.drawText(action.label.asOptionItalicText(), rect.centerX(), drawnTop + 55f * unit, actionLabelPaint)
         actionDetailPaint.color = Color.parseColor("#5D2C27")
         canvas.drawText(action.detail, rect.centerX(), drawnTop + 72f * unit, actionDetailPaint)
     }
@@ -996,7 +996,7 @@ class ChessMenuView(
         actionSymbolPaint.textSize = 23f * textScale
         canvas.drawText(action.symbol, rect.centerX(), drawnTop + 28f * unit, actionSymbolPaint)
         actionLabelPaint.color = Color.parseColor("#4A1714")
-        canvas.drawText(action.label, rect.centerX(), drawnTop + 55f * unit, actionLabelPaint)
+        canvas.drawText(action.label.asOptionItalicText(), rect.centerX(), drawnTop + 55f * unit, actionLabelPaint)
         actionDetailPaint.color = Color.parseColor("#6A2D1B")
         canvas.drawText(action.detail, rect.centerX(), drawnTop + 72f * unit, actionDetailPaint)
     }
@@ -1051,7 +1051,7 @@ class ChessMenuView(
         val groupTop = rect.centerY() - groupHeight / 2f
         val labelBaseline = groupTop - labelMetrics.ascent
         val detailBaseline = groupTop + labelHeight + gap - detailMetrics.ascent
-        canvas.drawText(action.label, rect.centerX(), labelBaseline, actionLabelPaint)
+        canvas.drawText(action.label.asOptionItalicText(), rect.centerX(), labelBaseline, actionLabelPaint)
         canvas.drawText(action.detail, rect.centerX(), detailBaseline, actionDetailPaint)
     }
 

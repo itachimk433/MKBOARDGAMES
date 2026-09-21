@@ -769,16 +769,6 @@ class MainActivity : AppCompatActivity() {
         }
         root.addView(homeStyleRow)
 
-        var motionDice = SettingsManager.isMotionDiceEnabled(ctx)
-        val (motionDiceRow, motionDiceVal) =
-            settingRow("◈", "Motion Dice", if (motionDice) "On" else "Off")
-        motionDiceRow.setOnClickListener {
-            motionDice = !motionDice
-            SettingsManager.setMotionDiceEnabled(ctx, motionDice)
-            motionDiceVal.text = if (motionDice) "On" else "Off"
-        }
-        root.addView(motionDiceRow)
-
         var helperEnabled = SettingsManager.getHelper(ctx)
         val (helperRow, helperVal) =
             settingRow("💡", "Helper", if (helperEnabled) "On" else "Off")
