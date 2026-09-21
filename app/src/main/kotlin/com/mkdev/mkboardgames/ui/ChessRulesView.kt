@@ -42,12 +42,15 @@ class ChessRulesView(
     private val isTicTacToe = gameLabel.replace(" ", "").replace("·", "").equals("TICTACTOE", ignoreCase = true)
     private val isConnectFour = gameLabel.replace(" ", "").replace("·", "").equals("CONNECTFOUR", ignoreCase = true)
     private val isLudo = gameLabel.replace(" ", "").equals("LUDO", ignoreCase = true)
+    private val isSnakesLadders =
+        gameLabel.replace(" ", "").replace("&", "").equals("SNAKESLADDERS", ignoreCase = true)
     private val isOnitama = gameLabel.replace(" ", "").equals("ONITAMA", ignoreCase = true)
     private val isFiveFieldKono =
         gameLabel.replace(" ", "").replace("·", "").equals("FIVEFIELDKONO", ignoreCase = true)
     private val isChessFamily =
         isChess || isAmazons || isDraughts || isOthello || isFoxAndGeese || isGo || isShogi ||
-            isXiangqi || isTicTacToe || isConnectFour || isLudo || isOnitama || isFiveFieldKono
+            isXiangqi || isTicTacToe || isConnectFour || isLudo || isSnakesLadders || isOnitama ||
+            isFiveFieldKono
 
     init {
         if (isChessFamily || isMorabaraba) {
@@ -221,6 +224,7 @@ private class ChessMancalaRulesView(
             isXiangqi -> "xiangqi_home_icon.webp"
             isConnectFour -> "connect_four_home_icon.webp"
             isLudo -> "ludo_home_icon.webp"
+            isSnakesLadders -> "snakes_ladders_icon.webp"
             isOnitama -> "onitama_home_icon.webp"
             isFiveFieldKono -> "five_field_kono_home_icon.webp"
             else -> null
@@ -258,6 +262,7 @@ private class ChessMancalaRulesView(
             isDraughts -> "Draughts how to play"
             isOthello -> "Othello how to play"
             isMorabaraba -> "Morabaraba how to play"
+            isSnakesLadders -> "Snakes and Ladders how to play"
             isOnitama -> "Onitama how to play"
             isFiveFieldKono -> "Five Field Kono how to play"
             else -> "Chess how to play"
