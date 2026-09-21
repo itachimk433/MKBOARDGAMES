@@ -111,8 +111,14 @@ object SoundPlayer {
         if (loadedSampleIds.contains(soundId)) {
             playLoaded(key, volume, rate)
         } else {
-            pendingPlays.getOrPut(soundId) { mutableListOf() }
-                .add(PendingPlay(key, volume, rate))
+            // Movement sounds are frame-driven. Queueing every callback while
+            // SoundPool decodes a sample can release a burst of stale sounds
+            // on the first completed frame. One pending cue per sound is
+            // enough to warm the sample without replaying an old animation.
+            val pending = pendingPlays.getOrPut(soundId) { mutableListOf() }
+            if (pending.none { it.key == key }) {
+                pending.add(PendingPlay(key, volume, rate))
+            }
         }
     }
 

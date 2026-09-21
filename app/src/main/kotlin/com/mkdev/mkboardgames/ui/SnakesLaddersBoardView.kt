@@ -280,7 +280,6 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
     }
 
     init {
-        setLayerType(View.LAYER_TYPE_SOFTWARE, null)
         isClickable = true
         contentDescription = "Snakes and Ladders board"
     }
@@ -679,9 +678,9 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
             interpolator = LinearInterpolator()
             addUpdateListener {
                 animatedProgress = it.animatedValue as Float
-                val step = animatedProgress.toInt().coerceAtMost(segmentCount)
-                if (step < segmentCount && step != animatedSoundStep) {
-                    animatedSoundStep = step
+                val step = animatedProgress.toInt().coerceAtMost(segmentCount - 1)
+                while (animatedSoundStep < step) {
+                    animatedSoundStep++
                     onStep()
                 }
                 animatedPoints[index] = pointAlongPath(animatedProgress)

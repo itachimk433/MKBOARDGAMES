@@ -173,10 +173,6 @@ class LudoBoardView(context: Context) : View(context) {
         style = Paint.Style.STROKE
     }
 
-    init {
-        setLayerType(View.LAYER_TYPE_SOFTWARE, null)
-    }
-
     fun setBoard(board: Board) {
         if (selectedBoard == board) return
         selectedBoard = board
@@ -749,8 +745,9 @@ class LudoBoardView(context: Context) : View(context) {
             addUpdateListener {
                 animatedProgress = it.animatedValue as Float
                 val step = floor(animatedProgress).toInt()
-                if (step < animatedPath.lastIndex && step != animatedSoundStep) {
-                    animatedSoundStep = step
+                    .coerceAtMost(animatedPath.lastIndex - 1)
+                while (animatedSoundStep < step) {
+                    animatedSoundStep++
                     onMoveStep?.invoke()
                 }
                 invalidate()

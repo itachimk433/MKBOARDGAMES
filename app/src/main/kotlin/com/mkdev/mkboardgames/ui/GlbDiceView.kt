@@ -10,6 +10,8 @@ import android.opengl.GLES20
 import android.opengl.GLSurfaceView
 import android.opengl.GLUtils
 import android.opengl.Matrix
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.view.MotionEvent
 import android.view.ViewGroup
@@ -49,6 +51,7 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         set(value) {
             field = value
             glRenderer.setFacingRotation(if (value) 180f else 0f)
+            glSurfaceView.requestRender()
         }
     var isRolling: Boolean = false
         private set
@@ -69,7 +72,10 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         glSurfaceView.holder.setFormat(PixelFormat.TRANSLUCENT)
         glSurfaceView.setZOrderOnTop(true)
         glSurfaceView.setRenderer(glRenderer)
-        glSurfaceView.renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+        // The die is static between rolls. A continuous render loop creates a
+        // GL thread/frame workload for every player control, including hidden
+        // dice. setRotation()/setAnimationScale() request frames as needed.
+        glSurfaceView.renderMode = GLSurfaceView.RENDERMODE_WHEN_DIRTY
         glSurfaceView.isClickable = true
         glSurfaceView.setOnTouchListener { view, event ->
             if (event.actionMasked == MotionEvent.ACTION_UP && !isRolling) {
@@ -142,7 +148,13 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
                     currentOrientation = targetOrientation
                     glRenderer.setAnimationScale(1f)
                     applyOrientation(targetOrientation)
-                    onFinished()
+                    // Do not advance the game until the final orientation has
+                    // actually reached a GL frame. Otherwise the logical roll
+                    // can finish while the surface is still showing its
+                    // previous face on a busy device.
+                    requestFrameAndNotify {
+                        if (generation == rollGeneration) onFinished()
+                    }
                 }
             })
             start()
@@ -155,6 +167,12 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         rotationY = y
         rotationZ = z
         glRenderer.setRotation(x, y, z)
+        glSurfaceView.requestRender()
+    }
+
+    private fun requestFrameAndNotify(callback: () -> Unit) {
+        glRenderer.requestFrameAndNotify(callback)
+        glSurfaceView.requestRender()
     }
 
     private fun easeOutQuint(progress: Float): Float {
@@ -173,8 +191,10 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         animator?.cancel()
         animator = null
         isRolling = false
+        glRenderer.clearFrameCallback()
         glRenderer.setAnimationScale(1f)
         glRenderer.setRotation(rotationX, rotationY, rotationZ)
+        glSurfaceView.requestRender()
     }
 
     /**
@@ -191,6 +211,7 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         glSurfaceView.onResume()
         glRenderer.setAnimationScale(1f)
         glRenderer.setRotation(rotationX, rotationY, rotationZ)
+        glSurfaceView.requestRender()
     }
 
     /**
@@ -199,6 +220,7 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
      */
     fun setGameplayVisible(visible: Boolean) {
         glSurfaceView.visibility = if (visible) VISIBLE else INVISIBLE
+        if (visible) glSurfaceView.requestRender()
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
@@ -222,6 +244,7 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
     private class DiceRenderer(
         private val context: Context,
     ) : GLSurfaceView.Renderer {
+        private val mainHandler = Handler(Looper.getMainLooper())
         private var model: GltfModel? = null
         private var program = 0
         private var positionHandle = 0
@@ -241,6 +264,7 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         @Volatile private var rotationZ = 0f
         @Volatile private var facingRotation = 0f
         @Volatile private var animationScale = 1f
+        @Volatile private var frameRenderedCallback: (() -> Unit)? = null
 
         fun setRotation(x: Float, y: Float, z: Float) {
             rotationX = x
@@ -254,6 +278,20 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
 
         fun setAnimationScale(scale: Float) {
             animationScale = scale.coerceIn(1f, 1.2f)
+        }
+
+        fun requestFrameAndNotify(callback: () -> Unit) {
+            frameRenderedCallback = callback
+        }
+
+        fun clearFrameCallback() {
+            frameRenderedCallback = null
+        }
+
+        private fun notifyFrameRendered() {
+            val callback = frameRenderedCallback ?: return
+            frameRenderedCallback = null
+            mainHandler.post { callback() }
         }
 
         override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
@@ -303,7 +341,11 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
 
         override fun onDrawFrame(gl: GL10?) {
             GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
-            val currentModel = model ?: return
+            val currentModel = model
+            if (currentModel == null) {
+                notifyFrameRendered()
+                return
+            }
 
             val modelMatrix = FloatArray(16)
             Matrix.setIdentityM(modelMatrix, 0)
@@ -388,6 +430,7 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
             GLES20.glDisableVertexAttribArray(positionHandle)
             GLES20.glDisableVertexAttribArray(normalHandle)
             GLES20.glDisableVertexAttribArray(texCoordHandle)
+            notifyFrameRendered()
         }
 
         private fun createProgram(vertexSource: String, fragmentSource: String): Int {

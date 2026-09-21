@@ -36,6 +36,8 @@ object MusicPlayer {
     private val trackPositionsMs = IntArray(tracks.size)
     private var activeUsesMatchVolume = false
     private var requestedUsesMatchVolume = false
+    private var playerPrepared = false
+    private var prepareGeneration = 0
 
     /** Begin the selected mode's music session from the beginning.
      *
@@ -132,7 +134,9 @@ object MusicPlayer {
     }
 
     fun pause() {
-        player?.takeIf { it.isPlaying }?.pause()
+        if (playerPrepared) {
+            player?.takeIf { it.isPlaying }?.pause()
+        }
     }
 
     private fun resumeIfAllowed() {
@@ -142,27 +146,67 @@ object MusicPlayer {
         val existing = player
         if (existing != null) {
             applyVolume(existing)
-            if (!existing.isPlaying) existing.start()
+            if (playerPrepared && !existing.isPlaying) existing.start()
             return
         }
         if (requestedTrack !in tracks.indices) return
 
-        val newPlayer = MediaPlayer.create(ctx, tracks[requestedTrack]) ?: return
-        applyVolume(newPlayer)
-        newPlayer.isLooping = true
-        val savedPosition = trackPositionsMs[requestedTrack]
-        if (savedPosition > 0 && savedPosition < newPlayer.duration) {
-            newPlayer.seekTo(savedPosition)
+        val track = requestedTrack
+        val generation = ++prepareGeneration
+        val newPlayer = MediaPlayer()
+        val descriptor = ctx.resources.openRawResourceFd(tracks[track]) ?: run {
+            newPlayer.release()
+            return
+        }
+        playerPrepared = false
+        try {
+            descriptor.use {
+                newPlayer.setDataSource(it.fileDescriptor, it.startOffset, it.length)
+            }
+            newPlayer.isLooping = true
+        } catch (_: Exception) {
+            newPlayer.release()
+            return
         }
         newPlayer.setOnErrorListener { failedPlayer, _, _ ->
             failedPlayer.release()
             if (player === failedPlayer) player = null
-            resumeIfAllowed()
+            playerPrepared = false
+            if (generation == prepareGeneration) resumeIfAllowed()
             true
         }
-        activeTrack = requestedTrack
+        newPlayer.setOnPreparedListener { preparedPlayer ->
+            val stillRequested = generation == prepareGeneration &&
+                player === preparedPlayer &&
+                requestedTrack == track &&
+                modeSessionActive &&
+                appInForeground &&
+                SettingsManager.isMusicEnabled(ctx)
+            if (!stillRequested) {
+                preparedPlayer.release()
+                if (player === preparedPlayer) {
+                    player = null
+                    playerPrepared = false
+                }
+                return@setOnPreparedListener
+            }
+            playerPrepared = true
+            applyVolume(preparedPlayer)
+            val savedPosition = trackPositionsMs[track]
+            if (savedPosition > 0 && savedPosition < preparedPlayer.duration) {
+                preparedPlayer.seekTo(savedPosition)
+            }
+            preparedPlayer.start()
+        }
+        activeTrack = track
         player = newPlayer
-        newPlayer.start()
+        try {
+            newPlayer.prepareAsync()
+        } catch (_: Exception) {
+            newPlayer.release()
+            if (player === newPlayer) player = null
+            playerPrepared = false
+        }
     }
 
     private fun applyVolume(target: MediaPlayer? = player) {
@@ -187,8 +231,9 @@ object MusicPlayer {
     }
 
     private fun releasePlayer() {
+        prepareGeneration++
         player?.let { current ->
-            if (activeTrack in trackPositionsMs.indices) {
+            if (playerPrepared && activeTrack in trackPositionsMs.indices) {
                 trackPositionsMs[activeTrack] = runCatching { current.currentPosition }.getOrDefault(0)
             }
             current.setOnCompletionListener(null)
@@ -196,5 +241,6 @@ object MusicPlayer {
             current.release()
         }
         player = null
+        playerPrepared = false
     }
 }
