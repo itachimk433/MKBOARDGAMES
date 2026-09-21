@@ -28,6 +28,7 @@ class StandardGameHudView(
     private val menuLabel: String = "Menu",
     private val showHintControl: Boolean = false,
     private val showMenuControl: Boolean = true,
+    private val stackInfoBelowControls: Boolean = false,
 ) : View(context) {
     var onBack: (() -> Unit)? = null
     var onUndo: (() -> Unit)? = null
@@ -138,7 +139,7 @@ class StandardGameHudView(
     override fun onSizeChanged(w: Int, h: Int, oldWidth: Int, oldHeight: Int) {
         val buttonWidth = 44f * dp
         val buttonHeight = 28f * dp
-        val top = (h - buttonHeight) / 2f
+        val top = if (stackInfoBelowControls) 6f * dp else (h - buttonHeight) / 2f
         backRect.set(6f * dp, top, 6f * dp + buttonWidth, top + buttonHeight)
         if (showHistoryControls) {
             undoRect.set(w - buttonWidth * 3.3f, top, w - buttonWidth * 2.2f, top + buttonHeight)
@@ -264,17 +265,27 @@ class StandardGameHudView(
 
         textPaint.color = labelColor
         val centerX = width / 2f
+        val labelBaseline = if (stackInfoBelowControls) {
+            backRect.bottom + textPaint.textSize * 1.15f
+        } else {
+            height / 2f - textPaint.textSize * 0.15f
+        }
         canvas.drawText(
             label,
             centerX + labelOffsetDp * dp,
-            height / 2f - textPaint.textSize * 0.15f,
+            labelBaseline,
             textPaint,
         )
         if (detail.isNotEmpty()) {
+            val detailBaseline = if (stackInfoBelowControls) {
+                labelBaseline + detailPaint.textSize * 1.15f
+            } else {
+                height / 2f + detailPaint.textSize * 1.1f
+            }
             canvas.drawText(
                 detail,
                 centerX + labelOffsetDp * dp,
-                height / 2f + detailPaint.textSize * 1.1f,
+                detailBaseline,
                 detailPaint,
             )
         }

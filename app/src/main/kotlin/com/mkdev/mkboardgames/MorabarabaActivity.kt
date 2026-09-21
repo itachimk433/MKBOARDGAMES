@@ -80,7 +80,11 @@ class MorabarabaActivity : AppCompatActivity() {
             setBackgroundColor(Color.parseColor("#0E0E0E"))
         }
 
-        hudView = StandardGameHudView(this, labelTextSizeSp = 13f).apply {
+        hudView = StandardGameHudView(
+            this,
+            labelTextSizeSp = 13f,
+            stackInfoBelowControls = true,
+        ).apply {
             onBack = { onBack() }
             onUndo = { onUndo() }
             onRedo = { onRedo() }
