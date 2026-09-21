@@ -150,11 +150,12 @@ class ModeSelectionView(context: Context) : View(context) {
             (height - totalHeight - 12f * unit).coerceAtLeast(12f * unit),
         )
         normalRect.set(left, firstTop, left + buttonWidth, firstTop + normalButtonHeight)
+        val aboutLift = buttonHeight * 0.04f
         aboutRect.set(
             left,
-            normalRect.bottom + gap,
+            normalRect.bottom + gap - aboutLift,
             left + buttonWidth,
-            normalRect.bottom + gap + buttonHeight,
+            normalRect.bottom + gap - aboutLift + buttonHeight,
         )
         irregularRect.set(
             left,

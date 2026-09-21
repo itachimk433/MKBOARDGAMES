@@ -30,6 +30,7 @@ object SettingsManager {
     // ── Hints keys ───────────────────────────────────────────────────────────
     private const val KEY_CHESS_HINTS    = "chess_show_hints"
     private const val KEY_CHECKERS_HINTS = "checkers_show_hints"
+    private const val KEY_HELPER         = "helper_enabled"
 
     // ── Global + per-game theme keys ─────────────────────────────────────────
     private const val KEY_THEME            = "board_theme"
@@ -511,12 +512,26 @@ object SettingsManager {
             .apply()
 
     // ── Hints ────────────────────────────────────────────────────────────────
-    fun getChessHints(ctx: Context) = prefs(ctx).getBoolean(KEY_CHESS_HINTS, true)
-    fun setChessHints(ctx: Context, v: Boolean) = prefs(ctx).edit().putBoolean(KEY_CHESS_HINTS, v).apply()
-    fun getCheckersHints(ctx: Context) = prefs(ctx).getBoolean(KEY_CHECKERS_HINTS, true)
-    fun setCheckersHints(ctx: Context, v: Boolean) = prefs(ctx).edit().putBoolean(KEY_CHECKERS_HINTS, v).apply()
-    fun getShowHints(ctx: Context) = getChessHints(ctx)
-    fun setShowHints(ctx: Context, v: Boolean) = setChessHints(ctx, v)
+    fun getHelper(ctx: Context): Boolean {
+        val settings = prefs(ctx)
+        return if (settings.contains(KEY_HELPER)) {
+            settings.getBoolean(KEY_HELPER, true)
+        } else {
+            // Keep the existing Chess preference when upgrading from a
+            // version that exposed hints per game.
+            settings.getBoolean(KEY_CHESS_HINTS, true)
+        }
+    }
+
+    fun setHelper(ctx: Context, enabled: Boolean) =
+        prefs(ctx).edit().putBoolean(KEY_HELPER, enabled).apply()
+
+    fun getChessHints(ctx: Context) = getHelper(ctx)
+    fun setChessHints(ctx: Context, v: Boolean) = setHelper(ctx, v)
+    fun getCheckersHints(ctx: Context) = getHelper(ctx)
+    fun setCheckersHints(ctx: Context, v: Boolean) = setHelper(ctx, v)
+    fun getShowHints(ctx: Context) = getHelper(ctx)
+    fun setShowHints(ctx: Context, v: Boolean) = setHelper(ctx, v)
 
     // ── Themes ───────────────────────────────────────────────────────────────
     data class BoardTheme(val light: Int, val dark: Int, val accent: Int, val name: String)

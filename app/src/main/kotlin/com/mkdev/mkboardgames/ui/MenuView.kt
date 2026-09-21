@@ -398,8 +398,10 @@ class MenuView(
             return
         }
         val movedCard = cards.removeAt(fromIndex)
-        val adjustedTarget = if (targetIndex > fromIndex) targetIndex - 1 else targetIndex
-        cards.add(adjustedTarget.coerceIn(0, cards.size), movedCard)
+        // targetIndex is the final slot shown by the drop animation. Removing
+        // a card from above it already shifts the remaining cards left; the
+        // target slot must not be decremented a second time.
+        cards.add(targetIndex.coerceIn(0, cards.size), movedCard)
         saveCardOrder()
         clearArrangeState()
         updateCardLayout()
@@ -432,7 +434,10 @@ class MenuView(
     private fun nearestCardSlot(x: Float, contentY: Float): Int {
         if (cards.isEmpty()) return 0
         return cards.indices.minByOrNull { index ->
-            val rect = cards[index].rect
+            // Use stable grid slots rather than preview positions. The
+            // preview animates cards around the target while the drop itself
+            // is always resolved against a slot in the grid.
+            val rect = cardSlotRect(index)
             val dx = x - rect.centerX()
             val dy = contentY - rect.centerY()
             dx * dx + dy * dy
