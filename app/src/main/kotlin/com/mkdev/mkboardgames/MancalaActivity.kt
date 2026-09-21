@@ -525,7 +525,6 @@ class MancalaActivity : AppCompatActivity() {
                 "III",
                 "#E58A7A",
             ),
-            StyledDialogs.choice("Back", "Return to the previous menu", "↩", "#A9B6E8"),
         )
         showChoiceOverlay(
             "CPU Difficulty",
@@ -540,10 +539,6 @@ class MancalaActivity : AppCompatActivity() {
                     SettingsManager.setMancalaDifficulty(this, which)
                     if (returnToHome) showHome() else showMenu()
                 }
-            } else if (returnToHome) {
-                showHome()
-            } else {
-                showMenu()
             }
         }
     }

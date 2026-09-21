@@ -403,16 +403,11 @@ class YoteActivity : AppCompatActivity() {
                 ChessChoiceView.Choice("Easy${if (current == 0) "  ✓" else ""}", "A relaxed opponent", "I", Color.parseColor("#8EC7B9")),
                 ChessChoiceView.Choice("Medium${if (current == 1) "  ✓" else ""}", "A balanced match", "II", Color.parseColor("#E3B86A")),
                 ChessChoiceView.Choice("Hard${if (current == 2) "  ✓" else ""}", "A sharper opponent", "III", Color.parseColor("#E58A7A")),
-                ChessChoiceView.Choice("Back", "Return to the menu", "↩", Color.parseColor("#A9B6E8")),
             ),
             onCancel = { showMenu() },
         ) {
-            if (it < 3) {
-                SettingsManager.setYoteDifficulty(this, it)
-                showMenu()
-            } else {
-                showMenu()
-            }
+            SettingsManager.setYoteDifficulty(this, it)
+            showMenu()
         }
     }
 
