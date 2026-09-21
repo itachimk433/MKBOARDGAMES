@@ -967,7 +967,7 @@ class BoardView(context: Context) : View(context) {
         othelloPopProgress  = 0f
         popAnimator?.cancel()
         popAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
-            duration = 380L; interpolator = OvershootInterpolator(1.6f)
+            duration = 480L; interpolator = OvershootInterpolator(1.6f)
             addUpdateListener { othelloPopProgress = it.animatedValue as Float; invalidate() }
             addListener(object : AnimatorListenerAdapter() {
                 override fun onAnimationEnd(animation: Animator) {
@@ -991,6 +991,19 @@ class BoardView(context: Context) : View(context) {
                 invalidate()
                 onMoveMade?.invoke(move)
             }, 140L)
+            return
+        }
+        if (isOthelloBoard()) {
+            // Othello moves use the destination as both their source and
+            // destination. The shared piece-to-piece animation therefore
+            // treats the source as empty and completes synchronously. Keep
+            // the board locked through a short transition so the placed disc
+            // and flipped discs can play their pop animation in sequence.
+            selectedPos = null
+            legalMoves = emptyList()
+            pendingMove = move
+            isLocked = true
+            startMoveAnimator(move, durationMs = 180L)
             return
         }
         if (move.metadata["drop"] != null) {

@@ -2131,7 +2131,8 @@ Checkmate your opponent's King.
                 gameType == "AMAZONS" ||
                 gameType == "XIANGQI" ||
                 gameType == "CHECKERS" ||
-                gameType == "INTERNATIONAL_DRAUGHTS"
+                gameType == "INTERNATIONAL_DRAUGHTS" ||
+                gameType == "OTHELLO"
             ) {
                 choices.take(3)
             } else {

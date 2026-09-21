@@ -366,7 +366,7 @@ class MorabarabaActivity : AppCompatActivity() {
                 { showBoardAfterDialog() },
             ),
             520f,
-            fullScreen = false,
+            fullScreen = true,
         )
     }
 

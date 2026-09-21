@@ -511,15 +511,26 @@ Strategy
                 boardView.isLocked = false
                 return@launch
             }
-            hudView.setThinking(false)
             val safeMove = move ?: runCatching {
                 engine.allLegalMoves(snapshot, snapshot.currentTurn).firstOrNull()
             }.getOrNull()
             if (safeMove != null && snapshot == gameState) {
+                // On a small board the search can finish in a single frame.
+                // Keep the CPU turn and its piece animation perceptible,
+                // especially on the classic 3x3 board.
+                delay(if (boardSize == 3) 320L else 220L)
+                if (!isActive || !activityResumed || snapshot != gameState) {
+                    hudView.setThinking(false)
+                    boardView.isLocked = false
+                    return@launch
+                }
+                hudView.setThinking(false)
                 boardView.isLocked = false
                 handleMove(safeMove)
+            } else {
+                hudView.setThinking(false)
+                boardView.isLocked = false
             }
-            else boardView.isLocked = false
         }
     }
 
@@ -796,7 +807,8 @@ Strategy
                 val idx = lastMove.row * bs + lastMove.col
                 cellScale[idx] = 0f
                 ValueAnimator.ofFloat(0f, 1f).apply {
-                    duration = 250L; interpolator = OvershootInterpolator(1.5f)
+                    duration = if (bs == 3) 430L else 340L
+                    interpolator = OvershootInterpolator(1.5f)
                     addUpdateListener { cellScale[idx] = it.animatedValue as Float; invalidate() }
                     start()
                 }

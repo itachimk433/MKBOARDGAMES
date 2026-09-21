@@ -29,6 +29,7 @@ import com.mkdev.mkboardgames.games.go.GoRuleEngine
 import com.mkdev.mkboardgames.games.ludo.LudoRuleEngine
 import com.mkdev.mkboardgames.games.ludo.LudoSetup
 import com.mkdev.mkboardgames.games.morabaraba.MorabarabaRuleEngine
+import com.mkdev.mkboardgames.games.othello.OthelloRuleEngine
 import com.mkdev.mkboardgames.games.shogi.ShogiPiece
 import com.mkdev.mkboardgames.games.shogi.ShogiRuleEngine
 import com.mkdev.mkboardgames.games.tictactoe.TicTacToePiece
@@ -270,6 +271,7 @@ class ReplayActivity : AppCompatActivity() {
         val isTicTacToe  = gameType == "TICTACTOE"
         val isConnectFour = gameType == "CONNECTFOUR"
         val isMorabaraba = gameType == "MORABARABA"
+        val isOthello = gameType == "OTHELLO"
         val isLudo = gameType == "LUDO"
         val isYote = gameType == "YOTE"
         val isOnitama = gameType == "ONITAMA"
@@ -281,6 +283,7 @@ class ReplayActivity : AppCompatActivity() {
             "CHECKERS"   -> CheckersRuleEngine()
             "INTERNATIONAL_DRAUGHTS" -> InternationalDraughtsRuleEngine()
             "MORABARABA" -> MorabarabaRuleEngine(morabarabaPieceCount)
+            "OTHELLO" -> OthelloRuleEngine()
             "FOX_AND_GEESE" -> FoxAndGeeseRuleEngine()
             "LUDO" -> LudoRuleEngine()
             "XIANGQI" -> XiangqiRuleEngine()
@@ -319,7 +322,7 @@ class ReplayActivity : AppCompatActivity() {
         moveLabels = allLabels
 
         // Build per-state capture snapshots (not meaningful for TicTacToe or Othello)
-        val hasCaptures = !isTicTacToe && !isConnectFour && gameType != "OTHELLO" && !isLudo && !isOnitama
+        val hasCaptures = !isTicTacToe && !isConnectFour && !isOthello && !isLudo && !isOnitama
         val snaps = mutableListOf(CaptureSnapshot(emptyList(), emptyList()))
         if (hasCaptures) {
             if (gameType == "SHOGI") {
@@ -734,6 +737,7 @@ class ReplayActivity : AppCompatActivity() {
         "CHESS" -> "Chess"
         "LUDO" -> "Ludo"
         "MORABARABA" -> "Morabaraba"
+        "OTHELLO" -> "Othello"
         "TICTACTOE" -> "Tic-Tac-Toe"
         "CONNECTFOUR" -> "Connect Four"
         "YOTE" -> "Yoté"
