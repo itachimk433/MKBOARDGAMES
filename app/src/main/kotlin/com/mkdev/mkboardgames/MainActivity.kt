@@ -1001,8 +1001,23 @@ class MainActivity : AppCompatActivity() {
             { SettingsManager.getInternationalDraughtsTheme(ctx) },
             { v -> SettingsManager.setInternationalDraughtsTheme(ctx, v) }).first)
 
-        // ── Othello — difficulty fixed at hard; only theme is configurable ──
+        // ── Othello ──
         root.addView(sectionHeader("◉  OTHELLO"))
+        var othelloDiff = SettingsManager.getOthelloDifficulty(ctx)
+        val (othelloDiffRow, othelloDiffVal) =
+            settingRow("🎯", "CPU Difficulty", diffs[othelloDiff])
+        othelloDiffRow.setOnClickListener {
+            showSettingsChoiceDialog(
+                "Othello · CPU Difficulty",
+                diffs.take(3).toTypedArray(),
+                othelloDiff,
+            ) { i ->
+                SettingsManager.setOthelloDifficulty(ctx, i)
+                othelloDiff = i
+                othelloDiffVal.text = diffs[i]
+            }
+        }
+        root.addView(othelloDiffRow); root.addView(divider())
         root.addView(themeRow("Othello",
             { SettingsManager.getOthelloTheme(ctx) },
             { v -> SettingsManager.setOthelloTheme(ctx, v) }).first)

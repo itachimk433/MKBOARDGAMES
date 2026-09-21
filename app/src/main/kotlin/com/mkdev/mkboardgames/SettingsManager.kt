@@ -24,6 +24,7 @@ object SettingsManager {
     private const val KEY_ONITAMA_DIFFICULTY = "onitama_ai_difficulty"
     private const val KEY_AMAZONS_DIFFICULTY = "amazons_ai_difficulty"
     private const val KEY_XIANGQI_DIFFICULTY = "xiangqi_ai_difficulty"
+    private const val KEY_OTHELLO_DIFFICULTY = "othello_ai_difficulty"
     private const val KEY_MANCALA_MOVEMENT_SPEED = "mancala_movement_speed"
 
     // ── Hints keys ───────────────────────────────────────────────────────────
@@ -162,8 +163,44 @@ object SettingsManager {
     fun internationalDraughtsAiDepth(ctx: Context) =
         internationalDraughtsAiDepthForLevel(getInternationalDraughtsDifficulty(ctx))
 
-    // ── Othello — always hard (no user-facing difficulty) ────────────────────
-    fun othelloAiDepth(@Suppress("UNUSED_PARAMETER") ctx: Context) = 7
+    // ── Othello ────────────────────────────────────────────────────────────────
+    data class OthelloAiProfile(
+        val depth: Int,
+        val timeLimitMs: Long,
+        val varietyWindow: Int,
+    )
+
+    fun getOthelloDifficulty(ctx: Context) =
+        prefs(ctx).getInt(KEY_OTHELLO_DIFFICULTY, 2).coerceIn(0, 2)
+
+    fun setOthelloDifficulty(ctx: Context, v: Int) =
+        prefs(ctx).edit()
+            .putInt(KEY_OTHELLO_DIFFICULTY, v.coerceIn(0, 2))
+            .apply()
+
+    fun othelloAiProfileForLevel(level: Int): OthelloAiProfile =
+        when (level.coerceIn(0, 2)) {
+            0 -> OthelloAiProfile(
+                depth = 2,
+                timeLimitMs = 800L,
+                varietyWindow = 80,
+            )
+            1 -> OthelloAiProfile(
+                depth = 4,
+                timeLimitMs = 1600L,
+                varietyWindow = 30,
+            )
+            else -> OthelloAiProfile(
+                depth = 7,
+                timeLimitMs = 3000L,
+                varietyWindow = 0,
+            )
+        }
+
+    fun othelloAiProfile(ctx: Context) =
+        othelloAiProfileForLevel(getOthelloDifficulty(ctx))
+
+    fun othelloAiDepth(ctx: Context) = othelloAiProfile(ctx).depth
 
     // ── Morabaraba ───────────────────────────────────────────────────────────
     fun getMorabarabaDifficulty(ctx: Context) = prefs(ctx).getInt(KEY_MORABARABA_DIFFICULTY, 0)

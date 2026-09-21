@@ -1696,8 +1696,13 @@ Checkmate your opponent's King.
                             ).bestMove(thinkingState)
                         }
                         "OTHELLO"  -> {
-                            val ai = AIPlayer(engine, maxDepth = SettingsManager.othelloAiDepth(this@GameActivity), timeLimitMs = 3000L)
-                            ai.bestMove(thinkingState)
+                            val profile = SettingsManager.othelloAiProfile(this@GameActivity)
+                            AIPlayer(
+                                engine = engine,
+                                maxDepth = profile.depth,
+                                timeLimitMs = profile.timeLimitMs,
+                                varietyWindowOverride = profile.varietyWindow,
+                            ).bestMove(thinkingState)
                                 ?: engine.allLegalMoves(thinkingState, thinkingState.currentTurn).randomOrNull()
                         }
                         "GO" -> {
@@ -1913,9 +1918,9 @@ Checkmate your opponent's King.
             return
         }
         val items = mutableListOf("New Game", "How to Play")
-        // Othello uses a fixed AI setting; the other games expose their
-        // difficulty because their search depth can be tuned safely.
-        if (vsAI && gameType != "OTHELLO") items.add("CPU Difficulty")
+        // CPU games expose their difficulty because their search depth can be
+        // tuned safely.
+        if (vsAI) items.add("CPU Difficulty")
         items.add("Main Menu")
         val arr = items.toTypedArray()
         AlertDialog.Builder(this).setTitle("Menu")
@@ -1971,7 +1976,7 @@ Checkmate your opponent's King.
             { if (inProgress) showChessForfeitDialog() else showModeDialog() },
             { showRules(showModeAfter = false) },
         )
-        if (vsAI && gameType != "OTHELLO") {
+        if (vsAI) {
             choices += ChessChoiceView.Choice(
                 "CPU Difficulty",
                 "Adjust the challenge",
@@ -2080,6 +2085,10 @@ Checkmate your opponent's King.
             "AMAZONS" -> {
                 getDiff = { SettingsManager.getAmazonsDifficulty(this) }
                 setDiff = { v -> SettingsManager.setAmazonsDifficulty(this, v) }
+            }
+            "OTHELLO" -> {
+                getDiff = { SettingsManager.getOthelloDifficulty(this) }
+                setDiff = { v -> SettingsManager.setOthelloDifficulty(this, v) }
             }
             "XIANGQI" -> {
                 getDiff = { SettingsManager.getXiangqiDifficulty(this) }
