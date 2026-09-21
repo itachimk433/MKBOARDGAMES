@@ -719,9 +719,9 @@ class MorabarabaActivity : AppCompatActivity() {
     private fun showDifficultyDialog() {
         val current = SettingsManager.getMorabarabaDifficulty(this)
         val choices = listOf(
-            ChessChoiceView.Choice("Easy", if (current == 0) "Current setting" else "A relaxed challenge", "I", Color.parseColor("#8EC7B9")),
-            ChessChoiceView.Choice("Medium", if (current == 1) "Current setting" else "A balanced challenge", "II", Color.parseColor("#E3B86A")),
-            ChessChoiceView.Choice("Hard", if (current == 2) "Current setting" else "A serious challenge", "III", Color.parseColor("#E58A7A")),
+            ChessChoiceView.Choice("Easy${if (current == 0) "  ✓" else ""}", if (current == 0) "Current setting" else "A relaxed challenge", "I", Color.parseColor("#8EC7B9")),
+            ChessChoiceView.Choice("Medium${if (current == 1) "  ✓" else ""}", if (current == 1) "Current setting" else "A balanced challenge", "II", Color.parseColor("#E3B86A")),
+            ChessChoiceView.Choice("Hard${if (current == 2) "  ✓" else ""}", if (current == 2) "Current setting" else "A serious challenge", "III", Color.parseColor("#E58A7A")),
         )
         showChoiceDialog("CPU Difficulty", "Choose the challenge for your next move.", choices, choices.indices.map { which ->
             {

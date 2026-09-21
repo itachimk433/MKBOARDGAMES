@@ -642,7 +642,12 @@ Strategy
                         val current = SettingsManager.getTttDifficulty(this)
                         StyledDialogs.showChoices(this, "CPU Difficulty", "Adjust the challenge.",
                             diffs.mapIndexed { index, label ->
-                                StyledDialogs.choice(label, if (index == current) "Current setting" else "Computer strength", listOf("I", "II", "III")[index], listOf("#8EC7B9", "#E3B86A", "#E58A7A")[index])
+                                StyledDialogs.choice(
+                                    "$label${if (index == current) "  ✓" else ""}",
+                                    if (index == current) "Current setting" else "Computer strength",
+                                    listOf("I", "II", "III")[index],
+                                    listOf("#8EC7B9", "#E3B86A", "#E58A7A")[index],
+                                )
                             }, 520f, "T I C · T A C · T O E", onCancel = { showBoardAfterDialog() }) { selected, difficulty ->
                                 difficulty.dismiss()
                                 SettingsManager.setTttDifficulty(this, selected)

@@ -2105,25 +2105,25 @@ Checkmate your opponent's King.
     private fun showStyledDifficultyDialog(current: Int, setDiff: (Int) -> Unit) {
         val levels = listOf(
             ChessChoiceView.Choice(
-                "Easy",
+                "Easy${if (current == 0) "  ✓" else ""}",
                 if (current == 0) "Current setting" else "A relaxed challenge",
                 "I",
                 Color.parseColor("#8EC7B9"),
             ),
             ChessChoiceView.Choice(
-                "Medium",
+                "Medium${if (current == 1) "  ✓" else ""}",
                 if (current == 1) "Current setting" else "A balanced challenge",
                 "II",
                 Color.parseColor("#E3B86A"),
             ),
             ChessChoiceView.Choice(
-                "Hard",
+                "Hard${if (current == 2) "  ✓" else ""}",
                 if (current == 2) "Current setting" else "A serious challenge",
                 "III",
                 Color.parseColor("#E58A7A"),
             ),
             ChessChoiceView.Choice(
-                "Master",
+                "Master${if (current == 3) "  ✓" else ""}",
                 if (current == 3) "Current setting" else "Elite-level challenge",
                 "IV",
                 Color.parseColor("#D8A7FF"),

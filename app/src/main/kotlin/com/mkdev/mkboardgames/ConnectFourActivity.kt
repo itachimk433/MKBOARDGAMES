@@ -640,7 +640,12 @@ Control the centre columns, build threats in more than one direction, and block 
         val current = SettingsManager.getConnectFourDifficulty(this)
         StyledDialogs.showChoices(this, "CPU Difficulty", "Adjust the challenge.",
             labels.mapIndexed { index, label ->
-                StyledDialogs.choice(label, if (index == current) "Current setting" else "Computer strength", listOf("I", "II", "III")[index], listOf("#8EC7B9", "#E3B86A", "#E58A7A")[index])
+                StyledDialogs.choice(
+                    "$label${if (index == current) "  ✓" else ""}",
+                    if (index == current) "Current setting" else "Computer strength",
+                    listOf("I", "II", "III")[index],
+                    listOf("#8EC7B9", "#E3B86A", "#E58A7A")[index],
+                )
             }, 520f, "C O N N E C T · F O U R", onCancel = { showBoardAfterDialog() }) { which, dialog ->
                 dialog.dismiss()
                 val changed = which != current
