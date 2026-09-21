@@ -375,7 +375,7 @@ Control the centre columns, build threats in more than one direction, and block 
         interstitialAd = null
         redoGameStates.clear()
         redoRemovedMoves.clear()
-        undosRemaining = 3
+        undosRemaining = SettingsManager.undoCredits(this)
         AdManager.loadInterstitial(this) { interstitialAd = it }
         AdManager.loadRewarded(this)
         if (restoring == null) clearPausedMatch()
@@ -556,7 +556,8 @@ Control the centre columns, build threats in more than one direction, and block 
         if (moveHistory.isEmpty() || boardView.isLocked) return
         if (undosRemaining == 0) {
             UndoRewardDialog.show(this) {
-                undosRemaining++
+                undosRemaining += 2
+                SettingsManager.setUndoCredits(this, undosRemaining)
                 updateHud()
             }
             return
@@ -572,6 +573,7 @@ Control the centre columns, build threats in more than one direction, and block 
         redoGameStates.add(previous)
         redoRemovedMoves.add(removed)
         undosRemaining--
+        SettingsManager.setUndoCredits(this, undosRemaining)
         boardView.reset(gameState)
         updateHud()
     }

@@ -169,15 +169,40 @@ object AdManager {
         rewardedAd = null
         cachedAd.fullScreenContentCallback = object : FullScreenContentCallback() {
             override fun onAdDismissedFullScreenContent() {
+                restoreFullscreen(activity)
                 loadRewarded(activity.applicationContext)
             }
 
             override fun onAdFailedToShowFullScreenContent(error: com.google.android.gms.ads.AdError) {
+                restoreFullscreen(activity)
                 loadRewarded(activity.applicationContext)
                 onUnavailable()
             }
         }
         cachedAd.show(activity) { onReward() }
+    }
+
+    /**
+     * Rewarded ads and their parent Dialog can temporarily clear immersive
+     * flags. Restore the match window after either one closes.
+     */
+    fun restoreFullscreen(activity: Activity) {
+        val flags = (
+            android.view.View.SYSTEM_UI_FLAG_LAYOUT_STABLE or
+                android.view.View.SYSTEM_UI_FLAG_FULLSCREEN or
+                android.view.View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
+                android.view.View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+                android.view.View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
+                android.view.View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+            )
+        activity.window.decorView.post {
+            @Suppress("DEPRECATION")
+            activity.window.decorView.systemUiVisibility = flags
+        }
+        activity.window.decorView.postDelayed({
+            @Suppress("DEPRECATION")
+            activity.window.decorView.systemUiVisibility = flags
+        }, 250L)
     }
 
     fun loadRewarded(

@@ -283,7 +283,7 @@ class FiveFieldKonoActivity : AppCompatActivity() {
         matchStarted = true
         resultRecorded = false
         previousStates.clear()
-        undosRemaining = 3
+        undosRemaining = SettingsManager.undoCredits(this)
         AdManager.loadRewarded(this)
         if (restoring == null) PausedMatchStore.clear(this, GAME_KEY)
         if (vsAI) SettingsManager.setActiveGame(this, "five_field_kono")
@@ -363,7 +363,8 @@ class FiveFieldKonoActivity : AppCompatActivity() {
         if (previousStates.isEmpty() || boardView.isLocked) return
         if (undosRemaining == 0) {
             UndoRewardDialog.show(this) {
-                undosRemaining++
+                undosRemaining += 2
+                SettingsManager.setUndoCredits(this, undosRemaining)
                 updateHud()
             }
             return
@@ -376,6 +377,7 @@ class FiveFieldKonoActivity : AppCompatActivity() {
         boardView.gameState = gameState
         boardView.isLocked = false
         undosRemaining--
+        SettingsManager.setUndoCredits(this, undosRemaining)
         updateHud()
         resumeComputerTurnIfNeeded()
     }

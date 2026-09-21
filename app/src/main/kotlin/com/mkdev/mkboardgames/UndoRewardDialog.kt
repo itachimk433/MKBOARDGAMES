@@ -34,7 +34,7 @@ object UndoRewardDialog {
             setTypeface(typeface, android.graphics.Typeface.BOLD)
         }
         val message = TextView(activity).apply {
-            text = "Watch a short test ad to get 1 more undo turn."
+            text = "Watch a short test ad to get 2 more undo turns."
             setTextColor(Color.parseColor("#BFD0C6"))
             textSize = 16f
             setPadding(0, (12 * density).toInt(), 0, (24 * density).toInt())
@@ -52,6 +52,7 @@ object UndoRewardDialog {
                 isEnabled = false
                 text = "Loading ad…"
                 dialog.dismiss()
+                AdManager.restoreFullscreen(activity)
                 AdManager.showRewarded(
                     activity = activity,
                     onReward = onReward,
@@ -76,6 +77,9 @@ object UndoRewardDialog {
 
         dialog.setContentView(root)
         dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+        dialog.setOnDismissListener {
+            AdManager.restoreFullscreen(activity)
+        }
         dialog.setOnShowListener {
             dialog.window?.apply {
                 setLayout(

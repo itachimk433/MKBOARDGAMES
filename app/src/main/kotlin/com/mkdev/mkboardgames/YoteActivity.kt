@@ -432,7 +432,7 @@ class YoteActivity : AppCompatActivity() {
         autoplayEnabled = false
         autoplayMoveInProgress = false
         previousStates.clear()
-        undosRemaining = 3
+        undosRemaining = SettingsManager.undoCredits(this)
         AdManager.loadRewarded(this)
         capturedByWhite.clear()
         capturedByBlack.clear()
@@ -579,7 +579,8 @@ class YoteActivity : AppCompatActivity() {
         if (previousStates.isEmpty() || boardView.isLocked) return
         if (undosRemaining == 0) {
             UndoRewardDialog.show(this) {
-                undosRemaining++
+                undosRemaining += 2
+                SettingsManager.setUndoCredits(this, undosRemaining)
                 updateHud()
             }
             return
@@ -600,6 +601,7 @@ class YoteActivity : AppCompatActivity() {
         boardView.gameState = gameState
         boardView.isLocked = gameState.status != GameStatus.IN_PROGRESS
         undosRemaining--
+        SettingsManager.setUndoCredits(this, undosRemaining)
         updateHud()
         resumeComputerTurnIfNeeded()
     }

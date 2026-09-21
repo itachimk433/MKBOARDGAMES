@@ -206,7 +206,7 @@ class OnitamaActivity : AppCompatActivity() {
         resultRecorded = false
         autoplayEnabled = false
         previousStates.clear()
-        undosRemaining = 3
+        undosRemaining = SettingsManager.undoCredits(this)
         AdManager.loadRewarded(this)
         whiteCardIndex = 0
         blackCardIndex = 0
@@ -364,7 +364,8 @@ class OnitamaActivity : AppCompatActivity() {
         if (previousStates.isEmpty() || boardView.isLocked) return
         if (undosRemaining == 0) {
             UndoRewardDialog.show(this) {
-                undosRemaining++
+                undosRemaining += 2
+                SettingsManager.setUndoCredits(this, undosRemaining)
                 updateHud()
             }
             return
@@ -377,6 +378,7 @@ class OnitamaActivity : AppCompatActivity() {
         boardView.gameState = gameState
         boardView.isLocked = false
         undosRemaining--
+        SettingsManager.setUndoCredits(this, undosRemaining)
         syncCards()
         updateHud()
         if (vsAI && aiControlsCurrentTurn()) triggerAI()

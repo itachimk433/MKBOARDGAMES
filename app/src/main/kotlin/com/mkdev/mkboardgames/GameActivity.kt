@@ -1242,7 +1242,7 @@ Checkmate your opponent's King.
                 if (autoplayAllowed && gameType != "LUDO" && vsAI) View.VISIBLE else View.GONE
         }
         redoGameStates.clear(); redoCaptures.clear(); redoMoves.clear(); redoCapSnaps.clear()
-        undosRemaining = 3
+        undosRemaining = SettingsManager.undoCredits(this)
         AdManager.loadInterstitial(this) { interstitialAd = it }
         AdManager.loadRewarded(this)
         moveHistory.clear(); capturedByWhite.clear(); capturedByBlack.clear(); captureSnapshots.clear()
@@ -1884,7 +1884,8 @@ Checkmate your opponent's King.
         if (moveHistory.isEmpty() || boardView.isLocked) return
         if (undosRemaining == 0) {
             UndoRewardDialog.show(this) {
-                undosRemaining++
+                undosRemaining += 2
+                SettingsManager.setUndoCredits(this, undosRemaining)
                 updateHud()
             }
             return
@@ -1904,6 +1905,7 @@ Checkmate your opponent's King.
         redoGameStates.add(prevState); redoCaptures.add(prevCap)
         redoMoves.add(rMoves);         redoCapSnaps.add(rSnaps)
         undosRemaining--
+        SettingsManager.setUndoCredits(this, undosRemaining)
         refreshCaptureViews()
         boardView.isLocked = false; boardView.gameState = gameState; updateHud()
     }

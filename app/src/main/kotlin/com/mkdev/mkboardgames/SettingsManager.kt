@@ -58,6 +58,7 @@ object SettingsManager {
 
     // active game tag — set at the start of every vs-AI game
     private const val KEY_ACTIVE_GAME = "active_game_tag"
+    private const val KEY_UNDO_CREDITS = "undo_credits"
 
     private fun sharedPrefs(ctx: Context) =
         ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -87,6 +88,16 @@ object SettingsManager {
 
     private fun activeGame(ctx: Context) =
         prefs(ctx).getString(KEY_ACTIVE_GAME, "overall") ?: "overall"
+
+    // Undo credits belong to the player, not to an individual match or game.
+    // Keep them in the regular shared preferences so switching game modes does
+    // not silently reset the player's balance.
+    fun undoCredits(ctx: Context): Int =
+        sharedPrefs(ctx).getInt(KEY_UNDO_CREDITS, 3).coerceAtLeast(0)
+
+    fun setUndoCredits(ctx: Context, value: Int) {
+        sharedPrefs(ctx).edit().putInt(KEY_UNDO_CREDITS, value.coerceAtLeast(0)).apply()
+    }
 
     // ── Chess ────────────────────────────────────────────────────────────────
     data class ChessAiProfile(

@@ -267,7 +267,20 @@ class StandardGameHudView(
         }
 
         textPaint.color = labelColor
-        val centerX = width / 2f
+        val labelLeft = backRect.right + 4f * dp
+        val labelRight = when {
+            showHistoryControls -> undoRect.left - 4f * dp
+            showHintControl -> hintRect.left - 4f * dp
+            showMenuControl -> menuRect.left - 4f * dp
+            else -> width.toFloat() - 4f * dp
+        }
+        val labelHalfWidth = (
+            textPaint.measureText(label) / 2f
+        ).coerceAtMost(((labelRight - labelLeft) / 2f).coerceAtLeast(0f))
+        val centerX = ((labelLeft + labelRight) / 2f).coerceIn(
+            labelLeft + labelHalfWidth,
+            labelRight - labelHalfWidth,
+        )
         val labelBaseline = if (stackInfoBelowControls) {
             backRect.bottom + textPaint.textSize * 1.15f
         } else {
