@@ -2135,7 +2135,8 @@ Checkmate your opponent's King.
                 gameType == "CHECKERS" ||
                 gameType == "INTERNATIONAL_DRAUGHTS" ||
                 gameType == "FOX_AND_GEESE" ||
-                gameType == "OTHELLO"
+                gameType == "OTHELLO" ||
+                gameType == "GO"
             ) {
                 choices.take(3)
             } else {

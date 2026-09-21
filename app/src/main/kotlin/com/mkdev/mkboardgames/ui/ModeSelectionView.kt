@@ -150,7 +150,7 @@ class ModeSelectionView(context: Context) : View(context) {
             (height - totalHeight - 12f * unit).coerceAtLeast(12f * unit),
         )
         normalRect.set(left, firstTop, left + buttonWidth, firstTop + normalButtonHeight)
-        val aboutLift = buttonHeight * 0.04f
+        val aboutLift = buttonHeight * 0.09f
         aboutRect.set(
             left,
             normalRect.bottom + gap - aboutLift,
@@ -305,8 +305,8 @@ class ModeSelectionView(context: Context) : View(context) {
 
     private fun drawLoadingRing(canvas: Canvas, rect: RectF) {
         val radius = 8f * unit
-        val centerX = rect.right - 17f * unit
-        val centerY = rect.top + 17f * unit
+        val centerX = rect.right - 25f * unit
+        val centerY = rect.centerY()
         canvas.drawArc(
             RectF(centerX - radius, centerY - radius, centerX + radius, centerY + radius),
             loadingAngle,

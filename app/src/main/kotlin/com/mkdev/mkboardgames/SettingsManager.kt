@@ -327,7 +327,8 @@ object SettingsManager {
     }
 
     // ── Go ────────────────────────────────────────────────────────────────────
-    fun getGoDifficulty(ctx: Context) = prefs(ctx).getInt(KEY_GO_DIFFICULTY, 0)
+    fun getGoDifficulty(ctx: Context) =
+        prefs(ctx).getInt(KEY_GO_DIFFICULTY, 0).coerceIn(0, 2)
     fun setGoDifficulty(ctx: Context, v: Int) =
         prefs(ctx).edit().putInt(KEY_GO_DIFFICULTY, v.coerceIn(0, 2)).apply()
 

@@ -167,6 +167,12 @@ class MenuView(
         textSize = 7.5f * sp.coerceAtMost(3f)
         setShadowLayer(1.5f * dp, 0f, 1f * dp, Color.argb(210, 0, 0, 0))
     }
+    private val cardLoadingRingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
+        style = Paint.Style.STROKE
+        strokeWidth = 2f * dp
+        strokeCap = Paint.Cap.ROUND
+    }
     private val copyrightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#555555"); textAlign = Paint.Align.CENTER
         textSize = 10f * sp.coerceAtMost(3f)
@@ -221,6 +227,9 @@ class MenuView(
     private val backRect = RectF()
     private val backTouch = RectF()
     private var pressedCard: GameType? = null
+    private var loadingCard: GameType? = null
+    private var loadingAngle = 0f
+    private var loadingAnimator: ValueAnimator? = null
     private var pressedGear  = false
     private var pressedBack = false
     private var gearRotation  = 0f
@@ -511,6 +520,8 @@ class MenuView(
 
     // ── Touch ─────────────────────────────────────────────────────────────────
     override fun onTouchEvent(event: MotionEvent): Boolean {
+        if (loadingCard != null) return true
+
         // Content Y = screen Y shifted by current scroll offset. The complete
         // home surface, including the header and footer, shares this coordinate
         // space so that everything scrolls together.
@@ -621,7 +632,21 @@ class MenuView(
                 pressedCard?.let { animateCardScale(it, 1f) }
                 if (hit != null && hit == pressedCard && !isChallengeLocked(hit)) {
                     com.mkdev.mkboardgames.SoundPlayer.play("ui_click")
-                    onGameSelected?.invoke(hit)
+                    loadingCard = hit
+                    loadingAngle = 0f
+                    loadingAnimator?.cancel()
+                    loadingAnimator = ValueAnimator.ofFloat(0f, 360f).apply {
+                        duration = 700L
+                        repeatCount = ValueAnimator.INFINITE
+                        addUpdateListener {
+                            loadingAngle = it.animatedValue as Float
+                            postInvalidateOnAnimation()
+                        }
+                        start()
+                    }
+                    postDelayed({
+                        if (loadingCard == hit) onGameSelected?.invoke(hit)
+                    }, 140L)
                 }
                 pressedCard = null; pressedGear = false; invalidate()
             }
@@ -651,6 +676,8 @@ class MenuView(
         velocityTracker = null
         scrollScroller.forceFinished(true)
         clearArrangeState()
+        loadingAnimator?.cancel()
+        loadingAnimator = null
         super.onDetachedFromWindow()
     }
 
@@ -835,7 +862,28 @@ class MenuView(
         if (isChallengeLocked(card.type)) {
             drawChallengeLockOverlay(canvas, r)
         }
+        if (loadingCard == card.type) {
+            drawLoadingRing(canvas, r)
+        }
         if (scale != 1f) canvas.restore()
+    }
+
+    private fun drawLoadingRing(canvas: Canvas, rect: RectF) {
+        val radius = 5.5f * dp
+        val centerX = rect.right - 17f * dp
+        val centerY = rect.top + 17f * dp
+        canvas.drawArc(
+            RectF(
+                centerX - radius,
+                centerY - radius,
+                centerX + radius,
+                centerY + radius,
+            ),
+            loadingAngle,
+            285f,
+            false,
+            cardLoadingRingPaint,
+        )
     }
 
     private fun scaledCardRect(card: Card): RectF {

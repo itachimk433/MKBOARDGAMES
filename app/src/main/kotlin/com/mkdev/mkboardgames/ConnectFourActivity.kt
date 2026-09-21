@@ -22,6 +22,7 @@ import com.mkdev.mkboardgames.ui.BoardSelectionView
 import com.mkdev.mkboardgames.ui.ChessMenuView
 import com.mkdev.mkboardgames.ui.ConnectFourBoardStyle
 import com.mkdev.mkboardgames.ui.SnakesLaddersGameOverView
+import com.mkdev.mkboardgames.ui.StandardGameHudView
 import com.mkdev.mkboardgames.ui.StyledDialogs
 import kotlinx.coroutines.*
 
@@ -47,7 +48,7 @@ class ConnectFourActivity : AppCompatActivity() {
         get() = SettingsManager.currentMode(this) == GameMode.IRREGULAR
     private var exitPosted = false
 
-    private lateinit var hudView: HudView
+    private lateinit var hudView: StandardGameHudView
     private lateinit var boardView: ConnectBoardView
     private lateinit var scoreView: ScoreView
     private lateinit var autoplayButton: AutoplayButtonView
@@ -62,7 +63,12 @@ class ConnectFourActivity : AppCompatActivity() {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.parseColor("#121212"))
         }
-        hudView = HudView(this)
+        hudView = StandardGameHudView(this).apply {
+            onBack = { this@ConnectFourActivity.onBackPressed() }
+            onUndo = { this@ConnectFourActivity.onUndoClicked() }
+            onRedo = { this@ConnectFourActivity.onRedoClicked() }
+            onMenu = { this@ConnectFourActivity.onMenuClicked() }
+        }
         boardView = ConnectBoardView(this)
         scoreView = ScoreView(this)
         autoplayButton = AutoplayButtonView(this)
@@ -534,7 +540,12 @@ Control the centre columns, build threats in more than one direction, and block 
             vsAI && gameState.currentTurn == playerColor -> "Your turn"
             else -> "${if (redTurn) "Red" else "Yellow"}'s turn"
         }
-        hudView.setInfo(label, moveHistory.isNotEmpty(), redoGameStates.isNotEmpty(), redTurn)
+        hudView.setInfo(
+            value = label,
+            undo = moveHistory.isNotEmpty(),
+            redo = redoGameStates.isNotEmpty(),
+            accentColor = if (redTurn) Color.parseColor("#EF5350") else Color.parseColor("#FFD54F"),
+        )
     }
 
     fun onUndoClicked() {
@@ -1052,53 +1063,6 @@ Control the centre columns, build threats in more than one direction, and block 
             } else {
                 canvas.drawCircle(cx, cy, radius, if (color == PieceColor.WHITE) redP else yellowP)
             }
-        }
-    }
-
-    inner class HudView(ctx: Context) : View(ctx) {
-        private var label = "Red's turn"; private var canUndo = false; private var canRedo = false
-        private var thinking = false; private var redTurn = true
-        private val dp = resources.displayMetrics.density; private val sp = resources.displayMetrics.scaledDensity
-        private val bgP = Paint().apply { color = Color.parseColor("#1A1A1A") }
-        private val divP = Paint().apply { color = Color.parseColor("#2A2A2A") }
-        private val txtP = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER; isFakeBoldText = true; textSize = 14f * sp.coerceAtMost(3f) }
-        private val subP = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#7FC8F8"); textAlign = Paint.Align.CENTER; textSize = 10f * sp.coerceAtMost(3f) }
-        private val btnBgP = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#252525") }
-        private val btnP = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#7FC8F8"); textAlign = Paint.Align.CENTER; textSize = 10f * sp.coerceAtMost(3f) }
-        private val dimP = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#555555"); textAlign = Paint.Align.CENTER; textSize = 10f * sp.coerceAtMost(3f) }
-        private val backRect = RectF(); private val undoRect = RectF(); private val redoRect = RectF(); private val menuRect = RectF()
-
-        fun setInfo(value: String, undo: Boolean, redo: Boolean, red: Boolean) { label = value; canUndo = undo; canRedo = redo; redTurn = red; invalidate() }
-        fun setThinking(value: Boolean) { thinking = value; invalidate() }
-        override fun onSizeChanged(w: Int, h: Int, ow: Int, oh: Int) {
-            val bw = 42f * dp; val bh = 26f * dp; val by = (h - bh) / 2f
-            backRect.set(6f * dp, by, 6f * dp + bw, by + bh)
-            undoRect.set(w - bw * 3.3f, by, w - bw * 2.2f, by + bh)
-            redoRect.set(w - bw * 2.15f, by, w - bw * 1.1f, by + bh)
-            menuRect.set(w - bw * 1.05f, by, w - 4f * dp, by + bh)
-        }
-        override fun onTouchEvent(event: MotionEvent): Boolean {
-            if (event.action == MotionEvent.ACTION_UP) when {
-                backRect.contains(event.x, event.y) -> onBackPressed()
-                undoRect.contains(event.x, event.y) -> onUndoClicked()
-                redoRect.contains(event.x, event.y) -> onRedoClicked()
-                menuRect.contains(event.x, event.y) -> onMenuClicked()
-            }
-            return true
-        }
-        override fun onDraw(canvas: Canvas) {
-            canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgP)
-            canvas.drawRect(0f, height - dp, width.toFloat(), height.toFloat(), divP)
-            val rr = 5f * dp
-            listOf(backRect, undoRect, redoRect, menuRect).forEach { canvas.drawRoundRect(it, rr, rr, btnBgP) }
-            canvas.drawText("← Back", backRect.centerX(), backRect.centerY() + btnP.textSize * .36f, btnP)
-            canvas.drawText("Undo", undoRect.centerX(), undoRect.centerY() + btnP.textSize * .36f, if (canUndo) btnP else dimP)
-            canvas.drawText("Redo", redoRect.centerX(), redoRect.centerY() + btnP.textSize * .36f, if (canRedo) btnP else dimP)
-            canvas.drawText("Menu", menuRect.centerX(), menuRect.centerY() + btnP.textSize * .36f, btnP)
-            txtP.color = if (redTurn) Color.parseColor("#EF5350") else Color.parseColor("#FFD54F")
-            val cx = width / 2f
-            canvas.drawText(label, cx, height / 2f - txtP.textSize * .15f, txtP)
-            if (thinking) canvas.drawText("Thinking…", cx, height / 2f + subP.textSize * 1.1f, subP)
         }
     }
 
