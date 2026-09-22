@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import com.android.billingclient.api.BillingClient
 import com.android.billingclient.api.BillingClient.BillingResponseCode
+import com.android.billingclient.api.BillingClientStateListener
 import com.android.billingclient.api.BillingFlowParams
 import com.android.billingclient.api.BillingResult
 import com.android.billingclient.api.PendingPurchasesParams
@@ -70,12 +71,11 @@ object RemoveAdsManager {
                 finishPurchase("Remove Ads is not available yet. Please try again shortly.")
                 return@ensureReady
             }
+            val productDetailsParams = BillingFlowParams.ProductDetailsParams.newBuilder()
+                .setProductDetails(details)
+                .build()
             val flowParams = BillingFlowParams.newBuilder()
-                .setProductDetailsParams(
-                    BillingFlowParams.ProductDetailsParams.newBuilder()
-                        .setProductDetails(details)
-                        .build(),
-                )
+                .setProductDetailsParamsList(listOf(productDetailsParams))
                 .build()
             val result = billingClient?.launchBillingFlow(activity, flowParams)
             if (result == null || result.responseCode != BillingResponseCode.OK) {
@@ -88,7 +88,7 @@ object RemoveAdsManager {
         val client = billingClient ?: return
         if (client.isReady || isConnecting) return
         isConnecting = true
-        client.startConnection(object : BillingClient.BillingClientStateListener {
+        client.startConnection(object : BillingClientStateListener {
             override fun onBillingSetupFinished(result: BillingResult) {
                 isConnecting = false
                 val ready = result.responseCode == BillingResponseCode.OK
