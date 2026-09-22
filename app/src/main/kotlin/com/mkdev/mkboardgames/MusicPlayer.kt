@@ -8,7 +8,8 @@ import android.media.MediaPlayer
  *
  * The player is paused, rather than released, when music is disabled or the
  * app is backgrounded. Mode selection, active matches, and in-game pause
- * screens each have their own looping soundtrack.
+ * screens share a randomized playlist; Onitama and paused matches keep their
+ * dedicated tracks.
  */
 object MusicPlayer {
 
@@ -39,11 +40,7 @@ object MusicPlayer {
     private var playerPrepared = false
     private var prepareGeneration = 0
 
-    /** Begin the selected mode's music session from the beginning.
-     *
-     * Game-selection music intentionally starts fresh whenever the user enters
-     * that screen. Its saved position is not reused, unlike the other tracks.
-     */
+    /** Keep the shared playlist active while the user chooses a game. */
     fun playForMode(ctx: Context, mode: GameMode) {
         applicationContext = ctx.applicationContext
         modeSessionActive = true
@@ -98,7 +95,7 @@ object MusicPlayer {
         resumeIfAllowed()
     }
 
-    /** Play the dedicated mode-selection soundtrack. */
+    /** Play the shared playlist on the mode-selection screen. */
     fun enterModeSelection(ctx: Context) {
         switchToTrack(ctx, MODE_SELECTION_ONITAMA_TRACK, usesMatchVolume = false)
     }
@@ -163,10 +160,18 @@ object MusicPlayer {
             descriptor.use {
                 newPlayer.setDataSource(it.fileDescriptor, it.startOffset, it.length)
             }
-            newPlayer.isLooping = true
+            newPlayer.isLooping = track >= GLOBAL_TRACK_COUNT
         } catch (_: Exception) {
             newPlayer.release()
             return
+        }
+        newPlayer.setOnCompletionListener { completedPlayer ->
+            if (track < GLOBAL_TRACK_COUNT && player === completedPlayer) {
+                globalTrack = nextGlobalTrack()
+                resetTrackPosition(globalTrack)
+                requestedTrack = globalTrack
+                switchToRequestedTrack()
+            }
         }
         newPlayer.setOnErrorListener { failedPlayer, _, _ ->
             failedPlayer.release()
@@ -218,6 +223,17 @@ object MusicPlayer {
         }
         val scaledVolume = volumePercent / 100f
         target?.setVolume(scaledVolume, scaledVolume)
+    }
+
+    private fun ensureGlobalTrackSelected() {
+        if (globalTrack !in 0 until GLOBAL_TRACK_COUNT) {
+            globalTrack = MUSIC_1_TRACK
+        }
+    }
+
+    private fun nextGlobalTrack(): Int {
+        val candidates = intArrayOf(MUSIC_1_TRACK, MUSIC_2_TRACK, MUSIC_3_TRACK)
+        return candidates.filter { it != globalTrack }.random()
     }
 
     private fun resetTrackPosition(track: Int) {
