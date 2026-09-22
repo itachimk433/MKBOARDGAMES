@@ -13,16 +13,17 @@ import android.media.MediaPlayer
  */
 object MusicPlayer {
 
-    private const val NORMAL_TRACK = 0
-    private const val IRREGULAR_TRACK = 1
-    private const val MATCH_TRACK = 2
-    private const val MODE_SELECTION_ONITAMA_TRACK = 3
+    private const val MUSIC_1_TRACK = 0
+    private const val MUSIC_2_TRACK = 1
+    private const val MUSIC_3_TRACK = 2
+    private const val ONITAMA_TRACK = 3
     private const val PAUSED_MATCH_TRACK = 4
+    private const val GLOBAL_TRACK_COUNT = 3
 
     private val tracks = intArrayOf(
-        R.raw.in_game_selection_screen1,
-        R.raw.in_game_selection_screen2,
-        R.raw.in_match,
+        R.raw.music1,
+        R.raw.music2,
+        R.raw.music3,
         R.raw.mode_selection_screen_and_onitama_in_match_only,
         R.raw.paused_match,
     )
@@ -33,7 +34,8 @@ object MusicPlayer {
     private var modeSessionActive = false
     private var appInForeground = true
     private var applicationContext: Context? = null
-    private var matchTrack = MATCH_TRACK
+    private var globalTrack = -1
+    private var matchTrack = MUSIC_1_TRACK
     private val trackPositionsMs = IntArray(tracks.size)
     private var activeUsesMatchVolume = false
     private var requestedUsesMatchVolume = false
@@ -44,20 +46,21 @@ object MusicPlayer {
     fun playForMode(ctx: Context, mode: GameMode) {
         applicationContext = ctx.applicationContext
         modeSessionActive = true
-        requestedTrack = if (mode == GameMode.IRREGULAR) IRREGULAR_TRACK else NORMAL_TRACK
+        ensureGlobalTrackSelected()
+        requestedTrack = globalTrack
         requestedUsesMatchVolume = false
-        resetTrackPosition(requestedTrack)
         switchToRequestedTrack()
     }
 
     /** Switch to the standard match soundtrack for the current game. */
     fun enterMatch(ctx: Context) {
-        switchToTrack(ctx, MATCH_TRACK, usesMatchVolume = true)
+        ensureGlobalTrackSelected()
+        switchToTrack(ctx, globalTrack, usesMatchVolume = true)
     }
 
     /** Switch to the dedicated Onitama match soundtrack. */
     fun enterOnitamaMatch(ctx: Context) {
-        switchToTrack(ctx, MODE_SELECTION_ONITAMA_TRACK, usesMatchVolume = true)
+        switchToTrack(ctx, ONITAMA_TRACK, usesMatchVolume = true)
     }
 
     /** Switch to the soundtrack used by an in-game pause overlay. */
@@ -97,7 +100,12 @@ object MusicPlayer {
 
     /** Play the shared playlist on the mode-selection screen. */
     fun enterModeSelection(ctx: Context) {
-        switchToTrack(ctx, MODE_SELECTION_ONITAMA_TRACK, usesMatchVolume = false)
+        applicationContext = ctx.applicationContext
+        modeSessionActive = true
+        ensureGlobalTrackSelected()
+        requestedTrack = globalTrack
+        requestedUsesMatchVolume = false
+        switchToRequestedTrack()
     }
 
     /** Called by the application when no app activity is visible. */
