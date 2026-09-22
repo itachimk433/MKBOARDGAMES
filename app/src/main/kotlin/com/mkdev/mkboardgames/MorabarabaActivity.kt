@@ -388,7 +388,7 @@ class MorabarabaActivity : AppCompatActivity() {
         resultRecorded = false
         interstitialAd = null
         redoGameStates.clear(); redoCaptures.clear(); redoMoves.clear(); redoCapSnaps.clear()
-        undosRemaining = SettingsManager.undoCredits(this)
+        undosRemaining = SettingsManager.undoCredits(this, "MORABARABA")
         AdManager.loadInterstitial(this) { interstitialAd = it }
         AdManager.loadRewarded(this)
         aiJob?.cancel(); aiJob = null
@@ -760,7 +760,7 @@ class MorabarabaActivity : AppCompatActivity() {
         if (undosRemaining == 0) {
             UndoRewardDialog.show(this) {
                 undosRemaining += 2
-                SettingsManager.setUndoCredits(this, undosRemaining)
+                SettingsManager.setUndoCredits(this, "MORABARABA", undosRemaining)
                 updateHud()
             }
             return
@@ -782,7 +782,7 @@ class MorabarabaActivity : AppCompatActivity() {
         redoGameStates.add(prevState); redoCaptures.add(prevCap)
         redoMoves.add(rMoves);         redoCapSnaps.add(rSnaps)
         undosRemaining--
-        SettingsManager.setUndoCredits(this, undosRemaining)
+        SettingsManager.setUndoCredits(this, "MORABARABA", undosRemaining)
         topCaptureView.update(capturedByBlack)
         bottomCaptureView.update(capturedByWhite)
         boardView.gameState = gameState

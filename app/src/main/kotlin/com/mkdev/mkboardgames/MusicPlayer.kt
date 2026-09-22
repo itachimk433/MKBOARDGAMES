@@ -176,6 +176,7 @@ object MusicPlayer {
         newPlayer.setOnCompletionListener { completedPlayer ->
             if (track < GLOBAL_TRACK_COUNT && player === completedPlayer) {
                 globalTrack = nextGlobalTrack()
+                matchTrack = globalTrack
                 resetTrackPosition(globalTrack)
                 requestedTrack = globalTrack
                 switchToRequestedTrack()

@@ -59,6 +59,9 @@ object SettingsManager {
     // active game tag — set at the start of every vs-AI game
     private const val KEY_ACTIVE_GAME = "active_game_tag"
     private const val KEY_UNDO_CREDITS = "undo_credits"
+    private const val KEY_UNDO_CREDITS_MIGRATED = "undo_credits_migrated"
+
+    private fun undoKey(gameTag: String) = KEY_UNDO_CREDITS + "_" + gameTag
 
     private fun sharedPrefs(ctx: Context) =
         ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -89,14 +92,31 @@ object SettingsManager {
     private fun activeGame(ctx: Context) =
         prefs(ctx).getString(KEY_ACTIVE_GAME, "overall") ?: "overall"
 
-    // Undo credits belong to the player, not to an individual match or game.
-    // Keep them in the regular shared preferences so switching game modes does
-    // not silently reset the player's balance.
-    fun undoCredits(ctx: Context): Int =
-        sharedPrefs(ctx).getInt(KEY_UNDO_CREDITS, 3).coerceAtLeast(0)
+    // Undo credits are independent for every game. A one-time migration keeps
+    // the old shared balance for the first game opened after upgrading, while
+    // every other game starts with its own full balance.
+    fun undoCredits(ctx: Context, gameTag: String): Int {
+        val settings = sharedPrefs(ctx)
+        val key = undoKey(gameTag)
+        if (settings.contains(key)) return settings.getInt(key, 3).coerceAtLeast(0)
 
-    fun setUndoCredits(ctx: Context, value: Int) {
-        sharedPrefs(ctx).edit().putInt(KEY_UNDO_CREDITS, value.coerceAtLeast(0)).apply()
+        if (!settings.getBoolean(KEY_UNDO_CREDITS_MIGRATED, false) &&
+            settings.contains(KEY_UNDO_CREDITS)
+        ) {
+            val legacyValue = settings.getInt(KEY_UNDO_CREDITS, 3).coerceAtLeast(0)
+            settings.edit()
+                .putInt(key, legacyValue)
+                .putBoolean(KEY_UNDO_CREDITS_MIGRATED, true)
+                .apply()
+            return legacyValue
+        }
+        return 3
+    }
+
+    fun setUndoCredits(ctx: Context, gameTag: String, value: Int) {
+        sharedPrefs(ctx).edit()
+            .putInt(undoKey(gameTag), value.coerceAtLeast(0))
+            .apply()
     }
 
     // ── Chess ────────────────────────────────────────────────────────────────
