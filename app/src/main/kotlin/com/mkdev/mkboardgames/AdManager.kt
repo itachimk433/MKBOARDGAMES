@@ -10,29 +10,21 @@ import com.google.android.gms.ads.AdView
 import com.google.android.gms.ads.FullScreenContentCallback
 import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.MobileAds
-import com.google.android.gms.ads.appopen.AppOpenAd
 import com.google.android.gms.ads.rewarded.RewardedAd
 import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback
 
 object AdManager {
     // Official Google test IDs. Replace these before publishing the app.
-    private const val TEST_APP_OPEN_UNIT_ID = "ca-app-pub-3940256099942544/9257395921"
     private const val TEST_BANNER_UNIT_ID = "ca-app-pub-3940256099942544/6300978111"
     private const val TEST_REWARDED_UNIT_ID = "ca-app-pub-3940256099942544/5224354917"
     private const val BANNER_TAG = "mkboardgames_banner"
-    private const val APP_OPEN_MAX_AGE_MS = 4L * 60L * 60L * 1000L
 
     private var rewardedAd: RewardedAd? = null
     private var rewardedLoadInProgress = false
     private val rewardedLoadCallbacks = mutableListOf<(Boolean) -> Unit>()
     private var applicationContext: Context? = null
     private var mobileAdsInitialized = false
-    private var appOpenAd: AppOpenAd? = null
-    private var appOpenLoadInProgress = false
-    private var appOpenLoadedAt = 0L
     private var resumedActivity: Activity? = null
-    private var shouldShowAppOpen = false
-    private var isShowingAppOpen = false
 
     fun initialize(context: Context) {
         applicationContext = context.applicationContext
@@ -40,7 +32,6 @@ object AdManager {
         MobileAds.initialize(applicationContext!!) {
             mobileAdsInitialized = true
             loadRewarded(applicationContext!!)
-            loadAppOpen(applicationContext!!)
         }
     }
 
@@ -69,18 +60,12 @@ object AdManager {
     }
 
     fun onAppForeground(activity: Activity) {
-        if (SettingsManager.isAdsRemoved(activity)) return
-        shouldShowAppOpen = true
-        if (mobileAdsInitialized) {
-            loadAppOpen(activity.applicationContext)
-            maybeShowAppOpen()
-        }
+        // App-open ads are intentionally disabled. Opening or returning to the
+        // app should never interrupt the user with a full-screen advertisement.
     }
 
     fun onActivityResumed(activity: Activity) {
         resumedActivity = activity
-        if (SettingsManager.isAdsRemoved(activity)) return
-        maybeShowAppOpen()
     }
 
     fun onActivityPaused(activity: Activity) {
@@ -89,71 +74,11 @@ object AdManager {
 
     fun onAppBackground() {
         resumedActivity = null
-        shouldShowAppOpen = false
     }
 
     // Existing game-over interstitial hooks stay disabled.
     fun loadInterstitial(context: Context, onResult: (Any?) -> Unit) = onResult(null)
     fun showInterstitial(context: Context, ad: Any?) = Unit
-
-    private fun loadAppOpen(context: Context) {
-        if (SettingsManager.isAdsRemoved(context)) return
-        if (!mobileAdsInitialized || appOpenLoadInProgress || isFreshAppOpenReady()) return
-        appOpenLoadInProgress = true
-        AppOpenAd.load(
-            context,
-            TEST_APP_OPEN_UNIT_ID,
-            AdRequest.Builder().build(),
-            object : AppOpenAd.AppOpenAdLoadCallback() {
-                override fun onAdLoaded(ad: AppOpenAd) {
-                    appOpenAd = ad
-                    appOpenLoadedAt = System.currentTimeMillis()
-                    appOpenLoadInProgress = false
-                    maybeShowAppOpen()
-                }
-
-                override fun onAdFailedToLoad(error: LoadAdError) {
-                    appOpenLoadInProgress = false
-                }
-            },
-        )
-    }
-
-    private fun isFreshAppOpenReady(): Boolean {
-        return appOpenAd != null &&
-            System.currentTimeMillis() - appOpenLoadedAt < APP_OPEN_MAX_AGE_MS
-    }
-
-    private fun maybeShowAppOpen() {
-        val activity = resumedActivity ?: return
-        if (SettingsManager.isAdsRemoved(activity)) {
-            appOpenAd = null
-            shouldShowAppOpen = false
-            return
-        }
-        if (!shouldShowAppOpen || isShowingAppOpen) return
-        val ad = appOpenAd
-        if (ad == null || !isFreshAppOpenReady()) {
-            loadAppOpen(activity.applicationContext)
-            return
-        }
-
-        appOpenAd = null
-        shouldShowAppOpen = false
-        isShowingAppOpen = true
-        ad.fullScreenContentCallback = object : FullScreenContentCallback() {
-            override fun onAdDismissedFullScreenContent() {
-                isShowingAppOpen = false
-                loadAppOpen(activity.applicationContext)
-            }
-
-            override fun onAdFailedToShowFullScreenContent(error: com.google.android.gms.ads.AdError) {
-                isShowingAppOpen = false
-                loadAppOpen(activity.applicationContext)
-            }
-        }
-        ad.show(activity)
-    }
 
     /**
      * Shows a rewarded test ad, loading one first when necessary. The reward

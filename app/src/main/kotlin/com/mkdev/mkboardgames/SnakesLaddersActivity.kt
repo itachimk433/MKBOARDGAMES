@@ -376,7 +376,6 @@ class SnakesLaddersActivity : AppCompatActivity() {
                 turnResolutionPending = false
             }
         }
-        SoundPlayer.playMovement("ludo_dice")
     }
 
     private fun applyRoll(player: Int, value: Int) {

@@ -108,7 +108,7 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         val spin = RollSpin.random(motionDirection)
 
         animator = ValueAnimator.ofFloat(0f, 1f).apply {
-            duration = 680L
+            duration = 1360L
             interpolator = LinearInterpolator()
             addUpdateListener {
                 val progress = it.animatedFraction

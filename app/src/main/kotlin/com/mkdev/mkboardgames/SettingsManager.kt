@@ -516,23 +516,16 @@ object SettingsManager {
     // ── Home game card style ─────────────────────────────────────────────────
     private const val KEY_WOOD_GAME_CARDS = "wood_game_cards"
     enum class HomeStyle(val label: String) {
-        CLASSIC("Classic"),
         BROWN("Brown"),
     }
 
-    fun getHomeStyle(ctx: Context): HomeStyle {
-        return when (prefs(ctx).getString(KEY_HOME_STYLE, null)) {
-            HomeStyle.BROWN.name -> HomeStyle.BROWN
-            HomeStyle.CLASSIC.name -> HomeStyle.CLASSIC
-            else -> if (isBrownHomeStyleEnabled(ctx)) HomeStyle.BROWN else HomeStyle.CLASSIC
-        }
-    }
+    fun getHomeStyle(ctx: Context): HomeStyle = HomeStyle.BROWN
 
     fun setHomeStyle(ctx: Context, style: HomeStyle) {
         prefs(ctx).edit()
-            .putString(KEY_HOME_STYLE, style.name)
-            .putBoolean(KEY_HOME_BACKGROUND, style == HomeStyle.BROWN)
-            .putBoolean(KEY_WOOD_GAME_CARDS, style == HomeStyle.BROWN)
+            .putString(KEY_HOME_STYLE, HomeStyle.BROWN.name)
+            .putBoolean(KEY_HOME_BACKGROUND, true)
+            .putBoolean(KEY_WOOD_GAME_CARDS, true)
             .apply()
     }
 
@@ -541,13 +534,12 @@ object SettingsManager {
     fun setWoodGameCardStyleEnabled(ctx: Context, v: Boolean) =
         prefs(ctx).edit().putBoolean(KEY_WOOD_GAME_CARDS, v).apply()
     fun isBrownHomeStyleEnabled(ctx: Context) =
-        prefs(ctx).getBoolean(KEY_HOME_BACKGROUND, true) &&
-            prefs(ctx).getBoolean(KEY_WOOD_GAME_CARDS, true)
+        true
     fun setBrownHomeStyleEnabled(ctx: Context, v: Boolean) =
         prefs(ctx).edit()
-            .putString(KEY_HOME_STYLE, if (v) HomeStyle.BROWN.name else HomeStyle.CLASSIC.name)
-            .putBoolean(KEY_HOME_BACKGROUND, v)
-            .putBoolean(KEY_WOOD_GAME_CARDS, v)
+            .putString(KEY_HOME_STYLE, HomeStyle.BROWN.name)
+            .putBoolean(KEY_HOME_BACKGROUND, true)
+            .putBoolean(KEY_WOOD_GAME_CARDS, true)
             .apply()
 
     // ── Hints ────────────────────────────────────────────────────────────────

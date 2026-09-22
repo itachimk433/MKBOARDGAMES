@@ -588,7 +588,6 @@ class LudoActivity : AppCompatActivity() {
         pendingRollDirection = motionDirection
         pendingRollIsReroll = isReroll
         val player = LudoSetup.playerFromState(state)
-        SoundPlayer.playMovement("ludo_dice")
         playerDiceViews[player].rollTo(pendingRollValue, motionDirection) {
             if (!gameplayActive()) return@rollTo
             val completedValue = pendingRollValue

@@ -35,7 +35,7 @@ class MenuView(
             invalidate()
         }
 
-    var homeStyle: SettingsManager.HomeStyle = SettingsManager.HomeStyle.CLASSIC
+    var homeStyle: SettingsManager.HomeStyle = SettingsManager.HomeStyle.BROWN
         set(v) {
             field = v
             applyHomeStyleColors()
@@ -214,7 +214,7 @@ class MenuView(
     private val gridColumns = 3
     private val baseCardH = 136f * dp
     private val gameCardScale: Float
-        get() = if (homeStyle == SettingsManager.HomeStyle.CLASSIC) 1f else 1.06f
+        get() = 1.06f
     private val cardH get() = baseCardH
     private val gridPadding = 12f * dp
     private val gridSpacing = 8f * dp

@@ -129,18 +129,17 @@ class ModeSelectionView(context: Context) : View(context) {
         strokeCap = Paint.Cap.ROUND
     }
     private val removeAdsFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#E3B86A")
+        color = Color.parseColor("#34261B")
     }
     private val removeAdsBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#F7D99B")
+        color = Color.parseColor("#D3A05F")
         style = Paint.Style.STROKE
-        strokeWidth = 1.5f * unit
+        strokeWidth = unit
     }
     private val removeAdsTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#321A12")
+        color = Color.parseColor("#F7D99B")
         textAlign = Paint.Align.CENTER
         isFakeBoldText = true
-        setShadowLayer(1f * unit, 0f, 1f * unit, Color.argb(80, 255, 255, 255))
     }
     init {
         PlainGameButtonAssets.initialize(context)
@@ -212,7 +211,7 @@ class ModeSelectionView(context: Context) : View(context) {
             statsRect.bottom + 10f * unit,
         )
         val removeAdsWidth = 128f * unit
-        val removeAdsHeight = 42f * unit
+        val removeAdsHeight = 28f * unit
         removeAdsRect.set(
             14f * unit,
             height - removeAdsHeight - 16f * unit,
@@ -336,24 +335,15 @@ class ModeSelectionView(context: Context) : View(context) {
     private fun drawRemoveAdsButton(canvas: Canvas) {
         canvas.save()
         canvas.scale(removeAdsScale, removeAdsScale, removeAdsRect.centerX(), removeAdsRect.centerY())
-        val radius = 9f * unit
+        val radius = 5f * unit
         canvas.drawRoundRect(removeAdsRect, radius, radius, removeAdsFillPaint)
         canvas.drawRoundRect(removeAdsRect, radius, radius, removeAdsBorderPaint)
         val removed = SettingsManager.isAdsRemoved(context)
         removeAdsTextPaint.textSize = 11f * textScale
-        val firstLine = if (removed) "Ads Removed ✓" else "Remove Ads"
-        val secondLine = if (removed) "" else removeAdsPrice
-        val centerY = removeAdsRect.centerY()
-        val firstBaseline = if (secondLine.isEmpty()) {
-            centerY - (removeAdsTextPaint.ascent() + removeAdsTextPaint.descent()) / 2f
-        } else {
-            centerY - 2f * unit
-        }
-        canvas.drawText(firstLine, removeAdsRect.centerX(), firstBaseline, removeAdsTextPaint)
-        if (secondLine.isNotEmpty()) {
-            removeAdsTextPaint.textSize = 9f * textScale
-            canvas.drawText(secondLine, removeAdsRect.centerX(), centerY + 12f * unit, removeAdsTextPaint)
-        }
+        val label = if (removed) "Ads Removed ✓" else "Remove Ads $removeAdsPrice"
+        val baseline = removeAdsRect.centerY() -
+            (removeAdsTextPaint.ascent() + removeAdsTextPaint.descent()) / 2f
+        canvas.drawText(label, removeAdsRect.centerX(), baseline, removeAdsTextPaint)
         canvas.restore()
     }
 

@@ -86,8 +86,9 @@ class MancalaActivity : AppCompatActivity() {
         // then fly directly from that line to their landing pits.
         val pickupDuration = 0f
         private val normalizedSpeed = speedMultiplier.coerceIn(1f, 4f)
-        val stagingTravelDuration = 120f / normalizedSpeed
-        val stagingGap = 34f / normalizedSpeed
+        private val movementSlowdown = 1.2f
+        val stagingTravelDuration = 120f * movementSlowdown / normalizedSpeed
+        val stagingGap = 34f * movementSlowdown / normalizedSpeed
         val stagingDuration = if (movedStones.isEmpty()) {
             0f
         } else {
@@ -95,10 +96,10 @@ class MancalaActivity : AppCompatActivity() {
         }
         // Keep the selected movement-speed setting proportional to the actual
         // pit-to-pit flight time.
-        // Make every piece animation 1.2% slower while preserving the
+        // Make every piece animation 1.2x slower while preserving the
         // relative differences between the selectable speed settings.
-        val placementDuration = 260f * 1.012f / normalizedSpeed
-        val settleDuration = 600f * 1.012f / normalizedSpeed
+        val placementDuration = 260f * movementSlowdown / normalizedSpeed
+        val settleDuration = 600f * movementSlowdown / normalizedSpeed
         val sowingDuration = stagingDuration + sowingRoutes.fold(0f) { total, route ->
             total + routeDuration(route)
         }
@@ -540,7 +541,7 @@ class MancalaActivity : AppCompatActivity() {
                     showDifficultyConfirmation(which)
                 } else {
                     SettingsManager.setMancalaDifficulty(this, which)
-                    if (returnToHome) showHome() else showMenu()
+                    if (returnToHome) showDifficultyMenu(returnToHome = true) else showMenu()
                 }
             }
         }

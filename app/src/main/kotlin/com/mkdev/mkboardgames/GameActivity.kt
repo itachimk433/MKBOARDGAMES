@@ -2175,12 +2175,17 @@ Checkmate your opponent's King.
         )
         view.onChoiceSelected = { which ->
             val changed = which != current
-            setDiff(which)
-            dismissStyledOverlay()
-            if (changed && gameState.status == GameStatus.IN_PROGRESS && moveHistory.isNotEmpty()) {
-                showChessRestartDialog()
-            } else {
-                showChessBoardAfterDialog()
+            if (changed) {
+                setDiff(which)
+                if (gameState.status == GameStatus.IN_PROGRESS && moveHistory.isNotEmpty()) {
+                    dismissStyledOverlay()
+                    showChessRestartDialog()
+                } else {
+                    // Before the first move, keep the difficulty picker open so
+                    // the player can choose and verify a setting without being
+                    // sent back to the board after every tap.
+                    showStyledDifficultyDialog(which, setDiff)
+                }
             }
         }
         showStyledOverlay(
