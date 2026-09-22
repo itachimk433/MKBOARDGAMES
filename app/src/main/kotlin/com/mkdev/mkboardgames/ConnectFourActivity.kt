@@ -541,6 +541,7 @@ Control the centre columns, build threats in more than one direction, and block 
         val label = when {
             gameState.status != GameStatus.IN_PROGRESS -> "Game over"
             vsAI && gameState.currentTurn == playerColor -> "Your turn"
+            vsAI -> "CPU Turn"
             else -> "${if (redTurn) "Red" else "Yellow"}'s turn"
         }
         hudView.setInfo(
