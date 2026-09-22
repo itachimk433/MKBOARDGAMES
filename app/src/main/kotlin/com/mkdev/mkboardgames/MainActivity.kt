@@ -54,15 +54,37 @@ class MainActivity : AppCompatActivity() {
         menuView = null
         MusicPlayer.enterModeSelection(this)
 
-        val modeSelection = ModeSelectionView(this).apply {
-            onModeSelected = { mode ->
-                selectedGameMode = mode
-                SettingsManager.setCurrentMode(this@MainActivity, mode)
-                MusicPlayer.playForMode(this@MainActivity, mode)
-                showGameMenu()
+        val modeSelection = ModeSelectionView(this)
+        modeSelection.onModeSelected = { mode ->
+            selectedGameMode = mode
+            SettingsManager.setCurrentMode(this@MainActivity, mode)
+            MusicPlayer.playForMode(this@MainActivity, mode)
+            showGameMenu()
+        }
+        modeSelection.onAboutClicked = { showAbout() }
+        modeSelection.onStatsClicked = { showStatsDialog() }
+        modeSelection.onRemoveAdsClicked = {
+            RemoveAdsManager.purchase(this@MainActivity) { error ->
+                runOnUiThread {
+                    if (error == null) {
+                        modeSelection.setAdsRemoved()
+                        Toast.makeText(
+                            this@MainActivity,
+                            "Ads removed. Thank you!",
+                            Toast.LENGTH_LONG,
+                        ).show()
+                    } else if (error != "Purchase canceled.") {
+                        AlertDialog.Builder(this@MainActivity)
+                            .setTitle("Remove Ads")
+                            .setMessage(error)
+                            .setPositiveButton("OK", null)
+                            .show()
+                    }
+                }
             }
-            onAboutClicked = { showAbout() }
-            onStatsClicked = { showStatsDialog() }
+        }
+        RemoveAdsManager.prepare(this) { price ->
+            runOnUiThread { modeSelection.setRemoveAdsPrice(price) }
         }
         screenRoot.removeAllViews()
         screenRoot.addView(modeSelection, FrameLayout.LayoutParams(-1, -1))
