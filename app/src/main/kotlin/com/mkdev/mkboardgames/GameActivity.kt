@@ -1936,8 +1936,9 @@ Checkmate your opponent's King.
     fun onMenuClicked() {
         // The menu is an in-app dialog and does not trigger onPause().
         stopAutoplayAndAiThinking()
-        val inProgress = gameState.status == GameStatus.IN_PROGRESS && moveHistory.isNotEmpty()
-        if (inProgress) MusicPlayer.enterPausedMatch(this)
+        val matchActive = matchStarted && gameState.status == GameStatus.IN_PROGRESS
+        val inProgress = matchActive && moveHistory.isNotEmpty()
+        if (matchActive) MusicPlayer.enterPausedMatch(this)
         if (isStyledBoardGame()) {
             showChessGameplayMenu(inProgress)
             return

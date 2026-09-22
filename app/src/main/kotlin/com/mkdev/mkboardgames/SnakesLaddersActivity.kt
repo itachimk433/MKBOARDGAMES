@@ -354,6 +354,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
         for (player in 0 until playerCount) {
             boardView.setPlayerPosition(player, 0)
         }
+        MusicPlayer.enterMatch(this)
         showBoardAfterDialog()
         updateHud()
         SoundPlayer.playMovement("ludo_start")
@@ -529,6 +530,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
             Toast.makeText(this, "Wait for the dice to stop rolling", Toast.LENGTH_SHORT).show()
             return
         }
+        MusicPlayer.enterPausedMatch(this)
         hideBoardWhileDialogIsOpen()
         StyledDialogs.showChoices(
             this,
@@ -572,6 +574,9 @@ class SnakesLaddersActivity : AppCompatActivity() {
     }
 
     private fun showBoardAfterDialog() {
+        if (matchStarted && !gameOver) {
+            MusicPlayer.resumeMatch(this)
+        }
         dialogOpen = false
         boardBackdropView.visibility =
             if (selectedBoard.matchBackgroundAssetName == null) View.GONE else View.VISIBLE
