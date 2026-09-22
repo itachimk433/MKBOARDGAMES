@@ -7,6 +7,7 @@ import android.view.MotionEvent
 import android.view.View
 import com.mkdev.mkboardgames.GameMode
 import com.mkdev.mkboardgames.R
+import com.mkdev.mkboardgames.SettingsManager
 import com.mkdev.mkboardgames.SoundPlayer
 import kotlin.math.min
 
@@ -21,6 +22,7 @@ class ModeSelectionView(context: Context) : View(context) {
     var onModeSelected: ((GameMode) -> Unit)? = null
     var onAboutClicked: (() -> Unit)? = null
     var onStatsClicked: (() -> Unit)? = null
+    var onRemoveAdsClicked: (() -> Unit)? = null
 
     private val unit = resources.displayMetrics.density.coerceAtLeast(1f)
     private val textScale = resources.displayMetrics.scaledDensity.coerceAtMost(2f)
@@ -31,9 +33,12 @@ class ModeSelectionView(context: Context) : View(context) {
     private val challengesRect = RectF()
     private val statsRect = RectF()
     private val statsTouchRect = RectF()
+    private val removeAdsRect = RectF()
+    private val removeAdsTouchRect = RectF()
     private var pressedMode: GameMode? = null
     private var pressedAbout = false
     private var pressedStats = false
+    private var pressedRemoveAds = false
     private var loadingMode: GameMode? = null
     private var loadingAngle = 0f
     private var loadingAnimator: ValueAnimator? = null
@@ -41,6 +46,8 @@ class ModeSelectionView(context: Context) : View(context) {
     private var aboutScale = 1f
     private var irregularScale = 1f
     private var challengesScale = 1f
+    private var removeAdsScale = 1f
+    private var removeAdsPrice = "$3"
     private val logoBitmap: Bitmap? = try {
         (context.resources.getDrawable(R.drawable.ic_app_logo, null) as? android.graphics.drawable.BitmapDrawable)?.bitmap
     } catch (_: Exception) {
@@ -121,6 +128,20 @@ class ModeSelectionView(context: Context) : View(context) {
         strokeWidth = 2.5f * unit
         strokeCap = Paint.Cap.ROUND
     }
+    private val removeAdsFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#E3B86A")
+    }
+    private val removeAdsBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#F7D99B")
+        style = Paint.Style.STROKE
+        strokeWidth = 1.5f * unit
+    }
+    private val removeAdsTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#321A12")
+        textAlign = Paint.Align.CENTER
+        isFakeBoldText = true
+        setShadowLayer(1f * unit, 0f, 1f * unit, Color.argb(80, 255, 255, 255))
+    }
     init {
         PlainGameButtonAssets.initialize(context)
         isClickable = true
@@ -190,6 +211,20 @@ class ModeSelectionView(context: Context) : View(context) {
             statsRect.right + 10f * unit,
             statsRect.bottom + 10f * unit,
         )
+        val removeAdsWidth = 128f * unit
+        val removeAdsHeight = 42f * unit
+        removeAdsRect.set(
+            14f * unit,
+            height - removeAdsHeight - 16f * unit,
+            14f * unit + removeAdsWidth,
+            height - 16f * unit,
+        )
+        removeAdsTouchRect.set(
+            removeAdsRect.left - 8f * unit,
+            removeAdsRect.top - 8f * unit,
+            removeAdsRect.right + 8f * unit,
+            removeAdsRect.bottom + 8f * unit,
+        )
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -224,6 +259,7 @@ class ModeSelectionView(context: Context) : View(context) {
 
         drawModeCard(canvas, normalRect, GameMode.NORMAL, "♟️", "Play", "Standard rules")
         drawAboutButton(canvas)
+        drawRemoveAdsButton(canvas)
     }
 
     private fun drawModeCard(
@@ -284,6 +320,52 @@ class ModeSelectionView(context: Context) : View(context) {
         val baseline = aboutRect.centerY() - (metrics.ascent + metrics.descent) / 2f
         canvas.drawText("About".asOptionItalicText(), aboutRect.centerX(), baseline, playButtonLabelPaint)
         canvas.restore()
+    }
+
+    fun setRemoveAdsPrice(price: String?) {
+        if (SettingsManager.isAdsRemoved(context)) return
+        removeAdsPrice = price ?: "$3"
+        invalidate()
+    }
+
+    fun setAdsRemoved() {
+        removeAdsPrice = "✓"
+        invalidate()
+    }
+
+    private fun drawRemoveAdsButton(canvas: Canvas) {
+        canvas.save()
+        canvas.scale(removeAdsScale, removeAdsScale, removeAdsRect.centerX(), removeAdsRect.centerY())
+        val radius = 9f * unit
+        canvas.drawRoundRect(removeAdsRect, radius, radius, removeAdsFillPaint)
+        canvas.drawRoundRect(removeAdsRect, radius, radius, removeAdsBorderPaint)
+        val removed = SettingsManager.isAdsRemoved(context)
+        removeAdsTextPaint.textSize = 11f * textScale
+        val firstLine = if (removed) "Ads Removed ✓" else "Remove Ads"
+        val secondLine = if (removed) "" else removeAdsPrice
+        val centerY = removeAdsRect.centerY()
+        val firstBaseline = if (secondLine.isEmpty()) {
+            centerY - (removeAdsTextPaint.ascent() + removeAdsTextPaint.descent()) / 2f
+        } else {
+            centerY - 2f * unit
+        }
+        canvas.drawText(firstLine, removeAdsRect.centerX(), firstBaseline, removeAdsTextPaint)
+        if (secondLine.isNotEmpty()) {
+            removeAdsTextPaint.textSize = 9f * textScale
+            canvas.drawText(secondLine, removeAdsRect.centerX(), centerY + 12f * unit, removeAdsTextPaint)
+        }
+        canvas.restore()
+    }
+
+    private fun animateRemoveAdsScale(target: Float) {
+        ValueAnimator.ofFloat(removeAdsScale, target).apply {
+            duration = if (target < 1f) 70L else 110L
+            addUpdateListener {
+                removeAdsScale = it.animatedValue as Float
+                invalidate()
+            }
+            start()
+        }
     }
 
     private fun drawComingSoonStamp(canvas: Canvas, rect: RectF) {
@@ -353,8 +435,11 @@ class ModeSelectionView(context: Context) : View(context) {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 pressedStats = statsTouchRect.contains(event.x, event.y)
-                pressedAbout = !pressedStats && aboutTouchRect.contains(event.x, event.y)
-                pressedMode = if (pressedAbout || pressedStats) {
+                pressedRemoveAds = !pressedStats && removeAdsTouchRect.contains(event.x, event.y)
+                pressedAbout = !pressedStats &&
+                    !pressedRemoveAds &&
+                    aboutTouchRect.contains(event.x, event.y)
+                pressedMode = if (pressedAbout || pressedStats || pressedRemoveAds) {
                     null
                 } else {
                     when {
@@ -364,6 +449,7 @@ class ModeSelectionView(context: Context) : View(context) {
                 }
                 pressedMode?.let { animateCardScale(it, 0.96f) }
                 if (pressedAbout) animateAboutScale(0.96f)
+                if (pressedRemoveAds) animateRemoveAdsScale(0.96f)
                 invalidate()
                 return true
             }
@@ -377,6 +463,12 @@ class ModeSelectionView(context: Context) : View(context) {
                 if (pressedAbout && !aboutTouchRect.contains(event.x, event.y)) {
                     animateAboutScale(1f)
                     pressedAbout = false
+                    invalidate()
+                    return true
+                }
+                if (pressedRemoveAds && !removeAdsTouchRect.contains(event.x, event.y)) {
+                    animateRemoveAdsScale(1f)
+                    pressedRemoveAds = false
                     invalidate()
                     return true
                 }
@@ -414,6 +506,17 @@ class ModeSelectionView(context: Context) : View(context) {
                     invalidate()
                     return true
                 }
+                if (pressedRemoveAds) {
+                    val selectedRemoveAds = removeAdsTouchRect.contains(event.x, event.y)
+                    pressedRemoveAds = false
+                    animateRemoveAdsScale(1f)
+                    if (selectedRemoveAds && !SettingsManager.isAdsRemoved(context)) {
+                        SoundPlayer.play("ui_click")
+                        onRemoveAdsClicked?.invoke()
+                    }
+                    invalidate()
+                    return true
+                }
                 val selected = pressedMode
                 val rect = selected?.let(::modeRect)
                 pressedMode = null
@@ -443,7 +546,9 @@ class ModeSelectionView(context: Context) : View(context) {
             MotionEvent.ACTION_CANCEL -> {
                 pressedStats = false
                 pressedAbout = false
+                pressedRemoveAds = false
                 animateAboutScale(1f)
+                animateRemoveAdsScale(1f)
                 pressedMode?.let { animateCardScale(it, 1f) }
                 pressedMode = null
                 invalidate()
