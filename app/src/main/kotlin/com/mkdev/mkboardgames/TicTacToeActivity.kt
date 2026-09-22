@@ -565,6 +565,7 @@ Strategy
         val label = when {
             gameState.status != GameStatus.IN_PROGRESS -> "Game over"
             vsAI && gameState.currentTurn == playerColor -> "Your turn"
+            vsAI -> "CPU Turn"
             else -> "${if (isX) "X" else "O"}'s turn"
         }
         hudView.setInfo(
