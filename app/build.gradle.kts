@@ -48,6 +48,7 @@ plugins {
       implementation("androidx.appcompat:appcompat:1.6.1")
       implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
       implementation("com.google.android.gms:play-services-ads:23.6.0")
+      implementation("com.android.billingclient:billing-ktx:7.1.1")
 
       testImplementation("org.jetbrains.kotlin:kotlin-test:1.9.0")
   }
