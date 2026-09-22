@@ -1858,7 +1858,12 @@ Checkmate your opponent's King.
         } else {
             if (gameState.currentTurn == PieceColor.WHITE) "White" else "Black"
         }
-        val label = if (vsAI && gameState.currentTurn == playerColor) "Your turn" else "$turn to move"
+        val label = when {
+            gameState.status != GameStatus.IN_PROGRESS -> "Game over"
+            vsAI && gameState.currentTurn == playerColor -> "Your turn"
+            vsAI -> "CPU Turn"
+            else -> "$turn to move"
+        }
         hudView.setInfo(
             label,
             canUndo = moveHistory.isNotEmpty(),
