@@ -706,4 +706,14 @@ object SettingsManager {
     fun hasConsentAccepted(ctx: Context) = sharedPrefs(ctx).getBoolean(KEY_CONSENT, false)
     fun setConsentAccepted(ctx: Context) =
         sharedPrefs(ctx).edit().putBoolean(KEY_CONSENT, true).apply()
+
+    // ── Purchases ─────────────────────────────────────────────────────────────
+    private const val KEY_ADS_REMOVED = "ads_removed"
+
+    fun isAdsRemoved(ctx: Context): Boolean =
+        sharedPrefs(ctx).getBoolean(KEY_ADS_REMOVED, false)
+
+    fun setAdsRemoved(ctx: Context, removed: Boolean = true) {
+        sharedPrefs(ctx).edit().putBoolean(KEY_ADS_REMOVED, removed).apply()
+    }
 }
