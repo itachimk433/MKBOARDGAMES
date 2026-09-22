@@ -652,8 +652,12 @@ class MorabarabaActivity : AppCompatActivity() {
             "W: $wCount  •  B: $bCount" to flyTag
         }
 
-        val label = if (vsAI && gameState.currentTurn == playerColor) "Your turn"
-                    else "${if (gameState.currentTurn == PieceColor.WHITE) "White" else "Black"} to move"
+        val label = when {
+            gameState.status != GameStatus.IN_PROGRESS -> "Game over"
+            vsAI && gameState.currentTurn == playerColor -> "Your turn"
+            vsAI -> "CPU Turn"
+            else -> "${if (gameState.currentTurn == PieceColor.WHITE) "White" else "Black"} to move"
+        }
         hudView.setSideLabel(sub1)
         hudView.setInfo(
             value = label,
