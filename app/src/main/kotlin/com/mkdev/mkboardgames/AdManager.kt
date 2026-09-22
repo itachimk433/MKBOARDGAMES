@@ -36,6 +36,7 @@ object AdManager {
 
     fun initialize(context: Context) {
         applicationContext = context.applicationContext
+        if (SettingsManager.isAdsRemoved(context)) return
         MobileAds.initialize(applicationContext!!) {
             mobileAdsInitialized = true
             loadRewarded(applicationContext!!)
@@ -48,6 +49,7 @@ object AdManager {
      * This reserves space below the board instead of drawing over it.
      */
     fun attachBanner(container: LinearLayout) {
+        if (SettingsManager.isAdsRemoved(container.context)) return
         if (container.findViewWithTag<AdView>(BANNER_TAG) != null) return
         val adView = AdView(container.context).apply {
             tag = BANNER_TAG
@@ -67,6 +69,7 @@ object AdManager {
     }
 
     fun onAppForeground(activity: Activity) {
+        if (SettingsManager.isAdsRemoved(activity)) return
         shouldShowAppOpen = true
         if (mobileAdsInitialized) {
             loadAppOpen(activity.applicationContext)
@@ -76,6 +79,7 @@ object AdManager {
 
     fun onActivityResumed(activity: Activity) {
         resumedActivity = activity
+        if (SettingsManager.isAdsRemoved(activity)) return
         maybeShowAppOpen()
     }
 
@@ -93,6 +97,7 @@ object AdManager {
     fun showInterstitial(context: Context, ad: Any?) = Unit
 
     private fun loadAppOpen(context: Context) {
+        if (SettingsManager.isAdsRemoved(context)) return
         if (!mobileAdsInitialized || appOpenLoadInProgress || isFreshAppOpenReady()) return
         appOpenLoadInProgress = true
         AppOpenAd.load(
@@ -121,6 +126,11 @@ object AdManager {
 
     private fun maybeShowAppOpen() {
         val activity = resumedActivity ?: return
+        if (SettingsManager.isAdsRemoved(activity)) {
+            appOpenAd = null
+            shouldShowAppOpen = false
+            return
+        }
         if (!shouldShowAppOpen || isShowingAppOpen) return
         val ad = appOpenAd
         if (ad == null || !isFreshAppOpenReady()) {
@@ -154,6 +164,10 @@ object AdManager {
         onReward: () -> Unit,
         onUnavailable: () -> Unit,
     ) {
+        if (SettingsManager.isAdsRemoved(activity)) {
+            onReward()
+            return
+        }
         val cachedAd = rewardedAd
         if (cachedAd == null) {
             loadRewarded(activity) { loaded ->
@@ -209,6 +223,10 @@ object AdManager {
         context: Context,
         callback: (Boolean) -> Unit = {},
     ) {
+        if (SettingsManager.isAdsRemoved(context)) {
+            callback(true)
+            return
+        }
         rewardedAd?.let {
             callback(true)
             return
