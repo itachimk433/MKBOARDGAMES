@@ -636,7 +636,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
             LudoPlayerControlView(this).apply {
                 accentColor = SnakesLaddersBoardView.PLAYER_COLORS[player]
                 frameAssetName = selectedBoard.playerFrameAssetName
-                dieScale = selectedBoard.dieScale
+                dieScale = LudoPlayerControlView.UNIFORM_DIE_SCALE
                 label = playerName(player)
                 labelBelow = if (count == 2) player == 0 else player < 2
                 labelUpsideDown = false
@@ -664,7 +664,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
             control.labelBelow = isBottomPlayer
             control.labelUpsideDown = false
             control.frameAssetName = selectedBoard.playerFrameAssetName
-            control.dieScale = selectedBoard.dieScale
+            control.dieScale = LudoPlayerControlView.UNIFORM_DIE_SCALE
             control.dieHorizontalShiftFraction = if (player == 0 || player == 2) {
                 PLAYER_ONE_THREE_DIE_SHIFT_FRACTION
             } else {

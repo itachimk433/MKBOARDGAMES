@@ -101,6 +101,8 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
     init {
         setWillNotDraw(false)
         setLayerType(View.LAYER_TYPE_SOFTWARE, null)
+        clipChildren = false
+        clipToPadding = false
         minimumHeight = dp(CONTROL_HEIGHT)
     }
 
@@ -110,6 +112,7 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
         val frameHeight = dp(FRAME_HEIGHT)
         val avatarWidth = dp(AVATAR_SIZE)
         val dieSize = dp(renderedDieSizeDp())
+        val dieSurfaceSize = dp(renderedDieSurfaceSizeDp())
         val overlap = dp(2)
         val dieShift = (resources.displayMetrics.widthPixels * dieHorizontalShiftFraction)
             .roundToInt()
@@ -118,11 +121,13 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
         } else {
             0
         }
-        val dieLeft = if (profileOnEnd) {
-            ((profileLeft - dieSize) / 2 + dieShift).coerceAtLeast(0)
+        val dieCenterX = if (profileOnEnd) {
+            profileLeft / 2f + dieShift
         } else {
-            avatarWidth - overlap + dieShift
+            avatarWidth - overlap + dieShift + dieSize / 2f
         }
+        val dieLeft = (dieCenterX - dieSurfaceSize / 2f).roundToInt()
+        val dieTop = frameTop + (frameHeight - dieSurfaceSize) / 2
 
         addView(
             profile,
@@ -133,9 +138,9 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
         )
         addView(
             die,
-            LayoutParams(dieSize, dieSize).apply {
+            LayoutParams(dieSurfaceSize, dieSurfaceSize).apply {
                 leftMargin = dieLeft
-                topMargin = frameTop + (frameHeight - dieSize) / 2
+                topMargin = dieTop
             },
         )
     }
@@ -165,8 +170,8 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
         setMeasuredDimension(width, height)
         for (index in 0 until childCount) {
             val isProfile = index == 0
-            val childWidth = if (isProfile) AVATAR_SIZE else renderedDieSizeDp()
-            val childHeight = if (isProfile) FRAME_HEIGHT else renderedDieSizeDp()
+            val childWidth = if (isProfile) AVATAR_SIZE else renderedDieSurfaceSizeDp()
+            val childHeight = if (isProfile) FRAME_HEIGHT else renderedDieSurfaceSizeDp()
             val childWidthSpec = MeasureSpec.makeMeasureSpec(dp(childWidth), MeasureSpec.EXACTLY)
             val childHeightSpec = MeasureSpec.makeMeasureSpec(dp(childHeight), MeasureSpec.EXACTLY)
             getChildAt(index).measure(childWidthSpec, childHeightSpec)
@@ -275,8 +280,11 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
         value * resources.displayMetrics.density
 
     private fun renderedDieSizeDp(): Int =
-        ((if (frameAssetName != null) DIE_SIZE / 1.2f else DIE_SIZE.toFloat()) * dieScale)
+        ((DIE_SIZE / 1.2f) * dieScale)
             .roundToInt()
+
+    private fun renderedDieSurfaceSizeDp(): Int =
+        (renderedDieSizeDp() * GlbDiceView.SURFACE_SCALE).roundToInt()
 
     private fun loadFrameBitmap(assetName: String): Bitmap? = runCatching {
         context.assets.open(assetName).use {
@@ -322,6 +330,7 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
         private const val FRAME_HEIGHT = 74
         private const val AVATAR_SIZE = 70
         private const val DIE_SIZE = 74
+        const val UNIFORM_DIE_SCALE = 0.7f
         const val CONTROL_HEIGHT = LABEL_HEIGHT + FRAME_HEIGHT
         const val PAIR_WIDTH = AVATAR_SIZE + DIE_SIZE - 2
         const val RAIL_HEIGHT = 112

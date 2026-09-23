@@ -37,8 +37,10 @@ import kotlin.random.Random
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
-private const val DICE_IDLE_SCALE = 0.98f
-private const val DICE_ROLL_SCALE = 1.5f
+// 5% smaller than the previous 0.98 idle scale. The rolling scale is 50%
+// larger than this new idle size.
+private const val DICE_IDLE_SCALE = 0.931f
+private const val DICE_ROLL_SCALE = 1.3965f
 private const val DICE_LANDING_SCALE_PROGRESS = 0.9f
 private const val ROLL_DURATION_MS = 656L
 private const val TUMBLE_DEGREES_MULTIPLIER = 12f
@@ -578,7 +580,7 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
                     centerX = (minX + maxX) / 2f,
                     centerY = (minY + maxY) / 2f,
                     centerZ = (minZ + maxZ) / 2f,
-                    renderScale = 1.08f / maxDimension,
+                    renderScale = 1.08f / maxDimension / GlbDiceView.SURFACE_SCALE,
                 )
             }
 
@@ -1257,6 +1259,7 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
     }
 
     companion object {
+        const val SURFACE_SCALE = 1.5f
         private const val TAG = "GlbDiceView"
         private const val MODEL_ASSET = "low_poly_dice/scene.gltf"
 

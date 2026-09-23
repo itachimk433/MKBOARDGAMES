@@ -245,7 +245,7 @@ class LudoActivity : AppCompatActivity() {
                 } else {
                     null
                 }
-                dieScale = if (selectedBoard == LudoBoardView.Board.TWO) 1f else 0.7f
+                dieScale = LudoPlayerControlView.UNIFORM_DIE_SCALE
                 label = playerDisplayName(player)
                 labelBelow = player == 0 || player == 1
                 bind(
@@ -543,7 +543,7 @@ class LudoActivity : AppCompatActivity() {
         if (!::playerControlViews.isInitialized) return
         playerControlViews.forEachIndexed { player, control ->
             control.frameAssetName = if (isSnowBoard) SNOW_PLAYER_FRAME_ASSET else null
-            control.dieScale = if (isSnowBoard) 1f else 0.7f
+            control.dieScale = LudoPlayerControlView.UNIFORM_DIE_SCALE
             playerBadgeViews[player].avatarScale = if (isSnowBoard) 0.9f else 0.7f
             playerBadgeViews[player].ringAndGlowEnabled = !isSnowBoard
             control.bind(
