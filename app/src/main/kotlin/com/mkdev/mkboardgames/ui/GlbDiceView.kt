@@ -15,7 +15,7 @@ import android.os.Looper
 import android.util.Log
 import android.view.MotionEvent
 import android.view.ViewGroup
-import android.view.animation.LinearInterpolator
+import android.view.animation.DecelerateInterpolator
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
@@ -115,19 +115,17 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         glRenderer.setAnimationScale(1f)
 
         animator = ValueAnimator.ofFloat(0f, 1f).apply {
-            // A linear clock is intentional: RollPath is one fixed-axis,
-            // constant-speed rotation that already lands on the target face.
-            duration = 680L
-            interpolator = LinearInterpolator()
+            // Three fixed-axis tumble segments make the die read as a
+            // thrown object, while deceleration gives the final landing
+            // enough time to settle onto its target face.
+            duration = 820L
+            interpolator = DecelerateInterpolator(1.6f)
             addUpdateListener {
                 val progress = it.animatedFraction
-                val spinOrientation = Quat.fromAxisAngleDegrees(
-                    rollPath.axisX,
-                    rollPath.axisY,
-                    rollPath.axisZ,
-                    rollPath.totalDegrees * progress,
+                val orientation = rollPath.orientationAt(
+                    progress = progress,
+                    start = startOrientation,
                 )
-                val orientation = (spinOrientation * startOrientation).normalized()
 
                 currentOrientation = orientation
                 applyOrientation(orientation)
@@ -945,26 +943,67 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
     }
 
     private data class RollPath(
-        val axisX: Float,
-        val axisY: Float,
-        val axisZ: Float,
-        val totalDegrees: Float,
+        val segments: List<Segment>,
     ) {
+        private data class Segment(
+            val axis: Axis,
+            val degrees: Float,
+        )
+
+        fun orientationAt(
+            progress: Float,
+            start: Quat,
+        ): Quat {
+            val totalDegrees = segments.sumOf { it.degrees.toDouble() }.toFloat()
+            var remainingDegrees = totalDegrees * progress.coerceIn(0f, 1f)
+            var orientation = start
+
+            for (segment in segments) {
+                if (remainingDegrees <= 0f) break
+
+                val degrees = remainingDegrees.coerceAtMost(segment.degrees)
+                if (degrees > 0f) {
+                    orientation = (
+                        Quat.fromAxisAngleDegrees(
+                            segment.axis.x,
+                            segment.axis.y,
+                            segment.axis.z,
+                            degrees,
+                        ) * orientation
+                    ).normalized()
+                }
+                remainingDegrees -= degrees
+            }
+
+            return orientation
+        }
+
         companion object {
             fun from(
                 start: Quat,
                 target: Quat,
                 motionDirection: MotionDiceDirection,
             ): RollPath {
-                val fallbackAxis = when (motionDirection) {
-                    MotionDiceDirection.TOP_LEFT -> Axis(-0.75f, -0.55f, 0.2f)
-                    MotionDiceDirection.TOP_RIGHT -> Axis(-0.75f, 0.55f, 0.2f)
-                    MotionDiceDirection.UP -> Axis(1f, 0.15f, 0.1f)
-                    MotionDiceDirection.LEFT -> Axis(0.15f, -1f, 0.1f)
-                    MotionDiceDirection.RIGHT -> Axis(0.15f, 1f, 0.1f)
+                val segments = mutableListOf<Segment>()
+                var tumbleOrientation = start
+
+                repeat(3) {
+                    val axis = randomAxis(motionDirection)
+                    val degrees = Random.nextInt(180, 301).toFloat()
+                    segments += Segment(axis, degrees)
+                    tumbleOrientation = (
+                        Quat.fromAxisAngleDegrees(
+                            axis.x,
+                            axis.y,
+                            axis.z,
+                            degrees,
+                        ) * tumbleOrientation
+                    ).normalized()
                 }
 
-                var delta = (target * start.conjugate()).normalized()
+                var delta = (
+                    target * tumbleOrientation.conjugate()
+                ).normalized()
                 if (delta.w < 0f) {
                     delta = Quat(-delta.w, -delta.x, -delta.y, -delta.z)
                 }
@@ -973,7 +1012,7 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
                     (1f - delta.w * delta.w).coerceAtLeast(0f),
                 )
                 val axis = if (halfSine < 1e-4f) {
-                    fallbackAxis.normalized()
+                    Axis(0f, 1f, 0f)
                 } else {
                     Axis(
                         delta.x / halfSine,
@@ -984,26 +1023,25 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
                 val shortestDegrees = Math.toDegrees(
                     2.0 * acos(delta.w.coerceIn(-1f, 1f)),
                 ).toFloat()
-                val extraDegrees = Random.nextInt(2, 4) * 360f
+                segments += Segment(axis, shortestDegrees)
 
-                // Both choices end at the same target orientation. The
-                // reverse path uses the opposite fixed axis and travels the
-                // long way around instead of reversing during the roll.
-                return if (Random.nextBoolean()) {
-                    RollPath(
-                        axisX = axis.x,
-                        axisY = axis.y,
-                        axisZ = axis.z,
-                        totalDegrees = shortestDegrees + extraDegrees,
-                    )
-                } else {
-                    RollPath(
-                        axisX = -axis.x,
-                        axisY = -axis.y,
-                        axisZ = -axis.z,
-                        totalDegrees = 360f - shortestDegrees + extraDegrees,
-                    )
+                return RollPath(segments)
+            }
+
+            private fun randomAxis(direction: MotionDiceDirection): Axis {
+                val bias = when (direction) {
+                    MotionDiceDirection.UP -> Axis(1f, 0f, 0f)
+                    MotionDiceDirection.LEFT -> Axis(0f, -1f, 0f)
+                    MotionDiceDirection.RIGHT -> Axis(0f, 1f, 0f)
+                    MotionDiceDirection.TOP_LEFT -> Axis(-0.7f, -0.7f, 0f)
+                    MotionDiceDirection.TOP_RIGHT -> Axis(-0.7f, 0.7f, 0f)
                 }
+
+                return Axis(
+                    x = bias.x + Random.nextFloat() * 1.2f - 0.6f,
+                    y = bias.y + Random.nextFloat() * 1.2f - 0.6f,
+                    z = Random.nextFloat() * 1.2f - 0.6f,
+                ).normalized()
             }
         }
     }
