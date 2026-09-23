@@ -869,7 +869,7 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
                     centerX = (minX + maxX) / 2f,
                     centerY = (minY + maxY) / 2f,
                     centerZ = (minZ + maxZ) / 2f,
-                    renderScale = 1.08f / maxDimension,
+                    renderScale = 1.08f / maxDimension / GlbDiceView.SURFACE_SCALE,
                 )
             }
 
