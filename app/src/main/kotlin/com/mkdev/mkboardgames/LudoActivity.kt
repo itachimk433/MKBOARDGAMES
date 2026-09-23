@@ -302,6 +302,9 @@ class LudoActivity : AppCompatActivity() {
         lifecycleActive = true
         makeFullscreen()
         if (::boardView.isInitialized) boardView.resumeAnimations()
+        if (::playerDiceViews.isInitialized) {
+            playerDiceViews.forEach { it.onHostResume() }
+        }
         if (::playerDiceViews.isInitialized && !dialogOpen) setPlayerDiceVisible(true)
         SoundPlayer.movementSoundsEnabled = SettingsManager.isMovementSoundsEnabled(this)
         recoverInterruptedGameplay()
@@ -310,9 +313,11 @@ class LudoActivity : AppCompatActivity() {
     override fun onPause() {
         lifecycleActive = false
         handler.removeCallbacksAndMessages(null)
-        cancelPlayerDiceRolls()
+        if (::playerDiceViews.isInitialized) {
+            playerDiceViews.forEach { it.onHostPause() }
+        }
         setPlayerDiceVisible(false)
-        boardView.cancelAnimations()
+        boardView.pauseAnimations()
         notificationHost.removeAllViews()
         celebrationGeneration++
         SoundPlayer.stop("ludo_dice", "ludo_move", "ludo_start", "ludo_star", "ludo_win")
@@ -327,7 +332,9 @@ class LudoActivity : AppCompatActivity() {
     override fun onDestroy() {
         lifecycleActive = false
         handler.removeCallbacksAndMessages(null)
-        cancelPlayerDiceRolls()
+        if (::playerDiceViews.isInitialized) {
+            playerDiceViews.forEach { it.cancelRoll() }
+        }
         setPlayerDiceVisible(false)
         boardView.cancelAnimations()
         super.onDestroy()

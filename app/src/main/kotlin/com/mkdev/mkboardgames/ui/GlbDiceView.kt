@@ -63,6 +63,7 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
     private var rotationY = -28f
     private var rotationZ = 0f
     private var currentOrientation = Quat.fromEulerDegrees(-18f, -28f, 0f)
+    private var hostPausedRoll = false
     private val glRenderer = DiceRenderer(context.applicationContext)
 
     init {
@@ -108,20 +109,28 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         val spin = RollSpin.random(motionDirection)
 
         animator = ValueAnimator.ofFloat(0f, 1f).apply {
-            duration = 1360L
+            // Keep the roll short without visibly ramping down before the
+            // die reaches its result.
+            duration = 680L
             interpolator = LinearInterpolator()
             addUpdateListener {
                 val progress = it.animatedFraction
-                val eased = easeOutQuint(progress)
+                // Spin at a constant rate. Only the final quarter aligns to
+                // the result, preventing a late-looking face reversal.
+                val settleProgress = if (progress < 0.74f) {
+                    0f
+                } else {
+                    smoothStep((progress - 0.74f) / 0.26f)
+                }
                 val baseOrientation = Quat.slerp(
                     startOrientation,
                     targetOrientation,
-                    eased,
+                    settleProgress,
                 )
                 val spinOrientation = Quat.fromEulerDegrees(
-                    spin.turnsX * eased,
-                    spin.turnsY * eased,
-                    spin.turnsZ * eased,
+                    spin.turnsX * progress,
+                    spin.turnsY * progress,
+                    spin.turnsZ * progress,
                 )
                 val wobble = wobbleEnvelope(progress)
                 val tiltOrientation = Quat.fromEulerDegrees(
@@ -166,7 +175,9 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         rotationX = x
         rotationY = y
         rotationZ = z
-        glRenderer.setRotation(x, y, z)
+        // Keep the quaternion intact. Euler conversion can cross an
+        // equivalent-angle boundary and look like a sudden reversal.
+        glRenderer.setRotation(orientation)
         glSurfaceView.requestRender()
     }
 
@@ -175,9 +186,9 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         glSurfaceView.requestRender()
     }
 
-    private fun easeOutQuint(progress: Float): Float {
-        val remaining = 1f - progress
-        return 1f - remaining * remaining * remaining * remaining * remaining
+    private fun smoothStep(progress: Float): Float {
+        val value = progress.coerceIn(0f, 1f)
+        return value * value * (3f - 2f * value)
     }
 
     private fun wobbleEnvelope(progress: Float): Float {
@@ -190,10 +201,11 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         rollGeneration++
         animator?.cancel()
         animator = null
+        hostPausedRoll = false
         isRolling = false
         glRenderer.clearFrameCallback()
         glRenderer.setAnimationScale(1f)
-        glRenderer.setRotation(rotationX, rotationY, rotationZ)
+        glRenderer.setRotation(currentOrientation)
         glSurfaceView.requestRender()
     }
 
@@ -203,14 +215,21 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
      * cannot leave the renderer paused on a partially rolled frame.
      */
     fun onHostPause() {
-        cancelRoll()
+        if (isRolling) {
+            animator?.pause()
+            hostPausedRoll = true
+        }
         glSurfaceView.onPause()
     }
 
     fun onHostResume() {
         glSurfaceView.onResume()
         glRenderer.setAnimationScale(1f)
-        glRenderer.setRotation(rotationX, rotationY, rotationZ)
+        glRenderer.setRotation(currentOrientation)
+        if (hostPausedRoll) {
+            hostPausedRoll = false
+            animator?.resume()
+        }
         glSurfaceView.requestRender()
     }
 
@@ -259,17 +278,13 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         private var view = FloatArray(16)
         private var width = 1
         private var height = 1
-        @Volatile private var rotationX = -18f
-        @Volatile private var rotationY = -28f
-        @Volatile private var rotationZ = 0f
+        @Volatile private var orientation = Quat.fromEulerDegrees(-18f, -28f, 0f)
         @Volatile private var facingRotation = 0f
         @Volatile private var animationScale = 1f
         @Volatile private var frameRenderedCallback: (() -> Unit)? = null
 
-        fun setRotation(x: Float, y: Float, z: Float) {
-            rotationX = x
-            rotationY = y
-            rotationZ = z
+        fun setRotation(value: Quat) {
+            orientation = value.normalized()
         }
 
         fun setFacingRotation(rotation: Float) {
@@ -348,10 +363,7 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
             }
 
             val modelMatrix = FloatArray(16)
-            Matrix.setIdentityM(modelMatrix, 0)
-            Matrix.rotateM(modelMatrix, 0, rotationX, 1f, 0f, 0f)
-            Matrix.rotateM(modelMatrix, 0, rotationY, 0f, 1f, 0f)
-            Matrix.rotateM(modelMatrix, 0, rotationZ, 0f, 0f, 1f)
+            orientation.toOpenGlMatrix().copyInto(modelMatrix)
             Matrix.rotateM(modelMatrix, 0, facingRotation, 0f, 0f, 1f)
             Matrix.scaleM(
                 modelMatrix,
@@ -1027,6 +1039,25 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
                 )
             }
         }
+
+        fun toOpenGlMatrix(): FloatArray = floatArrayOf(
+            1f - 2f * (y * y + z * z),
+            2f * (x * y + w * z),
+            2f * (x * z - w * y),
+            0f,
+            2f * (x * y - w * z),
+            1f - 2f * (x * x + z * z),
+            2f * (y * z + w * x),
+            0f,
+            2f * (x * z + w * y),
+            2f * (y * z - w * x),
+            1f - 2f * (x * x + y * y),
+            0f,
+            0f,
+            0f,
+            0f,
+            1f,
+        )
 
         /**
          * Extracts Euler angles for the renderer's Rx * Ry * Rz matrix order.

@@ -628,13 +628,22 @@ class OnitamaActivity : AppCompatActivity() {
         super.onResume()
         activityResumed = true
         makeFullscreen()
-        if (::boardView.isInitialized && matchStarted && activeOverlay == null) triggerAI()
+        if (::boardView.isInitialized) {
+            boardView.resumeMoveAnimation()
+            if (!boardView.hasPendingMoveAnimation() &&
+                matchStarted && activeOverlay == null
+            ) triggerAI()
+        }
     }
 
     override fun onPause() {
         activityResumed = false
         aiRequestToken++
         aiJob?.cancel()
+        if (::boardView.isInitialized) {
+            if (boardView.hasPendingMoveAnimation()) boardView.pauseMoveAnimation()
+            else boardView.isLocked = false
+        }
         if (!isFinishing) savePausedMatch()
         super.onPause()
     }

@@ -153,9 +153,13 @@ class SnakesLaddersActivity : AppCompatActivity() {
         makeFullscreen()
         if (::playerDiceViews.isInitialized) {
             playerDiceViews.forEach { it.onHostResume() }
+            boardView.resumeAnimations()
             if (matchStarted && !dialogOpen && !gameOver) {
                 updateHud()
-                if (vsAI && currentPlayer == 1) {
+                if (vsAI && currentPlayer == 1 &&
+                    !turnResolutionPending &&
+                    playerDiceViews.none { it.isRolling }
+                ) {
                     handler.postDelayed(
                         { if (gameplayActive() && currentPlayer == 1) rollDice(automated = true) },
                         350L,
@@ -171,8 +175,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
         if (::playerDiceViews.isInitialized) {
             playerDiceViews.forEach { it.onHostPause() }
         }
-        turnResolutionPending = false
-        boardView.cancelAnimations()
+        boardView.pauseAnimations()
         SoundPlayer.stopAll()
         super.onPause()
     }
@@ -181,7 +184,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
         lifecycleActive = false
         handler.removeCallbacksAndMessages(null)
         if (::playerDiceViews.isInitialized) {
-            playerDiceViews.forEach { it.onHostPause() }
+            playerDiceViews.forEach { it.cancelRoll() }
         }
         turnResolutionPending = false
         boardView.cancelAnimations()

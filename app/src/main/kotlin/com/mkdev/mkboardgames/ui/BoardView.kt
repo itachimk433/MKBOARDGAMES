@@ -961,6 +961,16 @@ class BoardView(context: Context) : View(context) {
         invalidate()
     }
 
+    fun pauseMoveAnimation() {
+        animator?.pause()
+    }
+
+    fun resumeMoveAnimation() {
+        animator?.resume()
+    }
+
+    fun hasPendingMoveAnimation(): Boolean = animator != null || pendingMove != null
+
     /** Pop-in animation for Othello: placed disc + all flipped discs grow in with overshoot. */
     fun playOthelloPopAnim(positions: Set<Position>) {
         recentOthelloPieces = positions

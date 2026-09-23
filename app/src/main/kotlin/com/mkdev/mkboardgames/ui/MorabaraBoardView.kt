@@ -362,6 +362,16 @@ class MorabaraBoardView(context: Context) : View(context) {
         invalidate()
     }
 
+    fun pauseAnimations() {
+        animator?.pause()
+    }
+
+    fun resumeAnimations() {
+        animator?.resume()
+    }
+
+    fun hasPendingMoveAnimation(): Boolean = animator != null || pendingMove != null
+
     fun animateExternalMove(move: Move) = startAnim(move)
 
     // ─── Drawing ─────────────────────────────────────────────────────────────

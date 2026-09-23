@@ -139,13 +139,16 @@ class ConnectFourActivity : AppCompatActivity() {
         if (::boardView.isInitialized) {
             SettingsManager.activateGameTheme(this, "connect_four")
             boardView.applyTheme()
+            boardView.resumeDropAnimation()
         }
-        resumeComputerTurnIfNeeded()
+        if (!::boardView.isInitialized || !boardView.hasPendingDropAnimation()) {
+            resumeComputerTurnIfNeeded()
+        }
     }
 
     override fun onPause() {
         activityResumed = false
-        stopAutomatedGameplay()
+        pauseAutomatedGameplayForLifecycle()
         SoundPlayer.stopAll()
         if (!isFinishing) savePausedMatch()
         super.onPause()
@@ -187,6 +190,15 @@ class ConnectFourActivity : AppCompatActivity() {
         if (::autoplayButton.isInitialized) {
             autoplayButton.setAutoplayEnabled(false, animate = false)
         }
+    }
+
+    private fun pauseAutomatedGameplayForLifecycle() {
+        scope.coroutineContext.cancelChildren()
+        if (::boardView.isInitialized) {
+            if (boardView.hasPendingDropAnimation()) boardView.pauseDropAnimation()
+            else boardView.isLocked = false
+        }
+        if (::hudView.isInitialized) hudView.setThinking(false)
     }
 
     @Deprecated("Deprecated in Java")
@@ -965,6 +977,16 @@ Control the centre columns, build threats in more than one direction, and block 
             fallingProgress = 0f
             invalidate()
         }
+
+        fun pauseDropAnimation() {
+            fallingAnimator?.pause()
+        }
+
+        fun resumeDropAnimation() {
+            fallingAnimator?.resume()
+        }
+
+        fun hasPendingDropAnimation(): Boolean = fallingAnimator != null || dropAnimationCompletion != null
 
         override fun onDraw(canvas: Canvas) {
             canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgP)

@@ -208,7 +208,12 @@ class LudoBoardView(context: Context) : View(context) {
         invalidate()
     }
 
+    fun pauseAnimations() {
+        moveAnimator?.pause()
+    }
+
     fun resumeAnimations() {
+        moveAnimator?.resume()
         if (isAttachedToWindow && !protectionPulseAnimator.isStarted) {
             protectionPulseAnimator.start()
         }

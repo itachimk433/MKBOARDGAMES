@@ -162,13 +162,16 @@ class MorabarabaActivity : AppCompatActivity() {
         if (::boardView.isInitialized) {
             SettingsManager.activateGameTheme(this, "morabaraba")
             boardView.applyTheme()
+            boardView.resumeAnimations()
         }
-        resumeComputerTurnIfNeeded()
+        if (!::boardView.isInitialized || !boardView.hasPendingMoveAnimation()) {
+            resumeComputerTurnIfNeeded()
+        }
     }
 
     override fun onPause() {
         activityResumed = false
-        stopAutomatedGameplay()
+        pauseAutomatedGameplayForLifecycle()
         SoundPlayer.stopAll()
         if (!isFinishing) savePausedMatch()
         super.onPause()
@@ -556,6 +559,17 @@ class MorabarabaActivity : AppCompatActivity() {
             autoplayButton.setAutoplayEnabled(false, animate = false)
         }
         if (::boardView.isInitialized) boardView.cancelAnim()
+        if (::hudView.isInitialized) hudView.setThinking(false)
+    }
+
+    private fun pauseAutomatedGameplayForLifecycle() {
+        aiJob?.cancel()
+        aiJob = null
+        scope.coroutineContext.cancelChildren()
+        if (::boardView.isInitialized) {
+            if (boardView.hasPendingMoveAnimation()) boardView.pauseAnimations()
+            else boardView.isLocked = false
+        }
         if (::hudView.isInitialized) hudView.setThinking(false)
     }
 

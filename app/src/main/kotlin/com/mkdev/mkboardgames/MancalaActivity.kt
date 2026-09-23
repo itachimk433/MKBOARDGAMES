@@ -227,12 +227,15 @@ class MancalaActivity : AppCompatActivity() {
         super.onResume()
         activityResumed = true
         makeFullscreen()
-        if (::boardView.isInitialized) resumeComputerTurnIfNeeded()
+        if (::boardView.isInitialized) {
+            boardView.resumeMoveAnimation()
+            if (!boardView.hasPendingMoveAnimation()) resumeComputerTurnIfNeeded()
+        }
     }
 
     override fun onPause() {
         activityResumed = false
-        if (::boardView.isInitialized) stopAutomatedGameplay()
+        pauseAutomatedGameplayForLifecycle()
         if (!isFinishing) savePausedMatch()
         super.onPause()
     }
@@ -731,6 +734,15 @@ class MancalaActivity : AppCompatActivity() {
         }
     }
 
+    private fun pauseAutomatedGameplayForLifecycle() {
+        scope.coroutineContext.cancelChildren()
+        if (::boardView.isInitialized) {
+            if (boardView.hasPendingMoveAnimation()) boardView.pauseMoveAnimation()
+            else boardView.isLocked = false
+        }
+        if (::hudView.isInitialized) hudView.setThinking(false)
+    }
+
     private fun undoMove() {
         if (previousStates.isEmpty() || boardView.isLocked) return
         scope.coroutineContext.cancelChildren()
@@ -1117,6 +1129,16 @@ class MancalaActivity : AppCompatActivity() {
             captureFeedback = null
             captureFeedbackProgress = 0f
         }
+
+        fun pauseMoveAnimation() {
+            moveAnimator?.pause()
+        }
+
+        fun resumeMoveAnimation() {
+            moveAnimator?.resume()
+        }
+
+        fun hasPendingMoveAnimation(): Boolean = moveAnimator != null || moveAnimation != null
 
         private fun countsOf(snapshot: GameState): IntArray =
             IntArray(MancalaRuleEngine.BOARD_CELLS) { index -> engine.stones(snapshot, index) }

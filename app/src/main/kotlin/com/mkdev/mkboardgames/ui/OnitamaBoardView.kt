@@ -277,4 +277,14 @@ class OnitamaBoardView(context: Context) : View(context) {
         isLocked = false
         invalidate()
     }
+
+    fun pauseMoveAnimation() {
+        moveAnimator?.pause()
+    }
+
+    fun resumeMoveAnimation() {
+        moveAnimator?.resume()
+    }
+
+    fun hasPendingMoveAnimation(): Boolean = moveAnimator != null || pendingMove != null
 }

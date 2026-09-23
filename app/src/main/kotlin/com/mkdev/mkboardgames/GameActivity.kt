@@ -280,7 +280,10 @@ class GameActivity : AppCompatActivity() {
         super.onResume(); makeFullscreen()
         activityResumed = true
         SoundPlayer.movementSoundsEnabled = SettingsManager.isMovementSoundsEnabled(this)
-        resumeComputerTurnIfNeeded()
+        if (::boardView.isInitialized) boardView.resumeMoveAnimation()
+        if (!::boardView.isInitialized || !boardView.hasPendingMoveAnimation()) {
+            resumeComputerTurnIfNeeded()
+        }
     }
 
     private fun stopAutoplayAndAiThinking() {
@@ -303,10 +306,24 @@ class GameActivity : AppCompatActivity() {
 
     override fun onPause() {
         activityResumed = false
-        stopAutoplayAndAiThinking()
+        pauseAutomatedGameplayForLifecycle()
         SoundPlayer.stopAll()
         if (!isFinishing) savePausedMatch()
         super.onPause()
+    }
+
+    private fun pauseAutomatedGameplayForLifecycle() {
+        autoPassJob?.cancel()
+        autoPassJob = null
+        scope.coroutineContext.cancelChildren()
+        if (::boardView.isInitialized) {
+            if (boardView.hasPendingMoveAnimation()) {
+                boardView.pauseMoveAnimation()
+            } else {
+                boardView.isLocked = false
+            }
+        }
+        if (::hudView.isInitialized) hudView.setThinking(false)
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {

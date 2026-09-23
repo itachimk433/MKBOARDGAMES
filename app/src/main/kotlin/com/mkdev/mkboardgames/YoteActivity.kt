@@ -173,14 +173,26 @@ class YoteActivity : AppCompatActivity() {
         makeFullscreen()
         if (::boardView.isInitialized) {
             updateHud()
-            resumeComputerTurnIfNeeded()
+            boardView.resumeMoveAnimation()
+            if (!boardView.hasPendingMoveAnimation()) resumeComputerTurnIfNeeded()
         }
+    }
+
+    private fun pauseAutomatedGameplayForLifecycle() {
+        aiRequestToken++
+        aiJob?.cancel()
+        aiJob = null
+        scope.coroutineContext.cancelChildren()
+        if (::boardView.isInitialized) {
+            if (boardView.hasPendingMoveAnimation()) boardView.pauseMoveAnimation()
+            else boardView.isLocked = false
+        }
+        if (::hudView.isInitialized) hudView.setThinking(false)
     }
 
     override fun onPause() {
         activityResumed = false
-        if (::boardView.isInitialized) boardView.cancelMoveAnimation()
-        stopAutomatedGameplay()
+        pauseAutomatedGameplayForLifecycle()
         if (!isFinishing) savePausedMatch()
         super.onPause()
     }

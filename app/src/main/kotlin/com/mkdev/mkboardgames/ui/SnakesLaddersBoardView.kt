@@ -714,6 +714,14 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
         invalidate()
     }
 
+    fun pauseAnimations() {
+        moveAnimator?.pause()
+    }
+
+    fun resumeAnimations() {
+        moveAnimator?.resume()
+    }
+
     override fun onTouchEvent(event: MotionEvent): Boolean {
         if (!gameOver) return false
         if (event.actionMasked == MotionEvent.ACTION_UP) {

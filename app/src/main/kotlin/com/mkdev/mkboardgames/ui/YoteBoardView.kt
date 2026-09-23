@@ -643,6 +643,16 @@ class YoteBoardView(context: Context) : View(context) {
         invalidate()
     }
 
+    fun pauseMoveAnimation() {
+        moveAnimator?.pause()
+    }
+
+    fun resumeMoveAnimation() {
+        moveAnimator?.resume()
+    }
+
+    fun hasPendingMoveAnimation(): Boolean = moveAnimator != null || pendingMove != null
+
     private fun positionAt(x: Float, y: Float): Position? {
         if (!gridRect.contains(x, y)) return null
         val artworkX = (x - boardRect.left) / boardRect.width() * 1200f

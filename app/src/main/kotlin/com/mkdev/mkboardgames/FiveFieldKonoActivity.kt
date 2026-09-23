@@ -132,12 +132,15 @@ class FiveFieldKonoActivity : AppCompatActivity() {
         super.onResume()
         activityResumed = true
         makeFullscreen()
-        if (::boardView.isInitialized) resumeComputerTurnIfNeeded()
+        if (::boardView.isInitialized) {
+            boardView.resumeMoveAnimation()
+            if (!boardView.hasPendingMoveAnimation()) resumeComputerTurnIfNeeded()
+        }
     }
 
     override fun onPause() {
         activityResumed = false
-        stopAutomatedGameplay()
+        pauseAutomatedGameplayForLifecycle()
         if (!isFinishing && ::boardView.isInitialized) savePausedMatch()
         super.onPause()
     }
@@ -443,6 +446,16 @@ class FiveFieldKonoActivity : AppCompatActivity() {
         aiJob?.cancel()
         aiJob = null
         if (::boardView.isInitialized) boardView.cancelMoveAnimation()
+        if (::hudView.isInitialized) hudView.setThinking(false)
+    }
+
+    private fun pauseAutomatedGameplayForLifecycle() {
+        aiJob?.cancel()
+        aiJob = null
+        if (::boardView.isInitialized) {
+            if (boardView.hasPendingMoveAnimation()) boardView.pauseMoveAnimation()
+            else boardView.isLocked = false
+        }
         if (::hudView.isInitialized) hudView.setThinking(false)
     }
 

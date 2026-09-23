@@ -302,6 +302,16 @@ class FiveFieldKonoBoardView(context: Context) : View(context) {
         invalidate()
     }
 
+    fun pauseMoveAnimation() {
+        moveAnimator?.pause()
+    }
+
+    fun resumeMoveAnimation() {
+        moveAnimator?.resume()
+    }
+
+    fun hasPendingMoveAnimation(): Boolean = moveAnimator != null || pendingMove != null
+
     private fun positionAt(x: Float, y: Float): Position? {
         if (!boardRect.contains(x, y)) return null
         val sourceX = (x - boardRect.left) / boardRect.width()
