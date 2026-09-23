@@ -2,9 +2,12 @@ package com.mkdev.mkboardgames.games.ludo
 
 import com.mkdev.mkboardgames.engine.GameStatus
 import com.mkdev.mkboardgames.engine.PieceColor
+import com.mkdev.mkboardgames.engine.Position
 import kotlin.test.Test
+import kotlin.test.assertFalse
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class LudoRuleEngineTest {
     private val engine = LudoRuleEngine()
@@ -116,6 +119,29 @@ class LudoRuleEngineTest {
 
             assertEquals(LudoSetup.TOKENS_PER_PLAYER, moves.size)
         }
+    }
+
+    @Test
+    fun safeTrackCellsMatchTheFourVisibleStarsAndFourStartArrows() {
+        val expectedStarPositions = setOf(
+            Position(2, 6),
+            Position(6, 12),
+            Position(8, 2),
+            Position(12, 8),
+        )
+        val actualStarPositions = LudoSetup.PATH
+            .filterIndexed { index, _ -> index in LudoSetup.STAR_TRACK_INDICES }
+            .toSet()
+
+        assertEquals(expectedStarPositions, actualStarPositions)
+        assertEquals(
+            LudoSetup.STAR_TRACK_INDICES,
+            LudoSetup.SAFE_TRACK_INDICES - setOf(0, 13, 26, 39),
+        )
+        assertTrue(LudoSetup.isSafeTrackCell(Position(6, 12)))
+        assertTrue(LudoSetup.isSafeTrackCell(Position(8, 2)))
+        assertFalse(LudoSetup.isSafeTrackCell(Position(8, 12)))
+        assertFalse(LudoSetup.isSafeTrackCell(Position(6, 2)))
     }
 
     private fun progressAt(position: com.mkdev.mkboardgames.engine.Position, player: Int): Int =

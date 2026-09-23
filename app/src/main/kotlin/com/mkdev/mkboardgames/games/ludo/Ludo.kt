@@ -76,8 +76,8 @@ object LudoSetup {
      * The supplied board marks both the four coloured arrow/start cells and
      * the four star cells as safe. Tokens on these cells cannot be captured.
      */
-    val SAFE_TRACK_INDICES: Set<Int> = setOf(0, 13, 16, 23, 26, 39, 42, 49)
-    val STAR_TRACK_INDICES: Set<Int> = setOf(16, 23, 42, 49)
+    val SAFE_TRACK_INDICES: Set<Int> = setOf(0, 10, 13, 23, 26, 36, 39, 49)
+    val STAR_TRACK_INDICES: Set<Int> = setOf(10, 23, 36, 49)
 
     // The board artwork is green, yellow, red, blue clockwise from top-left.
     // The app's player order is red, blue, green, yellow.
