@@ -80,6 +80,11 @@ object SoundPlayer {
         ids["ludo_move"]        = p.load(ctx, R.raw.ludo_token_move,   1)
         ids["ludo_start"]       = p.load(ctx, R.raw.ludo_start,       1)
         ids["ludo_star"]        = p.load(ctx, R.raw.ludo_start,       1)
+        // Reuse the short shared capture cue for sending a token home.
+        ids["ludo_capture"]     = p.load(ctx, R.raw.capture,           1)
+        // The short Ludo chime also suits an individual token reaching center;
+        // ludo_win remains reserved for completing the whole match.
+        ids["ludo_home"]        = p.load(ctx, R.raw.ludo_start,       1)
         ids["ludo_win"]         = p.load(ctx, R.raw.ludo_win,         1)
 
         // Snakes & Ladders transitions

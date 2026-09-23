@@ -315,7 +315,15 @@ class LudoActivity : AppCompatActivity() {
             playerDiceViews.forEach { it.onHostPause() }
         }
         notificationHost.removeAllViews()
-        SoundPlayer.stop("ludo_dice", "ludo_move", "ludo_start", "ludo_star", "ludo_win")
+        SoundPlayer.stop(
+            "ludo_dice",
+            "ludo_move",
+            "ludo_start",
+            "ludo_star",
+            "ludo_capture",
+            "ludo_home",
+            "ludo_win",
+        )
         super.onPause()
     }
 
@@ -1757,7 +1765,11 @@ class LudoActivity : AppCompatActivity() {
             boardView.gameState = state
             boardView.legalMoves = emptyList()
             val targetProgress = move.metadata["targetProgress"] as? Int
+            if (move.captures.isNotEmpty()) {
+                SoundPlayer.playMovement("ludo_capture")
+            }
             if (targetProgress == LudoSetup.FINISH) {
+                SoundPlayer.playMovement("ludo_home")
                 val player = move.metadata["player"] as? Int ?: LudoSetup.playerFromState(state)
                 val token = (move.metadata["token"] as? Int ?: 0) + 1
                 val message = "TOKEN HOME! ${LudoSetup.PLAYER_NAMES[player]} token $token"
@@ -2129,7 +2141,13 @@ class LudoActivity : AppCompatActivity() {
         cancelPlayerDiceRolls()
         setPlayerDiceVisible(false)
         boardView.cancelAnimations()
-        SoundPlayer.stop("ludo_dice", "ludo_move", "ludo_star")
+        SoundPlayer.stop(
+            "ludo_dice",
+            "ludo_move",
+            "ludo_star",
+            "ludo_capture",
+            "ludo_home",
+        )
         // Keep the board mounted under the in-activity overlay.
         overlay.visibility = View.VISIBLE
     }
