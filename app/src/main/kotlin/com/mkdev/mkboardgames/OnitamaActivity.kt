@@ -637,13 +637,6 @@ class OnitamaActivity : AppCompatActivity() {
     }
 
     override fun onPause() {
-        activityResumed = false
-        aiRequestToken++
-        aiJob?.cancel()
-        if (::boardView.isInitialized) {
-            if (boardView.hasPendingMoveAnimation()) boardView.pauseMoveAnimation()
-            else boardView.isLocked = false
-        }
         if (!isFinishing) savePausedMatch()
         super.onPause()
     }

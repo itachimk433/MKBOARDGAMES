@@ -147,8 +147,6 @@ class ConnectFourActivity : AppCompatActivity() {
     }
 
     override fun onPause() {
-        activityResumed = false
-        pauseAutomatedGameplayForLifecycle()
         SoundPlayer.stopAll()
         if (!isFinishing) savePausedMatch()
         super.onPause()

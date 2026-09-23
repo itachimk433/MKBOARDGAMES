@@ -170,12 +170,9 @@ class SnakesLaddersActivity : AppCompatActivity() {
     }
 
     override fun onPause() {
-        lifecycleActive = false
-        handler.removeCallbacksAndMessages(null)
         if (::playerDiceViews.isInitialized) {
             playerDiceViews.forEach { it.onHostPause() }
         }
-        boardView.pauseAnimations()
         SoundPlayer.stopAll()
         super.onPause()
     }

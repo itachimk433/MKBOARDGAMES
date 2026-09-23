@@ -311,15 +311,10 @@ class LudoActivity : AppCompatActivity() {
     }
 
     override fun onPause() {
-        lifecycleActive = false
-        handler.removeCallbacksAndMessages(null)
         if (::playerDiceViews.isInitialized) {
             playerDiceViews.forEach { it.onHostPause() }
         }
-        setPlayerDiceVisible(false)
-        boardView.pauseAnimations()
         notificationHost.removeAllViews()
-        celebrationGeneration++
         SoundPlayer.stop("ludo_dice", "ludo_move", "ludo_start", "ludo_star", "ludo_win")
         super.onPause()
     }

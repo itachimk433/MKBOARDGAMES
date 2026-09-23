@@ -63,7 +63,6 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
     private var rotationY = -28f
     private var rotationZ = 0f
     private var currentOrientation = Quat.fromEulerDegrees(-18f, -28f, 0f)
-    private var hostPausedRoll = false
     private val glRenderer = DiceRenderer(context.applicationContext)
 
     init {
@@ -201,7 +200,6 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         rollGeneration++
         animator?.cancel()
         animator = null
-        hostPausedRoll = false
         isRolling = false
         glRenderer.clearFrameCallback()
         glRenderer.setAnimationScale(1f)
@@ -211,14 +209,11 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
 
     /**
      * GLSurfaceView does not receive Activity lifecycle callbacks through its
-     * FrameLayout parent. Forward them explicitly so returning to the app
-     * cannot leave the renderer paused on a partially rolled frame.
+     * FrameLayout parent. Pause only its rendering thread here; the roll
+     * animator and its completion callback must keep running so a system
+     * pause cannot strand the turn halfway through.
      */
     fun onHostPause() {
-        if (isRolling) {
-            animator?.pause()
-            hostPausedRoll = true
-        }
         glSurfaceView.onPause()
     }
 
@@ -226,10 +221,6 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         glSurfaceView.onResume()
         glRenderer.setAnimationScale(1f)
         glRenderer.setRotation(currentOrientation)
-        if (hostPausedRoll) {
-            hostPausedRoll = false
-            animator?.resume()
-        }
         glSurfaceView.requestRender()
     }
 

@@ -139,8 +139,6 @@ class FiveFieldKonoActivity : AppCompatActivity() {
     }
 
     override fun onPause() {
-        activityResumed = false
-        pauseAutomatedGameplayForLifecycle()
         if (!isFinishing && ::boardView.isInitialized) savePausedMatch()
         super.onPause()
     }

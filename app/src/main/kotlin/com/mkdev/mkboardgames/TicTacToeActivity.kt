@@ -149,8 +149,6 @@ class TicTacToeActivity : AppCompatActivity() {
         resumeComputerTurnIfNeeded()
     }
     override fun onPause() {
-        activityResumed = false
-        stopAutomatedGameplay()
         SoundPlayer.stopAll()
         if (!isFinishing) savePausedMatch()
         super.onPause()

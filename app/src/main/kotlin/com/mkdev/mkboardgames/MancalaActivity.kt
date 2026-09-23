@@ -234,8 +234,6 @@ class MancalaActivity : AppCompatActivity() {
     }
 
     override fun onPause() {
-        activityResumed = false
-        pauseAutomatedGameplayForLifecycle()
         if (!isFinishing) savePausedMatch()
         super.onPause()
     }
