@@ -47,7 +47,7 @@ class ModeSelectionView(context: Context) : View(context) {
     private var irregularScale = 1f
     private var challengesScale = 1f
     private var removeAdsScale = 1f
-    private var removeAdsPrice = "$3"
+    private var removeAdsPrice = "$5"
     private val logoBitmap: Bitmap? = try {
         (context.resources.getDrawable(R.drawable.ic_app_logo, null) as? android.graphics.drawable.BitmapDrawable)?.bitmap
     } catch (_: Exception) {
@@ -323,7 +323,7 @@ class ModeSelectionView(context: Context) : View(context) {
 
     fun setRemoveAdsPrice(price: String?) {
         if (SettingsManager.isAdsRemoved(context)) return
-        removeAdsPrice = price ?: "$3"
+        removeAdsPrice = price ?: "$5"
         invalidate()
     }
 

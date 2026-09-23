@@ -244,7 +244,9 @@ class StandardGameHudView(
         }
         if (showHistoryControls) {
             canvas.drawText(
-                if (undoCount > 0) "Undo($undoCount)" else "Undo",
+                if (undoCount == Int.MAX_VALUE) "Undo(∞)"
+                else if (undoCount > 0) "Undo($undoCount)"
+                else "Undo",
                 undoRect.centerX(),
                 undoRect.centerY() + buttonPaint.textSize * 0.36f,
                 if (canUndo) buttonPaint else disabledButtonPaint,

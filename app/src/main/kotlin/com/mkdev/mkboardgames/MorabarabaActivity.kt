@@ -394,7 +394,7 @@ class MorabarabaActivity : AppCompatActivity() {
         resultRecorded = false
         interstitialAd = null
         redoGameStates.clear(); redoCaptures.clear(); redoMoves.clear(); redoCapSnaps.clear()
-        undosRemaining = SettingsManager.undoCredits(this, "MORABARABA")
+        undosRemaining = SettingsManager.undoCredits(this, "MORABARABA", vsAI)
         AdManager.loadInterstitial(this) { interstitialAd = it }
         AdManager.loadRewarded(this)
         aiJob?.cancel(); aiJob = null
@@ -809,8 +809,12 @@ class MorabarabaActivity : AppCompatActivity() {
         capturedByWhite = cw.toMutableList(); capturedByBlack = cb.toMutableList()
         redoGameStates.add(prevState); redoCaptures.add(prevCap)
         redoMoves.add(rMoves);         redoCapSnaps.add(rSnaps)
-        undosRemaining--
-        SettingsManager.setUndoCredits(this, "MORABARABA", undosRemaining)
+        undosRemaining = SettingsManager.consumeUndoCredit(
+            this,
+            "MORABARABA",
+            undosRemaining,
+            vsAI,
+        )
         topCaptureView.update(capturedByBlack)
         bottomCaptureView.update(capturedByWhite)
         boardView.gameState = gameState

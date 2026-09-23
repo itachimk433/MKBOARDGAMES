@@ -60,6 +60,7 @@ object SettingsManager {
     private const val KEY_ACTIVE_GAME = "active_game_tag"
     private const val KEY_UNDO_CREDITS = "undo_credits"
     private const val KEY_UNDO_CREDITS_MIGRATED = "undo_credits_migrated"
+    private const val UNLIMITED_UNDO_CREDITS = Int.MAX_VALUE
 
     private fun undoKey(gameTag: String) = KEY_UNDO_CREDITS + "_" + gameTag
 
@@ -95,7 +96,12 @@ object SettingsManager {
     // Undo credits are independent for every game. A one-time migration keeps
     // the old shared balance for the first game opened after upgrading, while
     // every other game starts with its own full balance.
-    fun undoCredits(ctx: Context, gameTag: String): Int {
+    fun hasUnlimitedUndos(ctx: Context, vsAI: Boolean): Boolean =
+        !vsAI || isAdsRemoved(ctx)
+
+    fun undoCredits(ctx: Context, gameTag: String, vsAI: Boolean = true): Int {
+        if (hasUnlimitedUndos(ctx, vsAI)) return UNLIMITED_UNDO_CREDITS
+
         val settings = sharedPrefs(ctx)
         val key = undoKey(gameTag)
         if (settings.contains(key)) return settings.getInt(key, 3).coerceAtLeast(0)
@@ -111,6 +117,13 @@ object SettingsManager {
             return legacyValue
         }
         return 3
+    }
+
+    fun consumeUndoCredit(ctx: Context, gameTag: String, current: Int, vsAI: Boolean): Int {
+        if (hasUnlimitedUndos(ctx, vsAI)) return current
+        val remaining = (current - 1).coerceAtLeast(0)
+        setUndoCredits(ctx, gameTag, remaining)
+        return remaining
     }
 
     fun setUndoCredits(ctx: Context, gameTag: String, value: Int) {
@@ -235,16 +248,18 @@ object SettingsManager {
     fun othelloAiDepth(ctx: Context) = othelloAiProfile(ctx).depth
 
     // ── Morabaraba ───────────────────────────────────────────────────────────
-    fun getMorabarabaDifficulty(ctx: Context) = prefs(ctx).getInt(KEY_MORABARABA_DIFFICULTY, 0)
-    fun setMorabarabaDifficulty(ctx: Context, v: Int) = prefs(ctx).edit().putInt(KEY_MORABARABA_DIFFICULTY, v).apply()
+    fun getMorabarabaDifficulty(ctx: Context) =
+        prefs(ctx).getInt(KEY_MORABARABA_DIFFICULTY, 0).coerceIn(0, 2)
+    fun setMorabarabaDifficulty(ctx: Context, v: Int) =
+        prefs(ctx).edit().putInt(KEY_MORABARABA_DIFFICULTY, v.coerceIn(0, 2)).apply()
     fun morabarabaAiDepth(ctx: Context) = when (getMorabarabaDifficulty(ctx)) { 0 -> 3; 2 -> 7; else -> 5 }
     fun morabarabaAiTimeLimitMs(ctx: Context): Long = when (getMorabarabaDifficulty(ctx)) { 0 -> 600L; 2 -> 2500L; else -> 1200L }
 
     // ── Connect Four ─────────────────────────────────────────────────────────
     fun getConnectFourDifficulty(ctx: Context) =
-        prefs(ctx).getInt(KEY_CONNECT_FOUR_DIFFICULTY, 0)
+        prefs(ctx).getInt(KEY_CONNECT_FOUR_DIFFICULTY, 0).coerceIn(0, 2)
     fun setConnectFourDifficulty(ctx: Context, v: Int) =
-        prefs(ctx).edit().putInt(KEY_CONNECT_FOUR_DIFFICULTY, v).apply()
+        prefs(ctx).edit().putInt(KEY_CONNECT_FOUR_DIFFICULTY, v.coerceIn(0, 2)).apply()
     fun connectFourAiDepth(ctx: Context) = when (getConnectFourDifficulty(ctx)) {
         0 -> 3
         2 -> 7
@@ -297,7 +312,8 @@ object SettingsManager {
         foxAndGeeseAiProfile(ctx).varietyWindow
 
     // ── Ludo ─────────────────────────────────────────────────────────────────
-    fun getLudoDifficulty(ctx: Context) = prefs(ctx).getInt(KEY_LUDO_DIFFICULTY, 0)
+    fun getLudoDifficulty(ctx: Context) =
+        prefs(ctx).getInt(KEY_LUDO_DIFFICULTY, 0).coerceIn(0, 2)
     fun setLudoDifficulty(ctx: Context, v: Int) =
         prefs(ctx).edit().putInt(KEY_LUDO_DIFFICULTY, v.coerceIn(0, 2)).apply()
 
@@ -341,20 +357,20 @@ object SettingsManager {
 
     // ── Shogi ─────────────────────────────────────────────────────────────────
     fun getShogiDifficulty(ctx: Context) =
-        prefs(ctx).getInt(KEY_SHOGI_DIFFICULTY, 0).coerceIn(0, 3)
+        prefs(ctx).getInt(KEY_SHOGI_DIFFICULTY, 0).coerceIn(0, 2)
     fun setShogiDifficulty(ctx: Context, v: Int) =
-        prefs(ctx).edit().putInt(KEY_SHOGI_DIFFICULTY, v.coerceIn(0, 3)).apply()
+        prefs(ctx).edit().putInt(KEY_SHOGI_DIFFICULTY, v.coerceIn(0, 2)).apply()
     fun shogiAiDepth(ctx: Context) = when (getShogiDifficulty(ctx)) {
         0 -> 1
         1 -> 2
         2 -> 3
-        else -> 4
+        else -> 3
     }
     fun shogiAiTimeLimitMs(ctx: Context): Long = when (getShogiDifficulty(ctx)) {
         0 -> 700L
         1 -> 1200L
         2 -> 2200L
-        else -> 4200L
+        else -> 2200L
     }
 
     // ── Go ────────────────────────────────────────────────────────────────────
@@ -480,8 +496,10 @@ object SettingsManager {
 
     // ── Tic-Tac-Toe ──────────────────────────────────────────────────────────
     private const val KEY_TTT_DIFFICULTY = "ttt_ai_difficulty"
-    fun getTttDifficulty(ctx: Context) = prefs(ctx).getInt(KEY_TTT_DIFFICULTY, 0)
-    fun setTttDifficulty(ctx: Context, v: Int) = prefs(ctx).edit().putInt(KEY_TTT_DIFFICULTY, v).apply()
+    fun getTttDifficulty(ctx: Context) =
+        prefs(ctx).getInt(KEY_TTT_DIFFICULTY, 0).coerceIn(0, 2)
+    fun setTttDifficulty(ctx: Context, v: Int) =
+        prefs(ctx).edit().putInt(KEY_TTT_DIFFICULTY, v.coerceIn(0, 2)).apply()
     /** Depth scales with both difficulty and board size so the AI always responds fast. */
     fun tttAiDepth(ctx: Context, boardSize: Int): Int {
         val hardCap = when (boardSize) { 3 -> 9; 4 -> 7; else -> 6 }  // 5×5 max

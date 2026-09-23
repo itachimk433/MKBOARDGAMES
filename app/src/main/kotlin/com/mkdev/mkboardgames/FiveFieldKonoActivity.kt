@@ -287,7 +287,7 @@ class FiveFieldKonoActivity : AppCompatActivity() {
         matchStarted = true
         resultRecorded = false
         previousStates.clear()
-        undosRemaining = SettingsManager.undoCredits(this, "FIVE_FIELD_KONO")
+        undosRemaining = SettingsManager.undoCredits(this, "FIVE_FIELD_KONO", vsAI)
         AdManager.loadRewarded(this)
         if (restoring == null) PausedMatchStore.clear(this, GAME_KEY)
         if (vsAI) SettingsManager.setActiveGame(this, "five_field_kono")
@@ -380,8 +380,12 @@ class FiveFieldKonoActivity : AppCompatActivity() {
         }
         boardView.gameState = gameState
         boardView.isLocked = false
-        undosRemaining--
-        SettingsManager.setUndoCredits(this, "FIVE_FIELD_KONO", undosRemaining)
+        undosRemaining = SettingsManager.consumeUndoCredit(
+            this,
+            "FIVE_FIELD_KONO",
+            undosRemaining,
+            vsAI,
+        )
         updateHud()
         resumeComputerTurnIfNeeded()
     }

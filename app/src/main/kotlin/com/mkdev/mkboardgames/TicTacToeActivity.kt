@@ -394,7 +394,7 @@ Strategy
         resultRecorded = false
         interstitialAd = null
         redoGameStates.clear(); redoRemovedMoves.clear()
-        undosRemaining = SettingsManager.undoCredits(this, "TIC_TAC_TOE")
+        undosRemaining = SettingsManager.undoCredits(this, "TIC_TAC_TOE", vsAI)
         AdManager.loadInterstitial(this) { interstitialAd = it }
         AdManager.loadRewarded(this)
         if (restoring == null) clearPausedMatch()
@@ -606,8 +606,12 @@ Strategy
         gameState = restored
         redoGameStates.add(prevState)
         redoRemovedMoves.add(removed)
-        undosRemaining--
-        SettingsManager.setUndoCredits(this, "TIC_TAC_TOE", undosRemaining)
+        undosRemaining = SettingsManager.consumeUndoCredit(
+            this,
+            "TIC_TAC_TOE",
+            undosRemaining,
+            vsAI,
+        )
         boardView.isLocked = false
         boardView.reset(gameState)
         updateHud()

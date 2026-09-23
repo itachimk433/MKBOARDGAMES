@@ -390,7 +390,7 @@ Control the centre columns, build threats in more than one direction, and block 
         interstitialAd = null
         redoGameStates.clear()
         redoRemovedMoves.clear()
-        undosRemaining = SettingsManager.undoCredits(this, "CONNECT_FOUR")
+        undosRemaining = SettingsManager.undoCredits(this, "CONNECT_FOUR", vsAI)
         AdManager.loadInterstitial(this) { interstitialAd = it }
         AdManager.loadRewarded(this)
         if (restoring == null) clearPausedMatch()
@@ -595,8 +595,12 @@ Control the centre columns, build threats in more than one direction, and block 
         gameState = restored
         redoGameStates.add(previous)
         redoRemovedMoves.add(removed)
-        undosRemaining--
-        SettingsManager.setUndoCredits(this, "CONNECT_FOUR", undosRemaining)
+        undosRemaining = SettingsManager.consumeUndoCredit(
+            this,
+            "CONNECT_FOUR",
+            undosRemaining,
+            vsAI,
+        )
         boardView.reset(gameState)
         updateHud()
     }

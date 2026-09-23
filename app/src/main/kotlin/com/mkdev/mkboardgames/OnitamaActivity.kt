@@ -207,7 +207,7 @@ class OnitamaActivity : AppCompatActivity() {
         resultRecorded = false
         autoplayEnabled = false
         previousStates.clear()
-        undosRemaining = SettingsManager.undoCredits(this, "ONITAMA")
+        undosRemaining = SettingsManager.undoCredits(this, "ONITAMA", vsAI)
         AdManager.loadRewarded(this)
         whiteCardIndex = 0
         blackCardIndex = 0
@@ -389,8 +389,12 @@ class OnitamaActivity : AppCompatActivity() {
         }
         boardView.gameState = gameState
         boardView.isLocked = false
-        undosRemaining--
-        SettingsManager.setUndoCredits(this, "ONITAMA", undosRemaining)
+        undosRemaining = SettingsManager.consumeUndoCredit(
+            this,
+            "ONITAMA",
+            undosRemaining,
+            vsAI,
+        )
         syncCards()
         updateHud()
         if (vsAI && aiControlsCurrentTurn()) triggerAI()

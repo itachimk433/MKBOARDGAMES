@@ -449,7 +449,7 @@ class YoteActivity : AppCompatActivity() {
         autoplayEnabled = false
         autoplayMoveInProgress = false
         previousStates.clear()
-        undosRemaining = SettingsManager.undoCredits(this, "YOTE")
+        undosRemaining = SettingsManager.undoCredits(this, "YOTE", vsAI)
         AdManager.loadRewarded(this)
         capturedByWhite.clear()
         capturedByBlack.clear()
@@ -617,8 +617,12 @@ class YoteActivity : AppCompatActivity() {
         rebuildCapturedPieces()
         boardView.gameState = gameState
         boardView.isLocked = gameState.status != GameStatus.IN_PROGRESS
-        undosRemaining--
-        SettingsManager.setUndoCredits(this, "YOTE", undosRemaining)
+        undosRemaining = SettingsManager.consumeUndoCredit(
+            this,
+            "YOTE",
+            undosRemaining,
+            vsAI,
+        )
         updateHud()
         resumeComputerTurnIfNeeded()
     }

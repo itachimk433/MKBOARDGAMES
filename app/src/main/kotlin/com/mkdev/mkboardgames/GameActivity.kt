@@ -1261,7 +1261,7 @@ Checkmate your opponent's King.
                 if (autoplayAllowed && gameType != "LUDO" && vsAI) View.VISIBLE else View.GONE
         }
         redoGameStates.clear(); redoCaptures.clear(); redoMoves.clear(); redoCapSnaps.clear()
-        undosRemaining = SettingsManager.undoCredits(this, gameType)
+        undosRemaining = SettingsManager.undoCredits(this, gameType, vsAI)
         AdManager.loadInterstitial(this) { interstitialAd = it }
         AdManager.loadRewarded(this)
         moveHistory.clear(); capturedByWhite.clear(); capturedByBlack.clear(); captureSnapshots.clear()
@@ -1935,8 +1935,12 @@ Checkmate your opponent's King.
         capturedByWhite = cw.toMutableList(); capturedByBlack = cb.toMutableList()
         redoGameStates.add(prevState); redoCaptures.add(prevCap)
         redoMoves.add(rMoves);         redoCapSnaps.add(rSnaps)
-        undosRemaining--
-        SettingsManager.setUndoCredits(this, gameType, undosRemaining)
+        undosRemaining = SettingsManager.consumeUndoCredit(
+            this,
+            gameType,
+            undosRemaining,
+            vsAI,
+        )
         refreshCaptureViews()
         boardView.isLocked = false; boardView.gameState = gameState; updateHud()
     }
@@ -2190,7 +2194,8 @@ Checkmate your opponent's King.
                 gameType == "INTERNATIONAL_DRAUGHTS" ||
                 gameType == "FOX_AND_GEESE" ||
                 gameType == "OTHELLO" ||
-                gameType == "GO"
+                gameType == "GO" ||
+                gameType == "SHOGI"
             ) {
                 choices.take(3)
             } else {
@@ -2588,7 +2593,12 @@ Checkmate your opponent's King.
             canvas.drawRoundRect(menuRect, rr, rr, edgePaint)
             canvas.drawText("← Back", backRect.centerX(), backRect.centerY() + btnPaint.textSize * 0.36f, actionPaint)
             if (goMode) canvas.drawText("Pass", passRect.centerX(), passRect.centerY() + btnPaint.textSize * 0.36f, actionPaint)
-            canvas.drawText(if (undoCount > 0) "Undo($undoCount)" else "Undo", undoRect.centerX(), undoRect.centerY() + btnPaint.textSize * 0.36f,
+            canvas.drawText(
+                if (undoCount == Int.MAX_VALUE) "Undo(∞)"
+                else if (undoCount > 0) "Undo($undoCount)"
+                else "Undo",
+                undoRect.centerX(),
+                undoRect.centerY() + btnPaint.textSize * 0.36f,
                 if (gameOver) dimPaint else if (canUndo) btnPaint else dimPaint)
             canvas.drawText("Redo", redoRect.centerX(), redoRect.centerY() + btnPaint.textSize * 0.36f,
                 if (gameOver) dimPaint else if (canRedo) btnPaint else dimPaint)

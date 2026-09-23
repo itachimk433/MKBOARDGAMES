@@ -294,12 +294,36 @@ class ReplayActivity : AppCompatActivity() {
             else         -> ChessRuleEngine()
         }
 
-        // Reconstruct every board state from the move list
-        moves = parseMoves(movesJson)
+        // Reconstruct every board state from the move list. Connect Four
+        // historically stored a drop's requested row as 0 in some matches;
+        // normalize each drop against the board so replay always lands the
+        // piece in the same slot as the live game.
+        val parsedMoves = parseMoves(movesJson)
         val initialState = if (isOnitama && onitamaSetupSeed != Long.MIN_VALUE) {
             (engine as OnitamaRuleEngine).initialState(onitamaSetupSeed)
         } else {
             engine.initialState()
+        }
+        moves = if (isConnectFour) {
+            val connect = engine as ConnectFourRuleEngine
+            val normalized = mutableListOf<Move>()
+            var preview = initialState
+            for (move in parsedMoves) {
+                val landingRow = connect.landingRow(preview, move.to.col)
+                val normalizedMove = if (landingRow != null) {
+                    move.copy(
+                        from = ConnectFourRuleEngine.DROP,
+                        to = Position(landingRow, move.to.col),
+                    )
+                } else {
+                    move
+                }
+                normalized += normalizedMove
+                preview = connect.applyMove(preview, normalizedMove)
+            }
+            normalized
+        } else {
+            parsedMoves
         }
         val allStates  = mutableListOf(initialState)
         val allLabels  = mutableListOf("Start")
@@ -1065,7 +1089,9 @@ class ReplayActivity : AppCompatActivity() {
             val fallingY = fallingTargetY?.let {
                 fallingStartY + (it - fallingStartY) * fallingProgress
             }
-            val fallingRadius = cellSize * if (imageBoard) 0.37f else 0.31f
+            // Use the same piece size as the live Connect Four board for
+            // both Canvas and image-backed boards.
+            val fallingRadius = cellSize * 0.37f
 
             if (fallingX != null && fallingY != null && fallingColor != null && fallingY < boardStartY) {
                 drawDisc(canvas, fallingX, fallingY, fallingRadius, fallingColor!!)
@@ -1119,7 +1145,7 @@ class ReplayActivity : AppCompatActivity() {
                 else boardLeft + col * cellSize + cellSize / 2f
                 val cy = if (imageBoard) imageRowCenter(row)
                 else boardTop + row * cellSize + cellSize / 2f
-                drawDisc(canvas, cx, cy, cellSize * if (imageBoard) 0.37f else 0.31f, piece.color)
+                drawDisc(canvas, cx, cy, cellSize * 0.37f, piece.color)
             }
             winLine?.takeIf { it.size >= 2 }?.let { line ->
                 val first = line.first()
@@ -1140,7 +1166,11 @@ class ReplayActivity : AppCompatActivity() {
 
         private fun drawDisc(canvas: Canvas, cx: Float, cy: Float, radius: Float, color: PieceColor) {
             val bitmap = if (color == PieceColor.WHITE) yellowPieceBitmap else redPieceBitmap
-            if (bitmap != null && isImageBoard()) {
+            // The live board uses the supplied red/yellow artwork on Canvas
+            // too. The asset filenames are historical: yellowPieceBitmap is
+            // the visible red disc and redPieceBitmap is the visible yellow
+            // disc, matching PieceColor.WHITE/BLACK in Connect Four.
+            if (bitmap != null) {
                 canvas.drawBitmap(
                     bitmap,
                     null,
