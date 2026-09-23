@@ -115,10 +115,9 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         glRenderer.setAnimationScale(1f)
 
         animator = ValueAnimator.ofFloat(0f, 1f).apply {
-            // Three fixed-axis tumble segments make the die read as a
-            // thrown object, while deceleration gives the final landing
-            // enough time to settle onto its target face.
-            duration = 820L
+            // Keep the die tumbling for four times as long while preserving
+            // the requested three-times-faster spin rate.
+            duration = ROLL_DURATION_MS
             interpolator = DecelerateInterpolator(1.6f)
             addUpdateListener {
                 val progress = it.animatedFraction
@@ -989,7 +988,10 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
 
                 repeat(3) {
                     val axis = randomAxis(motionDirection)
-                    val degrees = Random.nextInt(180, 301).toFloat()
+                    // The animation lasts 4x longer, so the path needs 12x
+                    // the rotation distance to keep its angular speed at 3x.
+                    val degrees = Random.nextInt(180, 301).toFloat() *
+                        TUMBLE_DEGREES_MULTIPLIER
                     segments += Segment(axis, degrees)
                     tumbleOrientation = (
                         Quat.fromAxisAngleDegrees(
@@ -1237,6 +1239,8 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
     companion object {
         private const val TAG = "GlbDiceView"
         private const val MODEL_ASSET = "low_poly_dice/scene.gltf"
+        private const val ROLL_DURATION_MS = 820L * 4L
+        private const val TUMBLE_DEGREES_MULTIPLIER = 12f
 
         private const val VERTEX_SHADER = """
             attribute vec3 aPosition;
