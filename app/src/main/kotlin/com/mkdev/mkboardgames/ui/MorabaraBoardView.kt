@@ -295,6 +295,9 @@ class MorabaraBoardView(context: Context) : View(context) {
             addListener(object : AnimatorListenerAdapter() {
                 override fun onAnimationEnd(a: Animator) {
                     if (animGen != myGen) return
+                    // The animation has finished, so it must no longer make
+                    // pause/menu actions look like a move is still running.
+                    animator = null
                     val completed = pendingMove ?: return
                     pendingMove = null
                     if (completed.captures.isNotEmpty()) {
