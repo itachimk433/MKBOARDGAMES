@@ -64,7 +64,9 @@ class MenuView(
         FIVE_FIELD_KONO
     }
 
-    private data class Card(val type: GameType, var rect: RectF = RectF())
+    // Cards are intentionally identity-based: a recently played shortcut and
+    // its matching catalogue card need independent pressed/loading states.
+    private class Card(val type: GameType, var rect: RectF = RectF())
     private val cardOrderPreferences =
         context.getSharedPreferences("game_catalogue_layout", Context.MODE_PRIVATE)
     private val cards = mutableListOf<Card>()
@@ -177,6 +179,11 @@ class MenuView(
         textSize = 15f * sp.coerceAtMost(3f)
         setShadowLayer(2f * dp, 0f, 1f * dp, Color.argb(220, 0, 0, 0))
     }
+    private val sectionDividerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#F7D99B")
+        strokeWidth = 1f * dp
+        alpha = 190
+    }
     private val cardLoadingRingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
         style = Paint.Style.STROKE
@@ -236,21 +243,21 @@ class MenuView(
     private val gearTouch = RectF()
     private val backRect = RectF()
     private val backTouch = RectF()
-    private var pressedCard: GameType? = null
-    private var loadingCard: GameType? = null
+    private var pressedCard: Card? = null
+    private var loadingCard: Card? = null
     private var loadingAngle = 0f
     private var loadingAnimator: ValueAnimator? = null
     private var pressedGear  = false
     private var pressedBack = false
     private var gearRotation  = 0f
     private var gearSpinAnim: ValueAnimator? = null
-    private val cardScales    = HashMap<GameType, Float>()
+    private val cardScales    = HashMap<Card, Float>()
 
-    private fun animateCardScale(type: GameType, to: Float) {
-        val from = cardScales[type] ?: 1f
+    private fun animateCardScale(card: Card, to: Float) {
+        val from = cardScales[card] ?: 1f
         ValueAnimator.ofFloat(from, to).apply {
             duration = if (to < 1f) 70L else 110L
-            addUpdateListener { cardScales[type] = it.animatedValue as Float; invalidate() }
+            addUpdateListener { cardScales[card] = it.animatedValue as Float; invalidate() }
             start()
         }
     }
@@ -321,13 +328,13 @@ class MenuView(
     private val longPressToArrange = Runnable {
         val card = pressedCard ?: return@Runnable
         if (!isDragging && !pressedBack && !pressedGear &&
-            cards.any { it.type == card } && !isChallengeLocked(card)
+            cards.any { it.type == card.type } && !isChallengeLocked(card.type)
         ) {
             arrangeDropAnimator?.cancel()
             arrangeDropAnimator = null
-            arrangingCard = card
+            arrangingCard = card.type
             arrangeMode = true
-            arrangeTargetIndex = cards.indexOfFirst { it.type == card }
+            arrangeTargetIndex = cards.indexOfFirst { it.type == card.type }
             arrangePreviewProgress = 1f
             arrangePreviewStart.clear()
             arrangePreviewEnd.clear()
@@ -335,7 +342,7 @@ class MenuView(
             cardScales[card] = 1f
             dragCenterX = lastTouchX
             dragCenterY = lastTouchY + scrollY
-            cards.firstOrNull { it.type == card }?.let {
+            cards.firstOrNull { it.type == card.type }?.let {
                 dragOffsetX = lastTouchX - it.rect.centerX()
                 dragOffsetY = dragCenterY - it.rect.centerY()
                 dragCenterX = lastTouchX - dragOffsetX
@@ -612,7 +619,7 @@ class MenuView(
                 pressedBack = backTouch.contains(event.x, event.y)
                 pressedGear = !pressedBack && gearTouch.contains(event.x, cy)
                 pressedCard =
-                    if (!pressedGear && !pressedBack) cardAt(event.x, cy)?.type
+                    if (!pressedGear && !pressedBack) cardAt(event.x, cy)
                     else null
                 pressedCard?.let { animateCardScale(it, 0.96f) }
                 if (pressedCard != null) postDelayed(longPressToArrange, 2_000L)
@@ -698,9 +705,9 @@ class MenuView(
                     postDelayed({ onSettingsClicked?.invoke() }, 180L)
                     pressedGear = false; invalidate(); return true
                 }
-                val hit = cardAt(event.x, cy)?.type
+                val hit = cardAt(event.x, cy)
                 pressedCard?.let { animateCardScale(it, 1f) }
-                if (hit != null && hit == pressedCard && !isChallengeLocked(hit)) {
+                if (hit != null && hit == pressedCard && !isChallengeLocked(hit.type)) {
                     com.mkdev.mkboardgames.SoundPlayer.play("ui_click")
                     loadingCard = hit
                     loadingAngle = 0f
@@ -716,8 +723,8 @@ class MenuView(
                     }
                     postDelayed({
                         if (loadingCard == hit) {
-                            SettingsManager.recordRecentlyPlayed(context, hit.name)
-                            onGameSelected?.invoke(hit)
+                            SettingsManager.recordRecentlyPlayed(context, hit.type.name)
+                            onGameSelected?.invoke(hit.type)
                         }
                     }, 140L)
                 }
@@ -770,8 +777,10 @@ class MenuView(
         if (recentCards.isNotEmpty()) {
             drawSectionTitle(canvas, "Recently Played", headerH + 20f * dp)
             recentCards.forEach { card -> drawCard(canvas, card) }
+            val dividerY = recentlyPlayedGridTop() + cardH + 11f * dp
+            canvas.drawLine(gridPadding, dividerY, width - gridPadding, dividerY, sectionDividerPaint)
         }
-        drawSectionTitle(canvas, "Games", gamesSectionTitleBaseline())
+        drawSectionTitle(canvas, "ALL", gamesSectionTitleBaseline())
         if (arrangeMode && arrangeTargetIndex in cards.indices) {
             val target = cardSlotRect(arrangeTargetIndex)
             canvas.drawRoundRect(target, 18f * dp, 18f * dp, arrangeTargetFillPaint)
@@ -864,8 +873,8 @@ class MenuView(
     }
 
     private fun drawCard(canvas: Canvas, card: Card) {
-        val scale = cardScales[card.type] ?: 1f
-        val r = scaledCardRect(card); val pressed = pressedCard == card.type
+        val scale = cardScales[card] ?: 1f
+        val r = scaledCardRect(card); val pressed = pressedCard == card
         if (scale != 1f) { canvas.save(); canvas.scale(scale, scale, r.centerX(), r.centerY()) }
         if (homeStyle == SettingsManager.HomeStyle.BROWN && !isLightMode) {
             drawWoodCardShell(canvas, r, pressed)
@@ -943,7 +952,7 @@ class MenuView(
         if (isChallengeLocked(card.type)) {
             drawChallengeLockOverlay(canvas, r)
         }
-        if (loadingCard == card.type) {
+        if (loadingCard == card) {
             drawLoadingRing(canvas, r)
         }
         if (scale != 1f) canvas.restore()
@@ -1877,6 +1886,7 @@ class MenuView(
             cardTitlePaint.color = Color.parseColor("#1A1A1A")
             cardDescPaint.color  = Color.parseColor("#555555")
             sectionTitlePaint.color = Color.parseColor("#1976A8")
+            sectionDividerPaint.color = Color.parseColor("#1976A8")
             copyrightPaint.color = Color.parseColor("#999999")
             gearFillPaint.color  = Color.parseColor("#1976A8")
             gearEdgePaint.color  = Color.parseColor("#0D5277")
@@ -1891,6 +1901,7 @@ class MenuView(
             cardTitlePaint.color = Color.WHITE
             cardDescPaint.color  = Color.parseColor("#BDBDBD")
             sectionTitlePaint.color = Color.parseColor("#F7D99B")
+            sectionDividerPaint.color = Color.parseColor("#F7D99B")
             copyrightPaint.color = Color.parseColor("#555555")
             gearFillPaint.color  = Color.parseColor("#E3B86A")
             gearEdgePaint.color  = Color.parseColor("#F7D99B")
