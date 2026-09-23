@@ -598,6 +598,7 @@ class MancalaActivity : AppCompatActivity() {
     private fun startGame(restoring: PausedMatchStore.Match? = null) {
         gameOverView.visibility = View.GONE
         matchStarted = true
+        SettingsManager.recordRecentlyPlayed(this, "MANCALA")
         MusicPlayer.enterMatch(this)
         resultRecorded = false
         autoplayEnabled = false

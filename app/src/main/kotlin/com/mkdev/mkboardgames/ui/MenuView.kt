@@ -723,7 +723,6 @@ class MenuView(
                     }
                     postDelayed({
                         if (loadingCard == hit) {
-                            SettingsManager.recordRecentlyPlayed(context, hit.type.name)
                             onGameSelected?.invoke(hit.type)
                         }
                     }, 140L)
@@ -778,7 +777,21 @@ class MenuView(
             drawSectionTitle(canvas, "Recently Played", headerH + 20f * dp)
             recentCards.forEach { card -> drawCard(canvas, card) }
             val dividerY = recentlyPlayedGridTop() + cardH + 11f * dp
-            canvas.drawLine(gridPadding, dividerY, width - gridPadding, dividerY, sectionDividerPaint)
+            val labelGap = sectionTitlePaint.measureText("ALL") / 2f + 12f * dp
+            canvas.drawLine(
+                gridPadding,
+                dividerY,
+                width / 2f - labelGap,
+                dividerY,
+                sectionDividerPaint,
+            )
+            canvas.drawLine(
+                width / 2f + labelGap,
+                dividerY,
+                width - gridPadding,
+                dividerY,
+                sectionDividerPaint,
+            )
         }
         drawSectionTitle(canvas, "ALL", gamesSectionTitleBaseline())
         if (arrangeMode && arrangeTargetIndex in cards.indices) {

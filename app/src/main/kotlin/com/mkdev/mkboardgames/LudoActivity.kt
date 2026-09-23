@@ -505,6 +505,7 @@ class LudoActivity : AppCompatActivity() {
         celebrationMessage = null
         celebrationGeneration++
         matchStarted = true
+        SettingsManager.recordRecentlyPlayed(this, "LUDO")
         MusicPlayer.enterMatch(this)
         if (gameplayActive()) SoundPlayer.playMovement("ludo_start")
         economyEnabled = irregularMode && vsAI

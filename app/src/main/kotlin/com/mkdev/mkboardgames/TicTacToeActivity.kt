@@ -390,6 +390,7 @@ Strategy
     private fun startGame(restoring: PausedMatchStore.Match? = null) {
         showBoardAfterDialog(resumeAi = false)
         matchStarted = true
+        SettingsManager.recordRecentlyPlayed(this, "TICTACTOE")
         MusicPlayer.enterMatch(this)
         resultRecorded = false
         interstitialAd = null

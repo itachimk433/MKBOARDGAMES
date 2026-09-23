@@ -285,6 +285,7 @@ class FiveFieldKonoActivity : AppCompatActivity() {
         gameOverView.visibility = View.GONE
         gameRoot.visibility = View.VISIBLE
         matchStarted = true
+        SettingsManager.recordRecentlyPlayed(this, "FIVE_FIELD_KONO")
         resultRecorded = false
         previousStates.clear()
         undosRemaining = SettingsManager.undoCredits(this, "FIVE_FIELD_KONO", vsAI)

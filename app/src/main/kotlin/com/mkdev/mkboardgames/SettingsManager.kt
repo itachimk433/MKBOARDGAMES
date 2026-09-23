@@ -50,6 +50,8 @@ object SettingsManager {
     private const val KEY_STATS_DRAWS    = "stats_draws"
     private const val KEY_STATS_FORFEITS = "stats_forfeits"
     private const val KEY_RECENTLY_PLAYED = "recently_played_games"
+    private const val KEY_RECENTLY_PLAYED_VERSION = "recently_played_games_version"
+    private const val RECENTLY_PLAYED_VERSION = 2
 
     // ── Per-game stats keys ───────────────────────────────────────────────────
     private fun winKey(game: String)     = "stats_${game}_wins"
@@ -90,8 +92,16 @@ object SettingsManager {
     // Recently played is shared between the normal and irregular catalogues:
     // both modes expose the same games, so opening a game in either mode should
     // keep it available as a useful shortcut when the catalogue is revisited.
-    fun recentlyPlayedGames(ctx: Context): List<String> =
-        sharedPrefs(ctx)
+    fun recentlyPlayedGames(ctx: Context): List<String> {
+        val settings = sharedPrefs(ctx)
+        if (settings.getInt(KEY_RECENTLY_PLAYED_VERSION, 0) < RECENTLY_PLAYED_VERSION) {
+            settings.edit()
+                .remove(KEY_RECENTLY_PLAYED)
+                .putInt(KEY_RECENTLY_PLAYED_VERSION, RECENTLY_PLAYED_VERSION)
+                .apply()
+            return emptyList()
+        }
+        return settings
             .getString(KEY_RECENTLY_PLAYED, null)
             ?.split(",")
             ?.map(String::trim)
@@ -99,9 +109,11 @@ object SettingsManager {
             ?.distinct()
             ?.take(3)
             .orEmpty()
+    }
 
     fun recordRecentlyPlayed(ctx: Context, gameType: String) {
-        val updated = (listOf(gameType) + recentlyPlayedGames(ctx))
+        val normalizedGameType = gameType.trim().uppercase()
+        val updated = (listOf(normalizedGameType) + recentlyPlayedGames(ctx))
             .distinct()
             .take(3)
         sharedPrefs(ctx).edit()

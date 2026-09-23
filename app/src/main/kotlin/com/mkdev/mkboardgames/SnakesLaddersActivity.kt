@@ -343,6 +343,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
         resultDialogVisible = false
         turnResolutionPending = false
         matchStarted = true
+        SettingsManager.recordRecentlyPlayed(this, "SNAKES_LADDERS")
         gameOverView.winnerLabel = ""
         fireworksView.cancel()
         SoundPlayer.stop("snakes_ladders_fireworks", "snakes_ladders_victory")

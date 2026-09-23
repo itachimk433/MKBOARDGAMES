@@ -1248,6 +1248,7 @@ Checkmate your opponent's King.
     private fun startGame(restoring: PausedMatchStore.Match? = null) {
         showChessBoardAfterDialog(resumeAi = false)
         matchStarted = true
+        SettingsManager.recordRecentlyPlayed(this, gameType)
         MusicPlayer.enterMatch(this)
         resultRecorded = false
         interstitialAd = null

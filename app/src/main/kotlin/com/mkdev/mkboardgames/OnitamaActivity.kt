@@ -203,6 +203,7 @@ class OnitamaActivity : AppCompatActivity() {
     private fun startGame(restoring: PausedMatchStore.Match? = null) {
         gameOverView.visibility = View.GONE
         matchStarted = true
+        SettingsManager.recordRecentlyPlayed(this, "ONITAMA")
         MusicPlayer.enterOnitamaMatch(this)
         resultRecorded = false
         autoplayEnabled = false

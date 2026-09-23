@@ -390,6 +390,7 @@ class MorabarabaActivity : AppCompatActivity() {
     private fun startGame(restoring: PausedMatchStore.Match? = null) {
         showBoardAfterDialog()
         matchStarted = true
+        SettingsManager.recordRecentlyPlayed(this, "MORABARABA")
         MusicPlayer.enterMatch(this)
         resultRecorded = false
         interstitialAd = null
