@@ -136,46 +136,88 @@ class AmazonsRuleEngine(val boardSize: Int) : com.mkdev.mkboardgames.engine.Rule
         if (state.status == GameStatus.BLACK_WINS) return -100_000
         if (state.status == GameStatus.DRAW) return 0
 
-        val whiteMobility = allLegalMoves(state, PieceColor.WHITE).size
-        val blackMobility = allLegalMoves(state, PieceColor.BLACK).size
-        val whiteAmazonCount = state.board.count {
-            it is AmazonsPiece &&
-                it.type == AmazonsPieceType.AMAZON &&
-                it.color == PieceColor.WHITE
-        }
-        val blackAmazonCount = state.board.count {
-            it is AmazonsPiece &&
-                it.type == AmazonsPieceType.AMAZON &&
-                it.color == PieceColor.BLACK
-        }
-        return (whiteMobility - blackMobility) +
-            (whiteAmazonCount - blackAmazonCount) * 100
+        val whiteMobility = mobilityCount(state, PieceColor.WHITE)
+        val blackMobility = mobilityCount(state, PieceColor.BLACK)
+        return (whiteMobility - blackMobility) * 4 + positionalScore(state)
     }
 
     /**
      * A cheaper mobility evaluation for bounded AI search. The public
      * evaluation counts complete move objects for both sides; doing that at
      * every search leaf is needlessly expensive for Amazons, where each move
-     * contains a second queen ray for the arrow. Search only needs the side
-     * to move's mobility, with the sign flipped to White's perspective.
+     * contains a second queen ray for the arrow.
+     *
+     * This returns a White-perspective score because [AIPlayer] flips it for
+     * the side to move. The side-to-move mobility term is deliberately signed
+     * for White before that flip: otherwise the search rewards having fewer
+     * legal moves, which makes the Amazons AI play as if it wants to get
+     * trapped.
      */
     fun evaluateForSearch(state: GameState): Int {
-        val mobility = mobilityCount(state, state.currentTurn)
-        if (mobility == 0) {
+        val sideToMoveMobility = mobilityCount(state, state.currentTurn)
+        if (sideToMoveMobility == 0) {
             return if (state.currentTurn == PieceColor.WHITE) -100_000 else 100_000
         }
-        val whiteAmazonCount = state.board.count {
-            it is AmazonsPiece &&
-                it.type == AmazonsPieceType.AMAZON &&
-                it.color == PieceColor.WHITE
+        val signedMobility = if (state.currentTurn == PieceColor.WHITE) {
+            sideToMoveMobility
+        } else {
+            -sideToMoveMobility
         }
-        val blackAmazonCount = state.board.count {
-            it is AmazonsPiece &&
-                it.type == AmazonsPieceType.AMAZON &&
-                it.color == PieceColor.BLACK
+        return signedMobility * 4 + positionalScore(state)
+    }
+
+    private fun positionalScore(state: GameState): Int {
+        val whiteReach = reachableSquares(state, PieceColor.WHITE)
+        val blackReach = reachableSquares(state, PieceColor.BLACK)
+        val whiteArea = floodArea(state, PieceColor.WHITE)
+        val blackArea = floodArea(state, PieceColor.BLACK)
+
+        // Direct queen reach is the short-term mobility signal. Flooded area
+        // keeps the AI from choosing moves that look mobile now but concede
+        // an entire region once arrows split the board.
+        return (whiteReach.size - blackReach.size) * 12 +
+            (whiteArea - blackArea) * 8
+    }
+
+    private fun reachableSquares(state: GameState, color: PieceColor): Set<Position> {
+        val reachable = mutableSetOf<Position>()
+        state.board.indices.forEach { index ->
+            val position = Position(index / boardSize, index % boardSize)
+            val amazon = state.get(position) as? AmazonsPiece ?: return@forEach
+            if (amazon.type == AmazonsPieceType.AMAZON && amazon.color == color) {
+                reachable += raySquares(state, position)
+            }
         }
-        return (if (state.currentTurn == PieceColor.WHITE) -mobility else mobility) +
-            (whiteAmazonCount - blackAmazonCount) * 100
+        return reachable
+    }
+
+    private fun floodArea(state: GameState, color: PieceColor): Int {
+        val visited = mutableSetOf<Position>()
+        val queue = java.util.ArrayDeque<Position>()
+        state.board.indices.forEach { index ->
+            val position = Position(index / boardSize, index % boardSize)
+            val amazon = state.get(position) as? AmazonsPiece ?: return@forEach
+            if (amazon.type == AmazonsPieceType.AMAZON && amazon.color == color) {
+                visited += position
+                queue.addLast(position)
+            }
+        }
+
+        while (queue.isNotEmpty()) {
+            val current = queue.removeFirst()
+            for (direction in DIRECTIONS) {
+                val next = current + direction
+                if (!next.isValid(boardSize) ||
+                    next in visited ||
+                    state.get(next) != null
+                ) {
+                    continue
+                }
+                visited += next
+                queue.addLast(next)
+            }
+        }
+        return visited.size
     }
 
     private fun mobilityCount(state: GameState, color: PieceColor): Int {

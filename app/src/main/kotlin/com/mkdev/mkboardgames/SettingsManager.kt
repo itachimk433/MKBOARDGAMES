@@ -506,9 +506,9 @@ object SettingsManager {
 
     fun amazonsAiProfileForLevel(level: Int): AmazonsAiProfile =
         when (level.coerceIn(0, 2)) {
-            0 -> AmazonsAiProfile(depth = 1, timeLimitMs = 900L)
-            1 -> AmazonsAiProfile(depth = 2, timeLimitMs = 1600L)
-            else -> AmazonsAiProfile(depth = 3, timeLimitMs = 2600L)
+            0 -> AmazonsAiProfile(depth = 2, timeLimitMs = 1800L)
+            1 -> AmazonsAiProfile(depth = 3, timeLimitMs = 4000L)
+            else -> AmazonsAiProfile(depth = 5, timeLimitMs = 7000L)
         }
 
     fun getAmazonsDifficulty(ctx: Context) =

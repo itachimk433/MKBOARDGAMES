@@ -91,4 +91,15 @@ class AmazonsRuleEngineTest {
 
         assertEquals(GameStatus.BLACK_WINS, engine.gameStatus(state))
     }
+
+    @Test
+    fun `search evaluation rewards mobility for the side to move`() {
+        val engine = AmazonsRuleEngine(8)
+        val initial = engine.initialState()
+
+        assertTrue(engine.evaluateForSearch(initial) > 0)
+        assertTrue(
+            engine.evaluateForSearch(initial.copy(currentTurn = PieceColor.BLACK)) < 0,
+        )
+    }
 }

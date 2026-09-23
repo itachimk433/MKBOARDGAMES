@@ -185,7 +185,7 @@ class AIPlayer(
         // Preserve the generic-game safety net from the previous search:
         // games with an immediate one-move threat should block it even when a
         // short time budget prevents a deeper completed iteration.
-        if (!isChess) {
+        if (!isChess && !isAmazons) {
             immediateBlockingMove(state)?.let { return it }
         }
 
