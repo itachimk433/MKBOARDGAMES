@@ -161,6 +161,7 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         if (showingGameMenu) {
             menuView?.resetLoadingState()
+            menuView?.refreshRecentlyPlayed()
             MusicPlayer.playForMode(this, selectedGameMode)
         } else {
             MusicPlayer.enterModeSelection(this)

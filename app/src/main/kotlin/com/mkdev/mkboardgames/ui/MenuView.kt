@@ -55,6 +55,7 @@ class MenuView(
         }
         homeStyle = SettingsManager.getHomeStyle(context)
         com.mkdev.mkboardgames.SoundPlayer.init(context)
+        refreshRecentlyPlayed()
     }
 
     enum class GameType {
@@ -67,6 +68,8 @@ class MenuView(
     private val cardOrderPreferences =
         context.getSharedPreferences("game_catalogue_layout", Context.MODE_PRIVATE)
     private val cards = mutableListOf<Card>()
+    private val recentCards = mutableListOf<Card>()
+    private var recentlyPlayedTypes = emptyList<GameType>()
 
     private val dp = context.resources.displayMetrics.density
     private val sp = context.resources.displayMetrics.scaledDensity
@@ -167,6 +170,13 @@ class MenuView(
         textSize = 7.5f * sp.coerceAtMost(3f)
         setShadowLayer(1.5f * dp, 0f, 1f * dp, Color.argb(210, 0, 0, 0))
     }
+    private val sectionTitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#F7D99B")
+        textAlign = Paint.Align.CENTER
+        isFakeBoldText = true
+        textSize = 15f * sp.coerceAtMost(3f)
+        setShadowLayer(2f * dp, 0f, 1f * dp, Color.argb(220, 0, 0, 0))
+    }
     private val cardLoadingRingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
         style = Paint.Style.STROKE
@@ -256,6 +266,26 @@ class MenuView(
         invalidate()
     }
 
+    /**
+     * Reloads the shortcut row after returning from a game. The complete
+     * catalogue remains in its saved order below it; recent cards are only
+     * another way to reach those same GameTypes.
+     */
+    fun refreshRecentlyPlayed() {
+        val updated = SettingsManager.recentlyPlayedGames(context)
+            .mapNotNull { value -> runCatching { GameType.valueOf(value) }.getOrNull() }
+            .filter { type -> cards.any { it.type == type } }
+            .distinct()
+            .take(3)
+        if (updated == recentlyPlayedTypes) return
+
+        recentlyPlayedTypes = updated
+        recentCards.clear()
+        recentCards.addAll(updated.map(::Card))
+        updateCardLayout()
+        invalidate()
+    }
+
     // ── Scroll state ─────────────────────────────────────────────────────────
     private var scrollY    = 0f
     private var maxScrollY = 0f
@@ -290,7 +320,9 @@ class MenuView(
 
     private val longPressToArrange = Runnable {
         val card = pressedCard ?: return@Runnable
-        if (!isDragging && !pressedBack && !pressedGear && !isChallengeLocked(card)) {
+        if (!isDragging && !pressedBack && !pressedGear &&
+            cards.any { it.type == card } && !isChallengeLocked(card)
+        ) {
             arrangeDropAnimator?.cancel()
             arrangeDropAnimator = null
             arrangingCard = card
@@ -358,6 +390,9 @@ class MenuView(
 
     private fun updateCardLayout() {
         scrollScroller.forceFinished(true)
+        for (i in recentCards.indices) {
+            recentCards[i].rect = recentCardSlotRect(i)
+        }
         for (i in cards.indices) {
             cards[i].rect = cardSlotRect(i)
         }
@@ -447,9 +482,35 @@ class MenuView(
         val column = index % gridColumns
         val row = index / gridColumns
         val left = gridPadding + column * (cardW + gridSpacing)
-        val top = headerH + row * (cardH + gridSpacing)
+        val top = gamesGridTop() + row * (cardH + gridSpacing)
         return RectF(left, top, left + cardW, top + cardH)
     }
+
+    private fun recentCardSlotRect(index: Int): RectF {
+        val column = index % gridColumns
+        val left = gridPadding + column * (cardW + gridSpacing)
+        val top = recentlyPlayedGridTop()
+        return RectF(left, top, left + cardW, top + cardH)
+    }
+
+    private fun recentlyPlayedGridTop(): Float = headerH + 32f * dp
+
+    private fun gamesSectionTitleBaseline(): Float =
+        if (recentCards.isEmpty()) {
+            headerH + 20f * dp
+        } else {
+            recentlyPlayedGridTop() + cardH + 22f * dp
+        }
+
+    private fun gamesGridTop(): Float =
+        if (recentCards.isEmpty()) {
+            headerH + 32f * dp
+        } else {
+            recentlyPlayedGridTop() + cardH + 36f * dp
+        }
+
+    private fun cardAt(x: Float, contentY: Float): Card? =
+        (recentCards + cards).firstOrNull { scaledCardRect(it).contains(x, contentY) }
 
     private fun nearestCardSlot(x: Float, contentY: Float): Int {
         if (cards.isEmpty()) return 0
@@ -551,9 +612,7 @@ class MenuView(
                 pressedBack = backTouch.contains(event.x, event.y)
                 pressedGear = !pressedBack && gearTouch.contains(event.x, cy)
                 pressedCard =
-                    if (!pressedGear && !pressedBack) cards.firstOrNull {
-                        scaledCardRect(it).contains(event.x, cy)
-                    }?.type
+                    if (!pressedGear && !pressedBack) cardAt(event.x, cy)?.type
                     else null
                 pressedCard?.let { animateCardScale(it, 0.96f) }
                 if (pressedCard != null) postDelayed(longPressToArrange, 2_000L)
@@ -639,7 +698,7 @@ class MenuView(
                     postDelayed({ onSettingsClicked?.invoke() }, 180L)
                     pressedGear = false; invalidate(); return true
                 }
-                val hit = cards.firstOrNull { scaledCardRect(it).contains(event.x, cy) }?.type
+                val hit = cardAt(event.x, cy)?.type
                 pressedCard?.let { animateCardScale(it, 1f) }
                 if (hit != null && hit == pressedCard && !isChallengeLocked(hit)) {
                     com.mkdev.mkboardgames.SoundPlayer.play("ui_click")
@@ -656,7 +715,10 @@ class MenuView(
                         start()
                     }
                     postDelayed({
-                        if (loadingCard == hit) onGameSelected?.invoke(hit)
+                        if (loadingCard == hit) {
+                            SettingsManager.recordRecentlyPlayed(context, hit.name)
+                            onGameSelected?.invoke(hit)
+                        }
                     }, 140L)
                 }
                 pressedCard = null; pressedGear = false; invalidate()
@@ -705,6 +767,11 @@ class MenuView(
         if (currentGameMode == GameMode.IRREGULAR) {
             canvas.drawText("IRREGULAR MODE", width / 2f, headerH - 18f * dp, irregularModePaint)
         }
+        if (recentCards.isNotEmpty()) {
+            drawSectionTitle(canvas, "Recently Played", headerH + 20f * dp)
+            recentCards.forEach { card -> drawCard(canvas, card) }
+        }
+        drawSectionTitle(canvas, "Games", gamesSectionTitleBaseline())
         if (arrangeMode && arrangeTargetIndex in cards.indices) {
             val target = cardSlotRect(arrangeTargetIndex)
             canvas.drawRoundRect(target, 18f * dp, 18f * dp, arrangeTargetFillPaint)
@@ -736,6 +803,10 @@ class MenuView(
         canvas.restore()
         drawBackArrow(canvas)
         if (arrangeMode) drawArrangeHint(canvas)
+    }
+
+    private fun drawSectionTitle(canvas: Canvas, title: String, baseline: Float) {
+        canvas.drawText(title, width / 2f, baseline, sectionTitlePaint)
     }
 
     private fun drawCardAtCenter(canvas: Canvas, card: Card, centerX: Float, centerY: Float) {
@@ -1805,6 +1876,7 @@ class MenuView(
             cardBorderPaint.color = Color.parseColor("#E0E5EA")
             cardTitlePaint.color = Color.parseColor("#1A1A1A")
             cardDescPaint.color  = Color.parseColor("#555555")
+            sectionTitlePaint.color = Color.parseColor("#1976A8")
             copyrightPaint.color = Color.parseColor("#999999")
             gearFillPaint.color  = Color.parseColor("#1976A8")
             gearEdgePaint.color  = Color.parseColor("#0D5277")
@@ -1818,6 +1890,7 @@ class MenuView(
             cardBorderPaint.color = Color.parseColor("#343A42")
             cardTitlePaint.color = Color.WHITE
             cardDescPaint.color  = Color.parseColor("#BDBDBD")
+            sectionTitlePaint.color = Color.parseColor("#F7D99B")
             copyrightPaint.color = Color.parseColor("#555555")
             gearFillPaint.color  = Color.parseColor("#E3B86A")
             gearEdgePaint.color  = Color.parseColor("#F7D99B")

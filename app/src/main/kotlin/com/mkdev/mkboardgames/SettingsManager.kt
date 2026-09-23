@@ -49,6 +49,7 @@ object SettingsManager {
     private const val KEY_STATS_LOSSES   = "stats_losses"
     private const val KEY_STATS_DRAWS    = "stats_draws"
     private const val KEY_STATS_FORFEITS = "stats_forfeits"
+    private const val KEY_RECENTLY_PLAYED = "recently_played_games"
 
     // ── Per-game stats keys ───────────────────────────────────────────────────
     private fun winKey(game: String)     = "stats_${game}_wins"
@@ -84,6 +85,28 @@ object SettingsManager {
 
     fun setCurrentModeFromIntent(ctx: Context, intent: android.content.Intent) {
         setCurrentMode(ctx, GameMode.fromName(intent.getStringExtra(GameMode.EXTRA_MODE)))
+    }
+
+    // Recently played is shared between the normal and irregular catalogues:
+    // both modes expose the same games, so opening a game in either mode should
+    // keep it available as a useful shortcut when the catalogue is revisited.
+    fun recentlyPlayedGames(ctx: Context): List<String> =
+        sharedPrefs(ctx)
+            .getString(KEY_RECENTLY_PLAYED, null)
+            ?.split(",")
+            ?.map(String::trim)
+            ?.filter(String::isNotEmpty)
+            ?.distinct()
+            ?.take(3)
+            .orEmpty()
+
+    fun recordRecentlyPlayed(ctx: Context, gameType: String) {
+        val updated = (listOf(gameType) + recentlyPlayedGames(ctx))
+            .distinct()
+            .take(3)
+        sharedPrefs(ctx).edit()
+            .putString(KEY_RECENTLY_PLAYED, updated.joinToString(","))
+            .apply()
     }
 
     // ── Active game tag ───────────────────────────────────────────────────────
