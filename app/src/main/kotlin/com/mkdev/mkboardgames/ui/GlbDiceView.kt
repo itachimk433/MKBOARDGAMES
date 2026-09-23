@@ -63,6 +63,7 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
     private var rotationY = -28f
     private var rotationZ = 0f
     private var currentOrientation = Quat.fromEulerDegrees(-18f, -28f, 0f)
+    private var animatorPausedForHost = false
     private val glRenderer = DiceRenderer(context.applicationContext)
 
     init {
@@ -72,9 +73,9 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         glSurfaceView.holder.setFormat(PixelFormat.TRANSLUCENT)
         glSurfaceView.setZOrderOnTop(true)
         glSurfaceView.setRenderer(glRenderer)
-        // The die is static between rolls. A continuous render loop creates a
-        // GL thread/frame workload for every player control, including hidden
-        // dice. setRotation()/setAnimationScale() request frames as needed.
+        // The die is static between rolls. Render continuously only while a
+        // roll is active so the animation can display every frame, then return
+        // to on-demand rendering for idle dice.
         glSurfaceView.renderMode = GLSurfaceView.RENDERMODE_WHEN_DIRTY
         glSurfaceView.isClickable = true
         glSurfaceView.setOnTouchListener { view, event ->
@@ -105,47 +106,31 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         val targetValue = nextValue.coerceIn(1, 6)
         val startOrientation = currentOrientation
         val targetOrientation = DiceOrientation.forValue(targetValue)
-        val spin = RollSpin.random(motionDirection)
+        val rollPath = RollPath.from(
+            start = startOrientation,
+            target = targetOrientation,
+            motionDirection = motionDirection,
+        )
+        glSurfaceView.renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+        glRenderer.setAnimationScale(1f)
 
         animator = ValueAnimator.ofFloat(0f, 1f).apply {
-            // Keep the roll short without visibly ramping down before the
-            // die reaches its result.
+            // A linear clock is intentional: RollPath is one fixed-axis,
+            // constant-speed rotation that already lands on the target face.
             duration = 680L
             interpolator = LinearInterpolator()
             addUpdateListener {
                 val progress = it.animatedFraction
-                // Spin at a constant rate. Only the final quarter aligns to
-                // the result, preventing a late-looking face reversal.
-                val settleProgress = if (progress < 0.74f) {
-                    0f
-                } else {
-                    smoothStep((progress - 0.74f) / 0.26f)
-                }
-                val baseOrientation = Quat.slerp(
-                    startOrientation,
-                    targetOrientation,
-                    settleProgress,
+                val spinOrientation = Quat.fromAxisAngleDegrees(
+                    rollPath.axisX,
+                    rollPath.axisY,
+                    rollPath.axisZ,
+                    rollPath.totalDegrees * progress,
                 )
-                val spinOrientation = Quat.fromEulerDegrees(
-                    spin.turnsX * progress,
-                    spin.turnsY * progress,
-                    spin.turnsZ * progress,
-                )
-                val wobble = wobbleEnvelope(progress)
-                val tiltOrientation = Quat.fromEulerDegrees(
-                    spin.tiltX * wobble,
-                    spin.tiltY * wobble,
-                    spin.tiltZ * wobble,
-                )
-                val orientation = (
-                    tiltOrientation *
-                        spinOrientation *
-                        baseOrientation
-                    ).normalized()
+                val orientation = (spinOrientation * startOrientation).normalized()
 
                 currentOrientation = orientation
                 applyOrientation(orientation)
-                glRenderer.setAnimationScale(1f + 0.12f * wobble)
             }
             addListener(object : AnimatorListenerAdapter() {
                 override fun onAnimationEnd(animation: Animator) {
@@ -161,6 +146,7 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
                     // can finish while the surface is still showing its
                     // previous face on a busy device.
                     requestFrameAndNotify {
+                        glSurfaceView.renderMode = GLSurfaceView.RENDERMODE_WHEN_DIRTY
                         if (generation == rollGeneration) onFinished()
                     }
                 }
@@ -185,35 +171,29 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         glSurfaceView.requestRender()
     }
 
-    private fun smoothStep(progress: Float): Float {
-        val value = progress.coerceIn(0f, 1f)
-        return value * value * (3f - 2f * value)
-    }
-
-    private fun wobbleEnvelope(progress: Float): Float {
-        val raw = progress * progress *
-            (1f - progress) * (1f - progress) * (1f - progress)
-        return (raw / 0.05184f).coerceIn(0f, 1f)
-    }
-
     fun cancelRoll() {
         rollGeneration++
         animator?.cancel()
         animator = null
+        animatorPausedForHost = false
         isRolling = false
         glRenderer.clearFrameCallback()
         glRenderer.setAnimationScale(1f)
         glRenderer.setRotation(currentOrientation)
+        glSurfaceView.renderMode = GLSurfaceView.RENDERMODE_WHEN_DIRTY
         glSurfaceView.requestRender()
     }
 
     /**
      * GLSurfaceView does not receive Activity lifecycle callbacks through its
-     * FrameLayout parent. Pause only its rendering thread here; the roll
-     * animator and its completion callback must keep running so a system
-     * pause cannot strand the turn halfway through.
+     * FrameLayout parent. Pause both rendering and the animator so the visible
+     * die cannot lose animation time while its GL thread is paused.
      */
     fun onHostPause() {
+        if (isRolling && animator != null) {
+            animator?.pause()
+            animatorPausedForHost = true
+        }
         glSurfaceView.onPause()
     }
 
@@ -222,6 +202,10 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         glRenderer.setAnimationScale(1f)
         glRenderer.setRotation(currentOrientation)
         glSurfaceView.requestRender()
+        if (animatorPausedForHost) {
+            animatorPausedForHost = false
+            animator?.resume()
+        }
     }
 
     /**
@@ -960,34 +944,81 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         }
     }
 
-    private data class RollSpin(
-        val turnsX: Float,
-        val turnsY: Float,
-        val turnsZ: Float,
-        val tiltX: Float,
-        val tiltY: Float,
-        val tiltZ: Float,
+    private data class RollPath(
+        val axisX: Float,
+        val axisY: Float,
+        val axisZ: Float,
+        val totalDegrees: Float,
     ) {
         companion object {
-            fun random(direction: MotionDiceDirection): RollSpin {
-                fun randomSign() = if (Random.nextBoolean()) 1f else -1f
-
-                val directionalTilt = when (direction) {
-                    MotionDiceDirection.TOP_LEFT -> -22f to -28f
-                    MotionDiceDirection.TOP_RIGHT -> -22f to 28f
-                    MotionDiceDirection.UP -> -12f to 0f
-                    MotionDiceDirection.LEFT -> 0f to -28f
-                    MotionDiceDirection.RIGHT -> 0f to 28f
+            fun from(
+                start: Quat,
+                target: Quat,
+                motionDirection: MotionDiceDirection,
+            ): RollPath {
+                val fallbackAxis = when (motionDirection) {
+                    MotionDiceDirection.TOP_LEFT -> Axis(-0.75f, -0.55f, 0.2f)
+                    MotionDiceDirection.TOP_RIGHT -> Axis(-0.75f, 0.55f, 0.2f)
+                    MotionDiceDirection.UP -> Axis(1f, 0.15f, 0.1f)
+                    MotionDiceDirection.LEFT -> Axis(0.15f, -1f, 0.1f)
+                    MotionDiceDirection.RIGHT -> Axis(0.15f, 1f, 0.1f)
                 }
 
-                return RollSpin(
-                    turnsX = Random.nextInt(2, 5) * 360f * randomSign(),
-                    turnsY = Random.nextInt(2, 5) * 360f * randomSign(),
-                    turnsZ = Random.nextInt(2, 4) * 360f * randomSign(),
-                    tiltX = directionalTilt.first,
-                    tiltY = directionalTilt.second,
-                    tiltZ = 0f,
+                var delta = (target * start.conjugate()).normalized()
+                if (delta.w < 0f) {
+                    delta = Quat(-delta.w, -delta.x, -delta.y, -delta.z)
+                }
+
+                val halfSine = sqrt(
+                    (1f - delta.w * delta.w).coerceAtLeast(0f),
                 )
+                val axis = if (halfSine < 1e-4f) {
+                    fallbackAxis.normalized()
+                } else {
+                    Axis(
+                        delta.x / halfSine,
+                        delta.y / halfSine,
+                        delta.z / halfSine,
+                    ).normalized()
+                }
+                val shortestDegrees = Math.toDegrees(
+                    2.0 * acos(delta.w.coerceIn(-1f, 1f)),
+                ).toFloat()
+                val extraDegrees = Random.nextInt(2, 4) * 360f
+
+                // Both choices end at the same target orientation. The
+                // reverse path uses the opposite fixed axis and travels the
+                // long way around instead of reversing during the roll.
+                return if (Random.nextBoolean()) {
+                    RollPath(
+                        axisX = axis.x,
+                        axisY = axis.y,
+                        axisZ = axis.z,
+                        totalDegrees = shortestDegrees + extraDegrees,
+                    )
+                } else {
+                    RollPath(
+                        axisX = -axis.x,
+                        axisY = -axis.y,
+                        axisZ = -axis.z,
+                        totalDegrees = 360f - shortestDegrees + extraDegrees,
+                    )
+                }
+            }
+        }
+    }
+
+    private data class Axis(
+        val x: Float,
+        val y: Float,
+        val z: Float,
+    ) {
+        fun normalized(): Axis {
+            val magnitude = sqrt(x * x + y * y + z * z)
+            return if (magnitude < 1e-6f) {
+                Axis(0f, 0f, 1f)
+            } else {
+                Axis(x / magnitude, y / magnitude, z / magnitude)
             }
         }
     }
@@ -1016,6 +1047,8 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
                 y * other.x +
                 z * other.w,
         )
+
+        fun conjugate(): Quat = Quat(w, -x, -y, -z)
 
         fun normalized(): Quat {
             val magnitude = sqrt(w * w + x * x + y * y + z * z)
