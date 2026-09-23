@@ -212,6 +212,10 @@ class MorabarabaActivity : AppCompatActivity() {
             showResult()
             return
         }
+        if (!canPauseMatch()) {
+            Toast.makeText(this, "Pause is available before your turn starts.", Toast.LENGTH_SHORT).show()
+            return
+        }
         stopAutomatedGameplay()
         showLeaveMatchDialog()
     }
@@ -359,6 +363,7 @@ class MorabarabaActivity : AppCompatActivity() {
     }
 
     private fun showLeaveMatchDialog() {
+        if (!canPauseMatch()) return
         MusicPlayer.enterPausedMatch(this)
         showChoiceDialog(
             "Leave Match?",
@@ -618,6 +623,13 @@ class MorabarabaActivity : AppCompatActivity() {
         vsAI && (gameState.currentTurn != playerColor ||
             (autoplayAllowed && autoplayEnabled))
 
+    private fun canPauseMatch(): Boolean =
+        matchStarted &&
+            gameState.status == GameStatus.IN_PROGRESS &&
+            !aiControlsCurrentTurn() &&
+            !boardView.isLocked &&
+            !boardView.hasPendingMoveAnimation()
+
     private fun resumeComputerTurnIfNeeded() {
         if (!activityResumed ||
             !::boardView.isInitialized ||
@@ -686,6 +698,10 @@ class MorabarabaActivity : AppCompatActivity() {
     fun onUndo()  { doUndo() }
     fun onRedo()  { doRedo() }
     fun onMenu()  {
+        if (!canPauseMatch()) {
+            Toast.makeText(this, "Pause is available before your turn starts.", Toast.LENGTH_SHORT).show()
+            return
+        }
         // In-app dialogs do not trigger onPause(), so stop AI and animations
         // before hiding the board behind the menu.
         stopAutomatedGameplay()

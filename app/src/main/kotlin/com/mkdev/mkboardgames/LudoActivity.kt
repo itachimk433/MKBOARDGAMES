@@ -361,8 +361,8 @@ class LudoActivity : AppCompatActivity() {
             showResultDialog()
             return
         }
-        if (matchStarted && state.status == GameStatus.IN_PROGRESS && diceRollInProgress()) {
-            Toast.makeText(this, "Wait for the dice to stop rolling", Toast.LENGTH_SHORT).show()
+        if (matchStarted && state.status == GameStatus.IN_PROGRESS && !canPauseMatch()) {
+            Toast.makeText(this, "Pause is available before your turn starts.", Toast.LENGTH_SHORT).show()
             return
         }
         if (state.status == GameStatus.IN_PROGRESS) {
@@ -1922,6 +1922,13 @@ class LudoActivity : AppCompatActivity() {
 
     private fun isHumanTurn(): Boolean = !vsAI || LudoSetup.playerFromState(state) == humanPlayer
     private fun isAiTurn(): Boolean = vsAI && !isHumanTurn()
+
+    private fun canPauseMatch(): Boolean =
+        matchStarted &&
+            state.status == GameStatus.IN_PROGRESS &&
+            isHumanTurn() &&
+            !diceRollInProgress() &&
+            !boardView.isLocked
 
     private fun playerDisplayName(player: Int): String {
         if (!vsAI) return "P${player + 1}"

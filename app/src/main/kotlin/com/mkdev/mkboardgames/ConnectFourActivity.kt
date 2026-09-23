@@ -11,6 +11,7 @@ import android.view.*
 import android.view.animation.AccelerateInterpolator
 import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.mkdev.mkboardgames.engine.*
 import com.mkdev.mkboardgames.games.connectfour.ConnectFourPiece
@@ -208,6 +209,10 @@ class ConnectFourActivity : AppCompatActivity() {
         }
         if (!matchStarted || gameState.status != GameStatus.IN_PROGRESS) {
             finish()
+            return
+        }
+        if (!canPauseMatch()) {
+            Toast.makeText(this, "Pause is available before your turn starts.", Toast.LENGTH_SHORT).show()
             return
         }
         stopAutomatedGameplay()
@@ -546,6 +551,13 @@ Control the centre columns, build threats in more than one direction, and block 
         vsAI && (gameState.currentTurn != playerColor ||
             (autoplayAllowed && autoplayEnabled))
 
+    private fun canPauseMatch(): Boolean =
+        matchStarted &&
+            gameState.status == GameStatus.IN_PROGRESS &&
+            !aiControlsCurrentTurn() &&
+            !boardView.isLocked &&
+            !boardView.hasPendingDropAnimation()
+
     private fun updateHud() {
         val redTurn = gameState.currentTurn == PieceColor.WHITE
         val label = when {
@@ -602,11 +614,16 @@ Control the centre columns, build threats in more than one direction, and block 
     }
 
     fun onMenuClicked() {
+        val matchActive = matchStarted && gameState.status == GameStatus.IN_PROGRESS
+        if (matchActive && !canPauseMatch()) {
+            Toast.makeText(this, "Pause is available before your turn starts.", Toast.LENGTH_SHORT).show()
+            return
+        }
         // In-app dialogs do not trigger onPause(), so cancel automated play
         // before hiding the board behind the menu.
         stopAutomatedGameplay()
         hideBoardWhileDialogIsOpen()
-        val inProgress = gameState.status == GameStatus.IN_PROGRESS && moveHistory.isNotEmpty()
+        val inProgress = matchActive && moveHistory.isNotEmpty()
         if (inProgress) MusicPlayer.enterPausedMatch(this)
         val items = mutableListOf("New Game", "How to Play")
         if (vsAI) items.add("CPU Difficulty")

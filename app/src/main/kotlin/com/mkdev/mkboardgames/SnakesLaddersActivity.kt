@@ -212,7 +212,8 @@ class SnakesLaddersActivity : AppCompatActivity() {
         } else if (gameOver) {
             showGameOverOverlay()
         } else if (matchStarted) {
-            showLeaveMatchDialog()
+            if (canPauseMatch()) showLeaveMatchDialog()
+            else Toast.makeText(this, "Pause is available before your turn starts.", Toast.LENGTH_SHORT).show()
         } else {
             finish()
         }
@@ -378,6 +379,14 @@ class SnakesLaddersActivity : AppCompatActivity() {
             }
         }
     }
+
+    private fun canPauseMatch(): Boolean =
+        matchStarted &&
+            !gameOver &&
+            (!vsAI || currentPlayer != 1) &&
+            !turnResolutionPending &&
+            playerDiceViews.none { it.isRolling } &&
+            !boardView.hasPendingMoveAnimation()
 
     private fun applyRoll(player: Int, value: Int) {
         if (player != currentPlayer || gameOver) return

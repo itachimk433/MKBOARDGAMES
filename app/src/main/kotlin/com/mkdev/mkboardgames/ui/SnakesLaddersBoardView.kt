@@ -722,6 +722,8 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
         moveAnimator?.resume()
     }
 
+    fun hasPendingMoveAnimation(): Boolean = moveAnimator != null
+
     override fun onTouchEvent(event: MotionEvent): Boolean {
         if (!gameOver) return false
         if (event.actionMasked == MotionEvent.ACTION_UP) {

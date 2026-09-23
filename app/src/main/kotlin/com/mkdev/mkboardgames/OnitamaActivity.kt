@@ -8,6 +8,7 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.mkdev.mkboardgames.engine.GameState
 import com.mkdev.mkboardgames.engine.GameStatus
@@ -71,7 +72,7 @@ class OnitamaActivity : AppCompatActivity() {
         hudView = StandardGameHudView(this, labelTextSizeSp = 12f).apply {
             onBack = { onBackPressed() }
             onUndo = { undoMove() }
-            onMenu = { if (!boardView.isLocked) showMenu() }
+            onMenu = { if (canPauseMatch()) showMenu() else showPauseUnavailable() }
         }
         topCards = OnitamaCardStripView(this, "BLACK")
         bottomCards = OnitamaCardStripView(this, "WHITE")
@@ -313,6 +314,17 @@ class OnitamaActivity : AppCompatActivity() {
         vsAI && (gameState.currentTurn != playerColor ||
             (autoplayAllowed && autoplayEnabled))
 
+    private fun canPauseMatch(): Boolean =
+        matchStarted &&
+            gameState.status == GameStatus.IN_PROGRESS &&
+            !aiControlsCurrentTurn() &&
+            !boardView.isLocked &&
+            !boardView.hasPendingMoveAnimation()
+
+    private fun showPauseUnavailable() {
+        Toast.makeText(this, "Pause is available before your turn starts.", Toast.LENGTH_SHORT).show()
+    }
+
     private fun selectCardForMove(move: Move) {
         val cardId = move.metadata["card"] as? String ?: return
         val cards = engine.cards(gameState, gameState.currentTurn)
@@ -385,6 +397,10 @@ class OnitamaActivity : AppCompatActivity() {
     }
 
     private fun showMenu() {
+        if (!canPauseMatch()) {
+            showPauseUnavailable()
+            return
+        }
         MusicPlayer.enterPausedMatch(this)
         stopAutomatedGameplay()
         boardView.isLocked = true
@@ -518,6 +534,10 @@ class OnitamaActivity : AppCompatActivity() {
     }
 
     private fun showLeaveMatchDialog() {
+        if (!canPauseMatch()) {
+            showPauseUnavailable()
+            return
+        }
         MusicPlayer.enterPausedMatch(this)
         stopAutomatedGameplay()
         showChoiceOverlay(
@@ -657,7 +677,7 @@ class OnitamaActivity : AppCompatActivity() {
             dismissOverlay(revealGame = false)
             callback?.invoke()
         } else if (matchStarted && gameState.status == GameStatus.IN_PROGRESS) {
-            showLeaveMatchDialog()
+            if (canPauseMatch()) showLeaveMatchDialog() else showPauseUnavailable()
         } else {
             super.onBackPressed()
         }

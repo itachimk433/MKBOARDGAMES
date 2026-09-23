@@ -6,6 +6,7 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.mkdev.mkboardgames.engine.GameState
 import com.mkdev.mkboardgames.engine.GameStatus
@@ -156,6 +157,8 @@ class FiveFieldKonoActivity : AppCompatActivity() {
             @Suppress("DEPRECATION") super.onBackPressed()
         } else if (gameState.status != GameStatus.IN_PROGRESS) {
             showResultDialog()
+        } else if (!canPauseMatch()) {
+            Toast.makeText(this, "Pause is available before your turn starts.", Toast.LENGTH_SHORT).show()
         } else {
             showLeaveMatchDialog()
         }
@@ -458,6 +461,10 @@ class FiveFieldKonoActivity : AppCompatActivity() {
     }
 
     private fun showMenu() {
+        if (!canPauseMatch()) {
+            Toast.makeText(this, "Pause is available before your turn starts.", Toast.LENGTH_SHORT).show()
+            return
+        }
         stopAutomatedGameplay()
         showChoiceOverlay(
             "Game Menu",
@@ -522,6 +529,13 @@ class FiveFieldKonoActivity : AppCompatActivity() {
             }
         }
     }
+
+    private fun canPauseMatch(): Boolean =
+        matchStarted &&
+            gameState.status == GameStatus.IN_PROGRESS &&
+            !aiControlsCurrentTurn() &&
+            !boardView.isLocked &&
+            !boardView.hasPendingMoveAnimation()
 
     private fun showResultDialog() {
         if (gameState.status == GameStatus.IN_PROGRESS) return

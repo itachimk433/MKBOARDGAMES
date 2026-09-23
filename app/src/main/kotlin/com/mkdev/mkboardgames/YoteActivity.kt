@@ -212,6 +212,8 @@ class YoteActivity : AppCompatActivity() {
             @Suppress("DEPRECATION") super.onBackPressed()
         } else if (gameState.status != GameStatus.IN_PROGRESS) {
             showResultDialog()
+        } else if (!canPauseMatch()) {
+            Toast.makeText(this, "Pause is available before your turn starts.", Toast.LENGTH_SHORT).show()
         } else {
             showLeaveMatchDialog()
         }
@@ -339,6 +341,7 @@ class YoteActivity : AppCompatActivity() {
     }
 
     private fun showLeaveMatchDialog() {
+        if (!canPauseMatch()) return
         MusicPlayer.enterPausedMatch(this)
         stopAutomatedGameplay()
         boardView.isLocked = true
@@ -368,6 +371,10 @@ class YoteActivity : AppCompatActivity() {
     }
 
     private fun showMenu() {
+        if (!canPauseMatch()) {
+            Toast.makeText(this, "Pause is available before your turn starts.", Toast.LENGTH_SHORT).show()
+            return
+        }
         MusicPlayer.enterPausedMatch(this)
         boardView.isLocked = true
         autoplayEnabled = false
@@ -742,6 +749,13 @@ class YoteActivity : AppCompatActivity() {
     private fun aiControlsCurrentTurn(): Boolean =
         vsAI && (gameState.currentTurn != playerColor ||
             (autoplayAllowed && autoplayEnabled))
+
+    private fun canPauseMatch(): Boolean =
+        matchStarted &&
+            gameState.status == GameStatus.IN_PROGRESS &&
+            !aiControlsCurrentTurn() &&
+            !boardView.isLocked &&
+            !boardView.hasPendingMoveAnimation()
 
     private fun stopAutomatedGameplay() {
         autoplayEnabled = false

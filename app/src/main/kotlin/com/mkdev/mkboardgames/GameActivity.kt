@@ -426,6 +426,10 @@ class GameActivity : AppCompatActivity() {
             finish()
             return
         }
+        if (!canPauseMatch()) {
+            Toast.makeText(this, "Pause is available before your turn starts.", Toast.LENGTH_SHORT).show()
+            return
+        }
         stopAutoplayAndAiThinking()
         MusicPlayer.enterPausedMatch(this)
         if (isStyledBoardGame()) {
@@ -1655,6 +1659,13 @@ Checkmate your opponent's King.
                 (autoplayAllowed && autoplayEnabled)
             )
 
+    private fun canPauseMatch(): Boolean =
+        matchStarted &&
+            gameState.status == GameStatus.IN_PROGRESS &&
+            !aiControlsCurrentTurn() &&
+            !boardView.isLocked &&
+            !boardView.hasPendingMoveAnimation()
+
     private fun resumeComputerTurnIfNeeded() {
         if (!activityResumed ||
             !::boardView.isInitialized ||
@@ -1949,9 +1960,13 @@ Checkmate your opponent's King.
     }
 
     fun onMenuClicked() {
+        val matchActive = matchStarted && gameState.status == GameStatus.IN_PROGRESS
+        if (matchActive && !canPauseMatch()) {
+            Toast.makeText(this, "Pause is available before your turn starts.", Toast.LENGTH_SHORT).show()
+            return
+        }
         // The menu is an in-app dialog and does not trigger onPause().
         stopAutoplayAndAiThinking()
-        val matchActive = matchStarted && gameState.status == GameStatus.IN_PROGRESS
         val inProgress = matchActive && moveHistory.isNotEmpty()
         if (matchActive) MusicPlayer.enterPausedMatch(this)
         if (isStyledBoardGame()) {

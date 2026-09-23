@@ -9,6 +9,7 @@ import android.view.*
 import android.view.animation.OvershootInterpolator
 import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.mkdev.mkboardgames.engine.*
 import com.mkdev.mkboardgames.games.tictactoe.TicTacToePiece
@@ -199,6 +200,10 @@ class TicTacToeActivity : AppCompatActivity() {
         }
         if (!matchStarted || gameState.status != GameStatus.IN_PROGRESS) {
             finish()
+            return
+        }
+        if (!canPauseMatch()) {
+            Toast.makeText(this, "Pause is available before your turn starts.", Toast.LENGTH_SHORT).show()
             return
         }
         stopAutomatedGameplay()
@@ -556,6 +561,12 @@ Strategy
         vsAI && (gameState.currentTurn != playerColor ||
             (autoplayAllowed && autoplayEnabled))
 
+    private fun canPauseMatch(): Boolean =
+        matchStarted &&
+            gameState.status == GameStatus.IN_PROGRESS &&
+            !aiControlsCurrentTurn() &&
+            !boardView.isLocked
+
     // ─── HUD / undo / menu ────────────────────────────────────────────────────
 
     private fun updateHud() {
@@ -616,11 +627,16 @@ Strategy
     }
 
     fun onMenuClicked() {
+        val matchActive = matchStarted && gameState.status == GameStatus.IN_PROGRESS
+        if (matchActive && !canPauseMatch()) {
+            Toast.makeText(this, "Pause is available before your turn starts.", Toast.LENGTH_SHORT).show()
+            return
+        }
         // In-app dialogs do not trigger onPause(), so cancel automated play
         // before hiding the board behind the menu.
         stopAutomatedGameplay()
         hideBoardWhileDialogIsOpen()
-        val inProgress = gameState.status == GameStatus.IN_PROGRESS && moveHistory.isNotEmpty()
+        val inProgress = matchActive && moveHistory.isNotEmpty()
         if (inProgress) MusicPlayer.enterPausedMatch(this)
         val items = mutableListOf("New Game", "How to Play")
         if (vsAI) items.add("CPU Difficulty")

@@ -10,6 +10,7 @@ import android.view.*
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.mkdev.mkboardgames.engine.GameState
 import com.mkdev.mkboardgames.engine.GameStatus
@@ -258,6 +259,8 @@ class MancalaActivity : AppCompatActivity() {
         }
         if (!matchStarted) {
             @Suppress("DEPRECATION") super.onBackPressed()
+        } else if (!canPauseMatch()) {
+            Toast.makeText(this, "Pause is available before your turn starts.", Toast.LENGTH_SHORT).show()
         } else {
             showLeaveMatchDialog()
         }
@@ -390,6 +393,7 @@ class MancalaActivity : AppCompatActivity() {
     }
 
     private fun showLeaveMatchDialog() {
+        if (!canPauseMatch()) return
         MusicPlayer.enterPausedMatch(this)
         stopAutomatedGameplay()
         boardView.isLocked = true
@@ -419,7 +423,10 @@ class MancalaActivity : AppCompatActivity() {
     }
 
     private fun showMenu() {
-        if (boardView.isMoveAnimating) return
+        if (!canPauseMatch()) {
+            Toast.makeText(this, "Pause is available before your turn starts.", Toast.LENGTH_SHORT).show()
+            return
+        }
         MusicPlayer.enterPausedMatch(this)
         stopAutomatedGameplay()
         boardView.isLocked = true
@@ -717,6 +724,13 @@ class MancalaActivity : AppCompatActivity() {
     private fun aiControlsCurrentTurn(): Boolean =
         vsAI && (gameState.currentTurn != playerColor ||
             (autoplayAllowed && autoplayEnabled))
+
+    private fun canPauseMatch(): Boolean =
+        matchStarted &&
+            gameState.status == GameStatus.IN_PROGRESS &&
+            !aiControlsCurrentTurn() &&
+            !boardView.isLocked &&
+            !boardView.isMoveAnimating
 
     private fun stopAutomatedGameplay() {
         autoplayEnabled = false
