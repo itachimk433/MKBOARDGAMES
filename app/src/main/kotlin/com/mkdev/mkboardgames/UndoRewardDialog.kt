@@ -3,14 +3,19 @@ package com.mkdev.mkboardgames
 import android.app.Dialog
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
+import android.os.Handler
+import android.os.Looper
 import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.LinearLayout
+import android.widget.ProgressBar
 import android.widget.TextView
-import android.widget.Toast
 
 object UndoRewardDialog {
+    private const val CONNECTION_ERROR =
+        "Please check your internet connection and try again."
+
     fun show(activity: android.app.Activity, onReward: () -> Unit) {
         val dialog = Dialog(activity)
         val density = activity.resources.displayMetrics.density
@@ -39,6 +44,10 @@ object UndoRewardDialog {
             textSize = 16f
             setPadding(0, (12 * density).toInt(), 0, (24 * density).toInt())
         }
+        val loading = ProgressBar(activity).apply {
+            isIndeterminate = true
+            visibility = android.view.View.GONE
+        }
         val actions = LinearLayout(activity).apply {
             gravity = Gravity.END
         }
@@ -50,18 +59,39 @@ object UndoRewardDialog {
             text = "Watch ad"
             setOnClickListener {
                 isEnabled = false
-                text = "Loading ad…"
-                dialog.dismiss()
+                cancel.isEnabled = false
+                text = "Checking…"
+                loading.visibility = android.view.View.VISIBLE
+                message.text = "Checking your connection and loading the ad…"
                 AdManager.restoreFullscreen(activity)
                 AdManager.showRewarded(
                     activity = activity,
-                    onReward = onReward,
+                    onReward = {},
                     onUnavailable = {
-                        Toast.makeText(
-                            activity,
-                            "The ad is not ready yet. Try again in a moment.",
-                            Toast.LENGTH_SHORT,
-                        ).show()
+                        if (!dialog.isShowing) return@showRewarded
+                        loading.visibility = android.view.View.GONE
+                        message.text = CONNECTION_ERROR
+                        cancel.isEnabled = true
+                        isEnabled = true
+                        text = "Watch ad"
+                    },
+                    onAdFinished = { rewardEarned ->
+                        if (!dialog.isShowing) return@showRewarded
+                        message.text = "Verifying the ad…"
+                        loading.visibility = android.view.View.VISIBLE
+                        Handler(Looper.getMainLooper()).postDelayed({
+                            if (!dialog.isShowing) return@postDelayed
+                            loading.visibility = android.view.View.GONE
+                            if (rewardEarned) {
+                                dialog.dismiss()
+                                onReward()
+                            } else {
+                                message.text = "The ad could not be verified. Please watch it completely and try again."
+                                cancel.isEnabled = true
+                                isEnabled = true
+                                text = "Watch ad"
+                            }
+                        }, 600L)
                     },
                 )
             }
@@ -70,6 +100,13 @@ object UndoRewardDialog {
         actions.addView(watch)
         root.addView(title)
         root.addView(message)
+        root.addView(loading, LinearLayout.LayoutParams(
+            (32 * density).toInt(),
+            (32 * density).toInt(),
+        ).apply {
+            gravity = Gravity.CENTER_HORIZONTAL
+            bottomMargin = (16 * density).toInt()
+        })
         root.addView(actions, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
             ViewGroup.LayoutParams.WRAP_CONTENT,

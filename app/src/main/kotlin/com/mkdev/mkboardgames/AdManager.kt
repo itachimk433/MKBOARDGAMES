@@ -2,6 +2,8 @@ package com.mkdev.mkboardgames
 
 import android.app.Activity
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.view.Gravity
 import android.widget.FrameLayout
 import android.widget.LinearLayout
@@ -23,6 +25,8 @@ object AdManager {
     private var rewardedAd: RewardedAd? = null
     private var rewardedLoadInProgress = false
     private val rewardedLoadCallbacks = mutableListOf<(Boolean) -> Unit>()
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private var rewardedLoadRequest = 0L
     private var applicationContext: Context? = null
     private var mobileAdsInitialized = false
     private var resumedActivity: Activity? = null
@@ -112,16 +116,18 @@ object AdManager {
         activity: Activity,
         onReward: () -> Unit,
         onUnavailable: () -> Unit,
+        onAdFinished: (rewardEarned: Boolean) -> Unit = {},
     ) {
         if (SettingsManager.isAdsRemoved(activity)) {
             onReward()
+            onAdFinished(true)
             return
         }
         val cachedAd = rewardedAd
         if (cachedAd == null) {
             loadRewarded(activity) { loaded ->
                 if (loaded) {
-                    showRewarded(activity, onReward, onUnavailable)
+                    showRewarded(activity, onReward, onUnavailable, onAdFinished)
                 } else {
                     onUnavailable()
                 }
@@ -130,10 +136,12 @@ object AdManager {
         }
 
         rewardedAd = null
+        var rewardEarned = false
         cachedAd.fullScreenContentCallback = object : FullScreenContentCallback() {
             override fun onAdDismissedFullScreenContent() {
                 restoreFullscreen(activity)
                 loadRewarded(activity.applicationContext)
+                onAdFinished(rewardEarned)
             }
 
             override fun onAdFailedToShowFullScreenContent(error: com.google.android.gms.ads.AdError) {
@@ -142,7 +150,10 @@ object AdManager {
                 onUnavailable()
             }
         }
-        cachedAd.show(activity) { onReward() }
+        cachedAd.show(activity) {
+            rewardEarned = true
+            onReward()
+        }
     }
 
     /**
@@ -183,6 +194,12 @@ object AdManager {
         rewardedLoadCallbacks += callback
         if (rewardedLoadInProgress) return
         rewardedLoadInProgress = true
+        val request = ++rewardedLoadRequest
+        mainHandler.postDelayed({
+            if (rewardedLoadInProgress && rewardedLoadRequest == request) {
+                finishRewardedLoad(false)
+            }
+        }, REWARDED_LOAD_TIMEOUT_MS)
         RewardedAd.load(
             context,
             TEST_REWARDED_UNIT_ID,
@@ -190,11 +207,15 @@ object AdManager {
             object : RewardedAdLoadCallback() {
                 override fun onAdLoaded(ad: RewardedAd) {
                     rewardedAd = ad
-                    finishRewardedLoad(true)
+                    if (rewardedLoadInProgress && rewardedLoadRequest == request) {
+                        finishRewardedLoad(true)
+                    }
                 }
 
                 override fun onAdFailedToLoad(error: LoadAdError) {
-                    finishRewardedLoad(false)
+                    if (rewardedLoadInProgress && rewardedLoadRequest == request) {
+                        finishRewardedLoad(false)
+                    }
                 }
             },
         )
@@ -202,8 +223,11 @@ object AdManager {
 
     private fun finishRewardedLoad(loaded: Boolean) {
         rewardedLoadInProgress = false
+        rewardedLoadRequest++
         val callbacks = rewardedLoadCallbacks.toList()
         rewardedLoadCallbacks.clear()
         callbacks.forEach { it(loaded) }
     }
+
+    private const val REWARDED_LOAD_TIMEOUT_MS = 10_000L
 }
