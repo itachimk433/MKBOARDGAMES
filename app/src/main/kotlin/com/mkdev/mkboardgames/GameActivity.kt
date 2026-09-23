@@ -818,7 +818,11 @@ class GameActivity : AppCompatActivity() {
                 BoardSelectionOption("Canvas Board", "Clean and modern"),
                 BoardSelectionOption("Classic Wood", "Warm tournament feel", "chess_board.jpg"),
                 BoardSelectionOption("Supplied Wood", "Rich natural grain", "chess_board_wood.jpg"),
-                BoardSelectionOption("Realistic Dark", "High-contrast frame"),
+                BoardSelectionOption(
+                    "Realistic Dark",
+                    "High-contrast frame",
+                    preview = BoardSelectionPreview.REALISTIC_CHESS,
+                ),
                 BoardSelectionOption("Black & White", "Bold monochrome", "chess_board_black_white.png"),
             )
         } else {
@@ -833,7 +837,11 @@ class GameActivity : AppCompatActivity() {
             BoardSelectionOption("Red & Black", "Bold contrast", "draughts_board_red_black.png", BoardSelectionPreview.CHECKERS),
             BoardSelectionOption("Classic Wood", "Warm tournament feel", "chess_board.jpg", BoardSelectionPreview.CHECKERS),
             BoardSelectionOption("Supplied Wood", "Rich natural grain", "chess_board_wood.jpg", BoardSelectionPreview.CHECKERS),
-            BoardSelectionOption("Realistic Dark", "High-contrast frame", preview = BoardSelectionPreview.CHECKERS),
+            BoardSelectionOption(
+                "Realistic Dark",
+                "High-contrast frame",
+                preview = BoardSelectionPreview.REALISTIC_CHESS,
+            ),
             BoardSelectionOption("Black & White", "Bold monochrome", "chess_board_black_white.png", BoardSelectionPreview.CHECKERS),
         )
         "INTERNATIONAL_DRAUGHTS" -> listOf(

@@ -7,6 +7,8 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
 import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.PointF
 import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Shader
@@ -16,7 +18,11 @@ import android.view.MotionEvent
 import android.view.View
 import android.animation.ValueAnimator
 import android.view.animation.LinearInterpolator
+import com.mkdev.mkboardgames.SettingsManager
 import com.mkdev.mkboardgames.SoundPlayer
+import com.mkdev.mkboardgames.engine.Position
+import com.mkdev.mkboardgames.games.foxandgeese.FoxAndGeeseSetup
+import com.mkdev.mkboardgames.games.morabaraba.MorabarabaBoard
 import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.sin
@@ -30,6 +36,7 @@ enum class BoardSelectionPreview {
     SHOGI,
     CONNECT_FOUR,
     MORABARABA,
+    REALISTIC_CHESS,
 }
 
 data class BoardSelectionOption(
@@ -80,6 +87,7 @@ class BoardSelectionView(
     private val frameBitmap = runCatching {
         context.assets.open("board_selection_frame.webp").use { BitmapFactory.decodeStream(it) }
     }.getOrNull()
+    private val realisticChessPreview = createRealisticChessPreview()
     private val cardRects = options.map { RectF() }
     private val imageRects = options.map { RectF() }
     private val backRect = RectF()
@@ -309,47 +317,39 @@ class BoardSelectionView(
                 }
             }
             BoardSelectionPreview.MORABARABA -> {
-                cardPaint.color = Color.parseColor("#D5A871")
-                canvas.drawRect(rect, cardPaint)
-                cardPaint.color = Color.parseColor("#5A311D")
-                cardPaint.style = Paint.Style.STROKE
-                cardPaint.strokeWidth = dp(2f)
-                canvas.drawRect(rect.left + rect.width() * .16f, rect.top + rect.height() * .12f,
-                    rect.right - rect.width() * .16f, rect.bottom - rect.height() * .12f, cardPaint)
-                canvas.drawRect(rect.left + rect.width() * .31f, rect.top + rect.height() * .27f,
-                    rect.right - rect.width() * .31f, rect.bottom - rect.height() * .27f, cardPaint)
-                canvas.drawLine(rect.centerX(), rect.top + rect.height() * .12f,
-                    rect.centerX(), rect.bottom - rect.height() * .12f, cardPaint)
-                canvas.drawLine(rect.left + rect.width() * .16f, rect.centerY(),
-                    rect.right - rect.width() * .16f, rect.centerY(), cardPaint)
-                cardPaint.style = Paint.Style.FILL
+                drawMorabarabaCanvasPreview(canvas, rect)
             }
             BoardSelectionPreview.FOX_AND_GEESE -> drawCrossPreview(canvas, rect)
-            BoardSelectionPreview.OTHELLO -> drawGridPreview(canvas, rect, 8, Color.parseColor("#2E7B50"))
+            BoardSelectionPreview.OTHELLO,
+            BoardSelectionPreview.CHECKERS,
+            BoardSelectionPreview.GRID -> drawCanvasCheckerPreview(canvas, rect)
+            BoardSelectionPreview.REALISTIC_CHESS -> {
+                drawBitmapCover(canvas, realisticChessPreview, rect)
+            }
             BoardSelectionPreview.XIANGQI -> drawGridPreview(canvas, rect, 9, Color.parseColor("#D0A05C"), rows = 10)
             BoardSelectionPreview.SHOGI -> drawGridPreview(canvas, rect, 9, Color.parseColor("#C79758"))
-            BoardSelectionPreview.CHECKERS -> drawCheckerPreview(canvas, rect)
-            BoardSelectionPreview.GRID -> drawGridPreview(canvas, rect, 8, Color.parseColor("#9B6944"))
         }
     }
 
-    private fun drawCheckerPreview(canvas: Canvas, rect: RectF) {
+    /**
+     * This is the same canvas board used by BoardView.drawBoard(). The picker
+     * used to draw a hard-coded brown grid here, which made Amazons and the
+     * other canvas styles look unrelated to the board shown in a match.
+     */
+    private fun drawCanvasCheckerPreview(canvas: Canvas, rect: RectF) {
+        val theme = SettingsManager.currentTheme(context)
         val cell = rect.width() / 8f
-        val light = Paint(Paint.ANTI_ALIAS_FLAG)
-        val dark = Paint(Paint.ANTI_ALIAS_FLAG)
+        val light = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = theme.light }
+        val dark = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = theme.dark }
         for (row in 0 until 8) for (column in 0 until 8) {
-            light.color = if ((row + column) % 2 == 0) Color.parseColor("#EAD9B8")
-            else Color.parseColor("#8A5135")
             canvas.drawRect(
                 rect.left + column * cell,
                 rect.top + row * cell,
                 rect.left + (column + 1) * cell,
                 rect.top + (row + 1) * cell,
-                light,
+                if ((row + column) % 2 == 0) light else dark,
             )
         }
-        dark.color = Color.argb(70, 0, 0, 0)
-        canvas.drawRect(rect, dark)
     }
 
     private fun drawGridPreview(
@@ -376,19 +376,180 @@ class BoardSelectionView(
     }
 
     private fun drawCrossPreview(canvas: Canvas, rect: RectF) {
-        cardPaint.color = Color.parseColor("#D6A96A")
+        val theme = SettingsManager.currentTheme(context)
+        val size = min(rect.width(), rect.height())
+        val left = rect.centerX() - size / 2f
+        val top = rect.centerY() - size / 2f
+        val cell = size / FoxAndGeeseSetup.BOARD_SIZE
+        val right = left + size
+        val bottom = top + size
+
+        cardPaint.color = Color.parseColor("#121212")
         canvas.drawRect(rect, cardPaint)
-        cardPaint.color = Color.parseColor("#6A3A20")
-        cardPaint.style = Paint.Style.STROKE
-        cardPaint.strokeWidth = dp(2f)
-        val left = rect.left + rect.width() * .22f
-        val right = rect.right - rect.width() * .22f
-        val top = rect.top + rect.height() * .1f
-        val bottom = rect.bottom - rect.height() * .1f
-        canvas.drawRect(left, top, right, bottom, cardPaint)
-        canvas.drawRect(rect.left + rect.width() * .1f, rect.top + rect.height() * .32f,
-            rect.right - rect.width() * .1f, rect.bottom - rect.height() * .32f, cardPaint)
-        cardPaint.style = Paint.Style.FILL
+        val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = theme.accent
+            style = Paint.Style.STROKE
+            strokeWidth = cell * 0.035f
+        }
+        val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = blendColor(theme.dark, Color.BLACK, 0.18f)
+            style = Paint.Style.STROKE
+            strokeWidth = cell * 0.045f
+            strokeCap = Paint.Cap.ROUND
+        }
+        val pointPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = blendColor(theme.light, Color.WHITE, 0.55f)
+        }
+        val pointBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = blendColor(theme.dark, theme.accent, 0.35f)
+            style = Paint.Style.STROKE
+            strokeWidth = cell * 0.025f
+        }
+        val cross = Path().apply {
+            moveTo(left + 2f * cell, top)
+            lineTo(left + 5f * cell, top)
+            lineTo(left + 5f * cell, top + 2f * cell)
+            lineTo(right, top + 2f * cell)
+            lineTo(right, top + 5f * cell)
+            lineTo(left + 5f * cell, top + 5f * cell)
+            lineTo(left + 5f * cell, bottom)
+            lineTo(left + 2f * cell, bottom)
+            lineTo(left + 2f * cell, top + 5f * cell)
+            lineTo(left, top + 5f * cell)
+            lineTo(left, top + 2f * cell)
+            lineTo(left + 2f * cell, top + 2f * cell)
+            close()
+        }
+        canvas.drawPath(cross, cardPaint)
+        canvas.drawPath(cross, borderPaint)
+
+        val dirs = listOf(
+            Position(-1, -1), Position(-1, 0), Position(-1, 1),
+            Position(0, -1), Position(0, 1),
+            Position(1, -1), Position(1, 0), Position(1, 1),
+        )
+        for (row in 0 until FoxAndGeeseSetup.BOARD_SIZE) {
+            for (column in 0 until FoxAndGeeseSetup.BOARD_SIZE) {
+                val from = Position(row, column)
+                if (!FoxAndGeeseSetup.isPlayable(from)) continue
+                for (dir in dirs) {
+                    val to = from + dir
+                    if (!FoxAndGeeseSetup.isConnected(from, to)) continue
+                    if (to.row < row || (to.row == row && to.col <= column)) continue
+                    canvas.drawLine(
+                        left + column * cell + cell / 2f,
+                        top + row * cell + cell / 2f,
+                        left + to.col * cell + cell / 2f,
+                        top + to.row * cell + cell / 2f,
+                        linePaint,
+                    )
+                }
+            }
+        }
+        for (row in 0 until FoxAndGeeseSetup.BOARD_SIZE) {
+            for (column in 0 until FoxAndGeeseSetup.BOARD_SIZE) {
+                if (!FoxAndGeeseSetup.isPlayable(Position(row, column))) continue
+                val cx = left + column * cell + cell / 2f
+                val cy = top + row * cell + cell / 2f
+                canvas.drawCircle(cx, cy, cell * 0.105f, pointPaint)
+                canvas.drawCircle(cx, cy, cell * 0.105f, pointBorderPaint)
+            }
+        }
+    }
+
+    private fun drawMorabarabaCanvasPreview(canvas: Canvas, rect: RectF) {
+        val theme = SettingsManager.currentTheme(context)
+        val size = min(rect.width(), rect.height())
+        val left = rect.centerX() - size / 2f
+        val top = rect.centerY() - size / 2f
+        val cell = size / 6f
+        val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(
+                170,
+                Color.red(theme.dark),
+                Color.green(theme.dark),
+                Color.blue(theme.dark),
+            )
+            style = Paint.Style.STROKE
+            strokeWidth = cell * 0.04f
+            strokeCap = Paint.Cap.ROUND
+        }
+        val nodePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(
+                255,
+                (Color.red(theme.dark) * .35f).toInt(),
+                (Color.green(theme.dark) * .35f).toInt(),
+                (Color.blue(theme.dark) * .35f).toInt(),
+            )
+        }
+        val nodeRingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(
+                200,
+                (Color.red(theme.dark) * .65f).toInt(),
+                (Color.green(theme.dark) * .65f).toInt(),
+                (Color.blue(theme.dark) * .65f).toInt(),
+            )
+            style = Paint.Style.STROKE
+            strokeWidth = cell * 0.04f
+        }
+        cardPaint.color = Color.parseColor("#0E0E0E")
+        canvas.drawRect(rect, cardPaint)
+        val point = { position: Position ->
+            PointF(
+                left + position.col * cell,
+                top + position.row * cell,
+            )
+        }
+        val drawn = mutableSetOf<Long>()
+        for (fromIndex in MorabarabaBoard.ADJACENCY.indices) {
+            for (toIndex in MorabarabaBoard.ADJACENCY[fromIndex]) {
+                val key = if (fromIndex < toIndex) {
+                    fromIndex.toLong() * 100 + toIndex
+                } else {
+                    toIndex.toLong() * 100 + fromIndex
+                }
+                if (!drawn.add(key)) continue
+                val from = point(MorabarabaBoard.POSITIONS[fromIndex])
+                val to = point(MorabarabaBoard.POSITIONS[toIndex])
+                canvas.drawLine(from.x, from.y, to.x, to.y, linePaint)
+            }
+        }
+        MorabarabaBoard.POSITIONS.forEach { position ->
+            val center = point(position)
+            canvas.drawCircle(center.x, center.y, cell * .13f, nodePaint)
+            canvas.drawCircle(center.x, center.y, cell * .13f, nodeRingPaint)
+        }
+    }
+
+    private fun createRealisticChessPreview(): Bitmap {
+        val size = 256
+        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val previewCanvas = Canvas(bitmap)
+        val previewPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        previewPaint.color = Color.parseColor("#171B20")
+        previewCanvas.drawRect(0f, 0f, size.toFloat(), size.toFloat(), previewPaint)
+        val frame = RectF(4f, 4f, size - 4f, size - 4f)
+        previewPaint.color = Color.parseColor("#2F3540")
+        previewCanvas.drawRoundRect(frame, 11f, 11f, previewPaint)
+        val inset = 14f
+        val cell = (size - inset * 2f) / 8f
+        for (row in 0 until 8) {
+            for (column in 0 until 8) {
+                previewPaint.color = if ((row + column) % 2 == 0) {
+                    Color.parseColor("#EAE5DA")
+                } else {
+                    Color.parseColor("#30363F")
+                }
+                previewCanvas.drawRect(
+                    inset + column * cell,
+                    inset + row * cell,
+                    inset + (column + 1) * cell,
+                    inset + (row + 1) * cell,
+                    previewPaint,
+                )
+            }
+        }
+        return bitmap
     }
 
     private fun drawContinueButton(canvas: Canvas) {
