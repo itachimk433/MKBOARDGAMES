@@ -15,7 +15,7 @@ import android.os.Looper
 import android.util.Log
 import android.view.MotionEvent
 import android.view.ViewGroup
-import android.view.animation.DecelerateInterpolator
+import android.view.animation.LinearInterpolator
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
@@ -36,6 +36,12 @@ import kotlin.math.sqrt
 import kotlin.random.Random
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
+
+private const val DICE_IDLE_SCALE = 0.98f
+private const val DICE_ROLL_SCALE = 1.5f
+private const val DICE_LANDING_SCALE_PROGRESS = 0.9f
+private const val ROLL_DURATION_MS = 656L
+private const val TUMBLE_DEGREES_MULTIPLIER = 12f
 
 /**
  * OpenGL ES renderer for the supplied embedded glTF dice model.
@@ -63,6 +69,7 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
     private var rotationY = -28f
     private var rotationZ = 0f
     private var currentOrientation = Quat.fromEulerDegrees(-18f, -28f, 0f)
+    private var rollProgress = 0f
     private var animatorPausedForHost = false
     private val glRenderer = DiceRenderer(context.applicationContext)
 
@@ -73,6 +80,7 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         glSurfaceView.holder.setFormat(PixelFormat.TRANSLUCENT)
         glSurfaceView.setZOrderOnTop(true)
         glSurfaceView.setRenderer(glRenderer)
+        glRenderer.setAnimationScale(DICE_IDLE_SCALE)
         // The die is static between rolls. Render continuously only while a
         // roll is active so the animation can display every frame, then return
         // to on-demand rendering for idle dice.
@@ -102,6 +110,7 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         val generation = ++rollGeneration
         animator?.cancel()
         isRolling = true
+        rollProgress = 0f
 
         val targetValue = nextValue.coerceIn(1, 6)
         val startOrientation = currentOrientation
@@ -112,15 +121,17 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
             motionDirection = motionDirection,
         )
         glSurfaceView.renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
-        glRenderer.setAnimationScale(1f)
+        glRenderer.setAnimationScale(DICE_ROLL_SCALE)
 
         animator = ValueAnimator.ofFloat(0f, 1f).apply {
-            // Keep the die tumbling for four times as long while preserving
-            // the requested three-times-faster spin rate.
+            // Keep the shortened roll at a constant speed so the final face
+            // lands without a deceleration phase that shows extra sides.
             duration = ROLL_DURATION_MS
-            interpolator = DecelerateInterpolator(1.6f)
+            interpolator = LinearInterpolator()
             addUpdateListener {
                 val progress = it.animatedFraction
+                rollProgress = progress
+                glRenderer.setAnimationScale(scaleForRollProgress(progress))
                 val orientation = rollPath.orientationAt(
                     progress = progress,
                     start = startOrientation,
@@ -136,7 +147,8 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
                     isRolling = false
                     animator = null
                     currentOrientation = targetOrientation
-                    glRenderer.setAnimationScale(1f)
+                    rollProgress = 1f
+                    glRenderer.setAnimationScale(DICE_IDLE_SCALE)
                     applyOrientation(targetOrientation)
                     // Do not advance the game until the final orientation has
                     // actually reached a GL frame. Otherwise the logical roll
@@ -174,8 +186,9 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         animator = null
         animatorPausedForHost = false
         isRolling = false
+        rollProgress = 0f
         glRenderer.clearFrameCallback()
-        glRenderer.setAnimationScale(1f)
+        glRenderer.setAnimationScale(DICE_IDLE_SCALE)
         glRenderer.setRotation(currentOrientation)
         glSurfaceView.renderMode = GLSurfaceView.RENDERMODE_WHEN_DIRTY
         glSurfaceView.requestRender()
@@ -196,7 +209,9 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
 
     fun onHostResume() {
         glSurfaceView.onResume()
-        glRenderer.setAnimationScale(1f)
+        glRenderer.setAnimationScale(
+            if (isRolling) scaleForRollProgress(rollProgress) else DICE_IDLE_SCALE,
+        )
         glRenderer.setRotation(currentOrientation)
         glSurfaceView.requestRender()
         if (animatorPausedForHost) {
@@ -204,6 +219,13 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
             animator?.resume()
         }
     }
+
+    private fun scaleForRollProgress(progress: Float): Float =
+        if (progress >= DICE_LANDING_SCALE_PROGRESS) {
+            DICE_IDLE_SCALE
+        } else {
+            DICE_ROLL_SCALE
+        }
 
     /**
      * GLSurfaceView can remain above its parent when it uses z-order-on-top.
@@ -252,7 +274,7 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         private var height = 1
         @Volatile private var orientation = Quat.fromEulerDegrees(-18f, -28f, 0f)
         @Volatile private var facingRotation = 0f
-        @Volatile private var animationScale = 1f
+        @Volatile private var animationScale = DICE_IDLE_SCALE
         @Volatile private var frameRenderedCallback: (() -> Unit)? = null
 
         fun setRotation(value: Quat) {
@@ -264,7 +286,7 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         }
 
         fun setAnimationScale(scale: Float) {
-            animationScale = scale.coerceIn(1f, 1.2f)
+            animationScale = scale.coerceIn(DICE_IDLE_SCALE, DICE_ROLL_SCALE)
         }
 
         fun requestFrameAndNotify(callback: () -> Unit) {
@@ -988,8 +1010,6 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
 
                 repeat(3) {
                     val axis = randomAxis(motionDirection)
-                    // The animation lasts 4x longer, so the path needs 12x
-                    // the rotation distance to keep its angular speed at 3x.
                     val degrees = Random.nextInt(180, 301).toFloat() *
                         TUMBLE_DEGREES_MULTIPLIER
                     segments += Segment(axis, degrees)
@@ -1239,8 +1259,6 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
     companion object {
         private const val TAG = "GlbDiceView"
         private const val MODEL_ASSET = "low_poly_dice/scene.gltf"
-        private const val ROLL_DURATION_MS = 820L * 4L
-        private const val TUMBLE_DEGREES_MULTIPLIER = 12f
 
         private const val VERTEX_SHADER = """
             attribute vec3 aPosition;
