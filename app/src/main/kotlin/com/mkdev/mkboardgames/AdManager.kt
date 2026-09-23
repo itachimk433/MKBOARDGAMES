@@ -3,6 +3,7 @@ package com.mkdev.mkboardgames
 import android.app.Activity
 import android.content.Context
 import android.view.Gravity
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.AdSize
@@ -42,11 +43,7 @@ object AdManager {
     fun attachBanner(container: LinearLayout) {
         if (SettingsManager.isAdsRemoved(container.context)) return
         if (container.findViewWithTag<AdView>(BANNER_TAG) != null) return
-        val adView = AdView(container.context).apply {
-            tag = BANNER_TAG
-            setAdSize(AdSize.BANNER)
-            adUnitId = TEST_BANNER_UNIT_ID
-        }
+        val adView = createBanner(container.context)
         container.addView(
             adView,
             LinearLayout.LayoutParams(
@@ -58,6 +55,33 @@ object AdManager {
         )
         adView.loadAd(AdRequest.Builder().build())
     }
+
+    /**
+     * Adds a banner over the game surface without participating in its
+     * measurement. This keeps the board and pieces fixed when the ad loads.
+     */
+    fun attachBannerOverlay(container: FrameLayout) {
+        if (SettingsManager.isAdsRemoved(container.context)) return
+        if (container.findViewWithTag<AdView>(BANNER_TAG) != null) return
+        val adView = createBanner(container.context)
+        container.addView(
+            adView,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+            },
+        )
+        adView.loadAd(AdRequest.Builder().build())
+    }
+
+    private fun createBanner(context: Context): AdView =
+        AdView(context).apply {
+            tag = BANNER_TAG
+            setAdSize(AdSize.BANNER)
+            adUnitId = TEST_BANNER_UNIT_ID
+        }
 
     fun onAppForeground(activity: Activity) {
         // App-open ads are intentionally disabled. Opening or returning to the

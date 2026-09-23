@@ -74,7 +74,7 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
             ),
             accentColor = Color.parseColor("#E3B86A"),
             profileScale = 0.7f,
-            dieScale = 0.7f,
+            dieScale = 0.742f,
         ),
         TWO(
             displayName = "Snow Board",
@@ -107,6 +107,7 @@ class SnakesLaddersBoardView(context: Context) : View(context) {
             matchBackgroundAssetName = "snakes_ladders_board_two_background.webp",
             playerFrameAssetName = "snakes_ladders_board_two_profile_dice.webp",
             profileScale = 0.9f,
+            dieScale = 0.742f,
         ),
         THREE(
             displayName = "Halloween Board",

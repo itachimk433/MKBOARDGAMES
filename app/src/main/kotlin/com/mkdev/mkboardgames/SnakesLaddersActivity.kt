@@ -10,7 +10,6 @@ import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.ImageView
-import android.widget.LinearLayout
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.mkdev.mkboardgames.ui.ChessMenuView
@@ -27,7 +26,7 @@ import com.mkdev.mkboardgames.ui.SnakesLaddersGameOverView
 import kotlin.random.Random
 
 class SnakesLaddersActivity : AppCompatActivity() {
-    private lateinit var gameRoot: LinearLayout
+    private lateinit var gameRoot: FrameLayout
     private lateinit var boardView: SnakesLaddersBoardView
     private lateinit var boardStage: FrameLayout
     private lateinit var screenRoot: FrameLayout
@@ -91,12 +90,11 @@ class SnakesLaddersActivity : AppCompatActivity() {
             isClickable = false
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
         }
-        gameRoot = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
+        gameRoot = FrameLayout(this).apply {
             setBackgroundColor(android.graphics.Color.TRANSPARENT)
-            addView(boardStage, LinearLayout.LayoutParams(-1, 0, 1f))
+            addView(boardStage, FrameLayout.LayoutParams(-1, -1))
         }
-        AdManager.attachBanner(gameRoot)
+        AdManager.attachBannerOverlay(gameRoot)
         gameRoot.visibility = View.GONE
 
         screenRoot = FrameLayout(this).apply {
@@ -636,7 +634,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
             LudoPlayerControlView(this).apply {
                 accentColor = SnakesLaddersBoardView.PLAYER_COLORS[player]
                 frameAssetName = selectedBoard.playerFrameAssetName
-                dieScale = LudoPlayerControlView.UNIFORM_DIE_SCALE
+                dieScale = selectedBoard.dieScale
                 label = playerName(player)
                 labelBelow = if (count == 2) player == 0 else player < 2
                 labelUpsideDown = false
@@ -664,7 +662,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
             control.labelBelow = isBottomPlayer
             control.labelUpsideDown = false
             control.frameAssetName = selectedBoard.playerFrameAssetName
-            control.dieScale = LudoPlayerControlView.UNIFORM_DIE_SCALE
+            control.dieScale = selectedBoard.dieScale
             control.dieHorizontalShiftFraction = if (player == 0 || player == 2) {
                 PLAYER_ONE_THREE_DIE_SHIFT_FRACTION
             } else {

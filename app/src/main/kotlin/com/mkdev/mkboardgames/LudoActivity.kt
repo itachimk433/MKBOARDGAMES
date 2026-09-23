@@ -285,7 +285,7 @@ class LudoActivity : AppCompatActivity() {
             0,
             1f,
         ))
-        AdManager.attachBanner(contentRoot)
+        AdManager.attachBannerOverlay(overlay)
         setContentView(overlay)
 
         boardView.onMoveSelected = { move ->

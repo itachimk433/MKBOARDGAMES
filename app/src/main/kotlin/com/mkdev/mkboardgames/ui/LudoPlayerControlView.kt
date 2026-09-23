@@ -330,7 +330,9 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
         private const val FRAME_HEIGHT = 74
         private const val AVATAR_SIZE = 70
         private const val DIE_SIZE = 74
-        const val UNIFORM_DIE_SCALE = 0.7f
+        // 6% larger than the compact themed-board size used by the
+        // Halloween and Forest Snakes & Ladders boards.
+        const val UNIFORM_DIE_SCALE = 0.742f
         const val CONTROL_HEIGHT = LABEL_HEIGHT + FRAME_HEIGHT
         const val PAIR_WIDTH = AVATAR_SIZE + DIE_SIZE - 2
         const val RAIL_HEIGHT = 112
