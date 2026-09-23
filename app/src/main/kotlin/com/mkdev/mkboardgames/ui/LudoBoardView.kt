@@ -292,15 +292,29 @@ class LudoBoardView(context: Context) : View(context) {
         for (move in legalMoves) {
             val accent = accentColorFor(move)
             val path = pathFor(move)
+            val movingPiece = LudoSetup.pieceForMove(gameState, move)
+            val isYardLaunch = (movingPiece?.progress ?: 0) < 0
             // The source cell is the starting point, not step one. Show only
             // the route markers between source and destination so intermediate
             // cells cannot be mistaken for separate legal destinations.
-            drawRoutePreview(canvas, path.drop(1).dropLast(1), accent)
-            val point = centerOf(move.to)
-            highlightPaint.color = Color.argb(245, Color.red(accent), Color.green(accent), Color.blue(accent))
-            canvas.drawCircle(point.x, point.y, cell * 0.34f, highlightPaint)
-            highlightPaint.color = Color.argb(240, 255, 255, 255)
-            canvas.drawCircle(point.x, point.y, cell * 0.08f, highlightPaint)
+            //
+            // A yard launch has no user-selectable destination yet: the token
+            // itself is the action target. Drawing the start-cell hint here
+            // makes it look like an extra square appears before the token
+            // leaves its yard.
+            if (!isYardLaunch) {
+                drawRoutePreview(canvas, path.drop(1).dropLast(1), accent)
+                val point = centerOf(move.to)
+                highlightPaint.color = Color.argb(
+                    245,
+                    Color.red(accent),
+                    Color.green(accent),
+                    Color.blue(accent),
+                )
+                canvas.drawCircle(point.x, point.y, cell * 0.34f, highlightPaint)
+                highlightPaint.color = Color.argb(240, 255, 255, 255)
+                canvas.drawCircle(point.x, point.y, cell * 0.08f, highlightPaint)
+            }
         }
         animatedMove?.let { drawPathHighlight(canvas, animatedPath, accentColorFor(it)) }
     }
@@ -634,9 +648,10 @@ class LudoBoardView(context: Context) : View(context) {
                 pendingLongPressPiece = if (!isLocked &&
                     gameState.status == com.mkdev.mkboardgames.engine.GameStatus.IN_PROGRESS
                 ) {
-                    positionAt(event.x, event.y)?.let { position ->
-                        pieceAt(position, event.x, event.y)
-                    }
+                    pieceAtTouch(event.x, event.y)
+                        ?: positionAt(event.x, event.y)?.let { position ->
+                            pieceAt(position, event.x, event.y)
+                        }
                 } else {
                     null
                 }
@@ -674,8 +689,18 @@ class LudoBoardView(context: Context) : View(context) {
             return true
         }
         if (isLocked) return true
-        val tapped = positionAt(event.x, event.y) ?: return true
-        val source = legalMoves
+        val touchedPiece = pieceAtTouch(event.x, event.y)
+        val tapped = positionAt(event.x, event.y)
+            ?: touchedPiece?.let { LudoSetup.positionOf(it) }
+            ?: return true
+        val source = touchedPiece?.let { piece ->
+            legalMoves
+                .filter { move ->
+                    move.metadata["player"] == piece.player &&
+                        move.metadata["token"] == piece.token
+                }
+                .minByOrNull { sourceDistance(it, event.x, event.y) }
+        } ?: legalMoves
             .filter { it.from == tapped }
             .minByOrNull { sourceDistance(it, event.x, event.y) }
         if (source != null) {
@@ -711,6 +736,63 @@ class LudoBoardView(context: Context) : View(context) {
             val dx = x - positionCenter.x - offset.x
             val dy = y - positionCenter.y - offset.y
             dx * dx + dy * dy
+        }
+    }
+
+    /**
+     * Hit-test the visible token artwork, not only its board anchor. Pin
+     * artwork extends well above the cell/base, so tapping the token head
+     * previously resolved to an unrelated board cell instead of its move.
+     */
+    private fun pieceAtTouch(x: Float, y: Float): LudoPiece? {
+        val hitPieces = LudoSetup.allPieces(gameState)
+            .filter { it.progress < LudoSetup.FINISH }
+            .mapNotNull { piece ->
+                val position = LudoSetup.positionOf(piece)
+                val stack = LudoSetup.piecesAt(gameState, position)
+                val index = stack.indexOfFirst { candidate ->
+                    candidate.player == piece.player && candidate.token == piece.token
+                }
+                val center = pointFor(piece, position)
+                val offset = if (piece.progress < 0) {
+                    PointF()
+                } else {
+                    stackOffset(index.coerceAtLeast(0), stack.size.coerceAtLeast(1))
+                }
+                val point = PointF(center.x + offset.x, center.y + offset.y)
+                val distance = tokenHitDistance(piece, point, x, y)
+                distance?.let { piece to it }
+            }
+        return hitPieces.minByOrNull { it.second }?.first
+    }
+
+    private fun tokenHitDistance(piece: LudoPiece, point: PointF, x: Float, y: Float): Float? {
+        val bitmap = tokenBitmaps.getOrNull(piece.player)
+        if (bitmap != null) {
+            val tokenHeight = cell * 0.92f * 1.6f * 1.05f
+            val tokenWidth = tokenHeight * bitmap.width.toFloat() / bitmap.height.toFloat()
+            val anchorFraction = selectedBoard.tokenTipFractions[piece.player]
+            val horizontalPadding = cell * 0.12f
+            val verticalPadding = cell * 0.12f
+            val left = point.x - tokenWidth / 2f - horizontalPadding
+            val top = point.y - tokenHeight * anchorFraction - verticalPadding
+            val right = point.x + tokenWidth / 2f + horizontalPadding
+            val bottom = point.y + tokenHeight * (1f - anchorFraction) + verticalPadding
+            if (x in left..right && y in top..bottom) {
+                val dx = x - point.x
+                val dy = y - point.y
+                return dx * dx + dy * dy
+            }
+            return null
+        }
+
+        val radius = cell * 0.48f
+        val dx = x - point.x
+        val dy = y - point.y
+        return if (dx * dx + dy * dy <= radius * radius) {
+            dx * dx + dy * dy
+        } else {
+            null
         }
     }
 
