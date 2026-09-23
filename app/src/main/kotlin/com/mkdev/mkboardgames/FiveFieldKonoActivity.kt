@@ -533,7 +533,7 @@ class FiveFieldKonoActivity : AppCompatActivity() {
     private fun canPauseMatch(): Boolean =
         matchStarted &&
             gameState.status == GameStatus.IN_PROGRESS &&
-            !aiControlsCurrentTurn() &&
+            !(vsAI && gameState.currentTurn != playerColor) &&
             !boardView.isLocked &&
             !boardView.hasPendingMoveAnimation()
 
