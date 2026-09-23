@@ -630,6 +630,13 @@ class LudoBoardView(context: Context) : View(context) {
     }
 
     private fun drawTurnMarker(canvas: Canvas) {
+        // A yard launch already has a visible token/source highlight. The
+        // normal turn marker sits on the same start square and looks like an
+        // extra destination while the token is about to leave the yard.
+        val launchPreviewVisible = legalMoves.any(::isYardLaunch) ||
+            animatedMove?.let(::isYardLaunch) == true
+        if (launchPreviewVisible) return
+
         val player = LudoSetup.playerFromState(gameState)
         val point = centerOf(LudoSetup.PATH[LudoSetup.startOffset(player)])
         piecePaint.style = Paint.Style.STROKE
@@ -638,6 +645,10 @@ class LudoBoardView(context: Context) : View(context) {
         canvas.drawCircle(point.x, point.y, cell * 0.47f, piecePaint)
         piecePaint.style = Paint.Style.FILL
     }
+
+    private fun isYardLaunch(move: Move): Boolean =
+        (LudoSetup.pieceForMove(gameState, move)?.progress ?: 0) < 0 &&
+            (move.metadata["targetProgress"] as? Int) == 0
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.actionMasked) {
