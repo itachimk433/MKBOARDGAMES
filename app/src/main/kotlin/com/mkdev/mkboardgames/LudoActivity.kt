@@ -1929,7 +1929,6 @@ class LudoActivity : AppCompatActivity() {
             isHumanTurn() &&
             !diceRollInProgress() &&
             pendingMove == null &&
-            !boardView.hasPendingMoveAnimation() &&
             !boardView.isLocked
 
     private fun playerDisplayName(player: Int): String {
