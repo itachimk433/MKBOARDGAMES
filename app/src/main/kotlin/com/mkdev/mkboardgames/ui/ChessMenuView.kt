@@ -82,6 +82,11 @@ class ChessMenuView(
         hasResumeMatch -> 462f
         else -> 414f
     }
+    // The Snakes menu has one extra action row, but its header should stay
+    // aligned with the other game setup screens instead of centering the
+    // taller action block as one group.
+    private val visualContentLiftDp =
+        if (isSnakesLadders) (760f - 500f) / 2f else 0f
     private val menuButtonScale = 0.9f
     private val lowerButtonLift = 0.24f
     private val gameHomeIconBitmap = run {
@@ -295,7 +300,7 @@ class ChessMenuView(
         val gap = 10f * unit
         val availableActionWidth = (width - sidePadding * 2f - gap) / 2f
         val actionWidth = availableActionWidth * menuButtonScale
-        val actionTop = contentOffset +
+        val actionTop = contentOffset + visualContentLiftDp * unit +
             (if (isChessFamily || isMorabaraba) 244f else 164f) * unit
         actions = buildList {
             add(
@@ -407,8 +412,9 @@ class ChessMenuView(
                 height,
                 drawFloatingPieces = isChess,
             )
-            drawChessHero(canvas, width, contentOffset)
-            drawChessHeader(canvas, width, contentOffset)
+            val visualTopOffset = contentOffset + visualContentLiftDp * unit
+            drawChessHero(canvas, width, visualTopOffset)
+            drawChessHeader(canvas, width, visualTopOffset)
         } else {
             val corner = 12f * unit
             surfacePaint.shader = LinearGradient(
