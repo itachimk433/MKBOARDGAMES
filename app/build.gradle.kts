@@ -3,6 +3,11 @@ plugins {
       kotlin("android")
   }
 
+  val appVersionCode =
+      System.getenv("APP_VERSION_CODE")?.toIntOrNull()?.takeIf { it > 25 } ?: 26
+  val appVersionName =
+      System.getenv("APP_VERSION_NAME")?.takeIf { it.isNotBlank() } ?: "2.5.1"
+
   android {
       compileSdk = 36
       namespace = "com.mkdev.mkboardgames"
@@ -11,8 +16,8 @@ plugins {
           applicationId = "com.mkdev.mkboardgames"
           minSdk = 24
           targetSdk = 36
-          versionCode = 25
-          versionName = "2.5"
+          versionCode = appVersionCode
+          versionName = appVersionName
       }
 
       signingConfigs {
