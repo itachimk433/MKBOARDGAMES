@@ -340,7 +340,7 @@ class ModeSelectionView(context: Context) : View(context) {
         canvas.drawRoundRect(removeAdsRect, radius, radius, removeAdsBorderPaint)
         val removed = SettingsManager.isAdsRemoved(context)
         removeAdsTextPaint.textSize = 11f * textScale
-        val label = if (removed) "Ads Removed ✓" else "Remove Ads $removeAdsPrice"
+        val label = if (removed) "Ads Removed ✓" else "Remove Ads"
         val baseline = removeAdsRect.centerY() -
             (removeAdsTextPaint.ascent() + removeAdsTextPaint.descent()) / 2f
         canvas.drawText(label, removeAdsRect.centerX(), baseline, removeAdsTextPaint)
