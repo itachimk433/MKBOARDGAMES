@@ -24,9 +24,9 @@ class MainActivity : AppCompatActivity() {
     private companion object {
         const val SUPPORT_EMAIL = "mkdev4360@gmail.com"
         const val PRIVACY_POLICY_URL =
-            "https://mkboard-games.pages.dev/privacy-policy"
+            "https://mkboardgames-terms.pages.dev/privacy-policy"
         const val TERMS_OF_SERVICE_URL =
-            "https://mkboard-games.pages.dev/terms-of-service"
+            "https://mkboardgames-terms.pages.dev/terms-of-service"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
