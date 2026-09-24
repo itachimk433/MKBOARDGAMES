@@ -133,9 +133,10 @@ object RemoveAdsManager {
                     ),
                 )
                 .build(),
-        ) { result, products ->
+        ) { result, productDetailsResult ->
             if (result.responseCode == BillingResponseCode.OK) {
-                productDetails = products.firstOrNull { it.productId == PRODUCT_ID }
+                productDetails = productDetailsResult.productDetailsList
+                    .firstOrNull { it.productId == PRODUCT_ID }
                 flushReadyCallbacks(productDetails != null)
             } else {
                 flushReadyCallbacks(false)
