@@ -20,7 +20,7 @@
         android:resizeableActivity="true">
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-3940256099942544~3347511713" />
+            android:value="ca-app-pub-4975030890366420~2624355333" />
 
         <!--
           Activities used to be locked to android:screenOrientation="portrait",

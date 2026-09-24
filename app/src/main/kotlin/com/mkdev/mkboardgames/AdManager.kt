@@ -17,9 +17,8 @@ import com.google.android.gms.ads.rewarded.RewardedAd
 import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback
 
 object AdManager {
-    // Official Google test IDs. Replace these before publishing the app.
-    private const val TEST_BANNER_UNIT_ID = "ca-app-pub-3940256099942544/6300978111"
-    private const val TEST_REWARDED_UNIT_ID = "ca-app-pub-3940256099942544/5224354917"
+    private const val BANNER_UNIT_ID = "ca-app-pub-4975030890366420/7054554934"
+    private const val REWARDED_UNIT_ID = "ca-app-pub-4975030890366420/8423476921"
     private const val BANNER_TAG = "mkboardgames_banner"
 
     private var rewardedAd: RewardedAd? = null
@@ -84,7 +83,7 @@ object AdManager {
         AdView(context).apply {
             tag = BANNER_TAG
             setAdSize(AdSize.BANNER)
-            adUnitId = TEST_BANNER_UNIT_ID
+            adUnitId = BANNER_UNIT_ID
         }
 
     fun onAppForeground(activity: Activity) {
@@ -202,7 +201,7 @@ object AdManager {
         }, REWARDED_LOAD_TIMEOUT_MS)
         RewardedAd.load(
             context,
-            TEST_REWARDED_UNIT_ID,
+            REWARDED_UNIT_ID,
             AdRequest.Builder().build(),
             object : RewardedAdLoadCallback() {
                 override fun onAdLoaded(ad: RewardedAd) {
