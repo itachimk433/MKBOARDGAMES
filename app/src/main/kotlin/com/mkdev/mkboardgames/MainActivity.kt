@@ -39,6 +39,7 @@ class MainActivity : AppCompatActivity() {
         screenRoot = FrameLayout(this)
         setContentView(screenRoot)
         showModeSelection()
+        window.decorView.post { showDailyTestClaim() }
 
         @Suppress("DEPRECATION")
         window.decorView.setOnSystemUiVisibilityChangeListener { visibility ->
@@ -95,6 +96,208 @@ class MainActivity : AppCompatActivity() {
         }
         screenRoot.removeAllViews()
         screenRoot.addView(modeSelection, FrameLayout.LayoutParams(-1, -1))
+    }
+
+    private fun showDailyTestClaim() {
+        if (isFinishing || activeSettingsDialog?.isShowing == true) return
+
+        val ctx = this
+        val dp = resources.displayMetrics.density
+        val palette = intArrayOf(
+            Color.parseColor("#E86A5B"),
+            Color.parseColor("#EF8B5B"),
+            Color.parseColor("#F2B35D"),
+            Color.parseColor("#D7C45C"),
+            Color.parseColor("#9CCB6B"),
+            Color.parseColor("#5FC18A"),
+            Color.parseColor("#58C0B2"),
+            Color.parseColor("#5CA9C8"),
+            Color.parseColor("#6C8FD1"),
+            Color.parseColor("#897AC7"),
+            Color.parseColor("#A879C1"),
+            Color.parseColor("#C27BA7"),
+            Color.parseColor("#D97886"),
+            Color.parseColor("#E05E6F"),
+        )
+        val claimedDay = SettingsManager.dailyTestClaimedDay(ctx)
+        val currentDay = SettingsManager.currentDailyTestDay(ctx)
+        val hasClaimedToday = claimedDay > 0 && currentDay == claimedDay
+
+        val wrapper = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(
+                (20 * dp).toInt(),
+                (8 * dp).toInt(),
+                (20 * dp).toInt(),
+                (4 * dp).toInt(),
+            )
+            background = android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                intArrayOf(
+                    Color.parseColor("#173B43"),
+                    Color.parseColor("#0C222C"),
+                    Color.parseColor("#071723"),
+                ),
+            )
+        }
+        val title = TextView(ctx).apply {
+            text = "14-DAY TEST RUN"
+            setTextColor(Color.parseColor("#F7D99B"))
+            setTypeface(typeface, Typeface.BOLD)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            letterSpacing = 0.12f
+        }
+        wrapper.addView(title)
+
+        val headline = TextView(ctx).apply {
+            text = if (claimedDay >= SettingsManager.DAILY_TEST_DAYS) {
+                "Test run complete"
+            } else {
+                "Your daily check-in is ready"
+            }
+            setTextColor(Color.parseColor("#FFF8E8"))
+            setTypeface(typeface, Typeface.BOLD)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
+            setPadding(0, (5 * dp).toInt(), 0, 0)
+        }
+        wrapper.addView(headline)
+
+        val subhead = TextView(ctx).apply {
+            text = if (claimedDay >= SettingsManager.DAILY_TEST_DAYS) {
+                "Thanks for helping test MK Board Games for 14 days."
+            } else if (hasClaimedToday) {
+                "Day $claimedDay is complete. Come back tomorrow for the next check-in."
+            } else {
+                "Try one game or feature, then claim today’s test pass."
+            }
+            setTextColor(Color.parseColor("#B8D0CF"))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            setPadding(0, (4 * dp).toInt(), 0, (14 * dp).toInt())
+        }
+        wrapper.addView(subhead)
+
+        val progress = TextView(ctx).apply {
+            text = "$claimedDay of ${SettingsManager.DAILY_TEST_DAYS} days claimed"
+            setTextColor(Color.parseColor("#F7D99B"))
+            setTypeface(typeface, Typeface.BOLD)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+            setPadding(0, 0, 0, (8 * dp).toInt())
+        }
+        wrapper.addView(progress)
+
+        val tiles = mutableListOf<TextView>()
+        val tileGrid = GridLayout(ctx).apply {
+            columnCount = 7
+            rowCount = 2
+            useDefaultMargins = false
+        }
+        repeat(SettingsManager.DAILY_TEST_DAYS) { index ->
+            val day = index + 1
+            val isClaimed = day <= claimedDay
+            val isCurrent = day == currentDay && !isClaimed
+            val tile = TextView(ctx).apply {
+                gravity = Gravity.CENTER
+                text = if (isClaimed) "$day\nDONE" else "$day\n${if (isCurrent) "CLAIM" else "NEXT"}"
+                setTextColor(if (isClaimed || isCurrent) Color.parseColor("#071723") else Color.parseColor("#8FA8A8"))
+                setTypeface(typeface, Typeface.BOLD)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f)
+                background = android.graphics.drawable.GradientDrawable().apply {
+                    cornerRadius = 10f * dp
+                    setColor(
+                        when {
+                            isClaimed -> Color.argb(170, Color.red(palette[index]), Color.green(palette[index]), Color.blue(palette[index]))
+                            isCurrent -> palette[index]
+                            else -> Color.parseColor("#1C3038")
+                        },
+                    )
+                    setStroke(
+                        (1 * dp).toInt(),
+                        if (isCurrent) Color.parseColor("#FFF8E8") else Color.TRANSPARENT,
+                    )
+                }
+                setPadding(0, (6 * dp).toInt(), 0, (6 * dp).toInt())
+            }
+            tileGrid.addView(
+                tile,
+                GridLayout.LayoutParams().apply {
+                    width = 0
+                    height = (48 * dp).toInt()
+                    columnSpec = GridLayout.spec(index % 7, 1f)
+                    rowSpec = GridLayout.spec(index / 7)
+                    setMargins((3 * dp).toInt(), (3 * dp).toInt(), (3 * dp).toInt(), (3 * dp).toInt())
+                },
+            )
+            tiles += tile
+        }
+        wrapper.addView(
+            tileGrid,
+            LinearLayout.LayoutParams(-1, (108 * dp).toInt()),
+        )
+
+        val action = TextView(ctx).apply {
+            text = when {
+                claimedDay >= SettingsManager.DAILY_TEST_DAYS -> "14-DAY TEST COMPLETE"
+                hasClaimedToday -> "DAY $claimedDay TEST: CLAIMED"
+                else -> "CLAIM DAY $currentDay TEST"
+            }
+            gravity = Gravity.CENTER
+            setTextColor(Color.parseColor("#071723"))
+            setTypeface(typeface, Typeface.BOLD)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+            background = android.graphics.drawable.GradientDrawable().apply {
+                cornerRadius = 12f * dp
+                setColor(if (hasClaimedToday || claimedDay >= SettingsManager.DAILY_TEST_DAYS) Color.parseColor("#78908F") else Color.parseColor("#F7D99B"))
+            }
+            setPadding(0, (14 * dp).toInt(), 0, (14 * dp).toInt())
+            isEnabled = !hasClaimedToday && claimedDay < SettingsManager.DAILY_TEST_DAYS
+        }
+        wrapper.addView(
+            action,
+            LinearLayout.LayoutParams(-1, (50 * dp).toInt()).apply {
+                topMargin = (12 * dp).toInt()
+                bottomMargin = (8 * dp).toInt()
+            },
+        )
+
+        val dialog = AlertDialog.Builder(ctx, android.R.style.Theme_Material_Dialog_MinWidth)
+            .setView(wrapper)
+            .setNegativeButton("Later", null)
+            .create()
+        action.setOnClickListener {
+            if (!SettingsManager.claimDailyTestDay(ctx)) return@setOnClickListener
+
+            val claimed = SettingsManager.dailyTestClaimedDay(ctx)
+            action.text = "DAY $claimed TEST: CLAIMED"
+            action.isEnabled = false
+            action.background = android.graphics.drawable.GradientDrawable().apply {
+                cornerRadius = 12f * dp
+                setColor(Color.parseColor("#78908F"))
+            }
+            headline.text = if (claimed >= SettingsManager.DAILY_TEST_DAYS) {
+                "Test run complete"
+            } else {
+                "Day $claimed is in the book"
+            }
+            subhead.text = if (claimed >= SettingsManager.DAILY_TEST_DAYS) {
+                "Thanks for helping test MK Board Games for 14 days."
+            } else {
+                "Nice work. Come back tomorrow for Day ${claimed + 1}."
+            }
+            progress.text = "$claimed of ${SettingsManager.DAILY_TEST_DAYS} days claimed"
+            tiles[claimed - 1].apply {
+                text = "$claimed\nDONE"
+                setTextColor(Color.parseColor("#071723"))
+                (background as? android.graphics.drawable.GradientDrawable)?.setColor(
+                    Color.argb(170, Color.red(palette[claimed - 1]), Color.green(palette[claimed - 1]), Color.blue(palette[claimed - 1])),
+                )
+            }
+            Toast.makeText(ctx, "Day $claimed test claimed.", Toast.LENGTH_SHORT).show()
+        }
+        dialog.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.parseColor("#071723")))
+        dialog.setOnDismissListener { if (activeSettingsDialog === dialog) activeSettingsDialog = null }
+        dialog.show()
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(Color.parseColor("#F7D99B"))
+        activeSettingsDialog = dialog
     }
 
     private fun showGameMenu() {

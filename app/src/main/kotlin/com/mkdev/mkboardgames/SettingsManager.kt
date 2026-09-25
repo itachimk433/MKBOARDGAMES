@@ -53,6 +53,9 @@ object SettingsManager {
     private const val RECENTLY_PLAYED_VERSION = 2
     private const val KEY_DAILY_REMINDERS_ENABLED = "daily_reminders_enabled"
     private const val KEY_LAST_APP_OPENED_AT = "last_app_opened_at"
+    private const val KEY_DAILY_TEST_CLAIMED_DAY = "daily_test_claimed_day"
+    private const val KEY_DAILY_TEST_CLAIM_DATE = "daily_test_claim_date"
+    const val DAILY_TEST_DAYS = 14
 
     // ── Per-game stats keys ───────────────────────────────────────────────────
     private fun winKey(game: String)     = "stats_${game}_wins"
@@ -138,6 +141,41 @@ object SettingsManager {
 
     fun lastAppOpenedAt(ctx: Context): Long =
         sharedPrefs(ctx).getLong(KEY_LAST_APP_OPENED_AT, 0L)
+
+    fun dailyTestClaimedDay(ctx: Context): Int =
+        sharedPrefs(ctx).getInt(KEY_DAILY_TEST_CLAIMED_DAY, 0).coerceIn(0, DAILY_TEST_DAYS)
+
+    fun currentDailyTestDay(ctx: Context): Int {
+        val claimedDay = dailyTestClaimedDay(ctx)
+        if (claimedDay >= DAILY_TEST_DAYS) return DAILY_TEST_DAYS
+
+        val lastClaimDate = sharedPrefs(ctx).getString(KEY_DAILY_TEST_CLAIM_DATE, null)
+        return if (lastClaimDate == dailyTestDateKey()) {
+            claimedDay.coerceAtLeast(1)
+        } else {
+            (claimedDay + 1).coerceAtMost(DAILY_TEST_DAYS)
+        }
+    }
+
+    fun claimDailyTestDay(ctx: Context): Boolean {
+        val claimedDay = dailyTestClaimedDay(ctx)
+        if (claimedDay >= DAILY_TEST_DAYS) return false
+
+        val today = dailyTestDateKey()
+        val currentDay = currentDailyTestDay(ctx)
+        val lastClaimDate = sharedPrefs(ctx).getString(KEY_DAILY_TEST_CLAIM_DATE, null)
+        if (lastClaimDate == today || currentDay <= claimedDay) return false
+
+        sharedPrefs(ctx).edit()
+            .putInt(KEY_DAILY_TEST_CLAIMED_DAY, currentDay)
+            .putString(KEY_DAILY_TEST_CLAIM_DATE, today)
+            .apply()
+        return true
+    }
+
+    private fun dailyTestDateKey(): String =
+        java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+            .format(java.util.Date())
 
     // ── Active game tag ───────────────────────────────────────────────────────
     fun setActiveGame(ctx: Context, gameTag: String) =
