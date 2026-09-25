@@ -126,7 +126,7 @@ object SettingsManager {
     }
 
     fun isDailyRemindersEnabled(ctx: Context): Boolean =
-        sharedPrefs(ctx).getBoolean(KEY_DAILY_REMINDERS_ENABLED, true)
+        sharedPrefs(ctx).getBoolean(KEY_DAILY_REMINDERS_ENABLED, false)
 
     fun setDailyRemindersEnabled(ctx: Context, enabled: Boolean) {
         sharedPrefs(ctx).edit().putBoolean(KEY_DAILY_REMINDERS_ENABLED, enabled).apply()

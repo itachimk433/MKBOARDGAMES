@@ -39,7 +39,6 @@ class MainActivity : AppCompatActivity() {
         screenRoot = FrameLayout(this)
         setContentView(screenRoot)
         showModeSelection()
-        window.decorView.post { requestDailyReminderPermissionIfNeeded() }
 
         @Suppress("DEPRECATION")
         window.decorView.setOnSystemUiVisibilityChangeListener { visibility ->
@@ -178,20 +177,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private var pendingDailyReminderEnable = false
-
-    private fun requestDailyReminderPermissionIfNeeded() {
-        if (!SettingsManager.isDailyRemindersEnabled(this) ||
-            Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
-            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) ==
-            android.content.pm.PackageManager.PERMISSION_GRANTED
-        ) {
-            return
-        }
-        requestPermissions(
-            arrayOf(Manifest.permission.POST_NOTIFICATIONS),
-            DailyReminderManager.NOTIFICATION_PERMISSION_REQUEST_CODE,
-        )
-    }
 
     override fun onRequestPermissionsResult(
         requestCode: Int,
