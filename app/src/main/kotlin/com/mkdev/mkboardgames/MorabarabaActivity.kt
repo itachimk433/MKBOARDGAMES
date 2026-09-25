@@ -753,20 +753,27 @@ class MorabarabaActivity : AppCompatActivity() {
 
     private fun showDifficultyDialog() {
         val current = SettingsManager.getMorabarabaDifficulty(this)
-        val choices = listOf(
-            ChessChoiceView.Choice("Easy${if (current == 0) "  ✓" else ""}", if (current == 0) "Current setting" else "A relaxed challenge", "I", Color.parseColor("#8EC7B9")),
-            ChessChoiceView.Choice("Medium${if (current == 1) "  ✓" else ""}", if (current == 1) "Current setting" else "A balanced challenge", "II", Color.parseColor("#E3B86A")),
-            ChessChoiceView.Choice("Hard${if (current == 2) "  ✓" else ""}", if (current == 2) "Current setting" else "A serious challenge", "III", Color.parseColor("#E58A7A")),
+        val choices = com.mkdev.mkboardgames.ui.DifficultyChoices.create(
+            this,
+            "morabaraba",
+            current,
+            listOf("Easy", "Medium", "Hard"),
         )
-        showChoiceDialog("CPU Difficulty", "Choose the challenge for your next move.", choices, choices.indices.map { which ->
-            {
-                val changed = which != current
-                SettingsManager.setMorabarabaDifficulty(this, which)
-                if (changed && gameState.status == GameStatus.IN_PROGRESS && moveHistory.isNotEmpty()) {
-                    showRestartDialog()
-                } else showBoardAfterDialog()
-            }
-        }, 520f)
+        showChoiceDialog(
+            "CPU Difficulty",
+            "Win 2 consecutive games at each level to unlock the next.",
+            choices,
+            choices.indices.map { which ->
+                {
+                    val changed = which != current
+                    SettingsManager.setMorabarabaDifficulty(this, which)
+                    if (changed && gameState.status == GameStatus.IN_PROGRESS && moveHistory.isNotEmpty()) {
+                        showRestartDialog()
+                    } else showBoardAfterDialog()
+                }
+            },
+            520f,
+        )
     }
 
     private fun showRestartDialog() {

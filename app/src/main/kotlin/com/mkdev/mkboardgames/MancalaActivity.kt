@@ -517,29 +517,15 @@ class MancalaActivity : AppCompatActivity() {
 
     private fun showDifficultyMenu(returnToHome: Boolean) {
         val current = SettingsManager.getMancalaDifficulty(this)
-        val options = listOf(
-            StyledDialogs.choice(
-                "Easy${if (current == 0) "  ✓" else ""}",
-                "A relaxed opponent",
-                "I",
-                "#8EC7B9",
-            ),
-            StyledDialogs.choice(
-                "Medium${if (current == 1) "  ✓" else ""}",
-                "A balanced match",
-                "II",
-                "#E3B86A",
-            ),
-            StyledDialogs.choice(
-                "Hard${if (current == 2) "  ✓" else ""}",
-                "A sharper opponent",
-                "III",
-                "#E58A7A",
-            ),
+        val options = com.mkdev.mkboardgames.ui.DifficultyChoices.create(
+            this,
+            "mancala",
+            current,
+            listOf("Easy", "Medium", "Hard"),
         )
         showChoiceOverlay(
             "CPU Difficulty",
-            "Choose the computer’s strength.",
+            "Win 2 consecutive games at each level to unlock the next.",
             options,
             onCancel = { if (returnToHome) showHome() else showMenu() },
         ) { which ->

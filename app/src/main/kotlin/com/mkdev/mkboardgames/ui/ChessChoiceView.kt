@@ -60,6 +60,7 @@ class ChessChoiceView(
         val symbol: String,
         val accent: Int,
         val assetName: String? = null,
+        val enabled: Boolean = true,
     )
 
     var onChoiceSelected: ((Int) -> Unit)? = null
@@ -691,46 +692,55 @@ class ChessChoiceView(
     }
 
     private fun drawChoice(canvas: Canvas, hit: ChoiceHit) {
-        if (gridChoices) {
-            drawGridChoice(canvas, hit)
-            return
+        val layer = if (hit.choice.enabled) {
+            null
+        } else {
+            canvas.saveLayerAlpha(hit.rect, 118)
         }
-        if (useLabelOnlyChoices) {
+        try {
+            if (gridChoices) {
+                drawGridChoice(canvas, hit)
+                return
+            }
+            if (useLabelOnlyChoices) {
+                val rect = hit.rect
+                val pressed = pressedIndex == hit.index
+                drawChessWoodButton(canvas, rect, pressed, unit)
+                val top = rect.top + if (pressed) 2f * unit else 0f
+                drawLabelOnlyChoice(canvas, rect, top, hit.choice)
+                return
+            }
+            if (isChessFamily || isMorabaraba) {
+                if (isMorabaraba) drawOthelloChoice(canvas, hit) else drawChessChoice(canvas, hit)
+                return
+            }
+            val scale = scales[hit.index] ?: 1f
             val rect = hit.rect
             val pressed = pressedIndex == hit.index
-            drawChessWoodButton(canvas, rect, pressed, unit)
-            val top = rect.top + if (pressed) 2f * unit else 0f
-            drawLabelOnlyChoice(canvas, rect, top, hit.choice)
-            return
-        }
-        if (isChessFamily || isMorabaraba) {
-            if (isMorabaraba) drawOthelloChoice(canvas, hit) else drawChessChoice(canvas, hit)
-            return
-        }
-        val scale = scales[hit.index] ?: 1f
-        val rect = hit.rect
-        val pressed = pressedIndex == hit.index
 
-        canvas.save()
-        canvas.scale(scale, scale, rect.centerX(), rect.centerY())
-        cardPaint.color = if (pressed) Color.parseColor("#21454A") else Color.parseColor("#16353B")
-        canvas.drawRoundRect(rect, 8f * unit, 8f * unit, cardPaint)
-        borderPaint.color = hit.choice.accent
-        canvas.drawRoundRect(
-            RectF(rect.left + 0.5f * unit, rect.top + 0.5f * unit, rect.right - 0.5f * unit, rect.bottom - 0.5f * unit),
-            8f * unit,
-            8f * unit,
-            borderPaint,
-        )
-        if (hit.choice.symbol.isNotBlank()) {
-            iconPaint.color = hit.choice.accent
-            canvas.drawText(hit.choice.symbol, rect.centerX(), rect.top + 29f * unit, iconPaint)
-            canvas.drawText(hit.choice.label.asOptionItalicText(), rect.centerX(), rect.top + 56f * unit, labelPaint)
-            canvas.drawText(hit.choice.detail, rect.centerX(), rect.top + 74f * unit, detailPaint)
-        } else {
-            drawCenteredChoiceText(canvas, rect, hit.choice)
+            canvas.save()
+            canvas.scale(scale, scale, rect.centerX(), rect.centerY())
+            cardPaint.color = if (pressed) Color.parseColor("#21454A") else Color.parseColor("#16353B")
+            canvas.drawRoundRect(rect, 8f * unit, 8f * unit, cardPaint)
+            borderPaint.color = hit.choice.accent
+            canvas.drawRoundRect(
+                RectF(rect.left + 0.5f * unit, rect.top + 0.5f * unit, rect.right - 0.5f * unit, rect.bottom - 0.5f * unit),
+                8f * unit,
+                8f * unit,
+                borderPaint,
+            )
+            if (hit.choice.symbol.isNotBlank()) {
+                iconPaint.color = hit.choice.accent
+                canvas.drawText(hit.choice.symbol, rect.centerX(), rect.top + 29f * unit, iconPaint)
+                canvas.drawText(hit.choice.label.asOptionItalicText(), rect.centerX(), rect.top + 56f * unit, labelPaint)
+                canvas.drawText(hit.choice.detail, rect.centerX(), rect.top + 74f * unit, detailPaint)
+            } else {
+                drawCenteredChoiceText(canvas, rect, hit.choice)
+            }
+            canvas.restore()
+        } finally {
+            layer?.let(canvas::restoreToCount)
         }
-        canvas.restore()
     }
 
     private fun drawGridChoice(canvas: Canvas, hit: ChoiceHit) {
@@ -1052,7 +1062,9 @@ class ChessChoiceView(
                 if (!isChessFamily && !isMorabaraba) selected?.let { animateScale(it, 1f) }
                 if (selected != null && hits[selected].rect.contains(event.x, event.y)) {
                     SoundPlayer.play("ui_click")
-                    onChoiceSelected?.invoke(selected)
+                    if (hits[selected].choice.enabled) {
+                        onChoiceSelected?.invoke(selected)
+                    }
                 } else if (dismissOnEmptyTap) {
                     onDismissRequested?.invoke()
                 }

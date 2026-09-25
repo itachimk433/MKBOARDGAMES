@@ -59,6 +59,9 @@ object SettingsManager {
 
     // active game tag — set at the start of every vs-AI game
     private const val KEY_ACTIVE_GAME = "active_game_tag"
+    private const val KEY_DIFFICULTY_UNLOCKED_LEVEL = "difficulty_unlocked_level"
+    private const val KEY_DIFFICULTY_WIN_STREAK = "difficulty_win_streak"
+    private const val KEY_DIFFICULTY_STREAK_LEVEL = "difficulty_streak_level"
     private const val KEY_UNDO_CREDITS = "undo_credits"
     private const val KEY_UNDO_CREDITS_MIGRATED = "undo_credits_migrated"
     private const val UNLIMITED_UNDO_CREDITS = Int.MAX_VALUE
@@ -126,6 +129,100 @@ object SettingsManager {
 
     private fun activeGame(ctx: Context) =
         prefs(ctx).getString(KEY_ACTIVE_GAME, "overall") ?: "overall"
+
+    private fun difficultyPreferenceKey(gameTag: String): String? = when (gameTag.lowercase()) {
+        "chess" -> KEY_CHESS_DIFFICULTY
+        "checkers" -> KEY_CHECKERS_DIFFICULTY
+        "international_draughts" -> KEY_INTERNATIONAL_DRAUGHTS_DIFFICULTY
+        "morabaraba" -> KEY_MORABARABA_DIFFICULTY
+        "connect_four" -> KEY_CONNECT_FOUR_DIFFICULTY
+        "fox_and_geese" -> KEY_FOX_AND_GEESE_DIFFICULTY
+        "ludo" -> KEY_LUDO_DIFFICULTY
+        "shogi" -> KEY_SHOGI_DIFFICULTY
+        "go" -> KEY_GO_DIFFICULTY
+        "mancala" -> KEY_MANCALA_DIFFICULTY
+        "yote" -> KEY_YOTE_DIFFICULTY
+        "five_field_kono" -> KEY_FIVE_FIELD_KONO_DIFFICULTY
+        "onitama" -> KEY_ONITAMA_DIFFICULTY
+        "amazons" -> KEY_AMAZONS_DIFFICULTY
+        "xiangqi" -> KEY_XIANGQI_DIFFICULTY
+        "othello" -> KEY_OTHELLO_DIFFICULTY
+        "ttt" -> KEY_TTT_DIFFICULTY
+        else -> null
+    }
+
+    private fun maximumDifficultyLevel(gameTag: String): Int? =
+        when (gameTag.lowercase()) {
+            "chess" -> 3
+            "checkers", "international_draughts", "morabaraba", "connect_four",
+            "fox_and_geese", "ludo", "shogi", "go", "mancala", "yote",
+            "five_field_kono", "onitama", "amazons", "xiangqi", "othello", "ttt" -> 2
+            else -> null
+        }
+
+    private fun unlockedDifficultyKey(gameTag: String) =
+        "${KEY_DIFFICULTY_UNLOCKED_LEVEL}_${gameTag.lowercase()}"
+
+    private fun difficultyWinStreakKey(gameTag: String) =
+        "${KEY_DIFFICULTY_WIN_STREAK}_${gameTag.lowercase()}"
+
+    private fun difficultyStreakLevelKey(gameTag: String) =
+        "${KEY_DIFFICULTY_STREAK_LEVEL}_${gameTag.lowercase()}"
+
+    /** Easy is available by default; each harder level is earned separately per game. */
+    fun highestUnlockedDifficulty(ctx: Context, gameTag: String): Int {
+        val maximum = maximumDifficultyLevel(gameTag) ?: return 0
+        return prefs(ctx).getInt(unlockedDifficultyKey(gameTag), 0).coerceIn(0, maximum)
+    }
+
+    private fun getDifficulty(ctx: Context, gameTag: String, preferenceKey: String, maximum: Int): Int {
+        val allowedMaximum = minOf(maximum, highestUnlockedDifficulty(ctx, gameTag))
+        return prefs(ctx).getInt(preferenceKey, 0).coerceIn(0, allowedMaximum)
+    }
+
+    private fun setDifficulty(
+        ctx: Context,
+        gameTag: String,
+        preferenceKey: String,
+        maximum: Int,
+        level: Int,
+    ) {
+        val allowedMaximum = minOf(maximum, highestUnlockedDifficulty(ctx, gameTag))
+        prefs(ctx).edit().putInt(preferenceKey, level.coerceIn(0, allowedMaximum)).apply()
+    }
+
+    private fun recordDifficultyWin(ctx: Context, gameTag: String) {
+        val normalizedGameTag = gameTag.lowercase()
+        val preferenceKey = difficultyPreferenceKey(normalizedGameTag) ?: return
+        val maximum = maximumDifficultyLevel(normalizedGameTag) ?: return
+        val settings = prefs(ctx)
+        val unlocked = settings.getInt(unlockedDifficultyKey(normalizedGameTag), 0)
+            .coerceIn(0, maximum)
+        val currentLevel = settings.getInt(preferenceKey, 0).coerceIn(0, unlocked)
+        val streakLevelKey = difficultyStreakLevelKey(normalizedGameTag)
+        val streakKey = difficultyWinStreakKey(normalizedGameTag)
+        val previousStreakLevel = settings.getInt(streakLevelKey, currentLevel)
+        val streak = if (previousStreakLevel == currentLevel) {
+            settings.getInt(streakKey, 0) + 1
+        } else {
+            1
+        }
+        val nextUnlocked = if (currentLevel == unlocked && streak >= 2) {
+            (unlocked + 1).coerceAtMost(maximum)
+        } else {
+            unlocked
+        }
+        settings.edit()
+            .putInt(unlockedDifficultyKey(normalizedGameTag), nextUnlocked)
+            .putInt(streakKey, if (nextUnlocked > unlocked) 0 else streak)
+            .putInt(streakLevelKey, currentLevel)
+            .apply()
+    }
+
+    private fun resetDifficultyWinStreak(ctx: Context, gameTag: String) {
+        if (difficultyPreferenceKey(gameTag) == null) return
+        prefs(ctx).edit().putInt(difficultyWinStreakKey(gameTag), 0).apply()
+    }
 
     // Undo credits are independent for every game. A one-time migration keeps
     // the old shared balance for the first game opened after upgrading, while
@@ -213,8 +310,8 @@ object SettingsManager {
         else -> ChessAiProfile(5, 1200L, 2)
     }
 
-    fun getChessDifficulty(ctx: Context) = prefs(ctx).getInt(KEY_CHESS_DIFFICULTY, 0).coerceIn(0, 3)
-    fun setChessDifficulty(ctx: Context, v: Int) = prefs(ctx).edit().putInt(KEY_CHESS_DIFFICULTY, v.coerceIn(0, 3)).apply()
+    fun getChessDifficulty(ctx: Context) = getDifficulty(ctx, "chess", KEY_CHESS_DIFFICULTY, 3)
+    fun setChessDifficulty(ctx: Context, v: Int) = setDifficulty(ctx, "chess", KEY_CHESS_DIFFICULTY, 3, v)
     fun chessAiDepth(ctx: Context) = chessAiProfileForLevel(getChessDifficulty(ctx)).depth
     fun chessAiTimeLimitMs(ctx: Context): Long = chessAiProfileForLevel(getChessDifficulty(ctx)).timeLimitMs
     fun chessAiQuiesceDepth(ctx: Context): Int = chessAiProfileForLevel(getChessDifficulty(ctx)).quiesceDepth
@@ -237,10 +334,10 @@ object SettingsManager {
 
     // ── Checkers ─────────────────────────────────────────────────────────────
     fun getCheckersDifficulty(ctx: Context) =
-        prefs(ctx).getInt(KEY_CHECKERS_DIFFICULTY, 0).coerceIn(0, 2)
+        getDifficulty(ctx, "checkers", KEY_CHECKERS_DIFFICULTY, 2)
 
     fun setCheckersDifficulty(ctx: Context, v: Int) =
-        prefs(ctx).edit().putInt(KEY_CHECKERS_DIFFICULTY, v.coerceIn(0, 2)).apply()
+        setDifficulty(ctx, "checkers", KEY_CHECKERS_DIFFICULTY, 2, v)
 
     fun checkersAiDepthForLevel(level: Int) = when (level.coerceIn(0, 2)) {
         0 -> 2
@@ -253,12 +350,10 @@ object SettingsManager {
 
     // ── International Draughts ──────────────────────────────────────────────
     fun getInternationalDraughtsDifficulty(ctx: Context) =
-        prefs(ctx).getInt(KEY_INTERNATIONAL_DRAUGHTS_DIFFICULTY, 0).coerceIn(0, 2)
+        getDifficulty(ctx, "international_draughts", KEY_INTERNATIONAL_DRAUGHTS_DIFFICULTY, 2)
 
     fun setInternationalDraughtsDifficulty(ctx: Context, v: Int) =
-        prefs(ctx).edit()
-            .putInt(KEY_INTERNATIONAL_DRAUGHTS_DIFFICULTY, v.coerceIn(0, 2))
-            .apply()
+        setDifficulty(ctx, "international_draughts", KEY_INTERNATIONAL_DRAUGHTS_DIFFICULTY, 2, v)
 
     fun internationalDraughtsAiDepthForLevel(level: Int) = when (level.coerceIn(0, 2)) {
         0 -> 2
@@ -277,12 +372,10 @@ object SettingsManager {
     )
 
     fun getOthelloDifficulty(ctx: Context) =
-        prefs(ctx).getInt(KEY_OTHELLO_DIFFICULTY, 0).coerceIn(0, 2)
+        getDifficulty(ctx, "othello", KEY_OTHELLO_DIFFICULTY, 2)
 
     fun setOthelloDifficulty(ctx: Context, v: Int) =
-        prefs(ctx).edit()
-            .putInt(KEY_OTHELLO_DIFFICULTY, v.coerceIn(0, 2))
-            .apply()
+        setDifficulty(ctx, "othello", KEY_OTHELLO_DIFFICULTY, 2, v)
 
     fun othelloAiProfileForLevel(level: Int): OthelloAiProfile =
         when (level.coerceIn(0, 2)) {
@@ -310,17 +403,17 @@ object SettingsManager {
 
     // ── Morabaraba ───────────────────────────────────────────────────────────
     fun getMorabarabaDifficulty(ctx: Context) =
-        prefs(ctx).getInt(KEY_MORABARABA_DIFFICULTY, 0).coerceIn(0, 2)
+        getDifficulty(ctx, "morabaraba", KEY_MORABARABA_DIFFICULTY, 2)
     fun setMorabarabaDifficulty(ctx: Context, v: Int) =
-        prefs(ctx).edit().putInt(KEY_MORABARABA_DIFFICULTY, v.coerceIn(0, 2)).apply()
+        setDifficulty(ctx, "morabaraba", KEY_MORABARABA_DIFFICULTY, 2, v)
     fun morabarabaAiDepth(ctx: Context) = when (getMorabarabaDifficulty(ctx)) { 0 -> 3; 2 -> 7; else -> 5 }
     fun morabarabaAiTimeLimitMs(ctx: Context): Long = when (getMorabarabaDifficulty(ctx)) { 0 -> 600L; 2 -> 2500L; else -> 1200L }
 
     // ── Connect Four ─────────────────────────────────────────────────────────
     fun getConnectFourDifficulty(ctx: Context) =
-        prefs(ctx).getInt(KEY_CONNECT_FOUR_DIFFICULTY, 0).coerceIn(0, 2)
+        getDifficulty(ctx, "connect_four", KEY_CONNECT_FOUR_DIFFICULTY, 2)
     fun setConnectFourDifficulty(ctx: Context, v: Int) =
-        prefs(ctx).edit().putInt(KEY_CONNECT_FOUR_DIFFICULTY, v.coerceIn(0, 2)).apply()
+        setDifficulty(ctx, "connect_four", KEY_CONNECT_FOUR_DIFFICULTY, 2, v)
     fun connectFourAiDepth(ctx: Context) = when (getConnectFourDifficulty(ctx)) {
         0 -> 3
         2 -> 7
@@ -337,10 +430,10 @@ object SettingsManager {
     )
 
     fun getFoxAndGeeseDifficulty(ctx: Context) =
-        prefs(ctx).getInt(KEY_FOX_AND_GEESE_DIFFICULTY, 0).coerceIn(0, 2)
+        getDifficulty(ctx, "fox_and_geese", KEY_FOX_AND_GEESE_DIFFICULTY, 2)
 
     fun setFoxAndGeeseDifficulty(ctx: Context, v: Int) =
-        prefs(ctx).edit().putInt(KEY_FOX_AND_GEESE_DIFFICULTY, v.coerceIn(0, 2)).apply()
+        setDifficulty(ctx, "fox_and_geese", KEY_FOX_AND_GEESE_DIFFICULTY, 2, v)
 
     fun foxAndGeeseAiProfileForLevel(level: Int): FoxAndGeeseAiProfile =
         when (level.coerceIn(0, 2)) {
@@ -374,9 +467,9 @@ object SettingsManager {
 
     // ── Ludo ─────────────────────────────────────────────────────────────────
     fun getLudoDifficulty(ctx: Context) =
-        prefs(ctx).getInt(KEY_LUDO_DIFFICULTY, 0).coerceIn(0, 2)
+        getDifficulty(ctx, "ludo", KEY_LUDO_DIFFICULTY, 2)
     fun setLudoDifficulty(ctx: Context, v: Int) =
-        prefs(ctx).edit().putInt(KEY_LUDO_DIFFICULTY, v.coerceIn(0, 2)).apply()
+        setDifficulty(ctx, "ludo", KEY_LUDO_DIFFICULTY, 2, v)
 
     // ── Xiangqi ───────────────────────────────────────────────────────────────
     data class XiangqiAiProfile(
@@ -387,12 +480,10 @@ object SettingsManager {
     )
 
     fun getXiangqiDifficulty(ctx: Context) =
-        prefs(ctx).getInt(KEY_XIANGQI_DIFFICULTY, 0).coerceIn(0, 2)
+        getDifficulty(ctx, "xiangqi", KEY_XIANGQI_DIFFICULTY, 2)
 
     fun setXiangqiDifficulty(ctx: Context, v: Int) =
-        prefs(ctx).edit()
-            .putInt(KEY_XIANGQI_DIFFICULTY, v.coerceIn(0, 2))
-            .apply()
+        setDifficulty(ctx, "xiangqi", KEY_XIANGQI_DIFFICULTY, 2, v)
 
     fun xiangqiAiProfileForLevel(level: Int): XiangqiAiProfile =
         when (level.coerceIn(0, 2)) {
@@ -418,9 +509,9 @@ object SettingsManager {
 
     // ── Shogi ─────────────────────────────────────────────────────────────────
     fun getShogiDifficulty(ctx: Context) =
-        prefs(ctx).getInt(KEY_SHOGI_DIFFICULTY, 0).coerceIn(0, 2)
+        getDifficulty(ctx, "shogi", KEY_SHOGI_DIFFICULTY, 2)
     fun setShogiDifficulty(ctx: Context, v: Int) =
-        prefs(ctx).edit().putInt(KEY_SHOGI_DIFFICULTY, v.coerceIn(0, 2)).apply()
+        setDifficulty(ctx, "shogi", KEY_SHOGI_DIFFICULTY, 2, v)
     fun shogiAiDepth(ctx: Context) = when (getShogiDifficulty(ctx)) {
         0 -> 1
         1 -> 2
@@ -436,9 +527,9 @@ object SettingsManager {
 
     // ── Go ────────────────────────────────────────────────────────────────────
     fun getGoDifficulty(ctx: Context) =
-        prefs(ctx).getInt(KEY_GO_DIFFICULTY, 0).coerceIn(0, 2)
+        getDifficulty(ctx, "go", KEY_GO_DIFFICULTY, 2)
     fun setGoDifficulty(ctx: Context, v: Int) =
-        prefs(ctx).edit().putInt(KEY_GO_DIFFICULTY, v.coerceIn(0, 2)).apply()
+        setDifficulty(ctx, "go", KEY_GO_DIFFICULTY, 2, v)
 
     fun goAiIterations(ctx: Context) = when (getGoDifficulty(ctx)) {
         0 -> 260
@@ -468,19 +559,19 @@ object SettingsManager {
     }
 
     fun getMancalaDifficulty(ctx: Context) =
-        prefs(ctx).getInt(KEY_MANCALA_DIFFICULTY, 0).coerceIn(0, 2)
+        getDifficulty(ctx, "mancala", KEY_MANCALA_DIFFICULTY, 2)
 
     fun setMancalaDifficulty(ctx: Context, v: Int) =
-        prefs(ctx).edit().putInt(KEY_MANCALA_DIFFICULTY, v.coerceIn(0, 2)).apply()
+        setDifficulty(ctx, "mancala", KEY_MANCALA_DIFFICULTY, 2, v)
 
     fun mancalaAiDepth(ctx: Context) = mancalaAiProfileForLevel(getMancalaDifficulty(ctx)).depth
 
     // ── Yoté ──────────────────────────────────────────────────────────────────
     fun getYoteDifficulty(ctx: Context) =
-        prefs(ctx).getInt(KEY_YOTE_DIFFICULTY, 0).coerceIn(0, 2)
+        getDifficulty(ctx, "yote", KEY_YOTE_DIFFICULTY, 2)
 
     fun setYoteDifficulty(ctx: Context, v: Int) =
-        prefs(ctx).edit().putInt(KEY_YOTE_DIFFICULTY, v.coerceIn(0, 2)).apply()
+        setDifficulty(ctx, "yote", KEY_YOTE_DIFFICULTY, 2, v)
 
     fun yoteAiDepth(ctx: Context) = when (getYoteDifficulty(ctx)) {
         0 -> 2
@@ -503,10 +594,10 @@ object SettingsManager {
         }
 
     fun getFiveFieldKonoDifficulty(ctx: Context) =
-        prefs(ctx).getInt(KEY_FIVE_FIELD_KONO_DIFFICULTY, 0).coerceIn(0, 2)
+        getDifficulty(ctx, "five_field_kono", KEY_FIVE_FIELD_KONO_DIFFICULTY, 2)
 
     fun setFiveFieldKonoDifficulty(ctx: Context, v: Int) =
-        prefs(ctx).edit().putInt(KEY_FIVE_FIELD_KONO_DIFFICULTY, v.coerceIn(0, 2)).apply()
+        setDifficulty(ctx, "five_field_kono", KEY_FIVE_FIELD_KONO_DIFFICULTY, 2, v)
 
     fun fiveFieldKonoAiDepth(ctx: Context) =
         fiveFieldKonoAiProfileForLevel(getFiveFieldKonoDifficulty(ctx)).depth
@@ -516,10 +607,10 @@ object SettingsManager {
 
     // ── Onitama ──────────────────────────────────────────────────────────────
     fun getOnitamaDifficulty(ctx: Context) =
-        prefs(ctx).getInt(KEY_ONITAMA_DIFFICULTY, 0).coerceIn(0, 2)
+        getDifficulty(ctx, "onitama", KEY_ONITAMA_DIFFICULTY, 2)
 
     fun setOnitamaDifficulty(ctx: Context, v: Int) =
-        prefs(ctx).edit().putInt(KEY_ONITAMA_DIFFICULTY, v.coerceIn(0, 2)).apply()
+        setDifficulty(ctx, "onitama", KEY_ONITAMA_DIFFICULTY, 2, v)
 
     fun onitamaAiDepth(ctx: Context) = when (getOnitamaDifficulty(ctx)) {
         0 -> 2
@@ -538,10 +629,10 @@ object SettingsManager {
         }
 
     fun getAmazonsDifficulty(ctx: Context) =
-        prefs(ctx).getInt(KEY_AMAZONS_DIFFICULTY, 0).coerceIn(0, 2)
+        getDifficulty(ctx, "amazons", KEY_AMAZONS_DIFFICULTY, 2)
 
     fun setAmazonsDifficulty(ctx: Context, v: Int) =
-        prefs(ctx).edit().putInt(KEY_AMAZONS_DIFFICULTY, v.coerceIn(0, 2)).apply()
+        setDifficulty(ctx, "amazons", KEY_AMAZONS_DIFFICULTY, 2, v)
 
     fun amazonsAiDepth(ctx: Context) =
         amazonsAiProfileForLevel(getAmazonsDifficulty(ctx)).depth
@@ -558,9 +649,9 @@ object SettingsManager {
     // ── Tic-Tac-Toe ──────────────────────────────────────────────────────────
     private const val KEY_TTT_DIFFICULTY = "ttt_ai_difficulty"
     fun getTttDifficulty(ctx: Context) =
-        prefs(ctx).getInt(KEY_TTT_DIFFICULTY, 0).coerceIn(0, 2)
+        getDifficulty(ctx, "ttt", KEY_TTT_DIFFICULTY, 2)
     fun setTttDifficulty(ctx: Context, v: Int) =
-        prefs(ctx).edit().putInt(KEY_TTT_DIFFICULTY, v.coerceIn(0, 2)).apply()
+        setDifficulty(ctx, "ttt", KEY_TTT_DIFFICULTY, 2, v)
     /** Depth scales with both difficulty and board size so the AI always responds fast. */
     fun tttAiDepth(ctx: Context, boardSize: Int): Int {
         val hardCap = when (boardSize) { 3 -> 9; 4 -> 7; else -> 6 }  // 5×5 max
@@ -740,6 +831,7 @@ object SettingsManager {
 
     fun recordWin(ctx: Context) {
         val game = activeGame(ctx)
+        recordDifficultyWin(ctx, game)
         prefs(ctx).edit()
             .putInt(KEY_STATS_WINS,    prefs(ctx).getInt(KEY_STATS_WINS,    0) + 1)
             .putInt(winKey(game),      prefs(ctx).getInt(winKey(game),      0) + 1)
@@ -748,6 +840,7 @@ object SettingsManager {
 
     fun recordLoss(ctx: Context) {
         val game = activeGame(ctx)
+        resetDifficultyWinStreak(ctx, game)
         prefs(ctx).edit()
             .putInt(KEY_STATS_LOSSES,  prefs(ctx).getInt(KEY_STATS_LOSSES,  0) + 1)
             .putInt(lossKey(game),     prefs(ctx).getInt(lossKey(game),     0) + 1)
@@ -756,6 +849,7 @@ object SettingsManager {
 
     fun recordDraw(ctx: Context) {
         val game = activeGame(ctx)
+        resetDifficultyWinStreak(ctx, game)
         prefs(ctx).edit()
             .putInt(KEY_STATS_DRAWS,   prefs(ctx).getInt(KEY_STATS_DRAWS,   0) + 1)
             .putInt(drawKey(game),     prefs(ctx).getInt(drawKey(game),     0) + 1)

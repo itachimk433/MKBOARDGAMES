@@ -2177,51 +2177,21 @@ Checkmate your opponent's King.
     }
 
     private fun showStyledDifficultyDialog(current: Int, setDiff: (Int) -> Unit) {
-        val levels = listOf(
-            ChessChoiceView.Choice(
-                "Easy${if (current == 0) "  ✓" else ""}",
-                if (current == 0) "Current setting" else "A relaxed challenge",
-                "I",
-                Color.parseColor("#8EC7B9"),
-            ),
-            ChessChoiceView.Choice(
-                "Medium${if (current == 1) "  ✓" else ""}",
-                if (current == 1) "Current setting" else "A balanced challenge",
-                "II",
-                Color.parseColor("#E3B86A"),
-            ),
-            ChessChoiceView.Choice(
-                "Hard${if (current == 2) "  ✓" else ""}",
-                if (current == 2) "Current setting" else "A serious challenge",
-                "III",
-                Color.parseColor("#E58A7A"),
-            ),
-            ChessChoiceView.Choice(
-                "Master${if (current == 3) "  ✓" else ""}",
-                if (current == 3) "Current setting" else "Elite-level challenge",
-                "IV",
-                Color.parseColor("#D8A7FF"),
-            ),
-        ).let { choices ->
-            if (
-                gameType == "AMAZONS" ||
-                gameType == "XIANGQI" ||
-                gameType == "CHECKERS" ||
-                gameType == "INTERNATIONAL_DRAUGHTS" ||
-                gameType == "FOX_AND_GEESE" ||
-                gameType == "OTHELLO" ||
-                gameType == "GO" ||
-                gameType == "SHOGI"
-            ) {
-                choices.take(3)
-            } else {
-                choices
-            }
+        val labels = if (gameType == "CHESS") {
+            listOf("Easy", "Medium", "Hard", "Master")
+        } else {
+            listOf("Easy", "Medium", "Hard")
         }
+        val levels = com.mkdev.mkboardgames.ui.DifficultyChoices.create(
+            context = this,
+            gameTag = gameType.lowercase(),
+            current = current,
+            labels = labels,
+        )
         val view = ChessChoiceView(
             this,
             title = "CPU Difficulty",
-            subtitle = "Choose the challenge for your next move.",
+            subtitle = "Win 2 consecutive games at each level to unlock the next.",
             choices = levels,
             gameLabel = styledGameLabel(),
         )

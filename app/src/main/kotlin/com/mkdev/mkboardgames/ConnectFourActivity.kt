@@ -693,30 +693,34 @@ Control the centre columns, build threats in more than one direction, and block 
 
     private fun showDifficultyDialog() {
         hideBoardWhileDialogIsOpen()
-        val labels = arrayOf("Easy", "Medium", "Hard")
         val current = SettingsManager.getConnectFourDifficulty(this)
-        StyledDialogs.showChoices(this, "CPU Difficulty", "Adjust the challenge.",
-            labels.mapIndexed { index, label ->
-                StyledDialogs.choice(
-                    "$label${if (index == current) "  ✓" else ""}",
-                    if (index == current) "Current setting" else "Computer strength",
-                    listOf("I", "II", "III")[index],
-                    listOf("#8EC7B9", "#E3B86A", "#E58A7A")[index],
-                )
-            }, 520f, "C O N N E C T · F O U R", onCancel = { showBoardAfterDialog() }) { which, dialog ->
-                dialog.dismiss()
-                val changed = which != current
-                SettingsManager.setConnectFourDifficulty(this, which)
-                if (changed && gameState.status == GameStatus.IN_PROGRESS && moveHistory.isNotEmpty()) {
-                    StyledDialogs.showChoices(this, "Restart Match?", "Difficulty changed. Restart now.",
-                        listOf(
-                            StyledDialogs.choice("Restart", "Start with the new difficulty", "↻", "#E3B86A"),
-                            StyledDialogs.choice("Keep Playing", "Leave the current match unchanged", "↩", "#A9B6E8"),
-                        ), 420f, "C O N N E C T · F O U R", onCancel = { showBoardAfterDialog() }) { restart, restartDialog ->
-                            restartDialog.dismiss()
-                            if (restart == 0) startGame() else showBoardAfterDialog()
-                        }
-                } else showBoardAfterDialog()
+        StyledDialogs.showChoices(
+            this,
+            "CPU Difficulty",
+            "Win 2 consecutive games at each level to unlock the next.",
+            com.mkdev.mkboardgames.ui.DifficultyChoices.create(
+                this,
+                "connect_four",
+                current,
+                listOf("Easy", "Medium", "Hard"),
+            ),
+            520f,
+            "C O N N E C T · F O U R",
+            onCancel = { showBoardAfterDialog() },
+        ) { which, dialog ->
+            dialog.dismiss()
+            val changed = which != current
+            SettingsManager.setConnectFourDifficulty(this, which)
+            if (changed && gameState.status == GameStatus.IN_PROGRESS && moveHistory.isNotEmpty()) {
+                StyledDialogs.showChoices(this, "Restart Match?", "Difficulty changed. Restart now.",
+                    listOf(
+                        StyledDialogs.choice("Restart", "Start with the new difficulty", "↻", "#E3B86A"),
+                        StyledDialogs.choice("Keep Playing", "Leave the current match unchanged", "↩", "#A9B6E8"),
+                    ), 420f, "C O N N E C T · F O U R", onCancel = { showBoardAfterDialog() }) { restart, restartDialog ->
+                        restartDialog.dismiss()
+                        if (restart == 0) startGame() else showBoardAfterDialog()
+                    }
+            } else showBoardAfterDialog()
             }
     }
 

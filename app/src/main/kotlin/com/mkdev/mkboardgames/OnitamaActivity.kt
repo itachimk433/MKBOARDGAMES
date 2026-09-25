@@ -453,11 +453,12 @@ class OnitamaActivity : AppCompatActivity() {
         val current = SettingsManager.getOnitamaDifficulty(this)
         showChoiceOverlay(
             "CPU Difficulty",
-            "Choose the computer's strength.",
-            listOf(
-                ChessChoiceView.Choice("Easy${if (current == 0) "  ✓" else ""}", "A relaxed opponent", "I", Color.parseColor("#8EC7B9")),
-                ChessChoiceView.Choice("Medium${if (current == 1) "  ✓" else ""}", "A balanced match", "II", Color.parseColor("#E3B86A")),
-                ChessChoiceView.Choice("Hard${if (current == 2) "  ✓" else ""}", "A sharper opponent", "III", Color.parseColor("#E58A7A")),
+            "Win 2 consecutive games at each level to unlock the next.",
+            com.mkdev.mkboardgames.ui.DifficultyChoices.create(
+                this,
+                "onitama",
+                current,
+                listOf("Easy", "Medium", "Hard"),
             ),
             onCancel = { showMenu() },
         ) {
