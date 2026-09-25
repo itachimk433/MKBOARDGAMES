@@ -866,9 +866,9 @@ class MainActivity : AppCompatActivity() {
         }
         val dotsScroll = android.widget.HorizontalScrollView(ctx).apply {
             isHorizontalScrollBarEnabled = false
-            addView(dotRow, android.widget.HorizontalScrollView.LayoutParams(
-                android.widget.HorizontalScrollView.LayoutParams.WRAP_CONTENT,
-                android.widget.HorizontalScrollView.LayoutParams.WRAP_CONTENT,
+            addView(dotRow, android.view.ViewGroup.LayoutParams(
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
             ))
         }
 
