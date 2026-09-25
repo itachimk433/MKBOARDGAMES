@@ -15,6 +15,7 @@ class MKBoardGamesApp : Application() {
                 if (startedActivities++ == 0) {
                     MusicPlayer.onAppForeground()
                     AdManager.onAppForeground(activity)
+                    DailyReminderManager.onAppForeground(activity)
                 }
             }
 

@@ -1,9 +1,11 @@
 package com.mkdev.mkboardgames
 
+import android.Manifest
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.util.TypedValue
 import android.view.*
@@ -37,8 +39,7 @@ class MainActivity : AppCompatActivity() {
         screenRoot = FrameLayout(this)
         setContentView(screenRoot)
         showModeSelection()
-
-
+        window.decorView.post { requestDailyReminderPermissionIfNeeded() }
 
         @Suppress("DEPRECATION")
         window.decorView.setOnSystemUiVisibilityChangeListener { visibility ->
@@ -174,6 +175,50 @@ class MainActivity : AppCompatActivity() {
             MusicPlayer.enterModeSelection(this)
         }
         makeFullscreen()
+    }
+
+    private var pendingDailyReminderEnable = false
+
+    private fun requestDailyReminderPermissionIfNeeded() {
+        if (!SettingsManager.isDailyRemindersEnabled(this) ||
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) ==
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
+        requestPermissions(
+            arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+            DailyReminderManager.NOTIFICATION_PERMISSION_REQUEST_CODE,
+        )
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray,
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode != DailyReminderManager.NOTIFICATION_PERMISSION_REQUEST_CODE) return
+
+        val granted = grantResults.firstOrNull() ==
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+        if (granted) {
+            DailyReminderManager.setEnabled(this, true)
+            if (pendingDailyReminderEnable) {
+                Toast.makeText(this, "Daily game reminders are on.", Toast.LENGTH_SHORT).show()
+            }
+        } else {
+            SettingsManager.setDailyRemindersEnabled(this, false)
+            if (pendingDailyReminderEnable) {
+                Toast.makeText(this, "Daily game reminders remain off.", Toast.LENGTH_SHORT).show()
+            }
+        }
+        pendingDailyReminderEnable = false
+        if (activeSettingsDialog?.isShowing == true) {
+            activeSettingsDialog?.dismiss()
+            showSettings()
+        }
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -341,7 +386,7 @@ class MainActivity : AppCompatActivity() {
             ppContent.addView(pTxt("\nDATA AND GAME INFORMATION\nNo account is required. Game statistics, app settings, and active game state are stored on your device. MKDEV does not receive or store your game records on its own servers."))
             ppContent.addView(pTxt("\nADVERTISING\nThe app may display banner and rewarded ads through Google AdMob. When ads are requested, Google and its advertising partners may process advertising identifiers, device and operating-system information, IP address, approximate location inferred from network information, ad views and interactions, diagnostics, and information used to prevent fraud and abuse. Google's Privacy Policy: https://policies.google.com/privacy"))
             ppContent.addView(pTxt("\nPURCHASES\nGoogle Play processes the optional one-time Remove Ads purchase. MKDEV receives purchase status, not your payment-card details."))
-            ppContent.addView(pTxt("\nPERMISSIONS\n• Internet — loads ads and communicates with Google Play services\n• Advertising ID — supports advertising services\n• Vibrate — haptic feedback during gameplay"))
+            ppContent.addView(pTxt("\nPERMISSIONS\n• Internet — loads ads and communicates with Google Play services\n• Advertising ID — supports advertising services\n• Notifications — optional daily game reminders\n• Vibrate — haptic feedback during gameplay"))
             ppContent.addView(pTxt("\nDATA DELETION\nGame information saved on this device can be deleted by clearing app data or uninstalling the app."))
             ppContent.addView(pTxt("\nCONTACT\n$SUPPORT_EMAIL"))
             val ppScroll = ScrollView(ctx).apply {
@@ -670,6 +715,35 @@ class MainActivity : AppCompatActivity() {
 
         // ── General ──
         root.addView(sectionHeader("⚙  GENERAL"))
+        var dailyReminders = SettingsManager.isDailyRemindersEnabled(ctx)
+        val (reminderRow, reminderVal) = settingRow(
+            "◷",
+            "Daily Game Reminders",
+            if (dailyReminders) "On" else "Off",
+        )
+        reminderRow.setOnClickListener {
+            if (dailyReminders) {
+                dailyReminders = false
+                DailyReminderManager.setEnabled(ctx, false)
+                reminderVal.text = "Off"
+            } else if (
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) !=
+                android.content.pm.PackageManager.PERMISSION_GRANTED
+            ) {
+                pendingDailyReminderEnable = true
+                requestPermissions(
+                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                    DailyReminderManager.NOTIFICATION_PERMISSION_REQUEST_CODE,
+                )
+            } else {
+                dailyReminders = true
+                DailyReminderManager.setEnabled(ctx, true)
+                reminderVal.text = "On"
+            }
+        }
+        root.addView(reminderRow)
+
         root.addView(sectionHeader("♫  MUSIC"))
         var musicEnabled = SettingsManager.isMusicEnabled(ctx)
         val (musicRow, musicVal) =

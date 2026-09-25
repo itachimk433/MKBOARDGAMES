@@ -51,6 +51,8 @@ object SettingsManager {
     private const val KEY_RECENTLY_PLAYED = "recently_played_games"
     private const val KEY_RECENTLY_PLAYED_VERSION = "recently_played_games_version"
     private const val RECENTLY_PLAYED_VERSION = 2
+    private const val KEY_DAILY_REMINDERS_ENABLED = "daily_reminders_enabled"
+    private const val KEY_LAST_APP_OPENED_AT = "last_app_opened_at"
 
     // ── Per-game stats keys ───────────────────────────────────────────────────
     private fun winKey(game: String)     = "stats_${game}_wins"
@@ -122,6 +124,20 @@ object SettingsManager {
             .putString(KEY_RECENTLY_PLAYED, updated.joinToString(","))
             .apply()
     }
+
+    fun isDailyRemindersEnabled(ctx: Context): Boolean =
+        sharedPrefs(ctx).getBoolean(KEY_DAILY_REMINDERS_ENABLED, true)
+
+    fun setDailyRemindersEnabled(ctx: Context, enabled: Boolean) {
+        sharedPrefs(ctx).edit().putBoolean(KEY_DAILY_REMINDERS_ENABLED, enabled).apply()
+    }
+
+    fun recordAppOpened(ctx: Context, openedAt: Long = System.currentTimeMillis()) {
+        sharedPrefs(ctx).edit().putLong(KEY_LAST_APP_OPENED_AT, openedAt).apply()
+    }
+
+    fun lastAppOpenedAt(ctx: Context): Long =
+        sharedPrefs(ctx).getLong(KEY_LAST_APP_OPENED_AT, 0L)
 
     // ── Active game tag ───────────────────────────────────────────────────────
     fun setActiveGame(ctx: Context, gameTag: String) =
