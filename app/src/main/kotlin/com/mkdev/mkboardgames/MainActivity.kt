@@ -64,6 +64,7 @@ class MainActivity : AppCompatActivity() {
         }
         modeSelection.onAboutClicked = { showAbout() }
         modeSelection.onStatsClicked = { showStatsDialog() }
+        modeSelection.onCheckInsClicked = { showDailyTestClaim() }
         modeSelection.onRemoveAdsClicked = {
             RemoveAdsManager.purchase(
                 activity = this@MainActivity,
@@ -168,7 +169,7 @@ class MainActivity : AppCompatActivity() {
             } else if (hasClaimedToday) {
                 "Day $claimedDay is complete. Come back tomorrow for the next check-in."
             } else {
-                "Try one game or feature, then claim today’s test pass."
+                "Don't forget to try at least one game or feature. Thank you."
             }
             setTextColor(Color.parseColor("#B8D0CF"))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
@@ -259,10 +260,29 @@ class MainActivity : AppCompatActivity() {
             },
         )
 
-        val dialog = AlertDialog.Builder(ctx, android.R.style.Theme_Material_Dialog_MinWidth)
+        val closeButton = TextView(ctx).apply {
+            text = "CLOSE"
+            gravity = Gravity.CENTER_VERTICAL or Gravity.END
+            setTextColor(Color.parseColor("#F7D99B"))
+            setTypeface(typeface, Typeface.BOLD)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            setPadding(0, 0, (4 * dp).toInt(), 0)
+            visibility = if (hasClaimedToday || claimedDay >= SettingsManager.DAILY_TEST_DAYS) {
+                View.VISIBLE
+            } else {
+                View.GONE
+            }
+        }
+        wrapper.addView(
+            closeButton,
+            LinearLayout.LayoutParams(-1, (42 * dp).toInt()),
+        )
+
+        lateinit var dialog: AlertDialog
+        dialog = AlertDialog.Builder(ctx, android.R.style.Theme_Material_Dialog_MinWidth)
             .setView(wrapper)
-            .setNegativeButton("Later", null)
             .create()
+        closeButton.setOnClickListener { dialog.dismiss() }
         action.setOnClickListener {
             if (!SettingsManager.claimDailyTestDay(ctx)) return@setOnClickListener
 
@@ -291,12 +311,12 @@ class MainActivity : AppCompatActivity() {
                     Color.argb(170, Color.red(palette[claimed - 1]), Color.green(palette[claimed - 1]), Color.blue(palette[claimed - 1])),
                 )
             }
+            closeButton.visibility = View.VISIBLE
             Toast.makeText(ctx, "Day $claimed test claimed.", Toast.LENGTH_SHORT).show()
         }
         dialog.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.parseColor("#071723")))
         dialog.setOnDismissListener { if (activeSettingsDialog === dialog) activeSettingsDialog = null }
         dialog.show()
-        dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(Color.parseColor("#F7D99B"))
         activeSettingsDialog = dialog
     }
 

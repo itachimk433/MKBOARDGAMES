@@ -22,6 +22,7 @@ class ModeSelectionView(context: Context) : View(context) {
     var onModeSelected: ((GameMode) -> Unit)? = null
     var onAboutClicked: (() -> Unit)? = null
     var onStatsClicked: (() -> Unit)? = null
+    var onCheckInsClicked: (() -> Unit)? = null
     var onRemoveAdsClicked: (() -> Unit)? = null
 
     private val unit = resources.displayMetrics.density.coerceAtLeast(1f)
@@ -33,11 +34,14 @@ class ModeSelectionView(context: Context) : View(context) {
     private val challengesRect = RectF()
     private val statsRect = RectF()
     private val statsTouchRect = RectF()
+    private val checkInsRect = RectF()
+    private val checkInsTouchRect = RectF()
     private val removeAdsRect = RectF()
     private val removeAdsTouchRect = RectF()
     private var pressedMode: GameMode? = null
     private var pressedAbout = false
     private var pressedStats = false
+    private var pressedCheckIns = false
     private var pressedRemoveAds = false
     private var loadingMode: GameMode? = null
     private var loadingAngle = 0f
@@ -47,6 +51,7 @@ class ModeSelectionView(context: Context) : View(context) {
     private var removeAdsLoadingAnimator: ValueAnimator? = null
     private var normalScale = 1f
     private var aboutScale = 1f
+    private var checkInsScale = 1f
     private var irregularScale = 1f
     private var challengesScale = 1f
     private var removeAdsScale = 1f
@@ -221,6 +226,20 @@ class ModeSelectionView(context: Context) : View(context) {
             statsRect.right + 10f * unit,
             statsRect.bottom + 10f * unit,
         )
+        val checkInsWidth = 106f * unit
+        val checkInsHeight = 28f * unit
+        checkInsRect.set(
+            width - checkInsWidth - 14f * unit,
+            height - checkInsHeight - 16f * unit,
+            width - 14f * unit,
+            height - 16f * unit,
+        )
+        checkInsTouchRect.set(
+            checkInsRect.left - 8f * unit,
+            checkInsRect.top - 8f * unit,
+            checkInsRect.right + 8f * unit,
+            checkInsRect.bottom + 8f * unit,
+        )
         val removeAdsWidth = 128f * unit
         val removeAdsHeight = 28f * unit
         removeAdsRect.set(
@@ -269,6 +288,7 @@ class ModeSelectionView(context: Context) : View(context) {
 
         drawModeCard(canvas, normalRect, GameMode.NORMAL, "♟️", "Play", "Standard rules")
         drawAboutButton(canvas)
+        drawCheckInsButton(canvas)
         drawRemoveAdsButton(canvas)
     }
 
@@ -396,11 +416,35 @@ class ModeSelectionView(context: Context) : View(context) {
         canvas.restore()
     }
 
+    private fun drawCheckInsButton(canvas: Canvas) {
+        canvas.save()
+        canvas.scale(checkInsScale, checkInsScale, checkInsRect.centerX(), checkInsRect.centerY())
+        val radius = 5f * unit
+        canvas.drawRoundRect(checkInsRect, radius, radius, removeAdsFillPaint)
+        canvas.drawRoundRect(checkInsRect, radius, radius, removeAdsBorderPaint)
+        removeAdsTextPaint.textSize = 11f * textScale
+        val baseline = checkInsRect.centerY() -
+            (removeAdsTextPaint.ascent() + removeAdsTextPaint.descent()) / 2f
+        canvas.drawText("Check-ins", checkInsRect.centerX(), baseline, removeAdsTextPaint)
+        canvas.restore()
+    }
+
     private fun animateRemoveAdsScale(target: Float) {
         ValueAnimator.ofFloat(removeAdsScale, target).apply {
             duration = if (target < 1f) 70L else 110L
             addUpdateListener {
                 removeAdsScale = it.animatedValue as Float
+                invalidate()
+            }
+            start()
+        }
+    }
+
+    private fun animateCheckInsScale(target: Float) {
+        ValueAnimator.ofFloat(checkInsScale, target).apply {
+            duration = if (target < 1f) 70L else 110L
+            addUpdateListener {
+                checkInsScale = it.animatedValue as Float
                 invalidate()
             }
             start()
@@ -474,11 +518,15 @@ class ModeSelectionView(context: Context) : View(context) {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 pressedStats = statsTouchRect.contains(event.x, event.y)
-                pressedRemoveAds = !pressedStats && removeAdsTouchRect.contains(event.x, event.y)
+                pressedCheckIns = !pressedStats && checkInsTouchRect.contains(event.x, event.y)
+                pressedRemoveAds = !pressedStats &&
+                    !pressedCheckIns &&
+                    removeAdsTouchRect.contains(event.x, event.y)
                 pressedAbout = !pressedStats &&
+                    !pressedCheckIns &&
                     !pressedRemoveAds &&
                     aboutTouchRect.contains(event.x, event.y)
-                pressedMode = if (pressedAbout || pressedStats || pressedRemoveAds) {
+                pressedMode = if (pressedAbout || pressedStats || pressedCheckIns || pressedRemoveAds) {
                     null
                 } else {
                     when {
@@ -488,6 +536,7 @@ class ModeSelectionView(context: Context) : View(context) {
                 }
                 pressedMode?.let { animateCardScale(it, 0.96f) }
                 if (pressedAbout) animateAboutScale(0.96f)
+                if (pressedCheckIns) animateCheckInsScale(0.96f)
                 if (pressedRemoveAds) animateRemoveAdsScale(0.96f)
                 invalidate()
                 return true
@@ -502,6 +551,12 @@ class ModeSelectionView(context: Context) : View(context) {
                 if (pressedAbout && !aboutTouchRect.contains(event.x, event.y)) {
                     animateAboutScale(1f)
                     pressedAbout = false
+                    invalidate()
+                    return true
+                }
+                if (pressedCheckIns && !checkInsTouchRect.contains(event.x, event.y)) {
+                    animateCheckInsScale(1f)
+                    pressedCheckIns = false
                     invalidate()
                     return true
                 }
@@ -541,6 +596,17 @@ class ModeSelectionView(context: Context) : View(context) {
                     if (selectedAbout) {
                         SoundPlayer.play("ui_click")
                         onAboutClicked?.invoke()
+                    }
+                    invalidate()
+                    return true
+                }
+                if (pressedCheckIns) {
+                    val selectedCheckIns = checkInsTouchRect.contains(event.x, event.y)
+                    pressedCheckIns = false
+                    animateCheckInsScale(1f)
+                    if (selectedCheckIns) {
+                        SoundPlayer.play("ui_click")
+                        onCheckInsClicked?.invoke()
                     }
                     invalidate()
                     return true
@@ -585,8 +651,10 @@ class ModeSelectionView(context: Context) : View(context) {
             MotionEvent.ACTION_CANCEL -> {
                 pressedStats = false
                 pressedAbout = false
+                pressedCheckIns = false
                 pressedRemoveAds = false
                 animateAboutScale(1f)
+                animateCheckInsScale(1f)
                 animateRemoveAdsScale(1f)
                 pressedMode?.let { animateCardScale(it, 1f) }
                 pressedMode = null
