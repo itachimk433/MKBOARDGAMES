@@ -414,7 +414,6 @@ class MancalaActivity : AppCompatActivity() {
                 }
                 1 -> {
                     clearPausedMatch()
-                    if (vsAI) SettingsManager.recordForfeit(this)
                     finish()
                 }
                 else -> showBoardAfterDialog()

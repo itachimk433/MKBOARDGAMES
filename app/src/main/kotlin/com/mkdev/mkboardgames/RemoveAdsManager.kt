@@ -2,6 +2,8 @@ package com.mkdev.mkboardgames
 
 import android.app.Activity
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import com.android.billingclient.api.BillingClient
 import com.android.billingclient.api.BillingClient.BillingResponseCode
 import com.android.billingclient.api.BillingClientStateListener
@@ -21,6 +23,8 @@ import com.android.billingclient.api.QueryPurchasesParams
  */
 object RemoveAdsManager {
     const val PRODUCT_ID = "remove_ads"
+    private const val PURCHASE_READY_TIMEOUT_MS = 15_000L
+    private const val INTERNET_ERROR = "Please Check Your Internet Connection and try again."
 
     private var appContext: Context? = null
     private var billingClient: BillingClient? = null
@@ -28,6 +32,11 @@ object RemoveAdsManager {
     private var isConnecting = false
     private val readyCallbacks = mutableListOf<(Boolean) -> Unit>()
     private var purchaseCallback: ((String?) -> Unit)? = null
+    private var purchaseLoadingCallback: ((Boolean) -> Unit)? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private var nextPurchaseRequestId = 0L
+    private var activePurchaseRequestId: Long? = null
+    private var purchaseReadyTimeout: Runnable? = null
 
     fun initialize(context: Context) {
         if (billingClient != null) return
@@ -58,19 +67,35 @@ object RemoveAdsManager {
         }
     }
 
-    fun purchase(activity: Activity, onResult: (String?) -> Unit) {
+    fun purchase(
+        activity: Activity,
+        onLoadingChanged: (Boolean) -> Unit,
+        onResult: (String?) -> Unit,
+    ) {
         if (SettingsManager.isAdsRemoved(activity)) {
+            onLoadingChanged(false)
             onResult(null)
             return
         }
+        val requestId = ++nextPurchaseRequestId
+        activePurchaseRequestId = requestId
         purchaseCallback = onResult
+        purchaseLoadingCallback = onLoadingChanged
+        onLoadingChanged(true)
+        purchaseReadyTimeout = Runnable {
+            if (activePurchaseRequestId == requestId) finishPurchase(INTERNET_ERROR)
+        }.also { mainHandler.postDelayed(it, PURCHASE_READY_TIMEOUT_MS) }
         initialize(activity)
-        ensureReady { ready ->
+        ensureReady readyCallback@{ ready ->
+            if (activePurchaseRequestId != requestId) return@readyCallback
+            cancelPurchaseReadyTimeout()
             val details = productDetails
             if (!ready || details == null) {
-                finishPurchase("Remove Ads is not available yet. Please try again shortly.")
-                return@ensureReady
+                finishPurchase(INTERNET_ERROR)
+                return@readyCallback
             }
+            purchaseLoadingCallback?.invoke(false)
+            purchaseLoadingCallback = null
             val productDetailsParams = BillingFlowParams.ProductDetailsParams.newBuilder()
                 .setProductDetails(details)
                 .build()
@@ -79,7 +104,16 @@ object RemoveAdsManager {
                 .build()
             val result = billingClient?.launchBillingFlow(activity, flowParams)
             if (result == null || result.responseCode != BillingResponseCode.OK) {
-                finishPurchase(result?.debugMessage ?: "Google Play could not start the purchase.")
+                val message = if (
+                    result == null ||
+                    result.responseCode == BillingResponseCode.NETWORK_ERROR ||
+                    result.responseCode == BillingResponseCode.SERVICE_UNAVAILABLE
+                ) {
+                    INTERNET_ERROR
+                } else {
+                    result.debugMessage.ifBlank { "Google Play could not start the purchase." }
+                }
+                finishPurchase(message)
             }
         }
     }
@@ -168,20 +202,27 @@ object RemoveAdsManager {
                 queryExistingPurchases()
                 finishPurchase(null)
             }
-            else -> finishPurchase(result.debugMessage.ifBlank { "Google Play could not complete the purchase." })
+            else -> finishPurchase(
+                if (result.responseCode == BillingResponseCode.NETWORK_ERROR ||
+                    result.responseCode == BillingResponseCode.SERVICE_UNAVAILABLE
+                ) {
+                    INTERNET_ERROR
+                } else {
+                    result.debugMessage.ifBlank { "Google Play could not complete the purchase." }
+                },
+            )
         }
     }
 
     private fun processPurchase(purchase: Purchase, callback: ((String?) -> Unit)?) {
         if (purchase.purchaseState != Purchase.PurchaseState.PURCHASED) {
-            callback?.invoke("Purchase is pending approval in Google Play.")
+            if (callback != null) finishPurchase("Purchase is pending approval in Google Play.")
             return
         }
         val client = billingClient ?: return
         if (purchase.isAcknowledged) {
             appContext?.let { SettingsManager.setAdsRemoved(it) }
-            callback?.invoke(null)
-            if (callback != null) purchaseCallback = null
+            if (callback != null) finishPurchase(null)
             return
         }
         client.acknowledgePurchase(
@@ -191,11 +232,12 @@ object RemoveAdsManager {
         ) { result ->
             if (result.responseCode == BillingResponseCode.OK) {
                 appContext?.let { SettingsManager.setAdsRemoved(it) }
-                callback?.invoke(null)
+                if (callback != null) finishPurchase(null)
             } else {
-                callback?.invoke("Purchase received, but Google Play has not confirmed it yet.")
+                if (callback != null) {
+                    finishPurchase("Purchase received, but Google Play has not confirmed it yet.")
+                }
             }
-            if (callback != null) purchaseCallback = null
         }
     }
 
@@ -209,6 +251,15 @@ object RemoveAdsManager {
     private fun finishPurchase(message: String?) {
         val callback = purchaseCallback ?: return
         purchaseCallback = null
+        activePurchaseRequestId = null
+        cancelPurchaseReadyTimeout()
+        purchaseLoadingCallback?.invoke(false)
+        purchaseLoadingCallback = null
         callback(message)
+    }
+
+    private fun cancelPurchaseReadyTimeout() {
+        purchaseReadyTimeout?.let(mainHandler::removeCallbacks)
+        purchaseReadyTimeout = null
     }
 }

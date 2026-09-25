@@ -342,6 +342,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
         turnResolutionPending = false
         matchStarted = true
         SettingsManager.recordRecentlyPlayed(this, "SNAKES_LADDERS")
+        if (vsAI) SettingsManager.setActiveGame(this, "snakes_ladders")
         gameOverView.winnerLabel = ""
         fireworksView.cancel()
         SoundPlayer.stop("snakes_ladders_fireworks", "snakes_ladders_victory")
@@ -503,6 +504,10 @@ class SnakesLaddersActivity : AppCompatActivity() {
         turnResolutionPending = false
         winner = player
         gameOver = true
+        if (vsAI) {
+            if (player == 0) SettingsManager.recordWin(this)
+            else SettingsManager.recordLoss(this)
+        }
         boardView.gameOver = true
         gameOverView.winnerLabel = "WINNER: ${playerName(player)}"
         SoundPlayer.stop("ludo_move")

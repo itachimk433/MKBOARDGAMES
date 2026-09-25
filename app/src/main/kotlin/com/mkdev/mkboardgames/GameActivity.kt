@@ -443,7 +443,6 @@ class GameActivity : AppCompatActivity() {
             }
             .setNeutralButton("Leave Match") { _, _ ->
                 clearPausedMatch()
-                if (vsAI) SettingsManager.recordForfeit(this)
                 finish()
             }
             .setNegativeButton("Keep Playing") { _, _ ->
@@ -493,7 +492,6 @@ class GameActivity : AppCompatActivity() {
                 1 -> {
                     dismissStyledOverlay()
                     clearPausedMatch()
-                    if (vsAI) SettingsManager.recordForfeit(this)
                     finish()
                 }
                 else -> {
@@ -1923,10 +1921,16 @@ Checkmate your opponent's King.
     fun onUndoClicked() {
         if (moveHistory.isEmpty() || boardView.isLocked) return
         if (undosRemaining == 0) {
-            UndoRewardDialog.show(this) {
-                undosRemaining += 2
-                SettingsManager.setUndoCredits(this, gameType, undosRemaining)
+            UndoRewardDialog.show(this, undosRemaining) {
+                undosRemaining = SettingsManager.grantUndoCredits(
+                    this,
+                    gameType,
+                    undosRemaining,
+                    2,
+                    vsAI,
+                )
                 updateHud()
+                undosRemaining
             }
             return
         }
@@ -1965,6 +1969,12 @@ Checkmate your opponent's King.
             captureSnapshots.add(rSnaps[i])
             moveHistory.add(rMoves[i])
         }
+        undosRemaining = SettingsManager.refundUndoCredit(
+            this,
+            gameType,
+            undosRemaining,
+            vsAI,
+        )
         gameState = nextState
         val (cw, cb) = nextCap
         capturedByWhite = cw.toMutableList(); capturedByBlack = cb.toMutableList()
@@ -1999,7 +2009,6 @@ Checkmate your opponent's King.
                         AlertDialog.Builder(this).setTitle("Forfeit Match?")
                             .setMessage("Starting a new game counts as a forfeit.")
                             .setPositiveButton("Forfeit & New Game") { _, _ ->
-                                if (vsAI) SettingsManager.recordForfeit(this)
                                 showModeDialog()
                             }.setNegativeButton("Cancel", null).show()
                     } else showModeDialog()
@@ -2014,7 +2023,6 @@ Checkmate your opponent's King.
                                 .setPositiveButton("Pause & Exit") { _, _ -> pauseMatchAndExit() }
                                 .setNeutralButton("Leave Match") { _, _ ->
                                     clearPausedMatch()
-                                    if (vsAI) SettingsManager.recordForfeit(this)
                                     finish()
                                 }.setNegativeButton("Cancel", null).show()
                         }
@@ -2114,7 +2122,6 @@ Checkmate your opponent's King.
         view.onChoiceSelected = { which ->
             dismissStyledOverlay()
             if (which == 1) {
-                if (vsAI) SettingsManager.recordForfeit(this)
                 showModeDialog()
             } else {
                 showChessBoardAfterDialog()

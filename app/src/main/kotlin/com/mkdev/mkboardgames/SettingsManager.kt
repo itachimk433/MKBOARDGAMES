@@ -48,7 +48,6 @@ object SettingsManager {
     private const val KEY_STATS_WINS     = "stats_wins"
     private const val KEY_STATS_LOSSES   = "stats_losses"
     private const val KEY_STATS_DRAWS    = "stats_draws"
-    private const val KEY_STATS_FORFEITS = "stats_forfeits"
     private const val KEY_RECENTLY_PLAYED = "recently_played_games"
     private const val KEY_RECENTLY_PLAYED_VERSION = "recently_played_games_version"
     private const val RECENTLY_PLAYED_VERSION = 2
@@ -57,13 +56,13 @@ object SettingsManager {
     private fun winKey(game: String)     = "stats_${game}_wins"
     private fun lossKey(game: String)    = "stats_${game}_losses"
     private fun drawKey(game: String)    = "stats_${game}_draws"
-    private fun forfeitKey(game: String) = "stats_${game}_forfeits"
 
     // active game tag — set at the start of every vs-AI game
     private const val KEY_ACTIVE_GAME = "active_game_tag"
     private const val KEY_UNDO_CREDITS = "undo_credits"
     private const val KEY_UNDO_CREDITS_MIGRATED = "undo_credits_migrated"
     private const val UNLIMITED_UNDO_CREDITS = Int.MAX_VALUE
+    const val MAX_UNDO_CREDITS = 10
 
     private fun undoKey(gameTag: String) = KEY_UNDO_CREDITS + "_" + gameTag
 
@@ -139,12 +138,15 @@ object SettingsManager {
 
         val settings = sharedPrefs(ctx)
         val key = undoKey(gameTag)
-        if (settings.contains(key)) return settings.getInt(key, 3).coerceAtLeast(0)
+        if (settings.contains(key)) {
+            return settings.getInt(key, 3).coerceIn(0, MAX_UNDO_CREDITS)
+        }
 
         if (!settings.getBoolean(KEY_UNDO_CREDITS_MIGRATED, false) &&
             settings.contains(KEY_UNDO_CREDITS)
         ) {
-            val legacyValue = settings.getInt(KEY_UNDO_CREDITS, 3).coerceAtLeast(0)
+            val legacyValue = settings.getInt(KEY_UNDO_CREDITS, 3)
+                .coerceIn(0, MAX_UNDO_CREDITS)
             settings.edit()
                 .putInt(key, legacyValue)
                 .putBoolean(KEY_UNDO_CREDITS_MIGRATED, true)
@@ -161,9 +163,33 @@ object SettingsManager {
         return remaining
     }
 
+    fun refundUndoCredit(ctx: Context, gameTag: String, current: Int, vsAI: Boolean): Int {
+        if (hasUnlimitedUndos(ctx, vsAI)) return current
+        val restored = (current.coerceIn(0, MAX_UNDO_CREDITS) + 1)
+            .coerceAtMost(MAX_UNDO_CREDITS)
+        setUndoCredits(ctx, gameTag, restored)
+        return restored
+    }
+
+    fun grantUndoCredits(
+        ctx: Context,
+        gameTag: String,
+        current: Int,
+        amount: Int,
+        vsAI: Boolean,
+    ): Int {
+        if (hasUnlimitedUndos(ctx, vsAI)) return current
+        val updated = (
+            current.coerceIn(0, MAX_UNDO_CREDITS).toLong() +
+                amount.coerceAtLeast(0).toLong()
+        ).coerceAtMost(MAX_UNDO_CREDITS.toLong()).toInt()
+        setUndoCredits(ctx, gameTag, updated)
+        return updated
+    }
+
     fun setUndoCredits(ctx: Context, gameTag: String, value: Int) {
         sharedPrefs(ctx).edit()
-            .putInt(undoKey(gameTag), value.coerceAtLeast(0))
+            .putInt(undoKey(gameTag), value.coerceIn(0, MAX_UNDO_CREDITS))
             .apply()
     }
 
@@ -692,13 +718,12 @@ object SettingsManager {
     }
 
     // ── Stats data ────────────────────────────────────────────────────────────
-    data class Stats(val wins: Int, val losses: Int, val draws: Int, val forfeits: Int)
+    data class Stats(val wins: Int, val losses: Int, val draws: Int)
 
     fun getStats(ctx: Context, mode: GameMode = currentMode(ctx)) = Stats(
         wins     = prefsForMode(ctx, mode).getInt(KEY_STATS_WINS,     0),
         losses   = prefsForMode(ctx, mode).getInt(KEY_STATS_LOSSES,   0),
-        draws    = prefsForMode(ctx, mode).getInt(KEY_STATS_DRAWS,    0),
-        forfeits = prefsForMode(ctx, mode).getInt(KEY_STATS_FORFEITS, 0)
+        draws    = prefsForMode(ctx, mode).getInt(KEY_STATS_DRAWS,    0)
     )
 
     fun getGameStats(
@@ -708,8 +733,7 @@ object SettingsManager {
     ) = Stats(
         wins     = prefsForMode(ctx, mode).getInt(winKey(game),     0),
         losses   = prefsForMode(ctx, mode).getInt(lossKey(game),    0),
-        draws    = prefsForMode(ctx, mode).getInt(drawKey(game),    0),
-        forfeits = prefsForMode(ctx, mode).getInt(forfeitKey(game), 0)
+        draws    = prefsForMode(ctx, mode).getInt(drawKey(game),    0)
     )
 
     // ── Record outcomes — updates both global AND per-game counters ───────────
@@ -738,14 +762,6 @@ object SettingsManager {
             .apply()
     }
 
-    fun recordForfeit(ctx: Context) {
-        val game = activeGame(ctx)
-        prefs(ctx).edit()
-            .putInt(KEY_STATS_FORFEITS, prefs(ctx).getInt(KEY_STATS_FORFEITS, 0) + 1)
-            .putInt(forfeitKey(game),   prefs(ctx).getInt(forfeitKey(game),   0) + 1)
-            .apply()
-    }
-
     fun recordLudoResult(ctx: Context, won: Boolean) {
         setActiveGame(ctx, "ludo")
         if (won) recordWin(ctx) else recordLoss(ctx)
@@ -754,14 +770,15 @@ object SettingsManager {
     fun resetStats(ctx: Context, mode: GameMode = currentMode(ctx)) {
         val edit = prefsForMode(ctx, mode).edit()
         edit.putInt(KEY_STATS_WINS, 0).putInt(KEY_STATS_LOSSES, 0)
-            .putInt(KEY_STATS_DRAWS, 0).putInt(KEY_STATS_FORFEITS, 0)
+            .putInt(KEY_STATS_DRAWS, 0)
         for (g in listOf(
             "chess", "amazons", "checkers", "international_draughts",
             "othello", "morabaraba", "ttt", "connect_four", "overall",
-            "fox_and_geese", "ludo", "shogi", "go"
+            "fox_and_geese", "ludo", "shogi", "go", "snakes_ladders",
+            "xiangqi", "mancala", "yote", "onitama", "five_field_kono",
         )) {
             edit.putInt(winKey(g), 0).putInt(lossKey(g), 0)
-                .putInt(drawKey(g), 0).putInt(forfeitKey(g), 0)
+                .putInt(drawKey(g), 0)
         }
         edit.apply()
     }

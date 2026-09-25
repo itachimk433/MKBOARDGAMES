@@ -64,24 +64,31 @@ class MainActivity : AppCompatActivity() {
         modeSelection.onAboutClicked = { showAbout() }
         modeSelection.onStatsClicked = { showStatsDialog() }
         modeSelection.onRemoveAdsClicked = {
-            RemoveAdsManager.purchase(this@MainActivity) { error ->
-                runOnUiThread {
-                    if (error == null) {
-                        modeSelection.setAdsRemoved()
-                        Toast.makeText(
-                            this@MainActivity,
-                            "Ads removed. Thank you!",
-                            Toast.LENGTH_LONG,
-                        ).show()
-                    } else if (error != "Purchase canceled.") {
-                        AlertDialog.Builder(this@MainActivity)
-                            .setTitle("Remove Ads")
-                            .setMessage(error)
-                            .setPositiveButton("OK", null)
-                            .show()
+            RemoveAdsManager.purchase(
+                activity = this@MainActivity,
+                onLoadingChanged = { loading ->
+                    runOnUiThread { modeSelection.setRemoveAdsLoading(loading) }
+                },
+                onResult = { error ->
+                    runOnUiThread {
+                        modeSelection.setRemoveAdsLoading(false)
+                        if (error == null) {
+                            modeSelection.setAdsRemoved()
+                            Toast.makeText(
+                                this@MainActivity,
+                                "Ads removed. Thank you!",
+                                Toast.LENGTH_LONG,
+                            ).show()
+                        } else if (error != "Purchase canceled.") {
+                            AlertDialog.Builder(this@MainActivity)
+                                .setTitle("Remove Ads")
+                                .setMessage(error)
+                                .setPositiveButton("OK", null)
+                                .show()
+                        }
                     }
-                }
-            }
+                },
+            )
         }
         RemoveAdsManager.prepare(this) { price ->
             runOnUiThread { modeSelection.setRemoveAdsPrice(price) }
@@ -813,6 +820,7 @@ class MainActivity : AppCompatActivity() {
         val pages = listOf(
             Page("Overall",    "★",  "overall"),
             Page("Chess",      "♟",  "chess"),
+            Page("Amazons",    "♛",  "amazons"),
             Page("Draughts",   "⬤",  "checkers"),
             Page("International Draughts", "⬤", "international_draughts"),
             Page("Othello",    "◉",  "othello"),
@@ -821,8 +829,14 @@ class MainActivity : AppCompatActivity() {
             Page("Connect Four", "●", "connect_four"),
             Page("Fox & Geese", "🦊", "fox_and_geese"),
             Page("Ludo", "●", "ludo"),
+            Page("Snakes & Ladders", "🎲", "snakes_ladders"),
+            Page("Xiangqi", "象", "xiangqi"),
             Page("Shogi", "将", "shogi"),
             Page("Go", "⚫", "go"),
+            Page("Mancala", "●", "mancala"),
+            Page("Yote", "⬡", "yote"),
+            Page("Onitama", "♞", "onitama"),
+            Page("Five Field Kono", "⬟", "five_field_kono"),
         )
 
         var currentPage = 0
@@ -850,22 +864,13 @@ class MainActivity : AppCompatActivity() {
                 dotRow.addView(this)
             }
         }
-
-        val modeRow = android.widget.LinearLayout(ctx).apply {
-            orientation = android.widget.LinearLayout.HORIZONTAL
-            gravity = android.view.Gravity.CENTER
-            setPadding((10 * dp).toInt(), (8 * dp).toInt(), (10 * dp).toInt(), (4 * dp).toInt())
+        val dotsScroll = android.widget.HorizontalScrollView(ctx).apply {
+            isHorizontalScrollBarEnabled = false
+            addView(dotRow, android.widget.HorizontalScrollView.LayoutParams(
+                android.widget.HorizontalScrollView.LayoutParams.WRAP_CONTENT,
+                android.widget.HorizontalScrollView.LayoutParams.WRAP_CONTENT,
+            ))
         }
-        val normalModeChip = android.widget.TextView(ctx).apply {
-            text = "Normal Mode"
-            setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 13f)
-            gravity = android.view.Gravity.CENTER
-            setPadding((12 * dp).toInt(), (8 * dp).toInt(), (12 * dp).toInt(), (8 * dp).toInt())
-            layoutParams = android.widget.LinearLayout.LayoutParams(
-                0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f,
-            ).also { it.setMargins((4 * dp).toInt(), 0, (4 * dp).toInt(), 0) }
-        }
-        modeRow.addView(normalModeChip)
 
         val navRow = android.widget.LinearLayout(ctx).apply {
             orientation = android.widget.LinearLayout.HORIZONTAL
@@ -933,7 +938,6 @@ class MainActivity : AppCompatActivity() {
             statLine("Wins",     s.wins,     "#4CAF50")
             statLine("Losses",   s.losses,   "#EF5350")
             statLine("Draws",    s.draws,    "#7FC8F8")
-            statLine("Forfeits", s.forfeits, "#FFA726")
 
             val total = s.wins + s.losses + s.draws
             if (total > 0) {
@@ -956,25 +960,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        fun refreshModeChips() {
-            listOf(normalModeChip to GameMode.NORMAL).forEach { (chip, mode) ->
-                chip.setTextColor(
-                    Color.parseColor(if (statsMode == mode) "#102C32" else "#E3B86A"),
-                )
-                chip.background = android.graphics.drawable.GradientDrawable().apply {
-                    cornerRadius = 12f * dp
-                    setColor(Color.parseColor(if (statsMode == mode) "#E3B86A" else "#21454A"))
-                    setStroke((1 * dp).toInt(), Color.parseColor("#85502D"))
-                }
-            }
-        }
-
-        normalModeChip.setOnClickListener {
-            statsMode = GameMode.NORMAL
-            refreshModeChips()
-            buildStatCard(pages[currentPage].gameTag)
-        }
-
         fun navigateTo(idx: Int) {
             currentPage = idx.coerceIn(0, pages.lastIndex)
             val page = pages[currentPage]
@@ -982,6 +967,13 @@ class MainActivity : AppCompatActivity() {
             dots.forEachIndexed { i, d ->
                 d.setTextColor(if (i == currentPage) android.graphics.Color.parseColor("#7FC8F8")
                                else                  android.graphics.Color.parseColor("#444444"))
+            }
+            dotsScroll.post {
+                val dot = dots[currentPage]
+                dotsScroll.smoothScrollTo(
+                    (dot.left + dot.width / 2 - dotsScroll.width / 2).coerceAtLeast(0),
+                    0,
+                )
             }
             buildStatCard(page.gameTag)
         }
@@ -1019,11 +1011,12 @@ class MainActivity : AppCompatActivity() {
             }
         })
 
-        refreshModeChips()
         buildStatCard("overall")
 
-        wrapper.addView(modeRow)
-        wrapper.addView(dotRow)
+        wrapper.addView(dotsScroll, android.widget.LinearLayout.LayoutParams(
+            android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+        ))
         wrapper.addView(navRow)
         wrapper.addView(android.view.View(ctx).apply {
             setBackgroundColor(android.graphics.Color.parseColor("#2A2A2A"))
@@ -1039,7 +1032,7 @@ class MainActivity : AppCompatActivity() {
             .setPositiveButton("OK", null)
             .setNeutralButton("Reset") { _, _ ->
                 AlertDialog.Builder(ctx).setTitle("Reset Stats?")
-                    .setMessage("This clears all wins, losses, draws and forfeits for the selected mode.")
+                    .setMessage("This clears all wins, losses and draws for the selected mode.")
                     .setPositiveButton("Reset") { _, _ -> SettingsManager.resetStats(ctx, statsMode) }
                     .setNegativeButton("Cancel", null).show()
             }

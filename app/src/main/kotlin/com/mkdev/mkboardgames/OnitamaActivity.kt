@@ -376,10 +376,16 @@ class OnitamaActivity : AppCompatActivity() {
     private fun undoMove() {
         if (previousStates.isEmpty() || boardView.isLocked) return
         if (undosRemaining == 0) {
-            UndoRewardDialog.show(this) {
-                undosRemaining += 2
-                SettingsManager.setUndoCredits(this, "ONITAMA", undosRemaining)
+            UndoRewardDialog.show(this, undosRemaining) {
+                undosRemaining = SettingsManager.grantUndoCredits(
+                    this,
+                    "ONITAMA",
+                    undosRemaining,
+                    2,
+                    vsAI,
+                )
                 updateHud()
+                undosRemaining
             }
             return
         }
@@ -564,7 +570,6 @@ class OnitamaActivity : AppCompatActivity() {
                 1 -> {
                     gameRoot.visibility = View.GONE
                     PausedMatchStore.clear(this, "ONITAMA")
-                    if (vsAI) SettingsManager.recordForfeit(this)
                     finish()
                 }
                 else -> showBoardAfterDialog()

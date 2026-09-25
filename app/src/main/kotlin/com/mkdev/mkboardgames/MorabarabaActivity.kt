@@ -377,7 +377,6 @@ class MorabarabaActivity : AppCompatActivity() {
                 { pauseMatchAndExit() },
                 {
                     clearPausedMatch()
-                    if (vsAI) SettingsManager.recordForfeit(this)
                     finish()
                 },
                 { showBoardAfterDialog() },
@@ -745,7 +744,6 @@ class MorabarabaActivity : AppCompatActivity() {
             listOf(
                 { showBoardAfterDialog() },
                 {
-                    if (vsAI) SettingsManager.recordForfeit(this)
                     showModeDialog()
                 },
             ),
@@ -787,10 +785,16 @@ class MorabarabaActivity : AppCompatActivity() {
     private fun doUndo() {
         if (moveHistory.isEmpty()) return
         if (undosRemaining == 0) {
-            UndoRewardDialog.show(this) {
-                undosRemaining += 2
-                SettingsManager.setUndoCredits(this, "MORABARABA", undosRemaining)
+            UndoRewardDialog.show(this, undosRemaining) {
+                undosRemaining = SettingsManager.grantUndoCredits(
+                    this,
+                    "MORABARABA",
+                    undosRemaining,
+                    2,
+                    vsAI,
+                )
                 updateHud()
+                undosRemaining
             }
             return
         }
@@ -835,6 +839,12 @@ class MorabarabaActivity : AppCompatActivity() {
             captureSnapshots.add(rSnaps[i])
             moveHistory.add(rMoves[i])
         }
+        undosRemaining = SettingsManager.refundUndoCredit(
+            this,
+            "MORABARABA",
+            undosRemaining,
+            vsAI,
+        )
         gameState = nextState
         val (cw, cb) = nextCap
         capturedByWhite = cw.toMutableList(); capturedByBlack = cb.toMutableList()

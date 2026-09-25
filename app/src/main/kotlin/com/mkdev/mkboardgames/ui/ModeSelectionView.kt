@@ -42,6 +42,9 @@ class ModeSelectionView(context: Context) : View(context) {
     private var loadingMode: GameMode? = null
     private var loadingAngle = 0f
     private var loadingAnimator: ValueAnimator? = null
+    private var removeAdsLoading = false
+    private var removeAdsLoadingAngle = 0f
+    private var removeAdsLoadingAnimator: ValueAnimator? = null
     private var normalScale = 1f
     private var aboutScale = 1f
     private var irregularScale = 1f
@@ -141,6 +144,12 @@ class ModeSelectionView(context: Context) : View(context) {
         textAlign = Paint.Align.CENTER
         isFakeBoldText = true
     }
+    private val removeAdsLoadingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#F7D99B")
+        style = Paint.Style.STROKE
+        strokeWidth = 2.5f * unit
+        strokeCap = Paint.Cap.ROUND
+    }
     init {
         PlainGameButtonAssets.initialize(context)
         isClickable = true
@@ -150,6 +159,8 @@ class ModeSelectionView(context: Context) : View(context) {
     override fun onDetachedFromWindow() {
         loadingAnimator?.cancel()
         loadingAnimator = null
+        removeAdsLoadingAnimator?.cancel()
+        removeAdsLoadingAnimator = null
         super.onDetachedFromWindow()
     }
 
@@ -327,7 +338,27 @@ class ModeSelectionView(context: Context) : View(context) {
         invalidate()
     }
 
+    fun setRemoveAdsLoading(loading: Boolean) {
+        if (removeAdsLoading == loading) return
+        removeAdsLoading = loading
+        removeAdsLoadingAnimator?.cancel()
+        removeAdsLoadingAnimator = null
+        if (loading) {
+            removeAdsLoadingAnimator = ValueAnimator.ofFloat(0f, 360f).apply {
+                duration = 700L
+                repeatCount = ValueAnimator.INFINITE
+                addUpdateListener {
+                    removeAdsLoadingAngle = it.animatedValue as Float
+                    invalidate()
+                }
+                start()
+            }
+        }
+        invalidate()
+    }
+
     fun setAdsRemoved() {
+        setRemoveAdsLoading(false)
         removeAdsPrice = "✓"
         invalidate()
     }
@@ -339,11 +370,29 @@ class ModeSelectionView(context: Context) : View(context) {
         canvas.drawRoundRect(removeAdsRect, radius, radius, removeAdsFillPaint)
         canvas.drawRoundRect(removeAdsRect, radius, radius, removeAdsBorderPaint)
         val removed = SettingsManager.isAdsRemoved(context)
-        removeAdsTextPaint.textSize = 11f * textScale
-        val label = if (removed) "Ads Removed ✓" else "Remove Ads"
-        val baseline = removeAdsRect.centerY() -
-            (removeAdsTextPaint.ascent() + removeAdsTextPaint.descent()) / 2f
-        canvas.drawText(label, removeAdsRect.centerX(), baseline, removeAdsTextPaint)
+        if (removeAdsLoading && !removed) {
+            val radiusSpinner = 8f * unit
+            val centerX = removeAdsRect.centerX()
+            val centerY = removeAdsRect.centerY()
+            canvas.drawArc(
+                RectF(
+                    centerX - radiusSpinner,
+                    centerY - radiusSpinner,
+                    centerX + radiusSpinner,
+                    centerY + radiusSpinner,
+                ),
+                removeAdsLoadingAngle,
+                285f,
+                false,
+                removeAdsLoadingPaint,
+            )
+        } else {
+            removeAdsTextPaint.textSize = 11f * textScale
+            val label = if (removed) "Ads Removed ✓" else "Remove Ads"
+            val baseline = removeAdsRect.centerY() -
+                (removeAdsTextPaint.ascent() + removeAdsTextPaint.descent()) / 2f
+            canvas.drawText(label, removeAdsRect.centerX(), baseline, removeAdsTextPaint)
+        }
         canvas.restore()
     }
 
@@ -420,7 +469,7 @@ class ModeSelectionView(context: Context) : View(context) {
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        if (loadingMode != null) return true
+        if (loadingMode != null || removeAdsLoading) return true
 
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {

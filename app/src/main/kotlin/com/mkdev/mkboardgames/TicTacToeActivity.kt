@@ -221,7 +221,6 @@ class TicTacToeActivity : AppCompatActivity() {
                 0 -> pauseMatchAndExit()
                 1 -> {
                     clearPausedMatch()
-                    if (vsAI) SettingsManager.recordForfeit(this)
                     finish()
                 }
                 2 -> showBoardAfterDialog()
@@ -590,10 +589,16 @@ Strategy
     fun onUndoClicked() {
         if (moveHistory.isEmpty() || boardView.isLocked) return
         if (undosRemaining == 0) {
-            UndoRewardDialog.show(this) {
-                undosRemaining += 2
-                SettingsManager.setUndoCredits(this, "TIC_TAC_TOE", undosRemaining)
+            UndoRewardDialog.show(this, undosRemaining) {
+                undosRemaining = SettingsManager.grantUndoCredits(
+                    this,
+                    "TIC_TAC_TOE",
+                    undosRemaining,
+                    2,
+                    vsAI,
+                )
                 updateHud()
+                undosRemaining
             }
             return
         }
@@ -625,6 +630,12 @@ Strategy
         val nextState = redoGameStates.removeLast()
         val removed   = redoRemovedMoves.removeLast()
         for (i in removed.indices.reversed()) moveHistory.add(removed[i])
+        undosRemaining = SettingsManager.refundUndoCredit(
+            this,
+            "TIC_TAC_TOE",
+            undosRemaining,
+            vsAI,
+        )
         gameState = nextState
         boardView.isLocked = false
         boardView.reset(gameState)
@@ -665,7 +676,6 @@ Strategy
                             ), 420f, "T I C · T A C · T O E", onCancel = { showBoardAfterDialog() }) { selected, confirm ->
                                 confirm.dismiss()
                                 if (selected == 0) {
-                                    if (vsAI) SettingsManager.recordForfeit(this)
                                     showModeDialog()
                                 } else showBoardAfterDialog()
                             }
@@ -698,7 +708,7 @@ Strategy
                                 leave.dismiss()
                                 when (selected) {
                                     0 -> pauseMatchAndExit()
-                                    1 -> { clearPausedMatch(); if (vsAI) SettingsManager.recordForfeit(this); finish() }
+                                    1 -> { clearPausedMatch(); finish() }
                                     2 -> showBoardAfterDialog()
                                 }
                             }

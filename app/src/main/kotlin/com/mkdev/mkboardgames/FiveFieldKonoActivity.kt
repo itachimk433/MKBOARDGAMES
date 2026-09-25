@@ -367,10 +367,16 @@ class FiveFieldKonoActivity : AppCompatActivity() {
     private fun undoMove() {
         if (previousStates.isEmpty() || boardView.isLocked) return
         if (undosRemaining == 0) {
-            UndoRewardDialog.show(this) {
-                undosRemaining += 2
-                SettingsManager.setUndoCredits(this, "FIVE_FIELD_KONO", undosRemaining)
+            UndoRewardDialog.show(this, undosRemaining) {
+                undosRemaining = SettingsManager.grantUndoCredits(
+                    this,
+                    "FIVE_FIELD_KONO",
+                    undosRemaining,
+                    2,
+                    vsAI,
+                )
                 updateHud()
+                undosRemaining
             }
             return
         }
@@ -527,7 +533,6 @@ class FiveFieldKonoActivity : AppCompatActivity() {
                 }
                 1 -> {
                     PausedMatchStore.clear(this, GAME_KEY)
-                    if (vsAI) SettingsManager.recordForfeit(this)
                     finish()
                 }
                 else -> showBoardAfterDialog()

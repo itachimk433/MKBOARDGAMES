@@ -230,7 +230,6 @@ class ConnectFourActivity : AppCompatActivity() {
                     0 -> pauseMatchAndExit()
                     1 -> {
                         clearPausedMatch()
-                        if (vsAI) SettingsManager.recordForfeit(this)
                         finish()
                     }
                     2 -> showBoardAfterDialog()
@@ -579,10 +578,16 @@ Control the centre columns, build threats in more than one direction, and block 
     fun onUndoClicked() {
         if (moveHistory.isEmpty() || boardView.isLocked) return
         if (undosRemaining == 0) {
-            UndoRewardDialog.show(this) {
-                undosRemaining += 2
-                SettingsManager.setUndoCredits(this, "CONNECT_FOUR", undosRemaining)
+            UndoRewardDialog.show(this, undosRemaining) {
+                undosRemaining = SettingsManager.grantUndoCredits(
+                    this,
+                    "CONNECT_FOUR",
+                    undosRemaining,
+                    2,
+                    vsAI,
+                )
                 updateHud()
+                undosRemaining
             }
             return
         }
@@ -613,6 +618,12 @@ Control the centre columns, build threats in more than one direction, and block 
         val next = redoGameStates.removeLast()
         val removed = redoRemovedMoves.removeLast()
         for (i in removed.indices.reversed()) moveHistory.add(removed[i])
+        undosRemaining = SettingsManager.refundUndoCredit(
+            this,
+            "CONNECT_FOUR",
+            undosRemaining,
+            vsAI,
+        )
         gameState = next
         boardView.reset(gameState)
         updateHud()
@@ -652,7 +663,6 @@ Control the centre columns, build threats in more than one direction, and block 
                         ), 420f, "C O N N E C T · F O U R", onCancel = { showBoardAfterDialog() }) { selected, confirm ->
                             confirm.dismiss()
                             if (selected == 0) {
-                                if (vsAI) SettingsManager.recordForfeit(this)
                                 showModeDialog()
                             } else showBoardAfterDialog()
                         }
@@ -669,7 +679,7 @@ Control the centre columns, build threats in more than one direction, and block 
                             leave.dismiss()
                             when (selected) {
                                 0 -> pauseMatchAndExit()
-                                1 -> { clearPausedMatch(); if (vsAI) SettingsManager.recordForfeit(this); finish() }
+                                1 -> { clearPausedMatch(); finish() }
                                 2 -> showBoardAfterDialog()
                             }
                         }
