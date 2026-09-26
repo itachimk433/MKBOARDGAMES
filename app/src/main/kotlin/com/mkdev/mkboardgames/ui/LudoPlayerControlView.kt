@@ -100,7 +100,9 @@ class LudoPlayerControlView(context: Context) : FrameLayout(context) {
 
     init {
         setWillNotDraw(false)
-        setLayerType(View.LAYER_TYPE_SOFTWARE, null)
+        // Keep this container hardware-rendered. GlbDiceView may contain a
+        // GLSurfaceView, and a software layer here prevents Android from
+        // compositing that separate surface on newer devices.
         clipChildren = false
         clipToPadding = false
         minimumHeight = dp(CONTROL_HEIGHT)

@@ -54,7 +54,7 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
     private val glSurfaceView = GLSurfaceView(context)
     private val fallbackDiceView = LudoDiceView(context)
     private var usingFallbackDice = !SettingsManager.is3DDiceEnabled(context)
-    private var gameplayVisible = true
+    private var gameplayVisible = false
     private var attachedToWindow = false
 
     var value: Int = 1
