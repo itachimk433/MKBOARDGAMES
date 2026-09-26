@@ -41,6 +41,7 @@ class LudoDiceView(context: Context) : View(context) {
     private var rollGeneration = 0
     private var rotation = 0f
     private var scale = 1f
+    private var animatorPausedForHost = false
 
     private val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(90, 0, 0, 0)
@@ -108,10 +109,25 @@ class LudoDiceView(context: Context) : View(context) {
         rollGeneration++
         animator?.cancel()
         animator = null
+        animatorPausedForHost = false
         isRolling = false
         rotation = 0f
         scale = 1f
         invalidate()
+    }
+
+    fun onHostPause() {
+        if (isRolling && animator != null) {
+            animator?.pause()
+            animatorPausedForHost = true
+        }
+    }
+
+    fun onHostResume() {
+        if (animatorPausedForHost) {
+            animatorPausedForHost = false
+            animator?.resume()
+        }
     }
 
     override fun onDraw(canvas: Canvas) {

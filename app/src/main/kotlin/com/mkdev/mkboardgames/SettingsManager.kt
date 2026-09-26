@@ -55,6 +55,7 @@ object SettingsManager {
     private const val KEY_LAST_APP_OPENED_AT = "last_app_opened_at"
     private const val KEY_DAILY_TEST_CLAIMED_DAY = "daily_test_claimed_day"
     private const val KEY_DAILY_TEST_CLAIM_DATE = "daily_test_claim_date"
+    private const val KEY_USE_3D_DICE = "use_3d_dice"
     const val DAILY_TEST_DAYS = 14
 
     // ── Per-game stats keys ───────────────────────────────────────────────────
@@ -133,6 +134,13 @@ object SettingsManager {
 
     fun setDailyRemindersEnabled(ctx: Context, enabled: Boolean) {
         sharedPrefs(ctx).edit().putBoolean(KEY_DAILY_REMINDERS_ENABLED, enabled).apply()
+    }
+
+    fun is3DDiceEnabled(ctx: Context): Boolean =
+        sharedPrefs(ctx).getBoolean(KEY_USE_3D_DICE, true)
+
+    fun set3DDiceEnabled(ctx: Context, enabled: Boolean) {
+        sharedPrefs(ctx).edit().putBoolean(KEY_USE_3D_DICE, enabled).apply()
     }
 
     fun recordAppOpened(ctx: Context, openedAt: Long = System.currentTimeMillis()) {

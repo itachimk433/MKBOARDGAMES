@@ -614,6 +614,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
     private fun createPlayerControls(count: Int) {
         playerDiceViews = Array(count) { player ->
             GlbDiceView(this).apply {
+                accentColor = SnakesLaddersBoardView.PLAYER_COLORS[player]
                 contentDescription = "Player ${player + 1} dice"
                 onRoll = {
                     if (player == currentPlayer &&

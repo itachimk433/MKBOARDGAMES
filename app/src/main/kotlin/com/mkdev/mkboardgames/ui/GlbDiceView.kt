@@ -5,7 +5,6 @@ import android.content.res.AssetManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
-import android.graphics.PixelFormat
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
 import android.opengl.GLUtils
@@ -14,12 +13,14 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.view.MotionEvent
+import android.view.View
 import android.view.ViewGroup
 import android.view.animation.LinearInterpolator
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
 import android.widget.FrameLayout
+import com.mkdev.mkboardgames.SettingsManager
 import org.json.JSONObject
 import java.io.InputStream
 import java.nio.ByteBuffer
@@ -44,22 +45,34 @@ private const val DICE_ROLL_SCALE = 1.3965f
 private const val DICE_LANDING_SCALE_PROGRESS = 0.9f
 private const val ROLL_DURATION_MS = 656L
 private const val TUMBLE_DEGREES_MULTIPLIER = 12f
+private const val GL_STARTUP_TIMEOUT_MS = 2500L
 
 /**
  * OpenGL ES renderer for the supplied embedded glTF dice model.
  */
 class GlbDiceView(context: Context) : FrameLayout(context) {
     private val glSurfaceView = GLSurfaceView(context)
+    private val fallbackDiceView = LudoDiceView(context)
+    private var usingFallbackDice = !SettingsManager.is3DDiceEnabled(context)
+    private var gameplayVisible = true
+    private var attachedToWindow = false
 
     var value: Int = 1
         set(newValue) {
             field = newValue.coerceIn(1, 6)
+            fallbackDiceView.value = field
+        }
+    var accentColor: Int = Color.WHITE
+        set(newColor) {
+            field = newColor
+            fallbackDiceView.accentColor = newColor
         }
     var facesOppositeSide: Boolean = false
         set(value) {
             field = value
+            fallbackDiceView.facesOppositeSide = value
             glRenderer.setFacingRotation(if (value) 180f else 0f)
-            glSurfaceView.requestRender()
+            if (!usingFallbackDice) glSurfaceView.requestRender()
         }
     var isRolling: Boolean = false
         private set
@@ -73,28 +86,54 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
     private var currentOrientation = Quat.fromEulerDegrees(-18f, -28f, 0f)
     private var rollProgress = 0f
     private var animatorPausedForHost = false
-    private val glRenderer = DiceRenderer(context.applicationContext)
+    private var pendingRollCompletion: (() -> Unit)? = null
+    private var pendingRollTargetValue = 1
+    private val glRenderer = DiceRenderer(
+        context = context.applicationContext,
+        onUnavailable = { activateFallbackDice() },
+    )
+    private val glStartupWatchdog = Runnable {
+        if (!usingFallbackDice && !glRenderer.hasRenderedFrame()) {
+            activateFallbackDice()
+        }
+    }
 
     init {
-        setBackgroundColor(Color.TRANSPARENT)
+        setBackgroundColor(Color.rgb(10, 18, 27))
         glSurfaceView.setEGLContextClientVersion(2)
-        glSurfaceView.setEGLConfigChooser(8, 8, 8, 8, 16, 0)
-        glSurfaceView.holder.setFormat(PixelFormat.TRANSLUCENT)
-        glSurfaceView.setZOrderOnTop(true)
-        glSurfaceView.setRenderer(glRenderer)
-        glRenderer.setAnimationScale(DICE_IDLE_SCALE)
-        // The die is static between rolls. Render continuously only while a
-        // roll is active so the animation can display every frame, then return
-        // to on-demand rendering for idle dice.
-        glSurfaceView.renderMode = GLSurfaceView.RENDERMODE_WHEN_DIRTY
-        glSurfaceView.isClickable = true
-        glSurfaceView.setOnTouchListener { view, event ->
-            if (event.actionMasked == MotionEvent.ACTION_UP && !isRolling) {
-                view.performClick()
+        glSurfaceView.setEGLConfigChooser(8, 8, 8, 0, 16, 0)
+        fallbackDiceView.visibility = if (usingFallbackDice) View.VISIBLE else View.INVISIBLE
+        fallbackDiceView.onRoll = {
+            if (!isRolling) {
+                performClick()
                 onRoll?.invoke()
             }
-            true
         }
+        if (!usingFallbackDice) {
+            glSurfaceView.setRenderer(glRenderer)
+            glRenderer.setAnimationScale(DICE_IDLE_SCALE)
+            // The die is static between rolls. Render continuously only while
+            // a roll is active so the animation can display every frame, then
+            // return to on-demand rendering for idle dice.
+            glSurfaceView.renderMode = GLSurfaceView.RENDERMODE_WHEN_DIRTY
+            glSurfaceView.isClickable = true
+            glSurfaceView.setOnTouchListener { view, event ->
+                if (event.actionMasked == MotionEvent.ACTION_UP && !isRolling) {
+                    view.performClick()
+                    onRoll?.invoke()
+                }
+                true
+            }
+        } else {
+            glSurfaceView.visibility = View.GONE
+        }
+        addView(
+            fallbackDiceView,
+            LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+            ),
+        )
         addView(
             glSurfaceView,
             LayoutParams(
@@ -115,6 +154,21 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         rollProgress = 0f
 
         val targetValue = nextValue.coerceIn(1, 6)
+        pendingRollTargetValue = targetValue
+        pendingRollCompletion = onFinished
+        if (usingFallbackDice) {
+            fallbackDiceView.rollTo(targetValue, motionDirection) {
+                if (generation != rollGeneration) return@rollTo
+                value = targetValue
+                isRolling = false
+                animator = null
+                val completion = pendingRollCompletion
+                pendingRollCompletion = null
+                completion?.invoke()
+            }
+            return
+        }
+
         val startOrientation = currentOrientation
         val targetOrientation = DiceOrientation.forValue(targetValue)
         val rollPath = RollPath.from(
@@ -158,7 +212,11 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
                     // previous face on a busy device.
                     requestFrameAndNotify {
                         glSurfaceView.renderMode = GLSurfaceView.RENDERMODE_WHEN_DIRTY
-                        if (generation == rollGeneration) onFinished()
+                        if (generation == rollGeneration) {
+                            val completion = pendingRollCompletion
+                            pendingRollCompletion = null
+                            completion?.invoke()
+                        }
                     }
                 }
             })
@@ -189,6 +247,11 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         animatorPausedForHost = false
         isRolling = false
         rollProgress = 0f
+        pendingRollCompletion = null
+        if (usingFallbackDice) {
+            fallbackDiceView.cancelRoll()
+            return
+        }
         glRenderer.clearFrameCallback()
         glRenderer.setAnimationScale(DICE_IDLE_SCALE)
         glRenderer.setRotation(currentOrientation)
@@ -202,6 +265,10 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
      * die cannot lose animation time while its GL thread is paused.
      */
     fun onHostPause() {
+        if (usingFallbackDice) {
+            fallbackDiceView.onHostPause()
+            return
+        }
         if (isRolling && animator != null) {
             animator?.pause()
             animatorPausedForHost = true
@@ -210,6 +277,10 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
     }
 
     fun onHostResume() {
+        if (usingFallbackDice) {
+            fallbackDiceView.onHostResume()
+            return
+        }
         glSurfaceView.onResume()
         glRenderer.setAnimationScale(
             if (isRolling) scaleForRollProgress(rollProgress) else DICE_IDLE_SCALE,
@@ -230,12 +301,48 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         }
 
     /**
-     * GLSurfaceView can remain above its parent when it uses z-order-on-top.
-     * Dialog transitions must hide the surface itself, not just this container.
+     * Hide the actual active dice child during dialog transitions. This matters
+     * because the GL path uses a separate SurfaceView surface.
      */
     fun setGameplayVisible(visible: Boolean) {
-        glSurfaceView.visibility = if (visible) VISIBLE else INVISIBLE
-        if (visible) glSurfaceView.requestRender()
+        gameplayVisible = visible
+        removeCallbacks(glStartupWatchdog)
+        if (usingFallbackDice) {
+            fallbackDiceView.visibility = if (visible) VISIBLE else INVISIBLE
+        } else {
+            glSurfaceView.visibility = if (visible) VISIBLE else INVISIBLE
+            if (visible && attachedToWindow) {
+                glSurfaceView.requestRender()
+                postDelayed(glStartupWatchdog, GL_STARTUP_TIMEOUT_MS)
+            }
+        }
+    }
+
+    private fun activateFallbackDice() {
+        if (usingFallbackDice) return
+        post {
+            if (usingFallbackDice) return@post
+            if (!attachedToWindow) return@post
+            usingFallbackDice = true
+            rollGeneration++
+            animator?.cancel()
+            animator = null
+            isRolling = false
+            glRenderer.clearFrameCallback()
+            fallbackDiceView.value = value
+            val completion = pendingRollCompletion
+            pendingRollCompletion = null
+            if (completion != null) {
+                value = pendingRollTargetValue
+                fallbackDiceView.value = pendingRollTargetValue
+            }
+            fallbackDiceView.accentColor = accentColor
+            fallbackDiceView.facesOppositeSide = facesOppositeSide
+            glSurfaceView.visibility = View.GONE
+            fallbackDiceView.visibility = if (gameplayVisible) View.VISIBLE else View.INVISIBLE
+            Log.w(TAG, "3D dice unavailable; using software fallback dice")
+            completion?.invoke()
+        }
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
@@ -252,12 +359,24 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
     }
 
     override fun onDetachedFromWindow() {
+        attachedToWindow = false
+        removeCallbacks(glStartupWatchdog)
         cancelRoll()
         super.onDetachedFromWindow()
     }
 
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        attachedToWindow = true
+        if (!usingFallbackDice && gameplayVisible) {
+            removeCallbacks(glStartupWatchdog)
+            postDelayed(glStartupWatchdog, GL_STARTUP_TIMEOUT_MS)
+        }
+    }
+
     private class DiceRenderer(
         private val context: Context,
+        private val onUnavailable: () -> Unit,
     ) : GLSurfaceView.Renderer {
         private val mainHandler = Handler(Looper.getMainLooper())
         private var model: GltfModel? = null
@@ -278,6 +397,8 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         @Volatile private var facingRotation = 0f
         @Volatile private var animationScale = DICE_IDLE_SCALE
         @Volatile private var frameRenderedCallback: (() -> Unit)? = null
+        @Volatile private var firstFrameRendered = false
+        private var unavailableReported = false
 
         fun setRotation(value: Quat) {
             orientation = value.normalized()
@@ -299,6 +420,8 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
             frameRenderedCallback = null
         }
 
+        fun hasRenderedFrame(): Boolean = firstFrameRendered
+
         private fun notifyFrameRendered() {
             val callback = frameRenderedCallback ?: return
             frameRenderedCallback = null
@@ -306,30 +429,41 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         }
 
         override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
-            GLES20.glClearColor(0f, 0f, 0f, 0f)
-            GLES20.glEnable(GLES20.GL_DEPTH_TEST)
-            GLES20.glDisable(GLES20.GL_CULL_FACE)
+            firstFrameRendered = false
+            try {
+                // Keep the surface opaque and in the normal view hierarchy.
+                // Transparent, always-on-top SurfaceViews are unreliable on
+                // some newer Android/GPU combinations.
+                GLES20.glClearColor(10f / 255f, 18f / 255f, 27f / 255f, 1f)
+                GLES20.glEnable(GLES20.GL_DEPTH_TEST)
+                GLES20.glDisable(GLES20.GL_CULL_FACE)
 
-            program = createProgram(VERTEX_SHADER, FRAGMENT_SHADER)
-            positionHandle = GLES20.glGetAttribLocation(program, "aPosition")
-            normalHandle = GLES20.glGetAttribLocation(program, "aNormal")
-            texCoordHandle = GLES20.glGetAttribLocation(program, "aTexCoord")
-            mvpHandle = GLES20.glGetUniformLocation(program, "uMvp")
-            modelHandle = GLES20.glGetUniformLocation(program, "uModel")
-            textureHandle = GLES20.glGetUniformLocation(program, "uTexture")
-            useTextureHandle = GLES20.glGetUniformLocation(program, "uUseTexture")
-            baseColorHandle = GLES20.glGetUniformLocation(program, "uBaseColor")
+                program = createProgram(VERTEX_SHADER, FRAGMENT_SHADER)
+                positionHandle = GLES20.glGetAttribLocation(program, "aPosition")
+                normalHandle = GLES20.glGetAttribLocation(program, "aNormal")
+                texCoordHandle = GLES20.glGetAttribLocation(program, "aTexCoord")
+                mvpHandle = GLES20.glGetUniformLocation(program, "uMvp")
+                modelHandle = GLES20.glGetUniformLocation(program, "uModel")
+                textureHandle = GLES20.glGetUniformLocation(program, "uTexture")
+                useTextureHandle = GLES20.glGetUniformLocation(program, "uUseTexture")
+                baseColorHandle = GLES20.glGetUniformLocation(program, "uBaseColor")
 
-            model = try {
-                GltfModel.load(context.assets, MODEL_ASSET)
+                model = GltfModel.load(context.assets, MODEL_ASSET)
+                model?.uploadTextures()
             } catch (error: Exception) {
-                Log.e(TAG, "Unable to load Ludo dice model", error)
-                null
+                reportUnavailable(error)
             }
-            model?.uploadTextures()
         }
 
         override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
+            try {
+                configureSurface(width, height)
+            } catch (error: Exception) {
+                reportUnavailable(error)
+            }
+        }
+
+        private fun configureSurface(width: Int, height: Int) {
             this.width = width.coerceAtLeast(1)
             this.height = height.coerceAtLeast(1)
             GLES20.glViewport(0, 0, this.width, this.height)
@@ -351,6 +485,14 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         }
 
         override fun onDrawFrame(gl: GL10?) {
+            try {
+                drawFrame()
+            } catch (error: Exception) {
+                reportUnavailable(error)
+            }
+        }
+
+        private fun drawFrame() {
             GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
             val currentModel = model
             if (currentModel == null) {
@@ -438,7 +580,16 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
             GLES20.glDisableVertexAttribArray(positionHandle)
             GLES20.glDisableVertexAttribArray(normalHandle)
             GLES20.glDisableVertexAttribArray(texCoordHandle)
+            firstFrameRendered = true
             notifyFrameRendered()
+        }
+
+        private fun reportUnavailable(error: Exception) {
+            model = null
+            if (unavailableReported) return
+            unavailableReported = true
+            Log.e(TAG, "Unable to initialize Ludo dice renderer", error)
+            mainHandler.post(onUnavailable)
         }
 
         private fun createProgram(vertexSource: String, fragmentSource: String): Int {

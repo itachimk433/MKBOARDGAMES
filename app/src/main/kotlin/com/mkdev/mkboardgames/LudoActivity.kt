@@ -214,6 +214,7 @@ class LudoActivity : AppCompatActivity() {
         )
         playerDiceViews = Array(LudoSetup.PLAYER_COUNT) { player ->
             GlbDiceView(this).apply {
+                accentColor = LudoSetup.PLAYER_COLORS[player]
                 contentDescription = "${LudoSetup.PLAYER_NAMES[player]} die"
                 onRoll = {
                     if (player == LudoSetup.playerFromState(state) &&

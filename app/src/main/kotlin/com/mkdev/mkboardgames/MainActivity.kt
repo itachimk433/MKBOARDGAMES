@@ -1069,6 +1069,16 @@ class MainActivity : AppCompatActivity() {
         }
         root.addView(movSoundRow)
 
+        var use3DDice = SettingsManager.is3DDiceEnabled(ctx)
+        val (diceRow, diceVal) =
+            settingRow("◇", "Use 3D Dice", if (use3DDice) "On" else "Off")
+        diceRow.setOnClickListener {
+            use3DDice = !use3DDice
+            SettingsManager.set3DDiceEnabled(ctx, use3DDice)
+            diceVal.text = if (use3DDice) "On" else "Off"
+        }
+        root.addView(diceRow)
+
         var helperEnabled = SettingsManager.getHelper(ctx)
         val (helperRow, helperVal) =
             settingRow("💡", "Helper", if (helperEnabled) "On" else "Off")
