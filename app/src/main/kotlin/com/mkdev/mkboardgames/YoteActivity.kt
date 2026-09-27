@@ -377,7 +377,6 @@ class YoteActivity : AppCompatActivity() {
             return
         }
         MusicPlayer.enterPausedMatch(this)
-        boardView.isLocked = true
         autoplayEnabled = false
         autoplayButton.setAutoplayEnabled(false, animate = false)
         showChoiceOverlay(

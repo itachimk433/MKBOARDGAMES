@@ -430,7 +430,6 @@ class MancalaActivity : AppCompatActivity() {
         }
         MusicPlayer.enterPausedMatch(this)
         stopAutomatedGameplay()
-        boardView.isLocked = true
         showChoiceOverlay(
             "Game Menu",
             "What would you like to do?",
