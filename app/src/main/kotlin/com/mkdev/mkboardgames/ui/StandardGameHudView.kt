@@ -29,6 +29,7 @@ class StandardGameHudView(
     private val showHintControl: Boolean = false,
     private val showMenuControl: Boolean = true,
     private val stackInfoBelowControls: Boolean = false,
+    private val drawBackground: Boolean = true,
 ) : View(context) {
     var onBack: (() -> Unit)? = null
     var onUndo: (() -> Unit)? = null
@@ -218,8 +219,10 @@ class StandardGameHudView(
     }
 
     override fun onDraw(canvas: Canvas) {
-        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
-        canvas.drawRect(0f, height - dp, width.toFloat(), height.toFloat(), divPaint)
+        if (drawBackground) {
+            canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
+            canvas.drawRect(0f, height - dp, width.toFloat(), height.toFloat(), divPaint)
+        }
         val radius = 5f * dp
         val controls = if (showHistoryControls) {
             listOf(backRect, undoRect, redoRect) +

@@ -90,6 +90,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
             this,
             showHistoryControls = false,
             showMenuControl = false,
+            drawBackground = false,
         ).apply {
             onBack = { onBackPressed() }
         }
@@ -104,9 +105,7 @@ class SnakesLaddersActivity : AppCompatActivity() {
             setBackgroundColor(android.graphics.Color.TRANSPARENT)
             addView(
                 boardStage,
-                FrameLayout.LayoutParams(-1, -1).apply {
-                    topMargin = hudHeight
-                },
+                FrameLayout.LayoutParams(-1, -1),
             )
             addView(hudView, FrameLayout.LayoutParams(-1, hudHeight, android.view.Gravity.TOP))
         }

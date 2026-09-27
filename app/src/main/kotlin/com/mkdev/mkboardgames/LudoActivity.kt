@@ -130,6 +130,7 @@ class LudoActivity : AppCompatActivity() {
             this,
             showHistoryControls = false,
             showMenuControl = false,
+            drawBackground = false,
         ).apply {
             onBack = { onBackPressed() }
         }
@@ -138,9 +139,7 @@ class LudoActivity : AppCompatActivity() {
             FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT,
-            ).apply {
-                topMargin = hudHeight
-            },
+            ),
         )
         overlay.addView(
             hudView,
