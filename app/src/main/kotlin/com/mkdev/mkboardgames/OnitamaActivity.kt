@@ -655,6 +655,18 @@ class OnitamaActivity : AppCompatActivity() {
         if (::autoplayButton.isInitialized) autoplayButton.setAutoplayEnabled(false, animate = false)
     }
 
+    private fun pauseAutomatedGameplayForLifecycle() {
+        aiRequestToken++
+        aiJob?.cancel()
+        aiJob = null
+        scope.coroutineContext.cancelChildren()
+        if (::boardView.isInitialized) {
+            if (boardView.hasPendingMoveAnimation()) boardView.pauseMoveAnimation()
+            else boardView.isLocked = false
+        }
+        if (::hudView.isInitialized) hudView.setThinking(false)
+    }
+
     override fun onResume() {
         super.onResume()
         activityResumed = true
@@ -668,6 +680,8 @@ class OnitamaActivity : AppCompatActivity() {
     }
 
     override fun onPause() {
+        activityResumed = false
+        pauseAutomatedGameplayForLifecycle()
         if (!isFinishing) savePausedMatch()
         super.onPause()
     }

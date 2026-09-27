@@ -312,6 +312,7 @@ class LudoActivity : AppCompatActivity() {
     }
 
     override fun onPause() {
+        lifecycleActive = false
         if (::playerDiceViews.isInitialized) {
             playerDiceViews.forEach { it.onHostPause() }
         }

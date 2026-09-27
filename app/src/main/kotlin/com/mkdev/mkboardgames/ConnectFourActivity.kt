@@ -148,6 +148,8 @@ class ConnectFourActivity : AppCompatActivity() {
     }
 
     override fun onPause() {
+        activityResumed = false
+        pauseAutomatedGameplayForLifecycle()
         SoundPlayer.stopAll()
         if (!isFinishing) savePausedMatch()
         super.onPause()
@@ -770,6 +772,7 @@ Control the centre columns, build threats in more than one direction, and block 
             MusicPlayer.resumeMatch(this)
         }
         gameRoot.visibility = View.VISIBLE
+        boardView.isLocked = gameState.status != GameStatus.IN_PROGRESS
         if (resumeAi) resumeComputerTurnIfNeeded()
     }
 

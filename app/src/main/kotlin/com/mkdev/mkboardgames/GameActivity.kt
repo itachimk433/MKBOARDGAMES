@@ -305,6 +305,8 @@ class GameActivity : AppCompatActivity() {
     }
 
     override fun onPause() {
+        activityResumed = false
+        pauseAutomatedGameplayForLifecycle()
         SoundPlayer.stopAll()
         if (!isFinishing) savePausedMatch()
         super.onPause()
@@ -1248,6 +1250,7 @@ Checkmate your opponent's King.
         if (matchStarted && gameState.status == GameStatus.IN_PROGRESS) {
             MusicPlayer.resumeMatch(this)
         }
+        boardView.isLocked = gameState.status != GameStatus.IN_PROGRESS
         if (resumeAi) resumeComputerTurnIfNeeded()
     }
 

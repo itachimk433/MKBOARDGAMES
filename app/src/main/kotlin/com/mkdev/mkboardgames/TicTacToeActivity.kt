@@ -150,6 +150,8 @@ class TicTacToeActivity : AppCompatActivity() {
         resumeComputerTurnIfNeeded()
     }
     override fun onPause() {
+        activityResumed = false
+        pauseAutomatedGameplayForLifecycle()
         SoundPlayer.stopAll()
         if (!isFinishing) savePausedMatch()
         super.onPause()
@@ -189,6 +191,12 @@ class TicTacToeActivity : AppCompatActivity() {
         if (::autoplayButton.isInitialized) {
             autoplayButton.setAutoplayEnabled(false, animate = false)
         }
+    }
+
+    private fun pauseAutomatedGameplayForLifecycle() {
+        scope.coroutineContext.cancelChildren()
+        if (::boardView.isInitialized) boardView.isLocked = false
+        if (::hudView.isInitialized) hudView.setThinking(false)
     }
 
     @Deprecated("Deprecated in Java")
@@ -756,6 +764,7 @@ Strategy
             MusicPlayer.resumeMatch(this)
         }
         gameRoot.visibility = View.VISIBLE
+        boardView.isLocked = gameState.status != GameStatus.IN_PROGRESS
         if (resumeAi) resumeComputerTurnIfNeeded()
     }
 

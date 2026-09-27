@@ -170,6 +170,8 @@ class MorabarabaActivity : AppCompatActivity() {
     }
 
     override fun onPause() {
+        activityResumed = false
+        pauseAutomatedGameplayForLifecycle()
         SoundPlayer.stopAll()
         if (!isFinishing) savePausedMatch()
         super.onPause()
@@ -965,6 +967,7 @@ You win by either:
             MusicPlayer.resumeMatch(this)
         }
         gameRoot.visibility = View.VISIBLE
+        boardView.isLocked = gameState.status != GameStatus.IN_PROGRESS
         if (resumeAi) resumeComputerTurnIfNeeded()
     }
 
