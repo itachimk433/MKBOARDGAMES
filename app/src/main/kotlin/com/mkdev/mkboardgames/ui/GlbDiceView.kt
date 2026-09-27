@@ -13,6 +13,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.view.MotionEvent
+import android.graphics.PixelFormat
 import android.view.View
 import android.view.ViewGroup
 import android.view.animation.LinearInterpolator
@@ -99,9 +100,17 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
     }
 
     init {
-        setBackgroundColor(Color.rgb(10, 18, 27))
+        // The die is composited over the board. Keeping this container
+        // transparent prevents a rectangular panel from covering the artwork
+        // around the die when the OpenGL path is active.
+        setBackgroundColor(Color.TRANSPARENT)
         glSurfaceView.setEGLContextClientVersion(2)
-        glSurfaceView.setEGLConfigChooser(8, 8, 8, 0, 16, 0)
+        // GLSurfaceView uses an opaque surface unless both the EGL config and
+        // the native surface request an alpha channel. This setup is supported
+        // on Android 13+ and lets the board show through the cleared pixels.
+        glSurfaceView.setEGLConfigChooser(8, 8, 8, 8, 16, 0)
+        glSurfaceView.holder.setFormat(PixelFormat.TRANSLUCENT)
+        glSurfaceView.setZOrderOnTop(true)
         fallbackDiceView.visibility = if (usingFallbackDice) View.VISIBLE else View.INVISIBLE
         fallbackDiceView.onRoll = {
             if (!isRolling) {
@@ -431,10 +440,9 @@ class GlbDiceView(context: Context) : FrameLayout(context) {
         override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
             firstFrameRendered = false
             try {
-                // Keep the surface opaque and in the normal view hierarchy.
-                // Transparent, always-on-top SurfaceViews are unreliable on
-                // some newer Android/GPU combinations.
-                GLES20.glClearColor(10f / 255f, 18f / 255f, 27f / 255f, 1f)
+                // Only the die geometry should contribute pixels. The
+                // transparent clear lets the board remain visible around it.
+                GLES20.glClearColor(0f, 0f, 0f, 0f)
                 GLES20.glEnable(GLES20.GL_DEPTH_TEST)
                 GLES20.glDisable(GLES20.GL_CULL_FACE)
 
