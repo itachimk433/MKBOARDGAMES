@@ -454,29 +454,25 @@ class MancalaActivity : AppCompatActivity() {
 
     private fun showMovementSpeedMenu() {
         val current = SettingsManager.getMancalaMovementSpeed(this)
-        val options = (1..4).map { multiplier ->
+        val options = (1..2).map { multiplier ->
             val label = "${multiplier}x${if (multiplier == current) "  ✓" else ""}"
             val detail = when (multiplier) {
                 1 -> "Relaxed stone movement"
-                2 -> "Balanced stone movement"
-                3 -> "Quick stone movement"
-                else -> "Fastest stone movement"
+                else -> "Balanced stone movement"
             }
             val symbol = "I".repeat(multiplier)
             StyledDialogs.choice(label, detail, symbol, "#8EC7B9")
-        } + StyledDialogs.choice("Back", "Return to the game menu", "↩", "#A9B6E8")
+        }
         showChoiceOverlay(
             "Movement Speed",
             "Choose how quickly stones move around the board.",
             options,
             onCancel = { showMenu() },
         ) { which ->
-            if (which in 0..3) {
+            if (which in 0..1) {
                 val multiplier = which + 1
                 SettingsManager.setMancalaMovementSpeed(this, multiplier)
                 movementSpeedMultiplier = multiplier.toFloat()
-                showMenu()
-            } else {
                 showMenu()
             }
         }

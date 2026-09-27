@@ -23,12 +23,14 @@ import com.mkdev.mkboardgames.ui.SnakesLaddersBoardSelectionView
 import com.mkdev.mkboardgames.ui.SnakesLaddersEntryRule
 import com.mkdev.mkboardgames.ui.StyledDialogs
 import com.mkdev.mkboardgames.ui.SnakesLaddersGameOverView
+import com.mkdev.mkboardgames.ui.StandardGameHudView
 import kotlin.random.Random
 
 class SnakesLaddersActivity : AppCompatActivity() {
     private lateinit var gameRoot: FrameLayout
     private lateinit var boardView: SnakesLaddersBoardView
     private lateinit var boardStage: FrameLayout
+    private lateinit var hudView: StandardGameHudView
     private lateinit var screenRoot: FrameLayout
     private lateinit var boardBackdropView: ImageView
     private lateinit var fireworksView: FireworksView
@@ -83,6 +85,14 @@ class SnakesLaddersActivity : AppCompatActivity() {
                 },
             )
         }
+        val hudHeight = (60 * resources.displayMetrics.density).toInt()
+        hudView = StandardGameHudView(
+            this,
+            showHistoryControls = false,
+            showMenuControl = false,
+        ).apply {
+            onBack = { onBackPressed() }
+        }
         boardBackdropView = ImageView(this).apply {
             scaleType = ImageView.ScaleType.CENTER_CROP
             setImageBitmap(loadAssetBitmap("snakes_ladders_board_two_background.webp"))
@@ -92,7 +102,13 @@ class SnakesLaddersActivity : AppCompatActivity() {
         }
         gameRoot = FrameLayout(this).apply {
             setBackgroundColor(android.graphics.Color.TRANSPARENT)
-            addView(boardStage, FrameLayout.LayoutParams(-1, -1))
+            addView(
+                boardStage,
+                FrameLayout.LayoutParams(-1, -1).apply {
+                    topMargin = hudHeight
+                },
+            )
+            addView(hudView, FrameLayout.LayoutParams(-1, hudHeight, android.view.Gravity.TOP))
         }
         AdManager.attachBannerOverlay(gameRoot)
         gameRoot.visibility = View.GONE

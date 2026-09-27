@@ -44,6 +44,7 @@ import com.mkdev.mkboardgames.ui.BoardSelectionOption
 import com.mkdev.mkboardgames.ui.BoardSelectionView
 import com.mkdev.mkboardgames.ui.ChessMenuView
 import com.mkdev.mkboardgames.ui.LudoMatchBackgroundView
+import com.mkdev.mkboardgames.ui.StandardGameHudView
 import com.mkdev.mkboardgames.ui.StyledDialogs
 import kotlin.math.roundToInt
 import kotlin.random.Random
@@ -54,6 +55,7 @@ class LudoActivity : AppCompatActivity() {
     private lateinit var playerDiceViews: Array<GlbDiceView>
     private lateinit var playerBadgeViews: Array<LudoPlayerBadgeView>
     private lateinit var playerControlViews: Array<LudoPlayerControlView>
+    private lateinit var hudView: StandardGameHudView
     private lateinit var turnView: TextView
     private lateinit var economyView: TextView
     private lateinit var storeView: TextView
@@ -96,6 +98,7 @@ class LudoActivity : AppCompatActivity() {
         SettingsManager.activateGameTheme(this, "ludo")
 
         val dp = resources.displayMetrics.density
+        val hudHeight = (60 * dp).toInt()
         val contentRoot = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding((8 * dp).toInt(), (8 * dp).toInt(), (8 * dp).toInt(), (6 * dp).toInt())
@@ -123,10 +126,30 @@ class LudoActivity : AppCompatActivity() {
                 ViewGroup.LayoutParams.MATCH_PARENT,
             ),
         )
-        overlay.addView(contentRoot, FrameLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.MATCH_PARENT,
-        ))
+        hudView = StandardGameHudView(
+            this,
+            showHistoryControls = false,
+            showMenuControl = false,
+        ).apply {
+            onBack = { onBackPressed() }
+        }
+        overlay.addView(
+            contentRoot,
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+            ).apply {
+                topMargin = hudHeight
+            },
+        )
+        overlay.addView(
+            hudView,
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                hudHeight,
+                Gravity.TOP,
+            ),
+        )
         notificationHost = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.END

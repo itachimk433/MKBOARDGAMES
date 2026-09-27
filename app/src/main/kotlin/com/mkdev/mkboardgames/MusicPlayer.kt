@@ -241,7 +241,7 @@ object MusicPlayer {
     }
 
     private fun nextGlobalTrack(): Int {
-        val candidates = intArrayOf(MUSIC_1_TRACK, MUSIC_2_TRACK, MUSIC_3_TRACK)
+        val candidates = intArrayOf(MUSIC_2_TRACK, MUSIC_3_TRACK)
         return candidates.filter { it != globalTrack }.random()
     }
 
